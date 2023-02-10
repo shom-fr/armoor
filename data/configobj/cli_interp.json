@@ -1,0 +1,22 @@
+{
+  "functionality": 1,
+  "observation": {
+    "name": "SST L3",
+    "path": "../../shared_data/example/obs_test_ergane.nc",
+    "method": "nearest"
+  },
+  "models": [
+    {"name": "NEMO", "path": "../../shared_data/example/sst_2D.nc", "method": "linear"},
+    {"name": "NEMO", "path": "../../shared_data/example/sst_2D.nc", "method": "nearest"}
+  ],
+  "meta-zones": {
+    "name": "Meta-zone",
+    "cloud": [[-5.75, 48.5], [-5.5, 48.5],[-5.25, 48.5], [-5.75, 48.25], [-5.5, 48.25],[-5.25, 48.25], [-5.75, 48.0], [-5.5, 48.0],[-5.25, 48.0]]
+  },
+  "outputs": [{"plot": "diag_disp", "attribute": "SST"},
+              {"plot": "diag_disp", "attribute": "blablba"},
+              {"plot": "plot_map_metr_biais", "colormap": "thermal", "vmin": 10, "vmax": 15},
+              {"plot": "plot_map_metr_RMSEc", "colormap": "thermal", "vmin": 10, "vmax": 15}
+  ],
+  "format": ["pdf", "html"]
+}

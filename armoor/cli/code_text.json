@@ -1,0 +1,298 @@
+{
+  "path_file" : {
+    "comment": "Reading arguments from config file (comments are useless for the code)",
+    "argument": "--file",
+    "type": "file_path",
+    "help": "path to config file"
+  },
+
+  "output_path" : {
+    "comment": "Output folder to store all plots",
+    "argument": "--output-path",
+    "type": "folder_path",
+    "help": "path to store outputs"
+  },
+
+  "functionality": {
+    "comment": "1 - Select functionality",
+    "argument": "--func",
+    "type": "str",
+    "choices": ["sst", "p_hydro", "still_p_hydro", "section_hydro", "clim_hydro", "surface_stream", "stream_ADCP", "stream_VM_ADCP", "drift_buoys"],
+    "help": "Select wanted functionality from this list : sst, p_hydro, still_p_hydro, section_hydro, clim_hydro, surface_stream, stream_ADCP, stream_VM_ADCP, drift_buoys"
+  },
+
+
+  "colocate": {
+    "comment": "0 - Select colocating ",
+    "argument": "--colocate",
+    "type": "str",
+    "choices": ["auto", "model", "observation"],
+    "default": "auto",
+    "help": "Select colocation target"
+  },
+
+
+  "observation": {
+    "comment": "# 2 - Select observation",
+    "argument": "--observation",
+    "type": "file_path",
+    "help": "path to the observation file"
+  },
+
+
+  "obs_name": {
+    "comment": "# 2.1 - Set observation name",
+    "argument": "--obs-name",
+    "type": "str",
+    "default": "Observation",
+    "help": "custom name for the observation"
+  },
+  "obs_method": {
+    "comment": "# 2.3 - Set observation selection methode",
+    "argument": "--obs-method",
+    "type": "str",
+    "choices": ["nearest", "linear"],
+    "help": "Select colocation method"
+  },
+  "obs_method_z": {
+    "comment": "# 2.3 - Set observation selection methode",
+    "argument": "--obs-method-z",
+    "type": "str",
+    "choices": ["nearest", "linear"],
+    "help": "Select colocation method on z axis"
+  },
+    "obs_type": {
+    "comment": "# 2.4 - obs-type",
+    "argument": "--obs-type",
+    "type": "str",
+    "choices": ["LADCP", "VMADCP", "mouillage"],
+    "help": "type of ADCP observation data"
+  },
+
+
+  "models": {
+    "comment": "# 3 - Select models",
+    "argument": "--models",
+    "type": "file_path",
+    "nargs": "+",
+    "help": "path to the model files"
+  },
+  "mod_names": {
+    "comment": "# 3.1 - Set models names",
+    "argument": "--mod-names",
+    "type": "str",
+    "nargs": "+",
+    "help": "names of models in the same order as their paths"
+  },
+  "mod_methods": {
+    "comment": "# 3.2 - Set observation selection methode",
+    "argument": "--mod-methods",
+    "type": "str",
+    "choices": ["nearest", "linear"],
+    "nargs": "+",
+    "help": "Select colocation method for models in the same order as their paths"
+  },
+  "mod_methods_z": {
+    "comment": "# 3.2 - Set observation selection methode_z",
+    "argument": "--mod-methods-z",
+    "type": "str",
+    "choices": ["nearest", "linear"],
+    "nargs": "+",
+    "help": "Select colocation method_z for models in the same order as their paths"
+  },
+    "mod_type": {
+    "comment": "# 3.3 - mod-type",
+    "argument": "--mod-type",
+    "type": "str",
+    "choices": ["HYCOM"],
+    "help": "type of model data"
+  },
+
+  "meta_name": {
+    "comment": "# 4 define meta-zone global name",
+    "argument": "--meta-name",
+    "type": "str",
+    "help": "name of the meta-zone"
+  },
+
+  "polygon": {
+    "comment": "# 4.1 - Select polygon meta-zone",
+    "argument": "--polygon",
+    "type": "coords",
+    "nargs": "+",
+    "help": "polygon meta-zone defined by a set of coordinates. For example : lon1=-2.72, lat1=47.20,  lat2=50.84, lon2=-4.74  etc simply type : --polygon 47.20,-2.72 50.84,-4.74 etc"
+  },
+
+  "cloud": {
+    "comment": "# 4.2 - Select cloud meta-zone",
+    "argument": "--cloud",
+    "type": "coords",
+    "nargs": "+",
+    "help": "cloud meta-zone defined by a set of coordinates. For example : lon1=-2.72, lat1=47.20,  lat2=50.84, lon2=-4.74  etc simply type : --cloud 47.20,-2.72 50.84,-4.74 etc"
+  },
+  "radius": {
+    "comment": "# 4.2.1 - Select cloud meta-zone",
+    "argument": "--radius",
+    "type": "float",
+    "help": "radius around the points to expand the considered area of the cloud "
+  },
+
+  "quality": {
+    "comment": "# 4.3 - Select quality of data",
+    "argument": "--quality",
+    "type": "int",
+    "nargs": "2",
+    "help": "minimum and maximum quality of data to take into account "
+  },
+
+  "depth": {
+    "comment": "# 4.3 - Select depth(s)",
+    "argument": "--depth",
+    "type": "float",
+    "nargs": "+",
+    "help": "One, two or three arguments are allowed : One argument (depth); two arguments (start_depth, end_depth); three arguments (start_depth, end_depth, step)"
+  },
+  "density": {
+    "comment": "# 4.3 - Select depth(s)",
+    "argument": "--density",
+    "type": "float",
+    "nargs": "+",
+    "help": "One, two or three arguments are allowed : One argument (density); two arguments (start_density, end_density); three arguments (start_density, end_density, step)"
+  },
+  "bathy": {
+    "comment": "# 4.3 - Select depth(s)",
+    "argument": "--bathy",
+    "type": "float",
+    "nargs": "2",
+    "help": "minimum and maximum bathymetric to take into account"
+  },
+
+  "start": {
+    "comment": "# 4.4 - Select a start time",
+    "argument": "--start",
+    "type": "str",
+    "help": "values kept from 'start' can be absolute or relative to today"
+  },
+  "end": {
+    "comment": "# 4.4.1 - Select a end time",
+    "argument": "--end",
+    "type": "str",
+    "help": "values kept until 'end' can be absolute or relative to today"
+  },
+  "frequency": {
+    "comment": "# 4.4.2 - Select a end time",
+    "argument": "--frequency",
+    "type": "str",
+    "help": "values kept at a given frequency stating at the first value of observation dataset"
+  },
+  "times": {
+    "comment": "# 4.4.3 - Select a list of times",
+    "argument": "--times",
+    "type": "str",
+    "nargs": "+",
+    "help": "list of times"
+  },
+  "time_highlight": {
+    "comment": "# 4.4.3 - Highlight a list of times on charts",
+    "argument": "--time-highlight",
+    "type": "str",
+    "nargs": "+",
+    "help": "list of times"
+  },
+  "time_restriction": {
+    "comment": "# 4.4.4 - Select restricted time in a day",
+    "argument": "--time-restriction",
+    "type": "int",
+    "nargs": "2",
+    "help": "restrict data to certain hours in the day"
+  },
+  "interval": {
+    "comment": "# 4.4.4 - group by interval ",
+    "argument": "--interval",
+    "type": "str",
+    "help": "group by interval to compute statistics"
+  },
+  "cyclic": {
+    "comment": "# 4.4.5 - Select restricted time in a day???????",
+    "argument": "--cyclic",
+    "type": "str",
+    "nargs": "+",
+    "help": "restrict data to certain period of the year"
+  },
+  "vars": {
+    "comment": "# 4.4.6 - Select attributes of interest",
+    "argument": "--vars",
+    "type": "str",
+    "nargs": "+",
+    "help": "restrict attributes of on the dataset"
+  },
+
+
+  "plot": {
+    "comment": "# 5 - Select output",
+    "argument": "--plot",
+    "type": "str",
+    "choices": ["plot_ts_metr_bias_interval", "plot_map_metr_biais", "plot_map_metr_ecart", "plot_ts_metr_RMSE_interval", "plot_ts_metr_ecart", "diag_disp", "disp_diag_g", "map", "time_series_p", "plot_map_metr_RMSEc"],
+    "help": "choose output"
+  },
+  "attribute": {
+    "comment": "# 5.1 - Select attribute to plot",
+    "argument": "--attribute",
+    "type": "str",
+    "help": "select attribute to plot"
+  },
+  "vmin": {
+    "comment": "# 5.2 - Select the minimum value on the colormap for the plot",
+    "argument": "--vmin",
+    "type": "float",
+    "help": "select the minimum value on the colormap for the plot"
+  },
+  "vmax": {
+    "comment": "# 5.2.1 - Select the maximum value on the colormap for the plot",
+    "argument": "--vmax",
+    "type": "float",
+    "help": "select the maximum value on the colormap for the plot"
+  },
+  "colormap": {
+    "comment": "# 5.3 - Select attribute to plot",
+    "argument": "--colormap",
+    "type": "str",
+    "help": "select colormap for the the plot"
+  },
+      "tidal_waves ": {
+    "comment": "# 5.4 - Select the tidal waves to calculate in the harmonic analysis",
+    "argument": "--waves",
+    "type": "str",
+    "help": "tidal waves for harmonic analysis"
+  },
+  "path_comodo" : {
+    "comment": "Folder to comodo tools",
+    "argument": "--comodo-path",
+    "type": "folder_path",
+    "help": "path to the comodo tools"
+  },
+    "path_results_tide" : {
+    "comment": "Folder where to save the files for the harmonic analysis",
+    "argument": "--result-path-tide",
+    "type": "folder_path",
+    "help": "path where to save the files for the harmonic analysis"
+  },
+    "path_results_traj" : {
+    "comment": "Folder where to save the files for the trajectory calculation",
+    "argument": "--result-path-traj",
+    "type": "folder_path",
+    "help": "path where to save the files for the trajectory calculation"
+  },
+    "traj_duration_plot" : {
+    "comment": "Duration in s of the trajectories to plot",
+    "argument": "--traj-duration-plot",
+    "type": "float",
+    "help": "duration in s of the trajectories to plot"
+  },
+    "traj_freq_plot" : {
+    "comment": "Frequency in s of simulated trajectories to plot",
+    "argument": "-ttraj-freq-plot",
+    "type": "float",
+    "help": "Frequency in s of simulated trajectories to plot"
+  }
+}

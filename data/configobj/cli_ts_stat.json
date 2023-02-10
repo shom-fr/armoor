@@ -1,0 +1,20 @@
+{
+  "functionality": 1,
+  "observation": {
+    "name": "SST L3",
+    "path": "../../shared_data/example/obs_test_ergane.nc",
+    "method": "nearest"
+  },
+  "models": [
+    {"name": "NEMO", "path": "../../shared_data/example/model_pour_test.nc", "method": "linear"}
+  ],
+  "meta-zones": {
+    "name": "Meta-zone",
+    "cloud": [[-4, 47], [-4.5, 47.5],[-5, 48], [-5.5, 48.5], [-6, 49]],
+    "radius" : 1.0,
+    "start": "2020-06-01T00:00:00.000000000",
+    "end": "2020-06-03T00:00:00.000000000"
+  },
+  "outputs": [{"plot": "plot_ts_metr_ecart"}],
+  "format": ["pdf", "html"]
+}

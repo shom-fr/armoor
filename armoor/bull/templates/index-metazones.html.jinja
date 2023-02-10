@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <title>{{report.title}}</title>
+    <style>
+        @page {
+            margin: 0;
+            padding-top: 3.5cm;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        div.break {
+            break-before: always;
+        }
+
+        ul {
+            list-style-type: none;
+        }
+
+        img.property-image {
+            max-height: 22cm;
+        }
+
+        .output-img {
+            text-align: center;
+        }
+
+        .no-margin {
+            margin: 0;
+        }
+
+        .small-margin-bottom {
+            margin-bottom: 0.5rem;
+        }
+
+        header>* {
+            position: fixed;
+            padding: 0.5cm;
+            top: -3.5cm;
+            height: 2.5cm;
+        }
+
+        header .logo {
+            left: 0;
+            width: 130px;
+        }
+
+        header .title {
+            margin: auto;
+            left: 150px;
+            width: 380px;
+        }
+
+        .index header .title {
+            width: 600px;
+        }
+
+        header .metazone-img {
+            right: 0;
+            width: 180px;
+        }
+
+        .body {
+            padding: 1cm;
+            box-decoration-break: clone
+        }
+
+        header img {
+            height: 100%;
+        }
+
+        h2,
+        h3,
+        h5 {
+            color: #002554;
+            position: relative;
+        }
+
+        .underline::after {
+            content: "";
+            background: #5bc2e7;
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+        }
+
+        h1.underline::after {
+            height: 10px;
+            width: 100px;
+        }
+
+        h2.underline::after {
+            height: 8px;
+            width: 80px;
+        }
+
+        h3.underline::after,
+        li.underline::after {
+            height: 5px;
+            width: 50px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="index">
+        <header>
+            <div class="logo">
+                <img src="logo_shom.png">
+            </div>
+
+            <div class="title">
+                <h2 class="underline">
+                    {{report.title}} - {{report.date}}
+                </h2>
+                <h3>
+                    Index des méta-zones
+                </h3>
+            </div>
+        </header>
+
+        <div class="body">
+
+            {% for metazone in report.metazones %}
+            <h3 class="underline">
+                {{metazone.properties.name}}
+            </h3>
+            <h4>
+                {{metazone.properties.description}}
+            </h4>
+            <div>
+                {% for property in metazone.properties %}
+                {% if property != 'name' and property != 'description' and property != 'path' %}
+
+                <b>{{meta_zone_desc[property]}}</b> {{metazone.properties[property]}}<br>
+
+                {% endif %}
+                {% endfor %}
+                {% if 'path' in metazone.properties %}
+                <img src="{{metazone.properties.path}}" class="property-image">
+                {% endif %}
+            </div>
+
+            {% endfor %}
+
+        </div>
+    </div>
+
+</body>
+
+</html>

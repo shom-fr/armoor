@@ -1,0 +1,176 @@
+"""
+Class report to generate reports
+"""
+
+import json
+import os
+import shutil
+import tempfile
+
+from jinja2 import Environment, FileSystemLoader
+from PyPDF2 import PdfMerger
+from weasyprint import HTML
+
+import logging
+logger = logging.getLogger(__name__)
+
+
+class Report:
+    """
+    Class to handle reports
+    """
+
+    def __init__(self, output_folder_path):
+        self.output_folder_path = f'{output_folder_path}sources/'
+        self.rootdir = os.path.abspath(os.path.dirname(__file__))
+        self.copy_logo()
+
+        with open(f'{self.output_folder_path}data.json', "r", encoding="utf-8") as file:
+            # returns JSON object as
+            # a dictionary
+            logger.info('Loading parameters from configuration file.')
+            self.data_report = json.load(file)
+            file.close()
+
+    def copy_logo(self):
+        """
+        Copy logo from env to sources folder
+        Returns
+        -------
+        None
+        """
+        src = f'{self.rootdir}/templates/logo_shom.png'
+        dst = f'{self.output_folder_path}logo_shom.png'
+        shutil.copyfile(src, dst)
+
+    def __format_metazone_properties(self, properties: dict, translations: dict) -> list:
+        """
+        Format the metazone's properties into a list of tuples
+        Parameters
+        ----------
+        properties : the properties to format
+        translations : the translations for the properties
+
+        Returns
+        ----------
+        formatted_properties : the list of tuples
+        """
+        formatted_properties = []
+        for entry in properties:
+            if entry not in ['description', 'path', 'name']:
+                translation = translations[entry]
+                translation = translation if translation else entry
+                formatted_properties.append(
+                    (translation, str(properties[entry])))
+        return formatted_properties
+
+    def __generate_pdf_report(self):
+        """
+        Generate the report in PDF format
+        """
+        logger.info('Creating pdf')
+        # Initialize Jinja
+        loader = FileSystemLoader(self.rootdir)
+        env = Environment(loader=loader)
+
+        # Create a temporary directory in the output folder
+        tmp_directory = tempfile.mkdtemp()
+
+        # The list of temporary pdf files
+        generated_pdfs = []
+
+        # Generate the report index
+        template = env.get_template('templates/index.html.jinja')
+        render = template.render(self.data_report)
+        html = HTML(string=render, base_url=self.output_folder_path)
+        output_pdf = tmp_directory + 'index.pdf'
+        html.write_pdf(target=output_pdf)
+        generated_pdfs.append(output_pdf)
+
+        # Generate the report metazones index
+        template = env.get_template('templates/index-metazones.html.jinja')
+        render = template.render(self.data_report)
+        html = HTML(string=render, base_url=self.output_folder_path)
+        output_pdf = tmp_directory + 'index-metazones.pdf'
+        html.write_pdf(target=output_pdf)
+        generated_pdfs.append(output_pdf)
+
+        # Generate each metazone
+        for index_metazone, metazone in enumerate(self.data_report['report']['metazones']):
+            # Render the metazone index
+            template = env.get_template('templates/metazone.html.jinja')
+            properties = self.__format_metazone_properties(metazone['properties'],
+                                                           self.data_report['meta_zone_desc']
+                                                           )
+            render = template.render(self.data_report,
+                                     metazone=metazone,
+                                     properties=properties
+                                     )
+
+            # Convert to PDF
+            html = HTML(string=render, base_url=self.output_folder_path)
+            output_pdf = tmp_directory + 'metazone' + \
+                str(index_metazone) + '.pdf'
+            html.write_pdf(target=output_pdf)
+            generated_pdfs.append(output_pdf)
+
+            # Then each functionalities
+            for index_functionality, functionality in enumerate(metazone['functionalities']):
+                template = env.get_template(
+                    'templates/functionality.html.jinja')
+                render = template.render(self.data_report,
+                                         metazone=metazone,
+                                         functionality=functionality
+                                         )
+
+                base_name = tmp_directory + 'metazone' + \
+                    str(index_metazone) + 'functionality' + \
+                    str(index_functionality)
+
+                html = HTML(string=render, base_url=self.output_folder_path)
+                html.write_pdf(target=base_name + '.pdf')
+                generated_pdfs.append(base_name + '.pdf')
+
+        # Merge the generated pdfs
+        merger = PdfMerger()
+        for pdf in generated_pdfs:
+            merger.append(pdf)
+        merger.write(self.output_folder_path + "../output.pdf")
+        merger.close()
+
+    def __generate_html_report(self):
+        """
+        Generate the report in HTML format report
+        """
+        logger.info('Creating html')
+        # Initialize Jinja
+        loader = FileSystemLoader(self.rootdir)
+        env = Environment(loader=loader)
+
+        # Get template
+        template = env.get_template('templates/raw-html.html.jinja')
+
+        # Render template
+        render = template.render(self.data_report)
+
+        with open(f'{self.output_folder_path}../report.html', "w", encoding="utf-8") as output:
+            output.write(render)
+            output.close()
+
+    def generate_report(self):
+        """
+        Select type of report to be made
+        Returns
+        -------
+        None
+        """
+        if self.data_report['report']['format'] == 'pdf':
+            self.__generate_pdf_report()
+        elif self.data_report['report']['format'] == 'html':
+            self.__generate_html_report()
+        elif self.data_report['report']['format'] == 'all':
+            self.__generate_pdf_report()
+            self.__generate_html_report()
+        else:
+            logger.error('Error: unexpected format')
+
