@@ -1,0 +1,8 @@
+/armoor/base/__pycache__/
+/armoor/cli/__pycache__/
+/entry_points/__pycache__/
+/docs/build/
+build/
+.eggs/
+armoor.egg-info/
+dist
