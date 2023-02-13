@@ -39,7 +39,6 @@ setup(
                              'tick/config/search_spec.ini',
                              'tick/config/forecaster_spec.ini',
                              'tick/config/forecaster.ini',
-                             'bull/bull_spec.ini',
                              'bull/templates/index.html.jinja',
                              'bull/templates/index-metazones.html.jinja',
                              'bull/templates/functionality.html.jinja',
@@ -47,7 +46,8 @@ setup(
                              'bull/templates/raw-html.html.jinja',
                              'bull/templates/logo_shom.png'
                              ],
-                  'config' : ['log.ini'],
+                  'config' : ['log.ini',
+                             'bull/spec.ini'],
                   'bin' : ['armoor',
                            'armoor-tick-create',
                            'armoor-tick-search',
