@@ -26,7 +26,6 @@ setup(
                  'bin': 'bin'
                  },
     package_data={'armoor': ['cli/code_text.json',
-                             'base/cf.cfg',
                              'bull/templates/index.html.jinja',
                              'bull/templates/index-metazones.html.jinja',
                              'bull/templates/functionality.html.jinja',
@@ -35,6 +34,7 @@ setup(
                              'bull/templates/logo_shom.png'
                              ],
                   'config' : ['log.ini',
+                              'base/cf.cfg',
                              'bull/spec.ini',
                              'cli/spec.ini',
                              'hmi/spec.ini',
