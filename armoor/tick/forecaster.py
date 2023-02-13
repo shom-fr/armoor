@@ -24,8 +24,8 @@ class Forecaster:
         self.authorized_user_group = ''
 
         rootdir = os.path.abspath(os.path.dirname(__file__))
-        cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "config/forecaster_spec.ini"))
-        self.cfg_forecaster = cfgm_forecaster.load(os.path.join(rootdir, "config/forecaster.ini"))
+        cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/forecaster_spec.ini"))
+        self.cfg_forecaster = cfgm_forecaster.load(os.path.join(rootdir, "../../config/tick/forecaster.ini"))
         self.initialization()
 
     def initialization(self):
