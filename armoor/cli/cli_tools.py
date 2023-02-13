@@ -11,7 +11,7 @@ from validate import Validator, VdtTypeError
 import logging
 logger = logging.getLogger(__name__)
 
-path2configobj_spec = "config_spec.ini"
+path2configobj_spec = "../../config/cli/spec.ini"
 
 # list of the available meta-zones
 METAZONES = ['polygon', 'cloud', 'radius', 'quality',
