@@ -59,7 +59,7 @@ def main():
     start_time = time.time()
 
     output_folder_path, input_configuration_path = read_args()
-    spec_config_file = '../bull/bull_spec.ini'
+    spec_config_file = '../../config/bull/spec.ini'
 
     logger.info(f'details of configuration from file : {input_configuration_path}')
     dict_configuration = st.return_dict(input_configuration_path, spec_config_file)
