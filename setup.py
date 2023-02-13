@@ -26,7 +26,6 @@ setup(
                  'bin': 'bin'
                  },
     package_data={'armoor': ['cli/code_text.json',
-                             'cli/config_spec.ini',
                              'base/cf.cfg',
                              'hmi/configuration_spec.ini',
                              'hmi/configuration.ini',
@@ -47,7 +46,8 @@ setup(
                              'bull/templates/logo_shom.png'
                              ],
                   'config' : ['log.ini',
-                             'bull/spec.ini'],
+                             'bull/spec.ini',
+                             'cli/spec.ini'],
                   'bin' : ['armoor',
                            'armoor-tick-create',
                            'armoor-tick-search',
