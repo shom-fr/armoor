@@ -10,7 +10,7 @@ setup(
               'armoor/hmi',
               'armoor/tick',
               'armoor/test',
-              'armoor/bin',
+              'bin',
               'config'],
 
     package_dir={'armoor': 'armoor',
@@ -22,7 +22,8 @@ setup(
                  'armoor/tick': 'armoor/tick',
                  'armoor/test': 'armoor/test',
                  'armoor/bin': 'armoor/bin',
-                 'config': 'config'
+                 'config': 'config',
+                 'bin': 'bin'
                  },
     package_data={'armoor': ['cli/code_text.json',
                              'cli/config_spec.ini',
@@ -46,7 +47,17 @@ setup(
                              'bull/templates/raw-html.html.jinja',
                              'bull/templates/logo_shom.png'
                              ],
-                  'config' : ['log.ini']},
+                  'config' : ['log.ini'],
+                  'bin' : ['armoor',
+                           'armoor-tick-create',
+                           'armoor-tick-search',
+                           'armoor-tick-description',
+                           'armoor-tick-authentication-info',
+                           'armoor-tick-authentication',
+                           'armoor-script',
+                           'armoor-bull',
+                           'armoor-bull-report',
+                           'armoor-api']},
     include_package_data=True,
     version='0.0.3',
     description='armoor lib SHOM',
@@ -63,16 +74,16 @@ setup(
     test_suite='armoor',
     entry_points={
         'console_scripts': [
-            'armoor                          = armoor.bin.armoor:main',
-            'armoor-tick-create              = armoor.bin.armoor_tick_create:main',
-            'armoor-tick-search              = armoor.bin.armoor_tick_search:main',
-            'armoor-tick-description         = armoor.bin.armoor_tick_description:main',
-            'armoor-tick-authentication-info = armoor.bin.armoor_tick_authentication_info:main',
-            'armoor-tick-authentication      = armoor.bin.armoor_tick_authentication:main',
-            'armoor-script                   = armoor.bin.armoor_script:main',
-            'armoor-bull                     = armoor.bin.armoor_bull:main',
-            'armoor-bull-report              = armoor.bin.armoor_bull_report:main',
-            'armoor-api                      = armoor.bin.armoor_api:main'
+            'armoor = armoor.cli.run:main',
+            'armoor-tick-create = armoor.tick.run:create',
+            'armoor-tick-search = armoor.tick.run:search',
+            'armoor-tick-description = armoor.tick.run:description',
+            'armoor-tick-authentication-info = armoor.tick.run:authentication_info',
+            'armoor-tick-authentication = armoor.tick.run:authentication_update',
+            'armoor-script = armoor.hmi.run_script:main',
+            'armoor-bull = armoor.bull.run_script:main',
+            'armoor-bull-report = armoor.bull.run_script:only_report',
+            'armoor-api = armoor.tick.forecaster_api:app'
         ]
     },
 )
