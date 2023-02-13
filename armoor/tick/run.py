@@ -86,7 +86,7 @@ def search(argv=None):
 
     if not argv:
         argv = sys.argv[1:]
-    parser = ArgumentParser(description="Create a gitlab ticket")
+    parser = ArgumentParser(description="Search for gitlab tickets")
     cfg_ticket_lines, _ = cfgm_fields.arg_parse(parser=parser,
                                                 getargs=True,
                                                 args=argv)
