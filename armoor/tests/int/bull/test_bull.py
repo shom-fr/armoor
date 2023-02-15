@@ -3,9 +3,7 @@ import os
 
 from armoor.bull.run_script import main
 from armoor.hmi.script_tools import create_folder
-
-#TODO Please change this folder to the location of your P1 folder
-path = '/mnt/d/1144/P1/'
+from armoor.tests.config_path import path_p1 as path
 
 def change_path():
     os.chdir(path)

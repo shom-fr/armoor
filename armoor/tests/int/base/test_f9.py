@@ -1,15 +1,12 @@
 import sys
 import os
-
+import logging
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
 from armoor.hmi.script_tools import create_folder
-
+from armoor.tests.config_path import path_p1 as path
 import armoor.cli.logger_tools as log
-import logging
 
-#TODO Please change this folder to the location of your P1 folder
-path = '/mnt/d/1144/P1/'
 folder_test = 'test_f9'
 
 def change_path():
