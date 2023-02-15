@@ -9,7 +9,7 @@ setup(
               'armoor/cli',
               'armoor/hmi',
               'armoor/tick',
-              'armoor/test',
+              'armoor/tests',
               'bin',
               'config'],
 
@@ -20,7 +20,7 @@ setup(
                  'armoor/cli': 'armoor/cli',
                  'armoor/hmi': 'armoor/hmi',
                  'armoor/tick': 'armoor/tick',
-                 'armoor/test': 'armoor/test',
+                 'armoor/tests': 'armoor/tests',
                  'armoor/bin': 'armoor/bin',
                  'config': 'config',
                  'bin': 'bin'

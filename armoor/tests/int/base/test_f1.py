@@ -1,0 +1,100 @@
+import sys
+import os
+
+from armoor.cli.command_line_interface import command_line_interface
+from armoor.base.calls_from_dict import dict2call
+from armoor.hmi.script_tools import create_folder
+
+import armoor.cli.logger_tools as log
+import logging
+
+#TODO Please change this folder to the location of your P1 folder
+path = '/mnt/d/1144/P1/'
+folder_test = 'test_f1'
+
+def change_path():
+    os.chdir(path)
+
+    out_path = f'output_{folder_test}/'
+    create_folder(f'{path}{out_path}')
+    os.chdir(f'{path}{out_path}')
+
+    log.setup_logging()
+    logger = logging.getLogger(__name__)
+
+    return f'{path}{out_path}', logger
+
+
+class TestBulletins:
+
+    def test_diag_disp_sst(self):
+        out_path, logger = change_path()
+        logger.info('test_diag_disp_sst')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/diag_disp_sst.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_map_sst_biais(self):
+        out_path, logger = change_path()
+        logger.info('test_map_sst_biais')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_sst_biais.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_map_sst_diff(self):
+        out_path, logger = change_path()
+        logger.info('test_map_sst_diff')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_sst_diff.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_map_sst_diff_topaz(self):
+        out_path, logger = change_path()
+        logger.info('test_map_sst_diff_TOPAZ')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_sst_diff_TOPAZ.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_map_sst_rmse(self):
+        out_path, logger = change_path()
+        logger.info('test_map_sst_rmse')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_sst_rmse.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_map_sst_rmse_centree(self):
+        out_path, logger = change_path()
+        logger.info('test_map_sst_rmse_centree')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_sst_rmse_centree.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_ser_temp_sst(self):
+        out_path, logger = change_path()
+        logger.info('test_ser_temp_sst')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/ser_temp_sst.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_ser_temp_sst_ponct_diff(self):
+        out_path, logger = change_path()
+        logger.info('test_ser_temp_sst_ponct_diff')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/ser_temp_sst_ponct_diff.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_ser_temp_sst_ponct_intervalles(self):
+        out_path, logger = change_path()
+        logger.info('test_ser_temp_sst_ponct_intervalles')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/ser_temp_sst_ponct_intervalles.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
