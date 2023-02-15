@@ -1,16 +1,13 @@
 import sys
 import os
-
+import logging
 from armoor import base
 from armoor.base.colocation import colocate_all
 from armoor.base.open_data import open_file
 from armoor.hmi.script_tools import create_folder
-
+from armoor.tests.config_path import path_p1 as path
 import armoor.cli.logger_tools as log
-import logging
 
-#TODO Please change this folder to the location of your P1 folder
-path = '/mnt/d/1144/P1/'
 folder_test = 'uni_test_coloc'
 
 def change_path():
