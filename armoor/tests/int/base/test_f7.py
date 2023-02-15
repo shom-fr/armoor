@@ -1,0 +1,84 @@
+import sys
+import os
+
+from armoor.cli.command_line_interface import command_line_interface
+from armoor.base.calls_from_dict import dict2call
+from armoor.hmi.script_tools import create_folder
+
+import armoor.cli.logger_tools as log
+import logging
+
+#TODO Please change this folder to the location of your P1 folder
+path = '/mnt/d/1144/P1/'
+folder_test = 'test_f7'
+
+def change_path():
+    os.chdir(path)
+
+    out_path = f'output_{folder_test}/'
+    create_folder(f'{path}{out_path}')
+    os.chdir(f'{path}{out_path}')
+
+    log.setup_logging()
+    logger = logging.getLogger(__name__)
+
+    return f'{path}{out_path}', logger
+
+
+class TestBulletins:
+
+    def test_ellipses(self):
+        out_path, logger = change_path()
+        logger.info('test_ellipses')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/ellipses.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_ellipses_tranche(self):
+        out_path, logger = change_path()
+        logger.info('test_ellipses_tranche')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/ellipses_tranche.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_harmonic_table(self):
+        out_path, logger = change_path()
+        logger.info('test_harmonic_table')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/harmonic_table.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_harmonic_table_tranche(self):
+        out_path, logger = change_path()
+        logger.info('test_harmonic_table_tranche')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/harmonic_table_tranche.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_hovmoller_datashom(self):
+        out_path, logger = change_path()
+        logger.info('test_hovmoller_datashom')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/hovmoller_datashom.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_hovmoller_ladcp(self):
+        out_path, logger = change_path()
+        logger.info('test_hovmoller_LADCP')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/hovmoller_LADCP.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_hovmoller_datashom_bathyradius(self):
+        out_path, logger = change_path()
+        logger.info('test_hovmoller_datashom_bathyradius')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/hovmoller_datashom_bathyradius.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True

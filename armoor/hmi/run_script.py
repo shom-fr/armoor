@@ -54,7 +54,7 @@ def file_path(path_name: str) -> str:
     raise FileNotFoundError(path_name)
 
 
-def read_args(argv=None):
+def read_args(argv):
     """
     Read arguments needed to create the web interface images
     Parameters
@@ -65,8 +65,6 @@ def read_args(argv=None):
     -------
     The paths to the needed parameters output folder, input folder and input configuration file.
     """
-    if not argv:
-        argv = sys.argv[1:]
 
     parser = argparse.ArgumentParser(description='Command to create images needed'
                                                  ' for the web interface')
@@ -91,7 +89,7 @@ def read_args(argv=None):
     return output_folder_path, input_folder_path, input_configuration_path
 
 
-def main():
+def main(argv=None):
     """
     Calls the function with the arguments provided by the user to generate the web interface images
     Returns
@@ -102,7 +100,9 @@ def main():
     logger = logging.getLogger(__name__)
     start_time = time.time()
 
-    output_folder_path, input_folder_path, input_configuration_path = read_args()
+    if not argv:
+        argv = sys.argv[1:]
+    output_folder_path, input_folder_path, input_configuration_path = read_args(argv)
     spec_config_file = "../../config/hmi/spec.ini"
 
     logger.info(f'details of configuration from file : {input_configuration_path}')

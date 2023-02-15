@@ -14,7 +14,7 @@ from .report import Report
 
 import armoor.cli.logger_tools as log
 
-def read_args(argv=None):
+def read_args(argv):
     """
     Read arguments needed to create the weather report
     Parameters
@@ -25,8 +25,6 @@ def read_args(argv=None):
     -------
     The paths to the needed parameters output folder and input configuration file.
     """
-    if not argv:
-        argv = sys.argv[1:]
 
     parser = argparse.ArgumentParser(description='Command to create images and files needed'
                                                  ' for the weather report')
@@ -45,7 +43,7 @@ def read_args(argv=None):
     return output_folder_path, input_configuration_path
 
 
-def main():
+def main(argv=None):
     """
     Calls the function with the arguments provided by the user
     to generate the weather report images and files
@@ -58,7 +56,9 @@ def main():
 
     start_time = time.time()
 
-    output_folder_path, input_configuration_path = read_args()
+    if not argv:
+        argv = sys.argv[1:]
+    output_folder_path, input_configuration_path = read_args(argv)
     spec_config_file = '../../config/bull/spec.ini'
 
     logger.info(f'details of configuration from file : {input_configuration_path}')
@@ -74,7 +74,7 @@ def main():
     logger.info(f"Done in {time.time() - start_time} seconds ")
 
 
-def only_report():
+def only_report(argv):
     """
     Calls the function with the arguments provided by the user
     to generate the weather report
@@ -87,7 +87,9 @@ def only_report():
 
     start_time = time.time()
 
-    output_folder_path, _ = read_args()
+    if not argv:
+        argv = sys.argv[1:]
+    output_folder_path, _ = read_args(argv)
 
     logger.info('Creating report from sources.')
     report = Report(output_folder_path)

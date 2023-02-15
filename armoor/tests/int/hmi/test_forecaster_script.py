@@ -1,0 +1,92 @@
+import sys
+import os
+
+from armoor.hmi.run_script import main
+from armoor.hmi.script_tools import create_folder
+
+#TODO Please change this folder to the location of your P3 folder
+path = '/mnt/d/1144/P3/'
+
+def change_path():
+    os.chdir(path)
+
+class TestForecasterScripts:
+
+    def test_med_1(self):
+        change_path()
+        out_path = 'out/test_med_1/'
+        create_folder(out_path)
+        main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_1.ini'])
+        assert True
+
+    def test_med_2(self):
+        change_path()
+        out_path = 'out/test_med_2/'
+        create_folder(out_path)
+        main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_2.ini'])
+        assert True
+
+    def test_med_3(self):
+        change_path()
+        out_path = 'out/test_med_3/'
+        create_folder(out_path)
+        main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_3.ini'])
+        assert True
+
+    def test_med_4(self):
+        change_path()
+        out_path = 'out/test_med_4/'
+        create_folder(out_path)
+        main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_4.ini'])
+        assert True
+
+    def test_med_5(self):
+        change_path()
+        out_path = 'out/test_med_5/'
+        create_folder(out_path)
+        main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_5.ini'])
+        assert True
+
+    def test_med_10(self):
+        change_path()
+        out_path = 'out/test_med_10/'
+        create_folder(out_path)
+        main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_10.ini'])
+        assert True
+
+    def test_med_11(self):
+        change_path()
+        out_path = 'out/test_med_11/'
+        create_folder(out_path)
+        main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_11.ini'])
+        assert True
+
+    def test_med_12(self):
+        change_path()
+        out_path = 'out/test_med_12/'
+        create_folder(out_path)
+        main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_12.ini'])
+        assert True
+
+    #TODO uncomment : Caution next tests takes around 1h each
+    #
+    # def test_med(self):
+    #     change_path()
+    #     out_path = 'out/test_med/'
+    #     create_folder(out_path)
+    #     main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_med_12345101112.ini'])
+    #     assert True
+    #
+    # def test_indien(self):
+    #     change_path()
+    #     out_path = 'out/test_indien/'
+    #     create_folder(out_path)
+    #     main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_indien_1234589.ini'])
+    #     assert True
+    #
+    # def test_manga(self):
+    #     change_path()
+    #     out_path = 'out/test_manga/'
+    #     create_folder(out_path)
+    #     main(['-o', out_path, '-i', 'in/', '-c', 'config/hycom3d_manga_1234567.ini'])
+    #     assert True
