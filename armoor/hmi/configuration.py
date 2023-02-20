@@ -140,20 +140,20 @@ def apply_custom_metazone(param_xr: xr.Dataset,
     -------
     Dataset filtered
     """
-    print('Applying meta-zone and selecting variables of interest...')
+    logger.info('Applying meta-zone and selecting variables of interest')
     # SELECT VAR
     if variable is not None:
         param_xr = select_var(param_xr, variable)
-        print('Varibles selected')
+        logger.info(f'Variable selected')
 
     # SELECT EXTENT
     if extent is not None or config_reg_extent is not None:
         param_xr = select_extent(param_xr, config_reg_extent, extent)
-        print('Extent selected')
+        logger.info(f'Extent selected')
     # SELECT DEPTH
     if depth is not None:
         param_xr = param_xr.meta.vertical_selection_ponct(depth)
-        print('Depth selected')
+        logger.info(f'Depth selected')
     return param_xr
 
 
@@ -270,11 +270,11 @@ def read_netcdfs(paths: list, data_type: str = None) -> xr.Dataset:
     """
     if len(paths) == 1 and data_type not in ['rivers']:
         paths = paths[0]
-    print('Opening file(s)...')
+    logger.info('Opening file(s)')
     xarray_obj = base.open_file(paths, func='forecaster', type=data_type)
 
     if data_type not in ['rivers']:
-        print('Decoding xarray...')
+        logger.info('Decoding xarray')
         xarray_obj = xarray_obj.read.decode()
 
     return xarray_obj

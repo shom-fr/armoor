@@ -4,7 +4,6 @@ Functions to manage the creation of weather reports
 import datetime
 import os
 import json
-import logging
 
 from shapely.geometry.polygon import Polygon
 from shapely.geometry import MultiPoint
