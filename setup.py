@@ -9,7 +9,7 @@ setup(
               'armoor/cli',
               'armoor/hmi',
               'armoor/tick',
-              'armoor/tests',
+              'tests',
               'bin',
               'config'],
 
@@ -20,10 +20,9 @@ setup(
                  'armoor/cli': 'armoor/cli',
                  'armoor/hmi': 'armoor/hmi',
                  'armoor/tick': 'armoor/tick',
-                 'armoor/tests': 'armoor/tests',
-                 'armoor/bin': 'armoor/bin',
-                 'config': 'config',
-                 'bin': 'bin'
+                 'tests': 'tests',
+                 'bin': 'bin',
+                 'config': 'config'
                  },
     package_data={'armoor': ['cli/code_text.json',
                              'bull/templates/index.html.jinja',
