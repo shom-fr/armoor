@@ -5,7 +5,7 @@ from armoor import base
 from armoor.base.colocation import colocate_all
 from armoor.base.open_data import open_file
 from armoor.hmi.script_tools import create_folder
-from armoor.tests.config_path import path_p1 as path
+from tests.config_path import path_p1 as path
 import armoor.cli.logger_tools as log
 
 folder_test = 'uni_test_coloc'
