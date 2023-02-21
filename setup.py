@@ -37,7 +37,7 @@ setup(
                              'bull/spec.ini',
                              'cli/spec.ini',
                              'hmi/spec.ini',
-                             'tick/auth_spec.ini',
+                             'tick/auth.ini',
                              'tick/auth.cfg',
                              'tick/fields_spec.ini',
                              'tick/numeric.ini',
