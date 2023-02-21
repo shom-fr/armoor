@@ -43,7 +43,7 @@ setup(
                              'tick/numeric.cfg',
                              'tick/nodata.cfg',
                              'tick/field_value.cfg',
-                             'tick/search_spec.ini',
+                             'tick/search.ini',
                              'tick/forecaster.ini',
                              'tick/forecaster.cfg'],
                   'bin' : ['armoor',
