@@ -3,6 +3,7 @@ Ticket class created when using gitlab
 """
 import os
 import sys
+import pathlib
 
 import gitlab
 import requests
@@ -23,8 +24,10 @@ class Ticket:
         self.rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_auth = cfgm.ConfigManager(os.path.join(
             self.rootdir, "../../config/tick/auth.ini"))
+
+        current_dir = pathlib.Path().resolve()
         self.cfg_auth = cfgm_auth.load(
-            os.path.join(self.rootdir, "../../config/tick/auth.cfg"))
+            os.path.join(current_dir, "auth.cfg"))
 
         self.try_connection_to_project()
 

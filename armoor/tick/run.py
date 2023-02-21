@@ -3,6 +3,7 @@ Functions to manage gitlab issues
 """
 import os
 import sys
+import pathlib
 from argparse import ArgumentParser
 
 from xoa import cfgm
@@ -200,6 +201,7 @@ def authentication_update(argv=None):
 
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
+    current_dir = pathlib.Path().resolve()
     cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/auth.ini"))
 
     if not argv:
@@ -208,10 +210,10 @@ def authentication_update(argv=None):
     cfg_auth_lines, _ = cfgm_fields.arg_parse(parser=parser,
                                               getargs=True,
                                               args=argv,
-                                              cfgfile=os.path.join(rootdir, "../../config/tick/auth.cfg"))
+                                              cfgfile=os.path.join(current_dir, "auth.cfg"))
 
     formatted_cfg_auth = create_update_auth_cfg(cfg_auth_lines)
-    with open(os.path.join(rootdir, "../../config/tick/auth.cfg"), "w", encoding="utf-8") as auth_file:
+    with open(os.path.join(current_dir, "auth.cfg"), "w", encoding="utf-8") as auth_file:
         auth_file.write("\n".join(formatted_cfg_auth))
 
     print('Update done')
