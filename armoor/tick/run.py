@@ -82,7 +82,7 @@ def search(argv=None):
     None
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/search_spec.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/search.ini"))
 
     if not argv:
         argv = sys.argv[1:]
