@@ -120,7 +120,7 @@ class Ticket:
             self.rootdir, "../../config/tick/fields.ini"))
 
         kinds = {'numeric': os.path.join(self.rootdir, '../../config/tick/numeric.ini'),
-                 'nodata': os.path.join(self.rootdir, '../../config/tick/nodata.ini'),
+                 'nodata': os.path.join(self.rootdir, '../../config/tick/nodata.cfg'),
                  'field_value': os.path.join(self.rootdir, '../../config/tick/field_value.cfg')}
         cfg_fields = cfgm_fields.load(kinds[kind])
         cfg_fields.update({'kind': kind})
