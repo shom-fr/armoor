@@ -39,7 +39,7 @@ setup(
                              'hmi/spec.ini',
                              'tick/auth.ini',
                              'tick/auth.cfg',
-                             'tick/fields_spec.ini',
+                             'tick/fields.ini',
                              'tick/numeric.ini',
                              'tick/nodata.ini',
                              'tick/field_value.cfg',
