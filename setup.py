@@ -41,7 +41,7 @@ setup(
                              'tick/auth.cfg',
                              'tick/fields.ini',
                              'tick/numeric.ini',
-                             'tick/nodata.ini',
+                             'tick/nodata.cfg',
                              'tick/field_value.cfg',
                              'tick/search_spec.ini',
                              'tick/forecaster.ini',
