@@ -32,7 +32,7 @@ setup(
                              'bull/templates/raw-html.html.jinja',
                              'bull/templates/logo_shom.png'
                              ],
-                  'config' : ['log.ini',
+                  'config' : ['log.cfg',
                               'base/cf.cfg',
                              'bull/spec.ini',
                              'cli/spec.ini',
