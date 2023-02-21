@@ -22,7 +22,7 @@ class Ticket:
         self.project = None
         self.rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_auth = cfgm.ConfigManager(os.path.join(
-            self.rootdir, "../../config/tick/auth_spec.ini"))
+            self.rootdir, "../../config/tick/auth.ini"))
         self.cfg_auth = cfgm_auth.load(
             os.path.join(self.rootdir, "../../config/tick/auth.cfg"))
 
