@@ -42,7 +42,7 @@ setup(
                              'tick/fields_spec.ini',
                              'tick/numeric.ini',
                              'tick/nodata.ini',
-                             'tick/field_value.ini',
+                             'tick/field_value.cfg',
                              'tick/search_spec.ini',
                              'tick/forecaster_spec.ini',
                              'tick/forecaster.ini'],
