@@ -38,7 +38,6 @@ setup(
                              'cli/spec.ini',
                              'hmi/spec.ini',
                              'tick/auth.ini',
-                             'tick/auth.cfg',
                              'tick/fields.ini',
                              'tick/numeric.cfg',
                              'tick/nodata.cfg',
