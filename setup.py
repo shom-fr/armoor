@@ -44,7 +44,7 @@ setup(
                              'tick/nodata.ini',
                              'tick/field_value.cfg',
                              'tick/search_spec.ini',
-                             'tick/forecaster_spec.ini',
+                             'tick/forecaster.ini',
                              'tick/forecaster.cfg'],
                   'bin' : ['armoor',
                            'armoor-tick-create',
