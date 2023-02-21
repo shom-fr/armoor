@@ -1,1 +1,1 @@
-from .config_path import *
+from config.tests.config_path import *

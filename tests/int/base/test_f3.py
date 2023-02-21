@@ -4,7 +4,7 @@ import logging
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
 from armoor.hmi.script_tools import create_folder
-from tests.config_path import path_p1 as path
+from config.tests.config_path import path_p1 as path
 import armoor.cli.logger_tools as log
 
 folder_test = 'test_f3'
