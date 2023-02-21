@@ -26,7 +26,7 @@ def create(argv=None):
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
 
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/fields_spec.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/fields.ini"))
 
     if not argv:
         argv = sys.argv[1:]

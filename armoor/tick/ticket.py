@@ -117,7 +117,7 @@ class Ticket:
         Template
         """
         cfgm_fields = cfgm.ConfigManager(os.path.join(
-            self.rootdir, "../../config/tick/fields_spec.ini"))
+            self.rootdir, "../../config/tick/fields.ini"))
 
         kinds = {'numeric': os.path.join(self.rootdir, '../../config/tick/numeric.ini'),
                  'nodata': os.path.join(self.rootdir, '../../config/tick/nodata.ini'),
