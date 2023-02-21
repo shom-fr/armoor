@@ -24,7 +24,7 @@ class Ticket:
         cfgm_auth = cfgm.ConfigManager(os.path.join(
             self.rootdir, "../../config/tick/auth_spec.ini"))
         self.cfg_auth = cfgm_auth.load(
-            os.path.join(self.rootdir, "../../config/tick/auth.ini"))
+            os.path.join(self.rootdir, "../../config/tick/auth.cfg"))
 
         self.try_connection_to_project()
 
