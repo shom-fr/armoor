@@ -1,4 +1,5 @@
 """Open observation and model data"""
+import os
 import xarray as xr
 import numpy as np
 import datetime
@@ -55,7 +56,8 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
         croco_current = decode_croco_currents(path_files)
         return croco_current
 
-    elif path_files[-2:] == 'nc':
+
+    elif os.path.splitext(path_files)[1] in (".nc", ".netcdf"):
         logger.info(f"Single file dataset")
         return xr.open_dataset(path_files)
 
