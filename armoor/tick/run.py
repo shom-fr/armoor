@@ -208,10 +208,10 @@ def authentication_update(argv=None):
     cfg_auth_lines, _ = cfgm_fields.arg_parse(parser=parser,
                                               getargs=True,
                                               args=argv,
-                                              cfgfile=os.path.join(rootdir, "../../config/tick/auth.ini"))
+                                              cfgfile=os.path.join(rootdir, "../../config/tick/auth.cfg"))
 
     formatted_cfg_auth = create_update_auth_cfg(cfg_auth_lines)
-    with open(os.path.join(rootdir, "../../config/tick/auth.ini"), "w", encoding="utf-8") as auth_file:
+    with open(os.path.join(rootdir, "../../config/tick/auth.cfg"), "w", encoding="utf-8") as auth_file:
         auth_file.write("\n".join(formatted_cfg_auth))
 
     print('Update done')
