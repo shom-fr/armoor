@@ -3,7 +3,7 @@ import os
 
 from armoor.hmi.run_script import main
 from armoor.hmi.script_tools import create_folder
-from armoor.tests.config_path import path_p3 as path
+from config.tests.config_path import path_p3 as path
 
 def change_path():
     os.chdir(path)
@@ -66,25 +66,25 @@ class TestForecasterScripts:
         main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_12.ini'])
         assert True
 
-    #TODO uncomment : Caution next tests takes around 1h each
-
-    def test_med(self):
-        change_path()
-        out_path = 'out/test_med/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_12345101112.ini'])
-        assert True
-
-    def test_indien(self):
-        change_path()
-        out_path = 'out/test_indien/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_indien_1234589.ini'])
-        assert True
-
-    def test_manga(self):
-        change_path()
-        out_path = 'out/test_manga/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_manga_1234567.ini'])
-        assert True
+    # #TODO uncomment : Caution next tests takes around 1h each
+    #
+    # def test_med(self):
+    #     change_path()
+    #     out_path = 'out/test_med/'
+    #     create_folder(out_path)
+    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_12345101112.ini'])
+    #     assert True
+    #
+    # def test_indien(self):
+    #     change_path()
+    #     out_path = 'out/test_indien/'
+    #     create_folder(out_path)
+    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_indien_1234589.ini'])
+    #     assert True
+    #
+    # def test_manga(self):
+    #     change_path()
+    #     out_path = 'out/test_manga/'
+    #     create_folder(out_path)
+    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_manga_1234567.ini'])
+    #     assert True

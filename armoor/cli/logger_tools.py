@@ -13,7 +13,7 @@ def setup_logging():
 
     print(f'LOG START :: {timestamp}')
 
-    log_config_file = '../../config/log.ini'
+    log_config_file = '../../config/log.cfg'
     print(f'Using spec file :: {os.path.abspath(os.path.dirname(__file__))}/{log_config_file}')
 
     rootdir = os.path.abspath(os.path.dirname(__file__))

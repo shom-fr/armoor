@@ -4,10 +4,10 @@ import logging
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
 from armoor.hmi.script_tools import create_folder
-from armoor.tests.config_path import path_p1 as path
+from config.tests.config_path import path_p1 as path
 import armoor.cli.logger_tools as log
 
-folder_test = 'test_f9'
+folder_test = 'test_f4'
 
 def change_path():
     os.chdir(path)
@@ -24,37 +24,34 @@ def change_path():
 
 class TestBulletins:
 
-    def test_map_current_db(self):
+    def test_variable_2d(self):
         out_path, logger = change_path()
-        logger.info('test_map_current_DB')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_current_DB.ini"])
+        logger.info('test_variable_2d')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/variable_2d.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True
 
-    def test_map_trajectory(self):
+    def test_variable_3d(self):
         out_path, logger = change_path()
-        logger.info('test_map_trajectory')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_trajectory.ini"])
+        logger.info('test_variable_3d')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/variable_3d.ini"])
         parser.update({'output_path' : out_path })
-        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
-    def test_plot_diff_traj_distance(self):
+    def test_variable_3d_hycom(self):
         out_path, logger = change_path()
-        logger.info('test_plot_diff_traj_distance')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/plot_diff_traj_distance.ini"])
+        logger.info('test_variable_3d_hycom')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/variable_3d_hycom.ini"])
         parser.update({'output_path' : out_path })
-        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
-    def test_map_trajectory_topaz(self):
+    def test_variable_3d_steps(self):
         out_path, logger = change_path()
-        logger.info('test_map_trajectory_TOPAZ')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_trajectory_TOPAZ.ini"])
+        logger.info('test_variable_3d_steps')
+        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/variable_3d_steps.ini"])
         parser.update({'output_path' : out_path })
-        create_folder(f'tmp')
         dict2call(parser)
         assert True

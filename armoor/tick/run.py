@@ -26,7 +26,7 @@ def create(argv=None):
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
 
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/fields_spec.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/fields.ini"))
 
     if not argv:
         argv = sys.argv[1:]
@@ -82,7 +82,7 @@ def search(argv=None):
     None
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/search_spec.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/search.ini"))
 
     if not argv:
         argv = sys.argv[1:]
@@ -200,7 +200,7 @@ def authentication_update(argv=None):
 
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/auth_spec.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/auth.ini"))
 
     if not argv:
         argv = sys.argv[1:]
@@ -208,10 +208,10 @@ def authentication_update(argv=None):
     cfg_auth_lines, _ = cfgm_fields.arg_parse(parser=parser,
                                               getargs=True,
                                               args=argv,
-                                              cfgfile=os.path.join(rootdir, "../../config/tick/auth.ini"))
+                                              cfgfile=os.path.join(rootdir, "../../config/tick/auth.cfg"))
 
     formatted_cfg_auth = create_update_auth_cfg(cfg_auth_lines)
-    with open(os.path.join(rootdir, "../../config/tick/auth.ini"), "w", encoding="utf-8") as auth_file:
+    with open(os.path.join(rootdir, "../../config/tick/auth.cfg"), "w", encoding="utf-8") as auth_file:
         auth_file.write("\n".join(formatted_cfg_auth))
 
     print('Update done')

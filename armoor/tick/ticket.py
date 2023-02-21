@@ -22,9 +22,9 @@ class Ticket:
         self.project = None
         self.rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_auth = cfgm.ConfigManager(os.path.join(
-            self.rootdir, "../../config/tick/auth_spec.ini"))
+            self.rootdir, "../../config/tick/auth.ini"))
         self.cfg_auth = cfgm_auth.load(
-            os.path.join(self.rootdir, "../../config/tick/auth.ini"))
+            os.path.join(self.rootdir, "../../config/tick/auth.cfg"))
 
         self.try_connection_to_project()
 
@@ -117,11 +117,11 @@ class Ticket:
         Template
         """
         cfgm_fields = cfgm.ConfigManager(os.path.join(
-            self.rootdir, "../../config/tick/fields_spec.ini"))
+            self.rootdir, "../../config/tick/fields.ini"))
 
-        kinds = {'numeric': os.path.join(self.rootdir, '../../config/tick/numeric.ini'),
-                 'nodata': os.path.join(self.rootdir, '../../config/tick/nodata.ini'),
-                 'field_value': os.path.join(self.rootdir, '../../config/tick/field_value.ini')}
+        kinds = {'numeric': os.path.join(self.rootdir, '../../config/tick/numeric.cfg'),
+                 'nodata': os.path.join(self.rootdir, '../../config/tick/nodata.cfg'),
+                 'field_value': os.path.join(self.rootdir, '../../config/tick/field_value.cfg')}
         cfg_fields = cfgm_fields.load(kinds[kind])
         cfg_fields.update({'kind': kind})
 

@@ -3,7 +3,7 @@ import os
 
 from armoor.bull.run_script import main
 from armoor.hmi.script_tools import create_folder
-from armoor.tests.config_path import path_p1 as path
+from config.tests.config_path import path_p1 as path
 
 def change_path():
     os.chdir(path)
