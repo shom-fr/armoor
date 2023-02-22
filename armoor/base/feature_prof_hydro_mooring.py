@@ -61,7 +61,7 @@ def plot(config_obj):
 
         # SELECT VAR
         if 'attribute' in output:
-            var = [output['attribute']]
+            var = output['attribute']
         else:
             logger.info("You should indicate which variable you want to plot with keyword : attribute = ")
             var = None
