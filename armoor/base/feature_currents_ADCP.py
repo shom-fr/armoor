@@ -77,7 +77,7 @@ def plot(config_obj):
         plot_hovmoller = {"plot_hovmoller": 'plot_hovmoller'}
         if output["plot"] in plot_hovmoller:
             if 'attribute' in output:
-                attribute = output["attribute"].replace('current_', '')
+                attribute = output["attribute"][0].replace('current_', '')
             else:
                 attribute = "norm"
 
