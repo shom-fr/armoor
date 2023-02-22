@@ -27,7 +27,7 @@ class TestBulletins:
     def test_variable_2d(self):
         out_path, logger = change_path()
         logger.info('test_variable_2d')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/variable_2d.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_2d.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True
@@ -35,7 +35,7 @@ class TestBulletins:
     def test_variable_3d(self):
         out_path, logger = change_path()
         logger.info('test_variable_3d')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/variable_3d.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True
@@ -43,7 +43,7 @@ class TestBulletins:
     def test_variable_3d_hycom(self):
         out_path, logger = change_path()
         logger.info('test_variable_3d_hycom')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/variable_3d_hycom.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_hycom.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True
@@ -51,7 +51,7 @@ class TestBulletins:
     def test_variable_3d_steps(self):
         out_path, logger = change_path()
         logger.info('test_variable_3d_steps')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/variable_3d_steps.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_steps.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True

@@ -27,7 +27,7 @@ class TestBulletins:
     def test_map_diff(self):
         out_path, logger = change_path()
         logger.info('test_map_diff')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/map_diff.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_diff.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True
@@ -35,7 +35,7 @@ class TestBulletins:
     def test_ser_temp_ponct(self):
         out_path, logger = change_path()
         logger.info('test_ser_temp_ponct')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/ser_temp_ponct.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ser_temp_ponct.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True
@@ -43,7 +43,7 @@ class TestBulletins:
     def test_ser_temp_stats(self):
         out_path, logger = change_path()
         logger.info('test_ser_temp_stats')
-        parser = command_line_interface(['--file', f"../single_tests/{folder_test}/ser_temp_stats.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ser_temp_stats.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True
