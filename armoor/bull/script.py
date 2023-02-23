@@ -721,7 +721,7 @@ def incorporate_functionality(dict_configuration: dict,
     The dictionary updated with the details of the functionality
     """
     path_to_config = dict_configuration['functionalities'][functionality]['path_to_config']
-    parser = cli.command_line_interface(['--file', path_to_config])
+    parser = cli.command_line_interface(['--cfgfile', path_to_config])
     parser = add_meta_zone_from_name(parser, dict_configuration, meta_zone)
     dict_configuration['report'][meta_zone][functionality] = parser
     return dict_configuration
