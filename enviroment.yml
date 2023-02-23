@@ -21,6 +21,7 @@ dependencies:
   - geojson
   - configobj=5.0.6
   - opendrift
+  - cfgrib
   - pip:
     - pylint
     - pytest
