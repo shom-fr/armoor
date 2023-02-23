@@ -184,7 +184,7 @@ def plot(config_obj):
         if output["plot"] in plot_ts_metr_point:
             # Select the attributes to plot
             if 'attribute' in output:
-                attribute = output["attribute"].replace('current_', '')
+                attribute = output["attribute"][0].replace('current_', '')
             else:
                 attribute = "norm"
 
@@ -217,7 +217,7 @@ def plot(config_obj):
         if output["plot"] in plot_ts_metr_stats:
             # Select the attributes to plot
             if 'attribute' in output:
-                attribute = output["attribute"].replace('current_', '')
+                attribute = output["attribute"][0].replace('current_', '')
             else:
                 attribute = "norm"
 

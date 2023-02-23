@@ -62,15 +62,12 @@ def get_observation_models_meta(config_obj: dict):
 
     # Get observation type to read txt observation files
     logger.info(f"Reading observation files")
-    if "ADCP" in config_obj['functionality']:
-        if "type" in config_obj['observation']:
-            obs_type = config_obj['observation']['type']
-        else:
-            raise Exception("Pour lire les fichiers ADCP, vous devez préciser le format dans la variable \"type\" du "
-                            "fichier de paramètres. Cette variable peut être \"LADCP\", \"VMADCP\" ou "
-                            "\"mouillage\". ")
-    else:
-        obs_type = None
+
+    obs_type = config_obj['observation'].get('type')
+    if "ADCP" in config_obj['functionality'] and obs_type is None:
+        logger.warning("Pour lire les fichiers ADCP, vous devriez préciser le format dans la variable \"type\" du "
+                       "fichier de paramètres. Cette variable peut être \"LADCP\", \"VMADCP\" ou "
+                       "\"mouillage\". ")
 
     # Read observations
     logger.info(f"Opening observation from file(s)")

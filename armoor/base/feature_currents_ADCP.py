@@ -77,7 +77,7 @@ def plot(config_obj):
         plot_hovmoller = {"plot_hovmoller": 'plot_hovmoller'}
         if output["plot"] in plot_hovmoller:
             if 'attribute' in output:
-                attribute = output["attribute"].replace('current_', '')
+                attribute = output["attribute"][0].replace('current_', '')
             else:
                 attribute = "norm"
 
@@ -306,7 +306,7 @@ def select_point_bathy_radius(config_obj, observation, models):
     """
 
     obs_lon, obs_lat = observation["xarray_meta"].lon.values, observation["xarray_meta"].lat.values
-    if len(obs_lon) > 1:
+    if obs_lon.size > 1:
         obs_lon, obs_lat = obs_lon[0], obs_lat[0]
 
     # Get the criteria values
