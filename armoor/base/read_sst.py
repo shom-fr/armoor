@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
 """read variables in models and observation
 """
-import xoa
-import xarray as xr
-from xoa.regrid import grid2loc, regrid1d
+import os
+
 import numpy as np
+import xarray as xr
+
+from xoa.regrid import grid2loc, regrid1d
+import xoa
+import xoa.cf as xcf
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 @xr.register_dataarray_accessor("read_sst")
@@ -22,6 +29,19 @@ class SSTAccessor:
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
         xoa.register_accessors()
+        xoa.register_accessors(decode_sigma=True)
+
+        path_cfg = '../../config/base/cf.cfg'
+
+        try:
+            rootdir = os.path.abspath(os.path.dirname(__file__))
+            path = os.path.join(rootdir, path_cfg)
+        except:
+            logger.warning('cf.cfg file not found')
+            directory = os.getcwd()
+            logger.warning(f'using path : {directory}')
+
+        xcf.register_cf_specs(path)
 
     def sel(self, vars, depth=0):
         liste_ds = []

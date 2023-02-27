@@ -17,6 +17,7 @@ import xarray as xr
 
 from armoor import hmi
 from armoor import base
+import armoor.hmi.script_tools as st
 
 import logging
 logger = logging.getLogger(__name__)
@@ -440,7 +441,10 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
     elif func in ["visu_diff_sss", "visu_diff_sst"]:
         logger.info('Collocating and computing difference.')
         model_da = model2plot_xr.xoa[var_m].squeeze()
+
         obs_da = obs2plot_xr[var_m].squeeze()
+        obs_da = st.convert_K_C(obs_da)
+
         da_obs_coloc, da_model_coloc = base.colocate_all(obs_da,
                                                          model_da,
                                                          True,

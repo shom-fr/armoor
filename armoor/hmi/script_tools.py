@@ -13,6 +13,22 @@ from armoor import hmi
 import logging
 logger = logging.getLogger(__name__)
 
+
+def convert_K_C(data: xr.Dataset) -> xr.Dataset:
+    """
+    Convert temperature units into Celcius degrees.
+
+    Returns
+    -------
+    xarray.DataArray
+        Data array containing SST in Celcius degrees.
+    """
+    if 'units' in data.attrs and data.attrs['units'] == 'kelvin':
+        logger.info('Converting to Celsius degrees')
+        return data - 273.15
+    else:
+        return data
+
 def return_dict(path: str, spec_config_file: str) -> dict:
     """
     Read configObj for bull and hmi
