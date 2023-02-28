@@ -58,6 +58,7 @@ def rmse_center_generic(observation, model, dims):
 
 
 def rmsec_diag_disp(observation, model):
+    logger.info('Computing centered RMSE for dispersion diagram')
     rmsec = 0
     for i, obs in enumerate(observation):
         rmsec += (model[i] - observation[i]) ** 2
