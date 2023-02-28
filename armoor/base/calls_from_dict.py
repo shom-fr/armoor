@@ -74,7 +74,8 @@ def get_observation_models_meta(config_obj: dict):
     observation.update({"xarray": base.open_file(observation.pop("path"), config_obj['functionality'], obs_type)})
     logger.info(f"Applying : decode and meta zone on observation")
     observation.update({"xarray_meta": apply_metas2dataset(observation["xarray"].read.decode(),
-                                                           config_obj, get_method(observation))
+                                                           config_obj,
+                                                           get_method(observation))
                         })
 
     logger.info(f"File(s) read")
@@ -148,7 +149,7 @@ def get_observation_models_meta(config_obj: dict):
                                                  horizontal_colocation_flag,
                                                  vertical_colocation_flag,
                                                  temporal_colocation_flag,
-                                                 coloc_method=get_method(model, "method"),
+                                                 coloc_method=get_method(model),
                                                  opt_grid=config_obj["colocate"])
 
         observation["xarray_meta_coloc"].append(obs_coloc)
@@ -198,7 +199,7 @@ def get_observation_models_meta(config_obj: dict):
     return config_obj
 
 
-def get_method(data, method="method") -> str:
+def get_method(data) -> str:
     """
     Get the method to use.
     Parameters
@@ -212,11 +213,12 @@ def get_method(data, method="method") -> str:
         str
         Method to use.
     """
+    method = data.get('method')
 
-    if method in data.keys():
-        return data[method]
-    else:
-        return None
+    if method is None:
+        logger.warning(f'No method provided for {data.get("name")}')
+
+    return method
 
 
 def apply_metas2dataset(xarray_obj: xr.Dataset, meta_zones: dict, method: str) -> xr.Dataset:
