@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import gaussian_kde
 from scipy import stats
+from scipy.interpolate import interpn
 import shapely
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -538,9 +539,17 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
         if not math.isnan(obs.item(i)) and not math.isnan(mod.item(i)):
             x.append(obs.item(i))
             y.append(mod.item(i))
-    xy = np.vstack([x, y])
 
-    z = gaussian_kde(xy)(xy)
+    data, x_e, y_e = np.histogram2d(x, y, bins=20, density=True)
+    z = interpn((0.5 * (x_e[1:] + x_e[:-1]),
+                 0.5 * (y_e[1:] + y_e[:-1])),
+                data,
+                np.vstack([x, y]).T,
+                method="splinef2d",
+                bounds_error=False)
+
+    # To be sure to plot all data
+    z[np.where(np.isnan(z))] = 0.0
 
     # Sort the points by density, so that the densest points are plotted last
     z, x, y = (list(t) for t in zip(*sorted(zip(z, x, y))))
@@ -564,7 +573,7 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
 
     cbar = f.colorbar(im, ticklocation='left')
     cbar.set_label('Number Of Points', rotation=270, fontsize=15, labelpad=15)
-    plt.legend()
+    plt.legend(loc='upper left')
 
     ft.manage_output(plt, f'diag_disp_g_{var_title}_{model_name}_{obs_name}', output_path)
 
