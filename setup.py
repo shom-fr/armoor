@@ -33,10 +33,10 @@ setup(
                              'bull/templates/logo_shom.png'
                              ],
                   'config' : ['log.cfg',
-                              'base/cf.cfg',
+                              'cf.cfg',
                              'bull/bull.ini',
                              'cli/cli.ini',
-                             'hmi/spec.ini',
+                             'hmi/hmi.ini',
                              'tick/auth.ini',
                              'tick/fields.ini',
                              'tick/numeric.cfg',
