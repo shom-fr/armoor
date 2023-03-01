@@ -1,31 +1,13 @@
-import sys
-import os
-import logging
 from armoor import base
 from armoor.base.colocation import colocate_all
 from armoor.base.open_data import open_file
-from armoor.hmi.script_tools import create_folder
-from config.tests.config_path import path_p1 as path
-import armoor.cli.logger_tools as log
+from tests.int.base import change_path
 
 folder_test = 'uni_test_coloc'
 
-def change_path():
-    os.chdir(path)
-
-    out_path = f'output_{folder_test}/'
-    create_folder(f'{path}{out_path}')
-    os.chdir(f'{path}{out_path}')
-
-    log.setup_logging()
-    logger = logging.getLogger(__name__)
-
-    return f'{path}{out_path}', logger
-
-
 class TestColoc:
 
-    out_path, logger = change_path()
+    out_path, logger = change_path(folder_test)
 
     horizontal_colocation_flag = True
     vertical_colocation_flag = False

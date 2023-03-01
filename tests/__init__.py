@@ -1,1 +1,0 @@
-from config.tests.config_path import *

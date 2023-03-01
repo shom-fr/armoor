@@ -1,12 +1,15 @@
 import sys
 import os
-
+from xoa import cfgm
 from armoor.hmi.run_script import main
 from armoor.hmi.script_tools import create_folder
-from config.tests.config_path import path_p3 as path
+
+rootdir = os.path.abspath(os.path.dirname(__file__))
+cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "../../../config/tests/tests.ini"))
+paths = cfgm_forecaster.load(os.path.join(rootdir, "../../../config/tests.cfg"))
 
 def change_path():
-    os.chdir(path)
+    os.chdir(paths["path_p3"])
 
 class TestForecasterScripts:
 
