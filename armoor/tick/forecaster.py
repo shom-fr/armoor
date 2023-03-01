@@ -25,7 +25,7 @@ class Forecaster:
 
         rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/forecaster.ini"))
-        self.cfg_forecaster = cfgm_forecaster.load(os.path.join(rootdir, "../../config/tick/forecaster.cfg"))
+        self.cfg_forecaster = cfgm_forecaster.load(os.path.join(rootdir, "../../config/forecaster.cfg"))
         self.initialization()
 
     def initialization(self):
