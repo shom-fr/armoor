@@ -31,7 +31,7 @@ class SSTAccessor:
         xoa.register_accessors()
         xoa.register_accessors(decode_sigma=True)
 
-        path_cfg = '../../config/base/cf.cfg'
+        path_cfg = '../../config/cf.cfg'
 
         try:
             rootdir = os.path.abspath(os.path.dirname(__file__))

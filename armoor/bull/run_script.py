@@ -59,7 +59,7 @@ def main(argv=None):
     if not argv:
         argv = sys.argv[1:]
     output_folder_path, input_configuration_path = read_args(argv)
-    spec_config_file = '../../config/bull/spec.ini'
+    spec_config_file = '../../config/bull/bull.ini'
 
     logger.info(f'details of configuration from file : {input_configuration_path}')
     dict_configuration = st.return_dict(input_configuration_path, spec_config_file)
