@@ -35,7 +35,7 @@ setup(
                   'config' : ['log.cfg',
                               'base/cf.cfg',
                              'bull/bull.ini',
-                             'cli/spec.ini',
+                             'cli/cli.ini',
                              'hmi/spec.ini',
                              'tick/auth.ini',
                              'tick/fields.ini',
