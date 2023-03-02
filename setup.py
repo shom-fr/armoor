@@ -30,11 +30,11 @@ setup(
                              'bull/templates/functionality.html.jinja',
                              'bull/templates/metazone.html.jinja',
                              'bull/templates/raw-html.html.jinja',
-                             'bull/templates/logo_shom.png'
+                             'bull/templates/logo_shom.png',
+                             'bull/bull.ini'
                              ],
                   'config' : ['log.cfg',
                               'cf.cfg',
-                             'bull/bull.ini',
                              'cli/cli.ini',
                              'hmi/hmi.ini',
                              'tick/auth.ini',
