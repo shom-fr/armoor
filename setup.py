@@ -32,11 +32,11 @@ setup(
                              'bull/templates/raw-html.html.jinja',
                              'bull/templates/logo_shom.png',
                              'bull/bull.ini',
-                             'cli/cli.ini'
+                             'cli/cli.ini',
+                             'hmi/hmi.ini'
                              ],
                   'config' : ['log.cfg',
                               'cf.cfg',
-                             'hmi/hmi.ini',
                              'tick/auth.ini',
                              'tick/fields.ini',
                              'tick/search.ini',
