@@ -22,8 +22,7 @@ class Ticket:
         self.gitlab_project_id = -1
         self.project = None
         self.rootdir = os.path.abspath(os.path.dirname(__file__))
-        cfgm_auth = cfgm.ConfigManager(os.path.join(
-            self.rootdir, "../../config/tick/auth.ini"))
+        cfgm_auth = cfgm.ConfigManager(os.path.join(self.rootdir, "auth.ini"))
 
         current_dir = pathlib.Path().resolve()
         self.cfg_auth = cfgm_auth.load(
@@ -119,8 +118,7 @@ class Ticket:
         -------
         Template
         """
-        cfgm_fields = cfgm.ConfigManager(os.path.join(
-            self.rootdir, "../../config/tick/fields.ini"))
+        cfgm_fields = cfgm.ConfigManager(os.path.join(self.rootdir, "fields.ini"))
 
         kinds = {'numeric': os.path.join(self.rootdir, '../../config/numeric.cfg'),
                  'nodata': os.path.join(self.rootdir, '../../config/nodata.cfg'),
