@@ -27,7 +27,7 @@ def create(argv=None):
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
 
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/fields.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "fields.ini"))
 
     if not argv:
         argv = sys.argv[1:]
@@ -83,7 +83,7 @@ def search(argv=None):
     None
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/search.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "search.ini"))
 
     if not argv:
         argv = sys.argv[1:]
@@ -202,7 +202,7 @@ def authentication_update(argv=None):
     """
     rootdir = os.path.abspath(os.path.dirname(__file__))
     current_dir = pathlib.Path().resolve()
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/tick/auth.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "auth.ini"))
 
     if not argv:
         argv = sys.argv[1:]
