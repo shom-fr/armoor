@@ -113,7 +113,7 @@ def command_line_interface(argv=None):
 
     rootdir = os.path.abspath(os.path.dirname(__file__))
 
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "../../config/cli/cli.ini"))
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "cli.ini"))
 
     if not argv:
         argv = sys.argv[1:]
