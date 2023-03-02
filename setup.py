@@ -31,11 +31,11 @@ setup(
                              'bull/templates/metazone.html.jinja',
                              'bull/templates/raw-html.html.jinja',
                              'bull/templates/logo_shom.png',
-                             'bull/bull.ini'
+                             'bull/bull.ini',
+                             'cli/cli.ini'
                              ],
                   'config' : ['log.cfg',
                               'cf.cfg',
-                             'cli/cli.ini',
                              'hmi/hmi.ini',
                              'tick/auth.ini',
                              'tick/fields.ini',
