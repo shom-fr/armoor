@@ -69,6 +69,7 @@ setup(
     entry_points={
         'console_scripts': [
             'armoor = armoor.cli.run:main',
+            'armoor-sst = armoor.cli.run:script_p_sst',
             'armoor2 = armoor.cli.run:main_2',
             'armoor-tick-create = armoor.tick.run:create',
             'armoor-tick-search = armoor.tick.run:search',

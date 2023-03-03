@@ -14,12 +14,20 @@ def main_2():
     logger.info('Applying configuration to generate plots')
     base.calls_from_dict.dict2call(parser)
 
-def main(argv=None):
+def main(functionality :str = None):
     log.setup_logging()
     logger = logging.getLogger(__name__)
 
     logger.info('Retrieving parameter')
     parser = cli.command_line_interface()
 
+    if functionality:
+        parser.update({"functionality" : functionality})
+
+    print(f'{ parser = }')
     logger.info('Applying configuration to generate plots')
     base.calls_from_dict.dict2call(parser)
+
+
+def script_p_sst():
+    main('sst')
