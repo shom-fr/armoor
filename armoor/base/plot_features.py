@@ -540,19 +540,10 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
             x.append(obs.item(i))
             y.append(mod.item(i))
 
-    data, x_e, y_e = np.histogram2d(x, y, bins=20, density=True)
-    z = interpn((0.5 * (x_e[1:] + x_e[:-1]),
-                 0.5 * (y_e[1:] + y_e[:-1])),
-                data,
-                np.vstack([x, y]).T,
-                method="splinef2d",
-                bounds_error=False)
-
-    # To be sure to plot all data
-    z[np.where(np.isnan(z))] = 0.0
-
-    # Sort the points by density, so that the densest points are plotted last
-    z, x, y = (list(t) for t in zip(*sorted(zip(z, x, y))))
+    # Sturge's rule
+    nbins = int(1 + 3.322 * np.log2(n))
+    # Compute histogram
+    data, x_e, y_e = np.histogram2d(x, y, bins=nbins, density=True)
 
     slope, intercept, r, p, std_err = stats.linregress(x, y)
     rmse = calculation.rmsec_diag_disp(x, y)
@@ -561,21 +552,41 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
         return slope * x + intercept
 
     mymodel = list(map(myfunc, x))
-    im = axes.scatter(x, y, c=np.array(z) * n, s=4, cmap='jet')
-    min = obs.min() if obs.min() < mod.min() else mod.min()
-    max = obs.max() if obs.max() > mod.max() else mod.max()
-    plt.plot([min, max], [min, max], color='gray', linestyle='dashed', markersize=5)
+
+    vmin = np.nanmin([np.nanmin(obs), np.nanmin(mod)])
+    vmax = np.nanmax([np.nanmax(obs), np.nanmax(mod)])
+
+    markersize = np.tanh(1e5 / n)
+    treshold = 1e-2
+    if markersize < treshold:
+        markersize = treshold
+    axes.scatter(x, y, c='slateblue', s=2*markersize)
+    plt.plot([vmin, vmax], [vmin, vmax],
+             color='gray', linestyle='dashed', markersize=5)
     plt.grid(color='gray', linestyle='--', linewidth=1, zorder=1)
-    plt.plot(x, mymodel, color='red', linestyle='solid', markersize=5, label=f'y = {slope:.3f}*x + {intercept:.3f} \n'
-                                                                             f'Correlation Coef = {r:.3f}\n'
-                                                                             f'Std Err = {std_err:.3f}\n'
-                                                                             f'RMSE = {rmse:.3f}')
-
-    cbar = f.colorbar(im, ticklocation='left')
-    cbar.set_label('Number Of Points', rotation=270, fontsize=15, labelpad=15)
+    plt.plot(x, mymodel,
+             color='red',
+             linestyle='solid',
+             markersize=5,
+             label=f'y = {slope:.3f}*x + {intercept:.3f} \n'
+                   f'Correlation Coef = {r:.3f}\n'
+                   f'Std Err = {std_err:.3f}\n'
+                   f'RMSE = {rmse:.3f}\n'
+                   f'Npts = {n}')
     plt.legend(loc='upper left')
+    cs = axes.contour(
+            np.convolve(x_e, np.ones(2, dtype=int), 'valid') / 2.0,
+            np.convolve(y_e, np.ones(2, dtype=int), 'valid') / 2.0,
+            data.T/data.max(),
+            levels=np.arange(0.1, 1.2, 0.2),
+            cmap="Reds",
+            linewidths=1
+    )
+    axes.clabel(cs, cs.levels, inline=True, fontsize=5, fmt="%1.1f")
 
-    ft.manage_output(plt, f'diag_disp_g_{var_title}_{model_name}_{obs_name}', output_path)
+    ft.manage_output(plt,
+                     f'diag_disp_g_{var_title}_{model_name}_{obs_name}',
+                     output_path)
 
 
 def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metric, cmap=cmocean.cm.thermal, vmin=None,
