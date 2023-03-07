@@ -30,6 +30,15 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_map_sst_diff_seuil_bathy(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_map_sst_diff_seuil_bathy')
+        print(f"../single_tests/{folder_test}/map_sst_diff_seuil_bathy.ini")
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_diff_seuil_bathy.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
     def test_map_sst_diff_topaz(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_map_sst_diff_TOPAZ')
