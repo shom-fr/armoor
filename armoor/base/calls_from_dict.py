@@ -206,8 +206,6 @@ def get_method(data) -> str:
     ----------
     data : dict
         Parser.
-    method : str
-        Method to use.
     Returns
     -------
         str
@@ -257,18 +255,28 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, meta_zones: dict, method: str) -
         }
 
     if "meta_zones" in meta_zones:
-        # we apply the filters one after the other
+        # Cloud horizontal selection
+        if "cloud" in meta_zones["meta_zones"]:
+            radius = meta_zones["meta_zones"]["radius"] if "radius" in meta_zones["meta_zones"] else None
+            logger.info(f"Applying : cloud")
+            points = meta_zones["meta_zones"]["cloud"]
+            xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
+
+        # Bathymetry threshold
+        if 'h' in xarray_obj:
+            xarray_obj = xarray_obj.rename({'h': 'bathy'})
+        if 'bathy_min' in meta_zones["meta_zones"] or 'bathy_max' in meta_zones["meta_zones"]:
+            logger.info(f"Applying : bathymetry threshold")
+            if 'bathy' in xarray_obj:
+                min_bath = meta_zones["meta_zones"]["bathy_min"] if "bathy_min" in meta_zones["meta_zones"] else None
+                max_bath = meta_zones["meta_zones"]["bathy_max"] if "bathy_max" in meta_zones["meta_zones"] else None
+
+                xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath,
+                                                                        maximum=max_bath)
+        # Other meta-zones, one by one
         for name, filter in filters.items():
             if name in meta_zones["meta_zones"]:
                 logger.info(f"Applying : {name}")
                 xarray_obj = filter(xarray_obj)(meta_zones["meta_zones"][name])
-
-        ##################################################################################################
-        radius = meta_zones["meta_zones"]["radius"] if "radius" in meta_zones["meta_zones"] else None
-        if "cloud" in meta_zones["meta_zones"]:
-            logger.info(f"Applying : cloud")
-            points = meta_zones["meta_zones"]["cloud"]
-            xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
-        ##################################################################################################
 
     return xarray_obj
