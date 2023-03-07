@@ -334,15 +334,12 @@ class MetazoneAccessor:
 
         return rad_lat_deg
 
-    def horizontal_selection_bathymetry(self, bathymetry: float = None, minimum: float = None,
-                                        maximum: float = None, ) -> xr.Dataset:
+    def horizontal_selection_bathy(self, minimum: float = None, maximum: float = None, ) -> xr.Dataset:
         """
         Subset dataset selecting elements whom bathymetry values are included in the specified bathymetry range.
 
         Parameters
         ----------
-        bathymetry : float
-            Only bathymetry value kept (i.e. maximum = minimum).
         minimum : float
             Minimum bathymetry value kept.
         maximum : float
@@ -359,7 +356,7 @@ class MetazoneAccessor:
         """
 
         logger.info(f"Applying filter - horizontal_selection_bathymetry")
-        return self.data_selection(dim='bathy', value=bathymetry, minimum=minimum, maximum=maximum)
+        return self.data_selection(dim='bathy', minimum=minimum, maximum=maximum)
 
     def vertical_selection_depth(self, depth: list = None) -> xr.Dataset:
         """

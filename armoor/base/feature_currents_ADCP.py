@@ -310,11 +310,11 @@ def select_point_bathy_radius(config_obj, observation, models):
         obs_lon, obs_lat = obs_lon[0], obs_lat[0]
 
     # Get the criteria values
-    if "bathy" in config_obj["meta_zones"] and "radius" in config_obj["meta_zones"]:
-        bathy_thresh = config_obj["meta_zones"]["bathy"]
+    if "bathy_min" in config_obj["meta_zones"] and "radius" in config_obj["meta_zones"]:
+        min_bathy = config_obj["meta_zones"]["bathy_min"]
         radius = config_obj["meta_zones"]["radius"]
     else:
-        bathy_thresh = None
+        min_bathy = None
         radius = None
         logger.info(f"Oops, pour utiliser cette fonctionnalité, vous devriez spécifier le rayon "
                     f"autour de l'observation et le seuil batyhmétrique.... Le point du modèle "
@@ -322,10 +322,9 @@ def select_point_bathy_radius(config_obj, observation, models):
 
     # Select the point which satisfies the criteria, when possible
     for i_mod, mod in enumerate(models):
-        if bathy_thresh and radius:
+        if min_bathy and radius:
             if 'bathy' in mod["xarray_meta_coloc"].variables:
-                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].where(
-                    mod["xarray_meta_coloc"]["bathy"] > bathy_thresh)
+                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].meta.horizontal_selection_bathy(minimum=min_bathy)
             else:
                 logger.info("Oops, le modèle ne contient pas d'information de bathymétrie, "
                             "le critère ne peut donc pas être appliqué...")
