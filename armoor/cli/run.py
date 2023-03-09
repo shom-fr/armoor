@@ -31,3 +31,27 @@ def main(functionality :str = None):
 
 def script_p_sst():
     main('sst')
+
+def script_p_prof_hydro_vessel():
+    main('prof_hydro_vessel')
+
+def script_p_prof_hydro_mooring():
+    main('prof_hydro_mooring')
+
+def script_p_section_hydro():
+    main('section_hydro')
+
+def script_p_clim_hydro():
+    main('clim_hydro')
+
+def script_p_currents_hfr():
+    main('currents_hfr')
+
+def script_p_currents_ADCP():
+    main('currents_ADCP')
+
+def script_p_currents_VMADCP():
+    main('currents_VMADCP')
+
+def script_p_drifters():
+    main('drifters')
