@@ -172,7 +172,10 @@ def plot(config_obj):
         diag_ts_multi = {"diag_ts_multi": 'diag_ts_multi'}
 
         if output["plot"] in diag_ts_multi:
-            base.plot_features.plot_diag_ts_multi(models,
-                                                  observation["xarray_meta"],
-                                                  config_obj["meta_zones"]["radius"],
-                                                  output_path=sub_func_output_folder)
+            if "radius" not in config_obj["meta_zones"]:
+                logger.warning("Caution ! To plot Theta-S diagrams you need to specify a radius in the meta-zone")
+            else:
+                base.plot_features.plot_diag_ts_multi(models,
+                                                      observation["xarray_meta"],
+                                                      config_obj["meta_zones"]["radius"],
+                                                      output_path=sub_func_output_folder)
