@@ -5,13 +5,13 @@ Issues management
     :description: Anomaly management | You can create, search and read issues from Gitlab.
 
 You can create, search and read issues from Gitlab.
-Use **armoor-tick + TAB** to visualise all the commands available and get help with **-h** option.
+Use **armoor-tick + TAB** to visualize all the commands available, and get some help with the **-h** option.
 
 How to setup
 ------------
 
 In the folder where you will run the commands to create, read or search issues, please create a file named **auth.cfg**
-and paste the following code, replacing ``TOKEN``, ``GITLAB_URL_SERVER`` and ``ID_PROJECT`` with your information :
+and paste the following code by replacing ``TOKEN``, ``GITLAB_URL_SERVER`` and ``ID_PROJECT`` with your information :
 
 ::
 
@@ -22,13 +22,13 @@ and paste the following code, replacing ``TOKEN``, ``GITLAB_URL_SERVER`` and ``I
 
 .. IMPORTANT::
 
-   ``TOKEN`` must have api scope for the project ``ID_PROJECT``
+   ``TOKEN`` must have an api scope for the project ``ID_PROJECT``
 
-You can read your credential information with : ``armoor-tick-authentication-info``
+You can read your credentials information with : ``armoor-tick-authentication-info``
 
 You can update your credential with : ``armoor-tick-authentication``.
 
-Here's an example to update your token :
+Here is an example to update your token :
 
 ::
 
@@ -38,7 +38,7 @@ Here's an example to update your token :
 How to use
 ----------
 
-In this section you will learn how to search, read and create issues from Gitlab in command line with armoor.
+In this section you will learn how to search, read and create issues from Gitlab in a command line with armoor.
 
 Search for issues
 ~~~~~~~~~~~~~~~~~
@@ -47,9 +47,9 @@ The command to search for issues is ``armoor-tick-search`` which comes with thre
 
 * *request* : Any text which should be in the issue
 * *config* : Regional configuration name.
-* *state* : Filter by issues that are in a certain state, can be *opened* (default), *closed* or *all*.
+* *state* : Filter by issues that are in a certain state, that is either *opened* (default), *closed* or *all*.
 
-Here's an example :
+Here is an example :
 
 ::
 
@@ -59,9 +59,9 @@ Read an existing issue
 ~~~~~~~~~~~~~~~~~~~~~~
 
 To retrieve the description of an issue you need the ``issue_id`` that is provided
-on any search or after the creation of an issue.
+with any search or after the creation of an issue.
 
-Here's an example :
+Here is an example :
 
 ::
 
@@ -70,7 +70,7 @@ Here's an example :
 Create an issue
 ~~~~~~~~~~~~~~~
 
-The command to create an issue is ``armoor-tick-create`` all the options can be found in the following table :
+The command to create an issue is ``armoor-tick-create``. All the options can be found in the following table :
 
 +-------------------+---------------------------------------------------------------------------------------+
 | Field             | Description                                                                           |
@@ -83,7 +83,7 @@ The command to create an issue is ``armoor-tick-create`` all the options can be 
 +-------------------+---------------------------------------------------------------------------------------+
 | reporter          | Nom de la personne qui rapporte l’anomalie                                            |
 +-------------------+---------------------------------------------------------------------------------------+
-| reporting_level   | Niveau d’intérêt : Niveau 0 : intérêt pour tous, Niveau 100 : intérêt expert seulement|
+| reporting_level   | Niveau d’intérêt: Niveau 0: intérêt pour tous, Niveau 100: intérêt expert seulement   |
 +-------------------+---------------------------------------------------------------------------------------+
 | model             | Modèle : HYCOM/CROCO/PSY4/TOPAZ                                                       |
 +-------------------+---------------------------------------------------------------------------------------+
@@ -116,8 +116,8 @@ The command to create an issue is ``armoor-tick-create`` all the options can be 
 |                   | Sinon, l’utilisateur peut renseigner la valeur.                                       |
 +-------------------+---------------------------------------------------------------------------------------+
 
-All the option can be given in command line, in a file, or a combination of both.
-Here's an example :
+All the options can be given in a command line, in a file, or a combination of both.
+Here is an example :
 
 ::
 
