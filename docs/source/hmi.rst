@@ -4,16 +4,16 @@ Forecaster script
 .. meta::
     :description: Forecaster script | You can create images for forecaster wed interface.
 
-You will learn here how to create and customise the creation of images for the forecaster web interface.
+You will learn here how to create and customize the creation of images for the forecaster web interface.
 
 
 How to use
 ----------
 
-The command to use this script is ``armoor-script`` which comes with three mandatory options : *output-folder*, *input-folder* and *input-configuration*.
+The command to use this script is ``armoor-script``, which comes with three mandatory options : *output-folder*, *input-folder* and *input-configuration*.
 
 * *output-folder* : Folder path to store outputs created by the script for the web interface.
-* *input-folder* : Root folder path from which the data is collected to created images for the forecaster web interface.
+* *input-folder* : Root folder path from which the data is collected to create images for the forecaster web interface.
 * *input-configuration* : Configuration file for image generation
 
 This command generates a **.tgz** file containing all the created images and files with the right tree structure for the forecaster web interface.
@@ -49,19 +49,19 @@ The entries folder should contain and be structured as follows ::
     │       ├── woa18_decav_s03_04.nc
     │       └── woa18_decav_t03_04.nc
 
-With ``config_reg`` the *name* given in the configuration file si bellow and *YYYYMMDD* the production day (day of execution).
+Where ``config_reg`` is the *name* given in the configuration file (see below), and *YYYYMMDD* the production day (day of execution).
 
 Details on configuration file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There is two main sections ``[config_reg]`` and ``[parameters]``.
+There are two main sections ``[config_reg]`` and ``[parameters]``.
 
-Section *config_reg*
+*config_reg* section
 ____________________
 
-The name of the regional configuration must be the same as the folder inside the *input-folder* folder.
-Example if the production day is *20230307* and the regional configuration is *hycom3d_med* the folder name
-is *hycom3d_med_20230307* and the content of this section in the configuration file is as follow ::
+The name of the regional configuration must be the same as that used for the folder inside the *input-folder*.
+For example if the production day is *20230307* and the regional configuration *hycom3d_med*, the folder name
+will be *hycom3d_med_20230307* and the content of this section in the configuration file will be as follow::
 
     [config_reg]
         name = "hycom3d_med"
@@ -71,26 +71,26 @@ In this example the **.tgz** output file will be *hycom3d_med_20230307.tgz*.
 Section *parameters*
 ____________________
 
-There can be as many parameters as need, each parameter is composed with a header and 4 sub-parameters.
+There can be as many parameters as needed, each parameter being composed of a header and of 4 sub-parameters.
 
 Header
 ######
 
-The header can be composed of three parts :
-    1. ``[[parameter_name]]`` : must be unique and with only *letters*, *numbers* and *_*.
-    2. ``name`` is here only to make the configuration file more readable.
-    3. ``[[[extent]]]`` is an optional parameter, it must include the minimum, maximum longitudes and latitudes with the following attributes : *lon_min*, *lon_max*, *lat_min* and *lat_max*.
+The header can be composed of three parts:
+    1. ``[[parameter_name]]`` : must be unique, with only *letters*, *numbers* and *_*.
+    2. ``name`` is only here to make the configuration file more readable.
+    3. ``[[[extent]]]`` is an optional parameter, which must include the minimum and maximum longitudes and latitudes, with the following attributes : *lon_min*, *lon_max*, *lat_min* and *lat_max*.
 
 Sub-parameters
 ##############
 
-After the header the are 4 sub-parameters which must be named in triple square brackets param_* ( 1 to 4).
-Each sub-parameter can have combination of attributes depending on we want to display in the forecaster web interface.
-Here are the different attributes and their purpose :
+After the header there are 4 sub-parameters which must be named as triple square brackets param_* ( 1 to 4).
+Each sub-parameter can have a combination of attributes depending on what we want to display in the forecaster web interface.
+Here are the different possible attributes and their purpose:
 
 * ``name`` : Name displayed in the final image, plot or chart.
 
-* ``func`` : Visualisation functions, can either of the following :
+* ``func`` : Visualization functions among the following :
 
     #. ``visu_temp`` : 2D map of temperature or sea surface temperature.
     #. ``visu_sal`` : 2D map of salinity or sea surface salinity.
@@ -104,7 +104,7 @@ Here are the different attributes and their purpose :
     #. ``visu_mixedlayer`` : Mixed layer thickness computed from model.
     #. ``visu_mixedlayer_clim`` : Mixed layer thickness computed from climatology.
 
-* ``var`` : Variable of interest :
+* ``var`` : Variables of interest among the following:
 
     #. ``temp`` : temperature
     #. ``sst`` : sea surface temperature
@@ -116,15 +116,15 @@ Here are the different attributes and their purpose :
     #. ``RVFL`` : runoff
     #. ``tp`` : total precipitation
 
-* ``depth`` : depth of interest in meters.
+* ``depth`` : Depth of interest in meters.
 
-* ``obs`` : relative path to observation for comparison with model functions *visu_diff_sst* and *visu_diff_sss*.
+* ``obs`` : Relative path to observation for comparison with the model functions *visu_diff_sst* and *visu_diff_sss*.
 
-* ``forcing_model`` : relative path to forcing model observation for the following functions : *visu_mixedlayer_clim*, *visu_windforcing*, *visu_solarflux*, *visu_runoff* and *visu_precip*.
+* ``forcing_model`` : Relative path to forcing model observation for the following functions : *visu_mixedlayer_clim*, *visu_windforcing*, *visu_solarflux*, *visu_runoff* and *visu_precip*.
 
-* ``rarification`` : rarification factor to reduce quivers density, used in functions *visu_current* and *visu_windforcing*.
+* ``rarification`` : rarification factor to reduce quivers density. It is used in the functions *visu_current* and *visu_windforcing*.
 
-* ``multiprocess`` : used to speed up by parallelizing on all model's time steps, default value is *True*. Set to *False* only with function *visu_mixedlayer_clim*.
+* ``multiprocess`` : used for acceleration purposes by parallelization on all model's time steps. Its default value is *True* and it is only set to *False* with the function *visu_mixedlayer_clim*.
 
 
 Example
