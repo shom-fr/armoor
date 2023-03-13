@@ -77,8 +77,8 @@ Relative to horizontal restriction:
     * ``cloud`` : To indicate the list of points of interest
     * ``radius`` : To expand the area of interest to a radius (in km). This option is in combination with 'cloud'
     * ``polygon`` : To consider only the region inside the polygon defined by a list of points.
-    * ``bathy_min`` : Minimum authorized bathymetry value. @TODO
-    * ``bathy_max`` : Maximum authorized bathymetry value. @TODO
+    * ``bathy_min`` : Minimum authorized bathymetry value.
+    * ``bathy_max`` : Maximum authorized bathymetry value.
 
 Relative to vertical restriction:
 

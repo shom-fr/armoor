@@ -4,3 +4,98 @@ Reports
 .. meta::
     :description: Reports | You can generate reports based on armoor functionalities.
 
+
+How to generate reports
+-----------------------
+
+You will learn here how to use ``armoor-bull`` to create reports based on the 9 functionalities of armoor.
+To generate a report run the command ``armoor-bull`` with a configuration file using the option ``--cfgfile``.
+
+We can distinguish 3 sections in the configuration file:
+
+    #. Report : common part of the execution.
+    #. Functionalities : configurations.
+    #. Meta-zones : filters applied to the configurations.
+
+
+1. Report
+---------
+
+In the report's section 2 attributes must provided after ``[report]``:
+
+    * ``title`` : the title of the report.
+    * ``format`` : the output format, that is either **html**, **pdf** or **all** (both).
+
+
+2. Functionalities
+------------------
+
+We can provide as many Functionalities as needed after ``[functionalities]``.
+
+For each functionality, you must provide a functionality name in double brackets ``[[functionality_name]]`` followed by 2 attributes:
+
+    * ``path_to_config`` : path to a configuration file as it is described in :doc:`base` chapter, but without a **meta-zone** as it is specified in this file.
+    * ``meta_zones`` : a list of **meta-zone** names.
+
+.. Note::
+    The name's of the **meta-zone** in this list, must match the name in double brackets ``[[meta_zone_name]]`` in the section below.
+
+
+.. IMPORTANT::
+    Each functionality name ``[[functionality_name]]`` must be unique.
+
+
+2. Meta-zones
+-------------
+
+We can provide as many meta-zones as needed after ``[meta_zones]``.
+
+For each **meta-zone**, you must provide a meta-zone name in double brackets ``[[meta_zone_name]]`` followed by 2 attributes, plus the **filters to apply**:
+
+    * ``name`` : *meta-zone* name appearing in the title plots.
+    * ``description`` : *description* text appearing in the report.
+    * **filters to apply** : use the same attribute name's as the section **4. Meta-zones** in the :doc:`base` chapter for the same result.
+
+.. IMPORTANT::
+    Each **meta-zone** name ``[[meta_zone_name]]`` must be unique.
+
+
+Example
+-------
+
+Example of configuration file::
+
+    [report]
+        title = Bulletin de validation
+        format = pdf
+
+    [functionalities]
+        [[f1_map_sst_biais]]
+            path_to_config = test_f1/map_sst_biais.ini
+            meta_zones = meta_zone_polygon_1, meta_zone_polygon_2
+        [[f1_map_sst_diff]]
+            path_to_config = test_f1/map_sst_diff.ini
+            meta_zones = meta_zone_simple_polygon_1
+
+    [meta_zones]
+
+        [[meta_zone_polygon_1]]
+            name = "Polygon, interval, start and end time. => 2020"
+            description = Description de la meta_zone_polygon_1
+            polygon = [-6,49], [-6, 47],[-4, 47], [-4, 49]
+            start = 2020-06-01T00:00:00
+            end = 2020-06-04T03:00:00
+            interval = 12h
+
+        [[meta_zone_polygon_2]]
+            name = "Polygon, interval, start and end time. => 2022"
+            description = Description de la meta_zone_polygon_2
+            polygon = [-6,49], [-6, 47],[-4, 47], [-4, 49]
+            start = 2022-06-01T00:00:00
+            end = 2022-06-04T03:00:00
+            interval = 12h
+
+        [[meta_zone_simple_polygon_1]]
+            name = "Polygon 1"
+            description = Description de la meta_zone_simple_polygon_1
+            polygon = [-3.5,46], [-3.5, 48],[-2, 48], [-2, 46]
