@@ -39,7 +39,10 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
             logger.info(f"You are trying to open multiple files. If they corresponds to an "
                         f"HYCOM model, you should specify type='HYCOM_3D' or type='HYCOM_currents'"
                         f"in the configuration file.")
-            return xr.open_mfdataset(path_files)
+            try:
+                return xr.open_mfdataset(path_files)
+            except:
+                return open_several_obs(path_files)
 
     elif type == 'HYCOM_currents':
         logger.info(f"HYCOM_currents")
@@ -72,6 +75,29 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
             logger.info(f"VMADCP")
             return open_VMADCP(path_files)
 
+def open_several_obs(path_files) -> xr.Dataset:
+    """
+     Open several observation files and store them into one dataset
+     Parameters
+     ----------
+     path_files : str, list of str
+         Path to the netcdf files.
+
+     Returns
+     -------
+     xarray.Dataset
+         Model or observation dataset.
+     """
+    list_ds = []
+    for path in path_files:
+        ds = xr.open_dataset(path)
+        lon_ds = ds.LONGITUDE.assign_coords(LONGITUDE=ds.TIME.data).rename({'LONGITUDE': 'TIME'})
+        lat_ds = ds.LATITUDE.assign_coords(LATITUDE=ds.TIME.data).rename({'LATITUDE': 'TIME'})
+        ds = ds.drop(['LONGITUDE', 'LATITUDE'])
+        ds['LATITUDE'] = lat_ds
+        ds['LONGITUDE'] = lon_ds
+        list_ds.append(ds)
+    return xr.concat(list_ds,dim='TIME')
 
 def decode_croco_currents(path_files):
     """
