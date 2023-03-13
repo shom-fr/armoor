@@ -141,6 +141,12 @@ def get_observation_models_meta(config_obj: dict):
         vertical_colocation_flag = True
         horizontal_colocation_flag = False
 
+    # Colocation for functionnality 9
+    if config_obj["functionality"] == "drifters":
+        temporal_colocation_flag = False
+        vertical_colocation_flag = False
+        horizontal_colocation_flag = False
+
     logger.info(f"Collocating model(s) and observation")
     for index_model, model in enumerate(models):
         # Colocation per model
