@@ -8,6 +8,7 @@ from xoa.grid import dz2depth, shift
 import logging
 logger = logging.getLogger(__name__)
 
+
 def open_file(path_files, func=None, type=None) -> xr.Dataset:
     """
      Open a netcdf/txt file and store it into a dataset
@@ -26,7 +27,6 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
          Model or observation dataset.
      """
     logger.info(f"Opening")
-
     if func == 'forecaster':
         logger.info(f"forecaster")
         return open_forecaster(path_files, type)
@@ -35,11 +35,15 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
         if func == "clim_hydro":
             logger.info(f"clim_hydro")
             return xr.open_mfdataset(path_files, decode_times=False)
+
         else:
             logger.info(f"You are trying to open multiple files. If they corresponds to an "
                         f"HYCOM model, you should specify type='HYCOM_3D' or type='HYCOM_currents'"
                         f"in the configuration file.")
             return xr.open_mfdataset(path_files)
+
+    elif isinstance(path_files, list) and type == 'CMEMS':
+        return open_several_obs(path_files)
 
     elif type == 'HYCOM_currents':
         logger.info(f"HYCOM_currents")
@@ -56,7 +60,6 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
         croco_current = decode_croco_currents(path_files)
         return croco_current
 
-
     elif os.path.splitext(path_files)[1] in (".nc", ".netcdf"):
         logger.info(f"Single file dataset")
         return xr.open_dataset(path_files)
@@ -71,6 +74,31 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
         elif type == "VMADCP":
             logger.info(f"VMADCP")
             return open_VMADCP(path_files)
+
+
+def open_several_obs(path_files) -> xr.Dataset:
+    """
+     Open several observation files and store them into one dataset
+     Parameters
+     ----------
+     path_files : str, list of str
+         Path to the netcdf files.
+
+     Returns
+     -------
+     xarray.Dataset
+         Model or observation dataset.
+     """
+    list_ds = []
+    for path in path_files:
+        ds = xr.open_dataset(path)
+        lon_ds = ds.LONGITUDE.assign_coords(LONGITUDE=ds.TIME.data).rename({'LONGITUDE': 'TIME'})
+        lat_ds = ds.LATITUDE.assign_coords(LATITUDE=ds.TIME.data).rename({'LATITUDE': 'TIME'})
+        ds = ds.drop(['LONGITUDE', 'LATITUDE'])
+        ds['LATITUDE'] = lat_ds
+        ds['LONGITUDE'] = lon_ds
+        list_ds.append(ds)
+    return xr.concat(list_ds, dim='TIME')
 
 
 def decode_croco_currents(path_files):
