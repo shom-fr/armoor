@@ -55,17 +55,20 @@ class ReadAccessor:
             Decoded dataset.
         """
         logger.info(f"Decoding data")
-        # If coords can be regridded with no loss of information
-        self._obj = xoa.grid.to_rect(self._obj)
         # Remove QC from variables to prevent random behaviours
         vars_to_remove = ['TEMP_QC', 'PSAL_QC', 'TIME_QC', 'POSITION_QC']
         for var in vars_to_remove:
             if var in self._obj.variables:
                 self._obj = self._obj.drop(var)
+
         # Decode CROCO models
-        if 'xi_rho' in self._obj.dims:
+        if 'xi_rho' in self._obj.dims or 'lon_rho' in self._obj.dims:
             return self._obj.read.decode_croco().read.convert_lons().read.convert_depths()
         else:  # si autre modele/obs
+
+            # If coords can be regridded with no loss of information
+            self._obj = xoa.grid.to_rect(self._obj)
+
             self._obj = self._obj.read.decode_model()
             if 'lon' in self._obj.lon.dims and len(self._obj.lon.values) == len(self._obj.lat.values) and len(
                     self._obj.lon.values) == len(self._obj.time.values):
@@ -120,18 +123,42 @@ class ReadAccessor:
         """
         self._obj = self._obj.decode_sigma()
 
+        # Remove variables that are never used in the features. May need to be completed.
+        list_to_keep = [ 'temp', 'salt']
+        for var in list(self._obj.keys()):
+            if var not in list_to_keep:
+                self._obj = self._obj.drop(var)
+
+        # Depth becomes a variable
+        if 'depth' in self._obj:
+            self._obj = self._obj.reset_coords('depth')
+
+        # Rename coordinates
         self._obj = self._obj.rename_dims({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
         self._obj = self._obj.drop(['xi_rho', 'eta_rho'])
 
-        longitude = np.unique(self._obj.lon_rho.data)[:-1]
-        latitude = np.unique(self._obj.lat_rho.data)[:-1]
+        if len(self._obj['lon']) == len(np.unique(self._obj.lon_rho.data)):
+            longitude = np.unique(self._obj.lon_rho.data)
+            latitude = np.unique(self._obj.lat_rho.data)
+        elif len(self._obj['lon']) == len(np.unique(self._obj.lon_rho.data)) - 1:
+            longitude = np.unique(self._obj.lon_rho.data)[:-1]
+            latitude = np.unique(self._obj.lat_rho.data)[:-1]
 
         self._obj['lon'] = longitude
         self._obj['lat'] = latitude
 
-        if self._obj.depth.min() < 0 and self._obj.depth.max() > 0:
-            self._obj['depth'] = -self._obj.depth.where((self._obj.depth < 0) & (self._obj.depth > -1e5))
-        self._obj = self._obj.where(~np.isnan(self._obj.depth))
+        # Remove useless coordinates
+        self._obj = self._obj.reset_coords(drop=True)
+
+        # Set depth as coordinates
+        if 'depth' in self._obj:
+            self._obj = self._obj.assign_coords(depth=self._obj.depth)
+
+        # Convert depths
+        if 'depth' in self._obj:
+            if self._obj.depth.min() < 0 and self._obj.depth.max() > 0:
+                self._obj['depth'] = -self._obj.depth.where((self._obj.depth < 0) & (self._obj.depth > -1e5))
+            self._obj = self._obj.where(~np.isnan(self._obj.depth))
 
         return self._obj
 
