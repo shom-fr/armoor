@@ -1,8 +1,3 @@
-.. [SHOM] Validation and reports tools documentation master file, created by
-   sphinx-quickstart on Mon Mar  6 10:33:25 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Welcome to [SHOM] Validation and reports tools's documentation!
 ===============================================================
 
@@ -19,9 +14,22 @@ Welcome to [SHOM] Validation and reports tools's documentation!
    hmi
 
 
+As part of its activities, for the needs of its military and civilian customers, the Shom operates daily regional and coastal oceanographic forecasting models or exploits external models.
+
+In order to validate distributed data, they need tools to systematize the validation and monitoring of these models and their forcings and to facilitate their exploitation by association with observational data.
+
+The library “Armoor” has been developed to address these needs. This documentation presents this library and how to use its different functions.
+
+
+
+
 Indices and tables
 ==================
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+* :doc:`install` : Installation process for armoor tools
+* :doc:`base` : global presentation on how to use armoor comparison tool
+* :doc:`functionalities`: Description of the different comparison functions of the tool.
+* :doc:`bull`: Description of the generation of a comparison report based on the 9 functionalities described above
+* :doc:`tick`: Presentation of the tool to create, search and read issues from Gitlab.
+* :doc:`hmi` : Presentation of the script to generate images for the forecaster interface.
+

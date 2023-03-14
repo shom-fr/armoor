@@ -75,7 +75,7 @@ Relative to time restriction:
 Relative to horizontal restriction:
 
     * ``cloud`` : To indicate the list of points of interest
-    * ``radius`` : To expand the area of interest to a radius (in km). This option is in combination with 'cloud'
+    * ``radius`` : To expand the area of interest to a radius (in km). This option is in combination with 'cloud'.
     * ``polygon`` : To consider only the region inside the polygon defined by a list of points.
     * ``bathy_min`` : Minimum authorized bathymetry value.
     * ``bathy_max`` : Maximum authorized bathymetry value.
@@ -150,3 +150,34 @@ For each output here is the list of possible options (with their associated desc
     * ``tidal_waves`` : @TODO
     * ``path_results`` : @TODO
     * ``path_comodo`` : @TODO
+
+
+
+Example
+-------
+
+Example of configuration file for a *global scatter plots* and a *statistical time series*::
+
+    functionality = sst
+    colocate = auto
+
+    [observation]
+        name = "L3 METEOFRANCE"
+        path = data/test_f1/OBS/nov_METEOFRANCE-EUR-SST_L3MONOSENSOR_NRT-OBS_V2-AVHRR_METOP_B_FULL_TIME_SERIE_1621503492101.nc
+        method = nearest
+
+    [models]
+        [[HYCOM]]
+            name = HYCOM
+            path = data/test_f1/MODEL/HYCOMsst_2D.nc
+            method = nearest
+
+    [outputs]
+        [[plot_diag_disp]]
+            plot = diag_disp_g
+            colormap = thermal
+        [[ts_stats]]
+            plot = plot_ts_metr_stats
+
+
+

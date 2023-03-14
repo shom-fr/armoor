@@ -4,7 +4,7 @@ Forecaster script
 .. meta::
     :description: Forecaster script | You can create images for forecaster wed interface.
 
-You will learn here how to create and customize the creation of images for the forecaster web interface.
+You will learn here how to create and customize images for the forecaster web interface.
 
 
 How to use
@@ -21,7 +21,7 @@ This command generates a **.tgz** file containing all the created images and fil
 Details on input folder
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The entries folder should contain and be structured as follows ::
+The input folder should contain and be structured as follows ::
 
     ├── config_reg_YYYYMMDD
     │   ├── atmfrc
@@ -49,7 +49,7 @@ The entries folder should contain and be structured as follows ::
     │       ├── woa18_decav_s03_04.nc
     │       └── woa18_decav_t03_04.nc
 
-Where ``config_reg`` is the *name* given in the configuration file (see below), and *YYYYMMDD* the production day (day of execution).
+Where ``config_reg`` is the *name* given in the configuration file (see below), and *YYYYMMDD* the date of production of the data.
 
 Details on configuration file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,9 +59,9 @@ There are two main sections ``[config_reg]`` and ``[parameters]``.
 *config_reg* section
 ____________________
 
-The name of the regional configuration must be the same as that used for the folder inside the *input-folder*.
-For example if the production day is *20230307* and the regional configuration *hycom3d_med*, the folder name
-will be *hycom3d_med_20230307* and the content of this section in the configuration file will be as follow::
+The name of the regional configuration must be identical to the folder name inside the *input-folder*.
+For example if the production day is *20230307* and the regional configuration is *hycom3d_med*, the folder name
+shall be *hycom3d_med_20230307* and the content of this section in the configuration file will be as follow::
 
     [config_reg]
         name = "hycom3d_med"

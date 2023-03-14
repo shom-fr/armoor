@@ -10,8 +10,8 @@ project = '[SHOM] Validation and reports tools'
 copyright = '2023, Noveltis'
 author = 'Noveltis'
 
-import armoor
-release = armoor.__version__
+# import armoor
+# release = armoor.__version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
