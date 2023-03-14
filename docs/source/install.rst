@@ -4,7 +4,7 @@ Armoor installation
 .. meta::
     :description: Armoor Installation | You can install Armoor from source.
 
-Installation process for armoor tools
+This page describes the installation process for armoor tools
 
 Retrieving sources
 ------------------

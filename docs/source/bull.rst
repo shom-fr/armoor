@@ -21,7 +21,7 @@ We can distinguish 3 sections in the configuration file:
 1. Report
 ---------
 
-In the report's section 2 attributes must provided after ``[report]``:
+In the report's section, 2 attributes must be provided after ``[report]``:
 
     * ``title`` : the title of the report.
     * ``format`` : the output format, that is either **html**, **pdf** or **all** (both).
@@ -34,18 +34,18 @@ We can provide as many Functionalities as needed after ``[functionalities]``.
 
 For each functionality, you must provide a functionality name in double brackets ``[[functionality_name]]`` followed by 2 attributes:
 
-    * ``path_to_config`` : path to a configuration file as it is described in :doc:`base` chapter, but without a **meta-zone** as it is specified in this file.
+    * ``path_to_config`` : path to a configuration file as it is described in :doc:`base` chapter, but without a **meta-zone** (they are described in the configuration file of the report).
     * ``meta_zones`` : a list of **meta-zone** names.
 
 .. Note::
-    The name's of the **meta-zone** in this list, must match the name in double brackets ``[[meta_zone_name]]`` in the section below.
+    In this list, the name of the **meta-zone**, must match the name in double brackets ``[[meta_zone_name]]`` defined in the section below.
 
 
 .. IMPORTANT::
     Each functionality name ``[[functionality_name]]`` must be unique.
 
 
-2. Meta-zones
+3. Meta-zones
 -------------
 
 We can provide as many meta-zones as needed after ``[meta_zones]``.
@@ -54,7 +54,7 @@ For each **meta-zone**, you must provide a meta-zone name in double brackets ``[
 
     * ``name`` : *meta-zone* name appearing in the title plots.
     * ``description`` : *description* text appearing in the report.
-    * **filters to apply** : use the same attribute name's as the section **4. Meta-zones** in the :doc:`base` chapter for the same result.
+    * **filters to apply** : use the same attributes names as described in section **4. Meta-zones** of the :doc:`base` chapter.
 
 .. IMPORTANT::
     Each **meta-zone** name ``[[meta_zone_name]]`` must be unique.
