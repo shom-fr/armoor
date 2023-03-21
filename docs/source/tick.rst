@@ -121,7 +121,7 @@ Here is an example :
 
 ::
 
-    armoor-tick-create --title "my title" --production_time "06/03/2023" --cfgfile ticket_hycom_manga.cfg
+    armoor-tick-create --title "my title" --production-time "06/03/2023" --cfgfile ticket_hycom_manga.cfg
 
 The content of the *ticket_hycom_manga.cfg* file could be :
 
