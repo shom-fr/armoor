@@ -137,7 +137,6 @@ def plot(config_obj):
                             f"la période sur laquelle calculer l'analyse harmonique. Le calcul "
                             f"sera ici fait sur toute la période des fichiers d'entrée...")
 
-
             # Process harmonic analysis on observation
             logger.info("Beginning of the harmonic analysis on the observation.")
             # If metazone per slice, calculate average per slice
