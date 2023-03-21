@@ -6,8 +6,9 @@ import xoa.cf as xcf
 import numpy as np
 import os
 import xoa
-
+import gsw
 import logging
+
 logger = logging.getLogger(__name__)
 
 xoa.register_accessors(decode_sigma=True)
@@ -73,21 +74,37 @@ class ReadAccessor:
             if 'lon' in self._obj.lon.dims and len(self._obj.lon.values) == len(self._obj.lat.values) and len(
                     self._obj.lon.values) == len(self._obj.time.values):
                 self._obj = self._obj.read.convert_trajectory()
-
             if 'depth' in self._obj.dims and 'DEPH' in self._obj.variables:
                 self._obj = self._obj.read.decode_profiler()
             if 'lon' in self._obj.dims and self._obj.lon.dims == ('lon',) and len(self._obj.lon) == len(self._obj.time):
                 self._obj = self._obj.read.decode_profiler()
-            if 'depth' in self._obj.dims and 'depth' not in self._obj.coords:
-                self._obj = self._obj.assign_coords({'depth': self._obj.depth})
-            if 'depth' in self._obj.dims and len(self._obj.depth.dims) == 2:  # resoud cas de profils
-                depth = 0
+            if 'depth' in self._obj.dims and 'depth' not in self._obj.coords and 'pres' in self._obj:  # In-situ depths
+                self._obj = self._obj.read.depth_from_press()
             try:
                 self._obj = self._obj.read.convert_lons().read.convert_depths()
                 return self._obj
             except:
                 self._obj = self._obj.read.convert_depths()
                 return self._obj
+
+    def depth_from_press(self) -> xr.Dataset:
+        """
+        Calculate depth values from pressure.
+
+        Returns
+        -------
+        xarray.Dataset
+            Formatted dataset.
+
+        """
+        alat = self._obj.lat.broadcast_like(self._obj.pres)
+        adepth = gsw.z_from_p(self._obj.pres, alat)
+        adepth = adepth.where(adepth.notnull(), adepth.min())
+        adepth.attrs.update({"long_name": "Depth", "units": "m"})
+        self._obj = self._obj.rename({'depth': 'z'})
+        adepth = adepth.rename({'depth': 'z'})
+        self._obj = self._obj.assign_coords(depth=adepth)
+        return self._obj
 
     # TOPAZ, HYCOM2D, NEMO
     def decode_model(self) -> xr.Dataset:
