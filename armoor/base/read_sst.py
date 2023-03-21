@@ -2,17 +2,14 @@
 """read variables in models and observation
 """
 import os
-
 import numpy as np
 import xarray as xr
-
 from xoa.regrid import grid2loc, regrid1d
 import xoa
 import xoa.cf as xcf
-
 import logging
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 @xr.register_dataarray_accessor("read_sst")
 @xr.register_dataset_accessor("read_sst")
@@ -112,9 +109,7 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing SST. If several depth temperature, the temperature of the min depth is taken.
         """
-
         if 'depth' in self._obj.coords:
-
             try:
                 return self._obj.xoa.temp.sel(depth=depth, method='nearest').read_sst.convert_K_C()
             except:  # CROCO

@@ -4,7 +4,6 @@ import numpy as np
 from xoa.regrid import regrid1d
 import xoa.grid
 import xesmf as xe
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -84,15 +83,29 @@ def colocate_all(obs,
                     if 'sig' in mod[var].dims:
                         mod[var] = regrid1d(mod[var], depth)
 
+
             # Interpolation for other models
             else:
                 mod = mod.interp(depth=depth_values,
                                  method=coloc_method,
                                  kwargs={"fill_value": "extrapolate"})
             logger.info("Vertical colocation of observation")
-            obs = obs.interp(depth=depth_values,
-                             method=coloc_method,
-                             kwargs={"fill_value": "extrapolate"})
+
+            # Interpolation for CMEMS in-situ when depth is calculated from pressure
+            if 'depth' not in obs.dims and 'depth' in obs.coords:
+                depth = xr.DataArray(depth_values, name="depth", dims="depth")
+                ds_coloc = xr.Dataset()
+                for var in obs.variables:
+                    if 'depth' in obs[var].coords and var != 'depth':
+                        ds_coloc[var] = regrid1d(obs[var], depth)
+                    else:
+                        ds_coloc[var] = obs[var]
+                obs = ds_coloc
+                obs['depth']=depth
+            else:
+                obs = obs.interp(depth=depth_values,
+                                 method=coloc_method,
+                                 kwargs={"fill_value": "extrapolate"})
 
     # Horizontal colocation
     # Colocation for observations whose positions depend on time (profilers etc.)
