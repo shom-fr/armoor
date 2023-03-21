@@ -58,6 +58,51 @@ def colocate_all(obs,
 
     logger.info(f"Colocation to grid {opt_grid}")
 
+    # Time colocation
+    if temporal_colocation_flag:
+        time_values = np.unique(ds_tgt.time.values)
+        logger.info("Temporal model colocation")
+        mod = mod.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+
+        logger.info("Temporal observation colocation")
+        obs = obs.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+
+        # Horizontal colocation  # Colocation for observations whose positions depend on time (profilers etc.)
+    if horizontal_colocation_flag and 'time' in ds_tgt.lon.dims:
+        logger.info("Target grid positions are depending on time")
+        try:
+            logger.info("Observation positions colocation")
+            obs = colocate_lon_lat_time_obs(obs, ds_tgt, coloc_method)
+        except:
+            logger.warning("Observation positions colocation : Failed.")
+            pass
+
+        logger.info("Model positions colocation")
+        mod = colocate_lon_lat_time_mod(mod, ds_tgt, coloc_method)
+
+    elif horizontal_colocation_flag:
+        lon_values = np.unique(ds_tgt.lon.values)
+        lat_values = np.unique(ds_tgt.lat.values)
+
+        # If x/y coords remains after to_rect, we use xesmf to convert curv into rect grid
+        if 'x' in mod.dims:
+            logger.info("Curvilinear to rectilinear conversion")
+            mod = convert_curv_rect(mod, lon_values, lat_values)
+            logger.info("Curvilinear to rectilinear conversion : done.")
+        # Colocate model
+        try:
+            logger.info("Horizontal model colocation")
+            mod = mod.interp(lon=lon_values, lat=lat_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+        except:
+            logger.warning("Horizontal model colocation : Failed.")
+
+        # Colocate observation
+        try:
+            logger.info("Horizontal observation colocation")
+            obs = obs.interp(lon=lon_values, lat=lat_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+        except:
+            logger.warning("Horizontal observation colocation : Failed.")
+
     # Vertical colocation
     if vertical_colocation_flag:
         if 'DEPH' in ds_tgt.variables:
@@ -106,62 +151,6 @@ def colocate_all(obs,
                 obs = obs.interp(depth=depth_values,
                                  method=coloc_method,
                                  kwargs={"fill_value": "extrapolate"})
-
-    # Horizontal colocation
-    # Colocation for observations whose positions depend on time (profilers etc.)
-    if horizontal_colocation_flag and 'time' in ds_tgt.lon.dims:
-        logger.info("Target grid positions are depending on time")
-        try:
-            logger.info("Observation positions colocation")
-            obs = colocate_lon_lat_time_obs(obs, ds_tgt, coloc_method)
-        except:
-            logger.warning("Observation positions colocation : Failed.")
-            pass
-
-        logger.info("Model positions colocation")
-        mod = colocate_lon_lat_time_mod(mod, ds_tgt, coloc_method)
-
-    elif horizontal_colocation_flag:
-        lon_values = np.unique(ds_tgt.lon.values)
-        lat_values = np.unique(ds_tgt.lat.values)
-
-        # If x/y coords remains after to_rect, we use xesmf to convert curv into rect grid
-        if 'x' in mod.dims:
-            logger.info("Curvilinear to rectilinear conversion")
-            mod = convert_curv_rect(mod, lon_values, lat_values)
-            logger.info("Curvilinear to rectilinear conversion : done.")
-        # Colocate model
-        try:
-            logger.info("Horizontal model colocation")
-            mod = mod.interp(lon=lon_values,
-                             lat=lat_values,
-                             method=coloc_method,
-                             kwargs={"fill_value": "extrapolate"})
-        except:
-            logger.warning("Horizontal model colocation : Failed.")
-
-        # Colocate observation
-        try:
-            logger.info("Horizontal observation colocation")
-            obs = obs.interp(lon=lon_values,
-                             lat=lat_values,
-                             method=coloc_method,
-                             kwargs={"fill_value": "extrapolate"})
-        except:
-            logger.warning("Horizontal observation colocation : Failed.")
-
-    # Time colocation
-    if temporal_colocation_flag:
-        time_values = np.unique(ds_tgt.time.values)
-        logger.info("Temporal model colocation")
-        mod = mod.interp(time=time_values,
-                         method=coloc_method,
-                         kwargs={"fill_value": "extrapolate"})
-
-        logger.info("Temporal observation colocation")
-        obs = obs.interp(time=time_values,
-                         method=coloc_method,
-                         kwargs={"fill_value": "extrapolate"})
 
     return obs.squeeze(), mod.squeeze()
 
