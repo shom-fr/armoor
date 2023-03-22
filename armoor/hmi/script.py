@@ -40,7 +40,6 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
     config_name = config_obj['config_reg']['config']
 
     config_reg = f"{model_name}_{config_name}"
-    # config_obj['config_reg']['name'] = config_reg
 
     parameters = config_obj["parameters"]
 
