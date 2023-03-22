@@ -6,6 +6,7 @@ import datetime
 from xoa.grid import dz2depth, shift
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -74,6 +75,16 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
         elif type == "VMADCP":
             logger.info(f"VMADCP")
             return open_VMADCP(path_files)
+        elif type == "seasoar":
+            logger.info(f"seasoar")
+            return open_seasoar(path_files)
+        elif type == "scanfish":
+            logger.info(f"scanfish")
+            return open_scanfish(path_files)
+        else:
+            raise Exception("Oops, le type de fichier que vous essayez d'ouvrir n'est pas reconnu...")
+    else:
+        raise Exception("Oops, le fichier que vous essayez d'ouvrir n'est pas reconnu...")
 
 
 def open_several_obs(path_files) -> xr.Dataset:
@@ -413,9 +424,7 @@ def open_L_ADCP(path: str):
     list_ds = []
     for i_mes, array_series in enumerate(list_measures):
         # Fill the small arrays with nan values
-        array_same_size = np.lib.pad(array_series,
-                                     ((0, size_max - len(array_series)), (0, 0)),
-                                     'constant',
+        array_same_size = np.lib.pad(array_series, ((0, size_max - len(array_series)), (0, 0)), 'constant',
                                      constant_values=('NaN'))
         # Set the right depth values
         array_same_size[:, 6] = depth
@@ -491,6 +500,122 @@ def open_mouillages(path: str):
     return ds
 
 
+def open_seasoar(path_files):
+    """
+    Open txt file form seasoar observation and store it in dataset.
+    Parameters
+    ----------
+    path : str
+        Path to the seasoar txt file.
+
+    Returns
+    -------
+    dataset : xarray.dataset
+        seasoar observation dataset.
+    """
+    # Read the .txt file
+    file = open(path_files, 'r', encoding="ISO-8859-1")
+    lines = file.readlines()
+    n_line = len(lines)
+    for i in range(n_line):
+        lines[i] = lines[i].split('\t')
+        lines[i][-1] = lines[i][-1].rstrip('\n')  # Remove header
+    lines = np.array(lines[1:])
+    lines[lines == ''] = 9999999.
+
+    list_measures = []
+    for i, i_station in enumerate(np.unique(lines[:, 0])):
+        list_measures.append(lines[lines[:, 0] == i_station])
+
+    # Separate the measurements
+    list_ds = []
+    for i_mes, array_series in enumerate(list_measures):
+        # Get measurements coordinates
+        lon = float(array_series[0][4])
+        lat = float(array_series[0][3])
+        timeJ = float(array_series[0][1])
+        timeQ = array_series[0][2]
+        time_origineQ = np.datetime64('2000-01-01')
+        time = time_origineQ + np.timedelta64(timeQ, 's') + np.timedelta64(int(timeJ * 24 * 60 * 60), 's')
+        list_ds.append(array2ds_radiales(array_series, lon, lat, time, 'GT1'))
+
+    # Merge the datasets
+    ds = xr.concat(list_ds, dim='depth')
+
+    # Put time and depth as dimensions
+    list_ds = []
+    times = np.unique(ds.time.data)
+    depths = np.unique(ds.depth.data)
+    for time in times:
+        ds_time = ds.where(ds.time == np.datetime64(time), drop=True)
+        ds_time = ds_time.assign_coords(time=xr.DataArray([time], dims='time'))
+        ds_time = ds_time.assign_coords(lon=xr.DataArray([ds_time.lon.data[0]], dims='time'))
+        ds_time = ds_time.assign_coords(lat=xr.DataArray([ds_time.lat.data[0]], dims='time'))
+        ds_time = ds_time.drop_duplicates(dim='depth')
+        ds_time = ds_time.interp(depth=depths, method='nearest')
+        list_ds.append(ds_time)
+
+    ds = xr.concat(list_ds, dim='time')
+
+    return ds
+
+def open_scanfish(path_files):
+    """
+    Open txt file form scanfish observation and store it in dataset.
+    Parameters
+    ----------
+    path : str
+        Path to the scanfish txt file.
+
+    Returns
+    -------
+    dataset : xarray.dataset
+        scanfish observation dataset.
+    """
+    # Read the .txt file
+    file = open(path_files, 'r', encoding="ISO-8859-1")
+    lines = file.readlines()
+    n_line = len(lines)
+    for i in range(n_line):
+        lines[i] = lines[i].split('\t')
+        lines[i][-1] = lines[i][-1].rstrip('\n')  # Remove header
+    lines = np.array(lines[1:])
+    lines[lines == ''] = 9999999.
+
+    list_measures = []
+    for i, i_station in enumerate(np.unique(lines[:, 0])):
+        list_measures.append(lines[lines[:, 0] == i_station])
+
+    # Separate the measurements
+    list_ds = []
+    for i_mes, array_series in enumerate(list_measures):
+        # Get measurements coordinates
+        lon = float(array_series[0][4])
+        lat = float(array_series[0][3])
+        timeJ = float(array_series[0][1])
+        timeY = array_series[0][2]
+        time_origineY = np.datetime64('1970-01-01')
+        time = time_origineY + np.timedelta64(timeY, 's') + np.timedelta64(int(timeJ * 24 * 60 * 60), 's')
+        list_ds.append(array2ds_radiales(array_series, lon, lat, time, 'radiale'))
+
+    # Merge the datasets
+    ds = xr.concat(list_ds, dim='depth')
+
+    list_ds = []
+    times = np.unique(ds.time.data)
+    depths = np.unique(ds.depth.data)
+    for time in times:
+        ds_time = ds.where(ds.time == np.datetime64(time), drop=True)
+        ds_time = ds_time.assign_coords(time=xr.DataArray([time], dims='time'))
+        ds_time = ds_time.assign_coords(lon=xr.DataArray([ds_time.lon.data[0]], dims='time'))
+        ds_time = ds_time.assign_coords(lat=xr.DataArray([ds_time.lat.data[0]], dims='time'))
+        ds_time = ds_time.drop_duplicates(dim='depth')
+        ds_time = ds_time.interp(depth=depths, method='nearest')
+        list_ds.append(ds_time)
+
+    ds = xr.concat(list_ds, dim='time')
+    return ds
+
 def array2ds(array_series, lon, lat, date, bot_depth, type):
     """
     Convert np.array from the reading of ADCP txt observation data into datarray 7.
@@ -557,4 +682,34 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
 
         ds["Ampl"], ds["Dir"] = da_mag, da_dir
 
+    return ds
+
+
+def array2ds_radiales(array_series, lon, lat, date, type):
+    # Define the columns to read and variable names for each type of observation
+    if type == 'GT1':
+        long_names = ['Temperature', 'Salinity', 'Density', 'depth']
+        indexes = [6, 13, 14, 19]
+        data_type = 'seasoar'
+    elif type == 'radiale':
+        long_names = ['Temperature', 'Salinity', 'Density', 'depth']
+        indexes = [6, 8, 9, 11]
+        data_type = 'scanfish'
+
+    depth = array_series[:, indexes[3]].astype(np.float64)
+    da_temp = xr.DataArray(data=array_series[:, indexes[0]].astype(np.float64), dims=["depth"],
+                           coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
+                           attrs=dict(long_name=long_names[0], units="deg C", _FillValue=9999999.), )
+    da_sal = xr.DataArray(data=array_series[:, indexes[1]].astype(np.float64), dims=["depth"],
+                          coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
+                          attrs=dict(long_name=long_names[1], units="PSU", _FillValue=9999999.), )
+    da_dens = xr.DataArray(data=array_series[:, indexes[2]].astype(np.float64), dims=["depth"],
+                           coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
+                           attrs=dict(long_name=long_names[2], units="kg/m^3", _FillValue=9999999.), )
+    depth = xr.DataArray(data=depth, dims=["depth"], coords=dict(depth=('depth', depth)),
+                         attrs=dict(long_name="Instrument depth", units="m", _FillValue=9999999), )
+
+    # Create the dataset and add the data arrays
+    ds = xr.Dataset(attrs=dict(DATA_TYPE=data_type))
+    ds["Temperature"], ds["Salinity"], ds["Density"] = da_temp, da_sal, da_dens
     return ds
