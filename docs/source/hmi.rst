@@ -49,7 +49,7 @@ The input folder should contain and be structured as follows ::
     │       ├── woa18_decav_s03_04.nc
     │       └── woa18_decav_t03_04.nc
 
-Where ``config_reg`` is the *name* given in the configuration file (see below), and *YYYYMMDD* the date of production of the data.
+Where ``config_reg`` is the composition of the **model** and the **config** given in the configuration file (see below), and **YYYYMMDD** the date of production of the data.
 
 Details on configuration file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -59,12 +59,13 @@ There are two main sections ``[config_reg]`` and ``[parameters]``.
 *config_reg* section
 ____________________
 
-The name of the regional configuration must be identical to the folder name inside the *input-folder*.
-For example if the production day is *20230307* and the regional configuration is *hycom3d_med*, the folder name
-shall be *hycom3d_med_20230307* and the content of this section in the configuration file will be as follow::
+The name of the regional configuration must be identical to the folder name inside the **input-folder**.
+For example if the production day is **20230307**, the model **hycom3d** and the configuration **med**, the regional configuration will be **hycom3d_med**,
+the folder name **hycom3d_med_20230307** and the content of this section in the configuration file as follows::
 
     [config_reg]
-        name = "hycom3d_med"
+        model = "hycom3d"
+        config = "med"
 
 In this example the **.tgz** output file will be *hycom3d_med_20230307.tgz*.
 
@@ -133,7 +134,8 @@ _______
 Example of configuration file::
 
     [config_reg]
-        name = "hycom3d_med"
+        model = hycom3d
+        config = med
 
     [parameters]
 
