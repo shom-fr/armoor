@@ -35,7 +35,12 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
     -------
     None
     """
-    config_reg = config_obj['config_reg']['name']
+
+    model_name = config_obj['config_reg']['model']
+    config_name = config_obj['config_reg']['config']
+
+    config_reg = f"{model_name}_{config_name}"
+
     parameters = config_obj["parameters"]
 
     production_day = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -49,6 +54,8 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
                   't0': config_reg_t0.replace(':', 'h'),
                   'production_day': production_day,
                   'config_reg': config_reg,
+                  'model': model_name,
+                  'config': config_name,
                   'approval': {
                       'status': "not_processed",
                       'last_update': "",
