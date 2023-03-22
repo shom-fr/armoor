@@ -78,7 +78,7 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
                                 parameter,
                                 sub_param,
                                 input_folder_path,
-                                f'{output_folder_path}{config_reg}_{production_day}/')
+                                os.path.join(output_folder_path, f'{config_reg}_{production_day}'))
 
             logger.info(f'{config_reg} - {parameter} - {sub_param}  '
                         f'in {time.time() - start_time} seconds')
@@ -115,7 +115,7 @@ def create_data_json_file(model_json: dict,
     -------
     None
     """
-    json_data_path = f'{output_folder_path}{config_reg}_{production_day}/data.json'
+    json_data_path = os.path.join(output_folder_path, f'{config_reg}_{production_day}', 'data.json')
     logger.info(f'Writing production information into :')
     logger.info(f'{json_data_path}')
     with open(json_data_path, 'w', encoding='utf-8') as json_file:
@@ -138,8 +138,8 @@ def make_tarfile(output_folder_path: str,
     None
     """
 
-    source_dir = f'{output_folder_path}{config_reg}_{production_day}/'
-    output_filename = f'{output_folder_path}{config_reg}_{production_day}.tgz'
+    source_dir = os.path.join(output_folder_path, f'{config_reg}_{production_day}')
+    output_filename = os.path.join(output_folder_path, f'{config_reg}_{production_day}.tgz')
 
     # COMPRESSING to TGZ
     logger.info(f'COMPRESSING {source_dir} INTO {output_filename}')
@@ -399,10 +399,10 @@ def get_path2save(reg_time: str,
     -------
 
     """
-    path = f'{output_folder_path}{reg_time}/{parameter_mane}'
-    path = path.replace(':', 'h')
+    reg_time = reg_time.replace(':', 'h')
+    path = os.path.join(output_folder_path, reg_time, parameter_mane)
     hmi.create_folder(path)
-    path2save = f'{path}/{sub_param}'
+    path2save = os.path.join(path, sub_param)
     return path2save
 
 
