@@ -230,12 +230,11 @@ def decode_hycom_3d(path_files):
     # Open the file with depth values
     path_h = path_files[0]
     hycom = xr.open_dataset(path_h).xoa.decode().squeeze(drop=True)
-
-    if 'dz' not in hycom.variables:
+    if 'level' not in hycom.variables:
         raise Exception('Ooops ! Pour lire une sortie 3D du modèle HYCOM,'
                         ' vous devez renseigner les fichiers dans l\'ordre suivant :  h, variables.')
 
-    hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
+    hycom.coords["depth"] = dz2depth(hycom.level, centered=True)
 
     # Open the variable(s) and add them to the dataset
     for path in path_files[1:]:
