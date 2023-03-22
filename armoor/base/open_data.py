@@ -189,10 +189,10 @@ def decode_hycom_currents(path_files):
         logger.info(f"HYCOM 3D")
         path_h, path_u, path_v = path_files[0], path_files[1], path_files[2]
         hycom = xr.open_dataset(path_h).xoa.decode().squeeze(drop=True)
-        if 'dz' not in hycom.variables:
+        if 'level' not in hycom.variables:
             raise Exception('Ooops ! Pour lire une sortie de courant du modèle HYCOM,'
                             ' vous devez renseigner les fichiers dans l\'ordre suivant : h, u, v')
-        hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
+        hycom.coords["depth"] = dz2depth(hycom.level, centered=True)
 
     u = xr.open_dataset(path_u).xoa.decode().squeeze(drop=True)
     v = xr.open_dataset(path_v).xoa.decode().squeeze(drop=True)

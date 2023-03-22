@@ -60,7 +60,7 @@ class Forecaster:
         status of the approbation
         """
         status = {"status": "no_production", "last_update": "", "reporter": ""}
-        approbation_file = f'{self.approval_path}/{config_reg}_{production_time}/data.json'
+        approbation_file = os.path.join(self.approval_path, f'{config_reg}_{production_time}', 'data.json')
 
         if os.path.isfile(approbation_file):
             status = self.read_status(approbation_file)
@@ -81,7 +81,7 @@ class Forecaster:
         -------
         None
         """
-        approbation_file = f'{self.approval_path}/{config_reg}_{production_time}/data.json'
+        approbation_file = os.path.join(self.approval_path, f'{config_reg}_{production_time}', 'data.json')
 
         protected_status = ['validated', 'refused']
         old_status = self.get_status(config_reg, production_time)['status']

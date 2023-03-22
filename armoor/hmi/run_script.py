@@ -27,7 +27,7 @@ def folder_path(path_name: str) -> str:
     path : str
         path to wanted folder.
     """
-    if os.path.isdir(path_name) and path_name[-1:] == '/':
+    if os.path.isdir(path_name):
         return path_name
 
     raise NotADirectoryError(path_name)
