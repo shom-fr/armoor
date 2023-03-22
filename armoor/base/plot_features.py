@@ -421,9 +421,9 @@ def add_plg_minimap(ax_mini_map, ds):
         ds = ds.isel(time=0)
     if 'depth' in ds.dims:
         ds = ds.isel(depth=0)
-    for lon in ds.lon.data:
-        for lat in ds.lat.data:
-            if not np.isnan(ds.sel(lon=lon, lat=lat)):
+    for i_lon, lon in enumerate(ds.lon.data):
+        for i_lat, lat in enumerate(ds.lat.data):
+            if not np.isnan(ds.isel(lon=i_lon, lat=i_lat)):
                 lons.append(lon)
                 lats.append(lat)
     ax_mini_map.scatter(lons, lats, transform=ccrs.PlateCarree())
