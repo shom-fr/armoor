@@ -405,6 +405,29 @@ def add_mini_map(f, extent=None):
 
     return ax_mini_map
 
+def add_plg_minimap(ax_mini_map, ds):
+    """
+    Add the mini map ax to the figure
+    Parameters
+    ----------
+    ax_mini_map
+        ax of the minimap
+    ds : DataArray
+        DataArray whose lon/lat to plot.
+    """
+    lons = []
+    lats = []
+    if 'time' in ds.dims:
+        ds = ds.isel(time=0)
+    if 'depth' in ds.dims:
+        ds = ds.isel(depth=0)
+    for i_lon, lon in enumerate(ds.lon.data):
+        for i_lat, lat in enumerate(ds.lat.data):
+            if not np.isnan(ds.isel(lon=i_lon, lat=i_lat)):
+                lons.append(lon)
+                lats.append(lat)
+    ax_mini_map.scatter(lons, lats, transform=ccrs.PlateCarree())
+
 
 def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, obs, output_path=None):
     """
@@ -2257,8 +2280,7 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     # add minimap
     ax_mini_map = add_mini_map(f, obs_coloc)
     if 'lon' in list_dims_mean:
-        ax_mini_map.pcolormesh(obs_coloc.lon.values, obs_coloc.lat.values,
-                               np.zeros([len(obs_coloc.lat), len(obs_coloc.lon)]), transform=ccrs.PlateCarree())
+        add_plg_minimap(ax_mini_map, obs_coloc)
     else:
         ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30, transform=ccrs.PlateCarree())
 
