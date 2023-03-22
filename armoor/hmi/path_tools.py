@@ -18,7 +18,7 @@ def get_config_reg_path(input_folder_path: str,
     -------
     path(s) to the regional configuration model file(s)
     """
-    path = f'{input_folder_path}{config_reg_day}/model/'
+    path = os.path.join(input_folder_path, config_reg_day, 'model')
     logger.info(f'Regional configuration model path :')
     logger.info(f'{path}')
 
@@ -35,8 +35,8 @@ def get_config_reg_path(input_folder_path: str,
     for file in files_needed_for_var[var]:
         for file_in_folder in files_in_folder:
             if file in file_in_folder:
-                print(f'{file_in_folder = }')
-                final_paths.append(f'{path}{file_in_folder}')
+                logger.info(f'Using file : {file_in_folder}')
+                final_paths.append(os.path.join(path, file_in_folder))
 
     if final_paths:
         logger.debug('File(s) : ')
@@ -63,7 +63,7 @@ def get_obs_path(input_folder_path: str,
     -------
     path(s) to the observation file(s)
     """
-    path = f'{input_folder_path}{config_reg_day}/{obs_name}/'
+    path = os.path.join(input_folder_path, config_reg_day, obs_name)
     logger.info(f'Observation path :')
     logger.info(f'{path}')
 
@@ -75,7 +75,7 @@ def get_obs_path(input_folder_path: str,
     final_paths = list()
     for file in os.listdir(path):
         if var_in_file[var] in file.lower():
-            final_paths.append(f'{path}{file}')
+            final_paths.append(os.path.join(path, file))
 
     if final_paths:
         logger.debug('File(s) : ')
@@ -103,7 +103,7 @@ def get_forcing_model_path(input_folder_path: str,
     -------
     path(s) to the observation file(s)
     """
-    path = f'{input_folder_path}{config_reg_day}/{forcing_model}/'
+    path = os.path.join(input_folder_path, config_reg_day, forcing_model)
     logger.info(f'Forcing model path :')
     logger.info(f'{path}')
 
@@ -117,7 +117,7 @@ def get_forcing_model_path(input_folder_path: str,
             climato = {'temp': '_t', 'sal': '_s'}
             dirs = [file for file in dirs if climato[var] in file]
         for file in dirs:
-            final_paths.append(f'{path}{file}')
+            final_paths.append(os.path.join(path, file))
 
     print(final_paths)
     if final_paths:
@@ -144,7 +144,7 @@ def sort_by_start_name(path_folder: str, files: list, number_of_start_char: int)
     new_files = {}
     for file_name in files:
         if file_name[:number_of_start_char] in new_files:
-            new_files[file_name[:number_of_start_char]].append(f'{path_folder}{file_name}')
+            new_files[file_name[:number_of_start_char]].append(os.path.join(path_folder, file_name))
         else:
-            new_files.update({file_name[:number_of_start_char]: [f'{path_folder}{file_name}']})
+            new_files.update({file_name[:number_of_start_char]: [os.path.join(path_folder, file_name)]})
     return new_files
