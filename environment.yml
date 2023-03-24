@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python
   - uvicorn
+  - pycryptodome
   - sphinx
   - sphinx_rtd_theme
   - jinja2
