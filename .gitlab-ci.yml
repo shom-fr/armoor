@@ -2,8 +2,6 @@ image: continuumio/miniconda3:latest
 
 stages:
   - setup
-  - tests
-  - doc
 
 variables:
   MPLBACKEND: agg
@@ -18,47 +16,8 @@ setup:
   script:
     - conda config --set always_yes yes --set changeps1 no
     - conda info -a
-    - test -d armoorenv || conda env create -f environment.yml -p armoorenv
-    - source activate ./armoorenv
-    - conda list
-  only:
-      - noveltis
+    - test -d armoor_env || conda env create -f enviroment.yml -p armoor_env
+    - source activate ./armoor_env
   cache:
     paths:
-      - armoorenv/
-
-tests:
-  stage: tests
-  script:
-    - source activate ./armoorenv
-    - export PATH=$PWD/bin:$PATH
-    - export PYTHONPATH=$PWD
-    - cd tests
-    - pytest
-  only:
-    - noveltis
-  cache:
-    paths:
-      - armoorenv/
-    policy: pull
-
-pages:
-  stage: doc
-  script:
-    - source activate ./armoorenv
-    - export PATH=$PWD/bin:$PATH
-    - export PYTHONPATH=$PWD
-    - cd docs
-    - make html
-    - cd ..
-    - rm -rf public
-    - cp -r doc/_build/html public
-  only:
-    - noveltis
-  artifacts:
-    paths:
-      - public
-  cache:
-    paths:
-      - armoorenv/
-    policy: pull
+      - armoor_env/
