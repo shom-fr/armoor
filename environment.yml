@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - python
+  - uvicorn
   - sphinx
   - sphinx_rtd_theme
   - jinja2

@@ -2,6 +2,7 @@
 Forecaster class created when using the forecasting web interface
 """
 import os
+import pathlib
 import json
 
 from datetime import datetime
