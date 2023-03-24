@@ -52,8 +52,7 @@ setup(
                            'armoor-tick-authentication',
                            'armoor-script',
                            'armoor-bull',
-                           'armoor-bull-report',
-                           'armoor-api']},
+                           'armoor-bull-report']},
     include_package_data=True,
     version='0.0.3',
     description='armoor lib SHOM',
@@ -76,8 +75,7 @@ setup(
             'armoor-tick-authentication = armoor.tick.run:authentication_update',
             'armoor-script = armoor.hmi.run_script:main',
             'armoor-bull = armoor.bull.run_script:main',
-            'armoor-bull-report = armoor.bull.run_script:only_report',
-            'armoor-api = armoor.tick.forecaster_api:app'
+            'armoor-bull-report = armoor.bull.run_script:only_report'
         ]
     },
 )

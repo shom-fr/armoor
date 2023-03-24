@@ -1,3 +1,6 @@
+Armoor installation
+===================
+
 Retrieving sources
 ------------------
 
@@ -33,21 +36,33 @@ To build sphinx documentation as html files:
 Then open docs/build/html/index.html file.
 
 
-Utilisation d'armoor pour l'interface previsioniste :
------------------------------------------------------
+Interface prévisionnistes
+=========================
 
-Suivre les instructions d'installation précedentes, avec env_forecaster.yml
+Api armoor
+----------
+
+Voici les instructions pour lancer l'api armoor utilisé par l'interface prévisionnistes.
+
+Suivre les instructions d'installation précédentes.
 
 Placer les fichiers de configuration **forecaster.cfg** et **auth.cfg** dans le répertoire courant d'exécution de l'api.
 
 **forecaster.cfg** :
 
-    approval_path = '/path_to_front/assets/data'
+    approval_path = '/path_to_front/shom-ui/assets/data'
     origins = 'http://localhost', 'https://shom_url.fr'
     ldap_server_url = 'ldap://shom_ldap_url'
     domain = 'SHOM_DOMAIN'
     search_base = 'OU=ShomUsers,DC=shom,DC=shom_loc'
     authorized_user_group = 'shom_users'
+
+- approval_path : '/path_to_front/shom-ui/assets/data'
+- origins : 'http://localhost', 'https://shom_url.fr'
+- ldap_server_url : 'ldap://shom_ldap_url'
+- domain : 'SHOM_DOMAIN'
+- search_base : 'OU=ShomUsers,DC=shom,DC=shom_loc'
+- authorized_user_group : 'shom_users'
 
 **auth.cfg** :
 
@@ -56,7 +71,22 @@ Placer les fichiers de configuration **forecaster.cfg** et **auth.cfg** dans le 
         url = GITLAB_URL_SERVER
         project = ID_PROJECT
 
+- token : l’adresse du serveur Gitlab (ex: https://gitlab.com/).
+- url : le token afin de pouvoir s’authentifier (ex: glpat-uy8upta6xMoTh5yUTrfH).
+- project : l’identifiant du projet (ex: 24837828).
 
 Lancer l'api via uvicorn comme suit :
 
-    $ uvicorn armoor-api --timeout-keep-alive 60 --workers 4 --host 0.0.0.0 --port 1234 >/home/www/shom-demo/api/logs/uvicorn-armoor.log 2>&1 
+    $ uvicorn armoor.tick.forecaster_api:app --workers 4 --host 0.0.0.0 --port 1234
+
+Vous pouvez vérifier que l'api répond correctement avec host:port/ping/ si vous avez comme réponse "pong".
+
+
+Interface prévisionnistes
+-------------------------
+
+Voici les instructions pour lancer front-end de l'interface prévisionnistes.
+
+TODO @MATHIS @LAURENT
+
+TODO Compléter à la manière de auth.cfg les 6 points pour forecaster.cfg un peu plus haut
