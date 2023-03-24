@@ -18,6 +18,8 @@ setup:
     - conda info -a
     - test -d armoor_env || conda env create -f enviroment.yml -p armoor_env
     - source activate ./armoor_env
+  only:
+    - noveltis
   cache:
     paths:
       - armoor_env/
