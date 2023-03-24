@@ -31,3 +31,32 @@ To build sphinx documentation as html files:
     $ make html
 
 Then open docs/build/html/index.html file.
+
+
+Utilisation d'armoor pour l'interface previsioniste :
+-----------------------------------------------------
+
+Suivre les instructions d'installation précedentes, avec env_forecaster.yml
+
+Placer les fichiers de configuration **forecaster.cfg** et **auth.cfg** dans le répertoire courant d'exécution de l'api.
+
+**forecaster.cfg** :
+
+    approval_path = '/path_to_front/assets/data'
+    origins = 'http://localhost', 'https://shom_url.fr'
+    ldap_server_url = 'ldap://shom_ldap_url'
+    domain = 'SHOM_DOMAIN'
+    search_base = 'OU=ShomUsers,DC=shom,DC=shom_loc'
+    authorized_user_group = 'shom_users'
+
+**auth.cfg** :
+
+    [gitlab]
+        token = TOKEN
+        url = GITLAB_URL_SERVER
+        project = ID_PROJECT
+
+
+Lancer l'api via uvicorn comme suit :
+
+    $ uvicorn armoor-api --timeout-keep-alive 60 --workers 4 --host 0.0.0.0 --port 1234 >/home/www/shom-demo/api/logs/uvicorn-armoor.log 2>&1 
