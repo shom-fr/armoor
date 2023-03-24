@@ -16,10 +16,47 @@ setup:
   script:
     - conda config --set always_yes yes --set changeps1 no
     - conda info -a
-    - test -d armoor_env || conda env create -f enviroment.yml -p armoor_env
+    - test -d armoor_env || conda env create -f environment.yml -p armoor_env
     - source activate ./armoor_env
   only:
     - noveltis
   cache:
     paths:
       - armoor_env/
+
+tests:
+  stage: tests
+  script:
+    - source activate ./armoor_env
+    - export PATH=$PWD/bin:$PATH
+    - export PYTHONPATH=$PWD
+    - conda install pytest
+    - cd armoor/tests
+    - pytest
+  only:
+    - noveltis
+  cache:
+    paths:
+      - armoor_env/
+    policy: pull
+
+pages:
+  stage: doc
+  script:
+    - source activate ./armoor_env
+    - export PATH=$PWD/bin:$PATH
+    - export PYTHONPATH=$PWD
+    - cd docs
+    - make html
+    - cd ..
+    - rm -rf public
+    - cp -r doc/_build/html public
+  only:
+    - noveltis
+  artifacts:
+    paths:
+      - public
+  cache:
+    paths:
+      - armoor_env/
+    policy: pull
