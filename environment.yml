@@ -1,4 +1,4 @@
-name: armoor_env
+name: armoor_env_test_javier2
 channels:
   - conda-forge
   - defaults
@@ -26,6 +26,7 @@ dependencies:
   - cfgrib
   - pip:
     - pylint
+    - xoa-999-py3-none-any.whl
     - pytest
     - setuptools
     - build
