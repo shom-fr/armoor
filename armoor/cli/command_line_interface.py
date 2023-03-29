@@ -16,7 +16,6 @@ from xoa.cfgm import register_validation_functions
 
 register_validation_functions(absolute_or_relative_time=cli.cli_tools.int_or_string_configobj)
 register_validation_functions(path=cli.cli_tools.file_path)
-register_validation_functions(directory=cli.cli_tools.folder_path)
 register_validation_functions(force_list_path=cli.cli_tools.file_force_list_path_configObj)
 register_validation_functions(depth=cli.cli_tools.depth_configObj)
 register_validation_functions(coordinates=cli.cli_tools.coords_configObj)

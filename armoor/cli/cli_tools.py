@@ -282,11 +282,6 @@ def format_cofigObj2Dict(config: dict) -> dict:
         observation.update({"method_z": method_z})
     config.update({"observation": observation})
 
-    if "output-path" in config:
-        output_path = config.pop("output-path")
-        if output_path:
-            config.update({"output_path": output_path})
-
     # models
     if "models" in config:
         models = config.pop("models")
