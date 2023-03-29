@@ -71,8 +71,8 @@ Placer les fichiers de configuration **forecaster.cfg** et **auth.cfg** dans le 
         url = GITLAB_URL_SERVER
         project = ID_PROJECT
 
-- token : l’adresse du serveur Gitlab (ex: https://gitlab.com/).
-- url : le token afin de pouvoir s’authentifier (ex: glpat-uy8upta6xMoTh5yUTrfH).
+- token : le token afin de pouvoir s’authentifier (ex: glpat-uy8upta6xMoTh5yUTrfH). 
+- url : l’adresse du serveur Gitlab (ex: https://gitlab.com/).
 - project : l’identifiant du projet (ex: 24837828).
 
 Vous pouvez lancer l'api avec uvicorn avec le script suivant :
@@ -80,9 +80,9 @@ Vous pouvez lancer l'api avec uvicorn avec le script suivant :
     #!/bin/bash
     cd ~/api_directory
     source activate armoor_env
-    uvicorn armoor.tick.forecaster_api:app --workers 4 --host 0.0.0.0 --port 1234
+    uvicorn armoor.tick.forecaster_api:app --workers 4 --host 0.0.0.0 --port port_api
 
-Vous pouvez vérifier que l'api répond correctement avec host:port/ping/ si vous avez comme réponse "pong".
+Vous pouvez vérifier que l'api répond correctement avec host:port_api/ping/ si vous avez comme réponse "pong".
 
 
 Interface prévisionnistes
@@ -90,6 +90,17 @@ Interface prévisionnistes
 
 Voici les instructions pour lancer front-end de l'interface prévisionnistes.
 
-TODO @MATHIS @LAURENT
+Prérequis:
 
-TODO Compléter à la manière de auth.cfg les 6 points pour forecaster.cfg un peu plus haut
+Suivez la procédure d'installation pour [nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+
+Installer npm avec `nvm install npm`
+
+Installer http-server avec `npm install http-server -g`
+
+Lancement du front-end:
+
+    cd /path_to_front/shom-ui/
+    http-server main
+
+
