@@ -1,4 +1,5 @@
 """Common tools for all features"""
+import os
 import logging
 
 import numpy as np
@@ -22,9 +23,9 @@ def manage_output(plot, figure_name, folder_path):
 
     """
     if folder_path:
-        path = f'{folder_path}{figure_name}.png'
-        path = path.replace(':', '-')
-        path = path.replace(' ', '')
+        figure_name = figure_name.replace(':', '-')
+        figure_name = figure_name.replace(' ', '')
+        path = os.path.join(folder_path, f'{figure_name}.png')
         logger.info(f'Saving :: {path}')
         plot.savefig(path, bbox_inches='tight', format='png')
         plot.close('all')

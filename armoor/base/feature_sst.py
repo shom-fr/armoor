@@ -1,4 +1,5 @@
 """Create figures for feature 1:sst"""
+import os
 import copy
 
 from armoor import base
@@ -47,7 +48,7 @@ def plot(config_obj):
     for index_output, output in enumerate(outputs):
         logger.info(f'Generating plot :: {output["plot"]}')
         if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
+            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             logger.info(f'Storing in folder :: {sub_func_output_folder}')
             st.create_folder(sub_func_output_folder)
         else:
