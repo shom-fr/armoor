@@ -24,8 +24,7 @@ setup(
                  'bin': 'bin',
                  'config': 'config'
                  },
-    package_data={'armoor': ['cli/code_text.json',
-                             'bull/templates/index.html.jinja',
+    package_data={'armoor': ['bull/templates/index.html.jinja',
                              'bull/templates/index-metazones.html.jinja',
                              'bull/templates/functionality.html.jinja',
                              'bull/templates/metazone.html.jinja',
@@ -69,7 +68,6 @@ setup(
     entry_points={
         'console_scripts': [
             'armoor = armoor.cli.run:main',
-            'armoor2 = armoor.cli.run:main_2',
             'armoor-tick-create = armoor.tick.run:create',
             'armoor-tick-search = armoor.tick.run:search',
             'armoor-tick-description = armoor.tick.run:description',
@@ -82,11 +80,3 @@ setup(
         ]
     },
 )
-
-# Running tests :
-# Run python setup.py pytest
-
-# Deploying lib from whl file located in \armoor\dist directory
-# Run python -m build on root where setup.py is.
-# install armoor lib with pip install armoor-version-py3-none-any.whl on a new env
-# Then you can run : armoor --file example.ini
