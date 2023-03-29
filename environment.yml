@@ -1,4 +1,4 @@
-name: armoor_env_test_javier2
+name: armoor_env
 channels:
   - conda-forge
   - defaults
