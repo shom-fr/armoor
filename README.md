@@ -46,7 +46,7 @@ Voici les instructions pour lancer l'api armoor utilisé par l'interface prévis
 
 Suivre les instructions d'installation précédentes.
 
-Placer les fichiers de configuration **forecaster.cfg** et **auth.cfg** dans le répertoire courant d'exécution de l'api.
+Placer les fichiers de configuration **forecaster.cfg** et **auth.cfg** dans le répertoire courant d'exécution de l'api (ex: ~/api_directory).
 
 **forecaster.cfg** :
 
@@ -75,9 +75,12 @@ Placer les fichiers de configuration **forecaster.cfg** et **auth.cfg** dans le 
 - url : le token afin de pouvoir s’authentifier (ex: glpat-uy8upta6xMoTh5yUTrfH).
 - project : l’identifiant du projet (ex: 24837828).
 
-Lancer l'api via uvicorn comme suit :
+Vous pouvez lancer l'api avec uvicorn avec le script suivant :
 
-    $ uvicorn armoor.tick.forecaster_api:app --workers 4 --host 0.0.0.0 --port 1234
+    #!/bin/bash
+    cd ~/api_directory
+    source activate armoor_env
+    uvicorn armoor.tick.forecaster_api:app --workers 4 --host 0.0.0.0 --port 1234
 
 Vous pouvez vérifier que l'api répond correctement avec host:port/ping/ si vous avez comme réponse "pong".
 
