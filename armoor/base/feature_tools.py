@@ -33,28 +33,6 @@ def manage_output(plot, figure_name, folder_path):
         plot.show()
 
 
-def get_output(param, outputs):
-    """
-    Returns, if specified in the ConfigObj, the parameter (sst, current etc.) to plot.
-    Parameters
-    ----------
-    param : str
-        Parameters to retrieve.
-    outputs : dict
-        Dictionary which contains all the required outputs.
-
-    Returns
-    -------
-    outputs : str
-        Parameter to be plotted.
-
-    """
-    if param in outputs:
-        return outputs[param]
-    else:
-        return None
-
-
 def remove_missing_values_ds(models, observation, i, var_mod, vars):
     # Remove missing values
     if len(var_mod) == 1:

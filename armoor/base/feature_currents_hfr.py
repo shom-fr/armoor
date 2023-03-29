@@ -1,4 +1,5 @@
 """Create figures for feature 6:currents_hfr"""
+import os
 import copy
 from armoor import base
 import numpy as np
@@ -51,7 +52,7 @@ def plot(config_obj):
 
     for index_output, output in enumerate(outputs):
         if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
+            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
@@ -84,7 +85,7 @@ def plot(config_obj):
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
-                path_nc = f"{path_results}obs_tide_uv.nc"
+                path_nc = os.path.join(path_results,'obs_tide_uv.nc')
             else:
                 raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
@@ -106,7 +107,7 @@ def plot(config_obj):
                                                                 path_results, path_tools, list_waves, 'obs')
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on mod
-                path_nc = f"{path_results}mod_tide_uv.nc"
+                path_nc = os.path.join(path_results,'mod_tide_uv.nc')
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc, path_results,
                                                                     path_tools, list_waves, 'mod')
                 obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, True, False, False, coloc_method='nearest',
@@ -138,7 +139,7 @@ def plot(config_obj):
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
-                path_nc = f"{path_results}obs_tide_uv.nc"
+                path_nc = os.path.join(path_results,'obs_tide_uv.nc')
             else:
                 raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
@@ -163,7 +164,7 @@ def plot(config_obj):
             ds_models = []
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on mod
-                path_nc = f"{path_results}mod_tide_uv.nc"
+                path_nc = os.path.join(path_results,'mod_tide_uv.nc')
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc,
                                                                     path_results, path_tools, list_waves, 'mod')
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
@@ -249,9 +250,9 @@ def plot(config_obj):
                          "plot_map_metr_RMSEcentree": 'RMSEcentree'
                          }
         if output["plot"] in plot_map_metr:
-            vmin = ft.get_output('vmin', output)
-            vmax = ft.get_output('vmax', output)
-            cmap = ft.get_output("colormap", output)
+            vmin = output.get('vmin')
+            vmax = output.get('vmax')
+            cmap = output.get("colormap")
             cmap = cmap if cmap is None else f'cmo.{cmap}'
 
             for i_mod, mod in enumerate(models):

@@ -41,7 +41,9 @@ def harmonic_analysis(ds, var, path_nc, path_atlas, path_tools, list_waves, name
 
     # Create the netcdf file to run comodo
     format_ds2nc(ds, path_nc, var)
-    cmdline = f'{path_tools}comodo-detidor {path_nc}   --only-atlases -a -1 -v {var}  -d {list_waves}'
+
+    path_tools_comodo_detidor = os.path.join(path_tools, 'comodo-detidor')
+    cmdline = f'{path_tools_comodo_detidor} {path_nc} --only-atlases -a -1 -v {var}  -d {list_waves}'
 
     logger.info("Launch of comodo-detidor.")
     print(cmdline)
@@ -50,17 +52,21 @@ def harmonic_analysis(ds, var, path_nc, path_atlas, path_tools, list_waves, name
 
     # Read the result file
     if var == 'u v':
-        os.system(f'mv u-atlas.nc {path_atlas}{name}_u-atlas.nc')
-        os.system(f'mv v-atlas.nc {path_atlas}{name}_v-atlas.nc')
-        ds_u = xr.open_dataset(f'{path_atlas}{name}_u-atlas.nc').rename({'W': 'wave'})
-        ds_v = xr.open_dataset(f'{path_atlas}{name}_v-atlas.nc').rename({'W': 'wave'})
+        local_u_atlas = os.path.join(path_atlas, f'{name}_u-atlas.nc')
+        local_v_atlas = os.path.join(path_atlas, f'{name}_v-atlas.nc')
+
+        os.system(f'mv u-atlas.nc {local_u_atlas}')
+        os.system(f'mv v-atlas.nc {local_v_atlas}')
+
+        ds_u = xr.open_dataset(local_u_atlas).rename({'W': 'wave'})
+        ds_v = xr.open_dataset(local_v_atlas).rename({'W': 'wave'})
         ds_v['u_a'] = ds_u['u_a']
         ds_v['u_G'] = ds_u['u_G']
         ds_atlas = ds_v
         ds_atlas = ds_atlas.assign_coords({'lon': ds.lon})
         ds_atlas = ds_atlas.assign_coords({'lat': ds.lat})
     else:
-        ds_atlas = xr.open_dataset(path_atlas + "ssh-atlas.nc").rename({'W': 'wave'})
+        ds_atlas = xr.open_dataset(os.path.join(path_atlas, 'ssh-atlas.nc')).rename({'W': 'wave'})
 
     return ds_atlas
 

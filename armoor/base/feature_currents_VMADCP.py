@@ -1,4 +1,5 @@
 """Create figures for feature 8:currents_VMADCP"""
+import os
 import copy
 from armoor import base
 import armoor.hmi.script_tools as st
@@ -39,7 +40,7 @@ def plot(config_obj):
     # PLOT
     for index_output, output in enumerate(outputs):
         if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
+            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path

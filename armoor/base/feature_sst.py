@@ -57,9 +57,9 @@ def plot(config_obj):
         if 'attribute' in output and output['attribute'] != 'SST':
             logger.debug(f'{config_obj["functionality"]} should be used for SST only.')
         # get parameters from config obj
-        vmin = ft.get_output('vmin', output)
-        vmax = ft.get_output('vmax', output)
-        cmap = ft.get_output("colormap", output)
+        vmin = output.get('vmin')
+        vmax = output.get('vmax')
+        cmap = output.get("colormap")
         cmap = cmap if cmap is None else f'cmo.{cmap}'
 
         # PLOTS
