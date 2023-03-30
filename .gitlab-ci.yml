@@ -20,8 +20,6 @@ setup:
     - conda info -a
     - test -d armoor_env || conda env create -f environment.yml -p armoor_env
     - source activate ./armoor_env
-  only:
-    - noveltis
   cache:
     paths:
       - armoor_env/
@@ -35,8 +33,6 @@ tests:
     - conda install pytest
     - cd tests
     - pytest
-  only:
-    - noveltis
   cache:
     paths:
       - armoor_env/
@@ -53,8 +49,6 @@ pages:
     - cd ..
     - rm -rf public
     - cp -r doc/_build/html public
-  only:
-    - noveltis
   artifacts:
     paths:
       - public
