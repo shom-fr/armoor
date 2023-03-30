@@ -2,8 +2,8 @@ image: continuumio/miniconda3:latest
 
 stages:
   - setup
-  - tests
   - doc
+  - tests
 
 variables:
   MPLBACKEND: agg
