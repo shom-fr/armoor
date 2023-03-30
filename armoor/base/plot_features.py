@@ -1,4 +1,5 @@
 """Plot figures and outpout for all features"""
+import os
 import logging
 
 import matplotlib.pyplot as plt
@@ -15,6 +16,7 @@ import xarray as xr
 import math
 import gsw
 import armoor.base.feature_tools as ft
+import armoor.hmi.script_tools as st
 
 import logging
 logger = logging.getLogger(__name__)
@@ -637,7 +639,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
     else:
         mod_name = 'Model'
     if output_path:
-        output_path += f'{obs_name}_{mod_name}'
+        output_path = os.path.join(output_path, f'{obs_name}_{mod_name}')
+        st.create_folder(output_path)
 
     var_title = find_var_title(obs_name)
     if flag_slice:
