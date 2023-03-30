@@ -4,6 +4,8 @@ channels:
   - defaults
 dependencies:
   - python
+  - uvicorn
+  - pycryptodome
   - sphinx
   - sphinx_rtd_theme
   - jinja2
@@ -24,6 +26,7 @@ dependencies:
   - cfgrib
   - pip:
     - pylint
+    - xoa-999-py3-none-any.whl
     - pytest
     - setuptools
     - build

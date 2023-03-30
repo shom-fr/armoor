@@ -2,6 +2,7 @@
 Forecaster class created when using the forecasting web interface
 """
 import os
+import pathlib
 import json
 
 from datetime import datetime
@@ -25,7 +26,10 @@ class Forecaster:
 
         rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "forecaster.ini"))
-        self.cfg_forecaster = cfgm_forecaster.load(os.path.join(rootdir, "../../config/forecaster.cfg"))
+
+        current_dir = pathlib.Path().resolve()
+        self.cfg_forecaster = cfgm_forecaster.load(os.path.join(current_dir, "forecaster.cfg"))
+
         self.initialization()
 
     def initialization(self):

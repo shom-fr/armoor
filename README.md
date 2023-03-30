@@ -1,3 +1,6 @@
+Armoor installation
+===================
+
 Retrieving sources
 ------------------
 
@@ -31,3 +34,4 @@ To build sphinx documentation as html files:
     $ make html
 
 Then open docs/build/html/index.html file.
+
