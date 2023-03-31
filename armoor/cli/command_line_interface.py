@@ -15,11 +15,8 @@ logger = logging.getLogger(__name__)
 from xoa.cfgm import register_validation_functions
 
 register_validation_functions(absolute_or_relative_time=cli.cli_tools.int_or_string_configobj)
-register_validation_functions(path=cli.cli_tools.file_path)
-register_validation_functions(force_list_path=cli.cli_tools.file_force_list_path_configObj)
 register_validation_functions(depth=cli.cli_tools.depth_configObj)
 register_validation_functions(coordinates=cli.cli_tools.coords_configObj)
-register_validation_functions(vars_list=cli.cli_tools.vars_list_configObj)
 
 def command_line_interface(argv=None):
 

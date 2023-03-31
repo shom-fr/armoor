@@ -4,23 +4,14 @@ Tools for the command line interface
 import json
 import os
 from argparse import ArgumentTypeError
+from pprint import pprint
+from xoa import cfgm
 
 from configobj import ConfigObj
 from validate import Validator, VdtTypeError
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-# list of the available meta-zones
-METAZONES = ['polygon', 'cloud', 'radius', 'quality',
-             'start', 'end', 'frequency', 'times', 'time_highlight', 'interval',
-             'time_restriction', 'cyclic', 'depth', 'bathy', 'density', 'vars'
-             ]
-# list of the variables the user can select
-VARS = ["temp", "sal", "dens", "sndspd", "gbt", "mld", "uv"]
-
-list_of_available_methods = ["linear", "nearest"]
 
 
 def int_or_string_configobj(value):
@@ -191,8 +182,8 @@ def depth_configObj(depths) -> list:
 
 # function to check if the coordinates provided are well formatted
 def coords_configObj(coordinates) -> list:
-    """ @5
-    use when coordinates are provided
+    """
+    Used when coordinates are provided
     check "coordinates" type, check if coordinates are even and perform cleanup.
 
     Parameters
@@ -227,40 +218,6 @@ def coords_configObj(coordinates) -> list:
         raise VdtTypeError(coordinates)
 
 
-def vars_list_configObj(args):
-    """ @6
-    used when a list of the variables is provided
-    check "vars_list" type, verify if the user selection of variable is in the list
-
-    Parameters
-    ----------
-    args : str (or float)
-        value to verify and transform
-
-    Returns
-    -------
-    value : float
-        value as a float
-    """
-
-    if args in VARS:
-        return [args]
-    elif not isinstance(args, list):
-        # a value in the list
-        # is neither an integer nor a string
-        logger.error(f'{args} not a string or a list of strings')
-        raise VdtTypeError(args)
-    else:
-        vars = []
-        for arg in args:
-            if arg in VARS:
-                vars.append(arg)
-            else:
-                logger.error(f'{arg} is not in {VARS}')
-                raise VdtTypeError(f'variable not recognized : {arg}')
-        return vars
-
-
 def format_cofigObj2Dict(config: dict) -> dict:
     """
     function to format configObj input to useful dictionary
@@ -275,11 +232,10 @@ def format_cofigObj2Dict(config: dict) -> dict:
     config : dict
         formatted dictionary
     """
+    print('config   IN :::')
+    pprint(config.dict())
     # Clean observation if method_z not provided
     observation = remove_keys_with_none_value(config.pop("observation"))
-    if "method-z" in observation:
-        method_z = observation.pop("method-z")
-        observation.update({"method_z": method_z})
     config.update({"observation": observation})
 
     # models
@@ -291,9 +247,6 @@ def format_cofigObj2Dict(config: dict) -> dict:
                 new_models.append(remove_keys_with_none_value(models[model]))
             else:
                 new_models.append(remove_keys_with_none_value(models[model]))
-            if "method-z" in new_models:
-                method_z = new_models.pop("method-z")
-                new_models.update({"method_z": method_z})
         config.update({"models": new_models})
     else:
         logger.error('No model provided')
@@ -316,22 +269,6 @@ def format_cofigObj2Dict(config: dict) -> dict:
         meta_zones = remove_keys_with_none_value(config.pop("meta-zones"))
         if meta_zones:
             config.update({"meta_zones": meta_zones})
-
-        # change 2 item list of time restriction toto tuple
-        if "time-restriction" in config["meta_zones"]:
-            time_restriction = config["meta_zones"].pop("time-restriction")
-            config["meta_zones"].update({"time_restriction": time_restriction})
-        if "time-highlight" in config["meta_zones"]:
-            time_restriction = config["meta_zones"].pop("time-highlight")
-            config["meta_zones"].update({"time_highlight": time_restriction})
-        for value in ["time_restriction"]:
-            if value in config["meta_zones"]:
-                aux = config["meta_zones"].pop(value)
-                config["meta_zones"].update({value: (aux[0], aux[1])})
-        for value in ["quality"]:
-            if value in config["meta_zones"]:
-                aux = config["meta_zones"].pop(value)
-                config["meta_zones"].update({value: [aux[0], int(aux[1]), int(aux[2])]})
 
     return config
 
