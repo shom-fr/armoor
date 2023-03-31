@@ -6,6 +6,7 @@ import os
 import sys
 import argparse
 import time
+from xoa import cfgm
 
 import armoor.hmi.script_tools as st
 import armoor.hmi.script as s
@@ -105,10 +106,31 @@ def main(argv=None):
     output_folder_path, input_folder_path, input_configuration_path = read_args(argv)
 
     logger.info(f'details of configuration from file : {input_configuration_path}')
-    dict_configuration = st.return_dict(input_configuration_path, "hmi.ini")
+
+    rootdir = os.path.abspath(os.path.dirname(__file__))
+    cfgm_hmi_script = cfgm.ConfigManager(os.path.join(rootdir, "hmi.ini"))
+
+    dict_configuration = cfgm_hmi_script.load(input_configuration_path)
+
+    dict_configuration = format_hmi_dict(dict_configuration)
 
     logger.info(f'saved in folder : {output_folder_path}')
     logger.info(f'data comes from : {input_folder_path}')
 
     s.create_images(dict_configuration, input_folder_path, output_folder_path)
     logger.info(f"--- {time.time() - start_time} seconds ---")
+
+
+
+def format_hmi_dict(dict_configuration: dict) -> dict:
+
+    for parameter in dict_configuration['parameters']:
+        extent = dict_configuration['parameters'][parameter]['extent']
+
+        if all(value is None for value in extent.values()):
+            dict_configuration['parameters'][parameter].pop('extent')
+        elif any(value is None for value in extent.values()):
+            raise ValueError(f'Extent value error : {extent}')
+
+
+    return dict_configuration
