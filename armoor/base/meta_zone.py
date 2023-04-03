@@ -12,6 +12,7 @@ import math
 import logging
 logger = logging.getLogger(__name__)
 
+
 @xr.register_dataarray_accessor("meta")
 @xr.register_dataset_accessor("meta")
 class MetazoneAccessor:
@@ -261,7 +262,6 @@ class MetazoneAccessor:
 
         return ds
 
-
     def horizontal_selection_cloud_dots(self, cloud: [(float, float)], radius_km: float = 0.,
                                         method: str = None) -> xr.Dataset:
         """
@@ -419,7 +419,7 @@ class MetazoneAccessor:
         ds = self._obj
         if var_vert == 'depth':
             if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # check if NEMO or TOPAZ
-                return ds.sel(depth=depth, method='nearest').squeeze()
+                return ds.sel(depth=depth, method='nearest')
             elif 'z' in ds.dims or 'level' in ds.dims or (
                     depth in ds.dims and len(ds.depth.dims) == 2):  # check if CROCO or HYCOM or profile
                 tgt_depth = xr.DataArray([depth], dims="depth", name="depth")
@@ -433,9 +433,9 @@ class MetazoneAccessor:
                                 da = self._obj[var]
                                 da_tgt = regrid1d(da, tgt_depth)
                                 tgt_ds = tgt_ds.assign({var: da_tgt})
-                return tgt_ds.squeeze()
+                return tgt_ds
             else:
-                return ds.squeeze()
+                return ds
         elif var_vert == 'dens':
             return ds.sel(dens=depth, method='nearest')
 

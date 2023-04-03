@@ -405,6 +405,7 @@ def add_mini_map(f, extent=None):
 
     return ax_mini_map
 
+
 def add_plg_minimap(ax_mini_map, ds):
     """
     Add the mini map ax to the figure
@@ -421,6 +422,14 @@ def add_plg_minimap(ax_mini_map, ds):
         ds = ds.isel(time=0)
     if 'depth' in ds.dims:
         ds = ds.isel(depth=0)
+    if 'interval' in ds.dims:
+        ds = ds.isel(interval=0, idx_time=0)
+    if 'slice' in ds.dims:
+        ds = ds.isel(slice=0)
+    if 'idx_depth' in ds.dims:
+        ds = ds.isel(idx_depth=0)
+    if 'idx_dens' in ds.dims:
+        ds = ds.isel(idx_dens=0)
     for i_lon, lon in enumerate(ds.lon.data):
         for i_lat, lat in enumerate(ds.lat.data):
             if not np.isnan(ds.isel(lon=i_lon, lat=i_lat)):
@@ -890,8 +899,8 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
     """
 
     logger.info(f'Map of the model and observation and their comparison')
-    # Get the titles
 
+    # Get the titles
     if 'name' in obs_coloc.attrs:
         obs_name = obs_coloc.name
     else:
@@ -960,13 +969,19 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
 
     # Plot the values
     if metric == "difference":
-        if len(mod_coloc.time) == 1:
+        if np.size(mod_coloc.time) == 1:
             # Get the title
             title_time = np.datetime_as_string(obs_coloc.time, unit='s')
             title = f'{var_title} : {metric.capitalize()} metric \n{title_time}'
 
+            # Make sure to select the closest date
+            if np.size(obs_meta.time) > 1:
+                obs_meta = obs_meta.sel(time=obs_coloc.time, method='nearest')
+            if np.size(mod_meta.time) > 1:
+                mod_meta = mod_meta.sel(time=mod_coloc.time, method='nearest')
+
             # Plot, save and display
-            f, axs = plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, vmin, vmax, cmap, title, metric)
+            f, axs = plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title, metric)
 
             ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
 
@@ -1013,6 +1028,12 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                 time_max = np.datetime_as_string(obs_coloc.time.max(skipna=True).values, unit='s')
                 title_time = f'\nDates : {time_min} to {time_max}'
             else:
+                # Make sure to select the closest date
+                if np.size(obs_meta.time) > 1:
+                    obs_meta = obs_meta.sel(time=obs_coloc.time, method='nearest')
+                if np.size(mod_meta.time) > 1:
+                    mod_meta = mod_meta.sel(time=mod_coloc.time, method='nearest')
+
                 title_time = f"\nDate : {np.datetime_as_string(obs_coloc.time.values, unit='s')}"
             title = f'{var_title} : {metric.capitalize()} metric \n{title_time}'
             # Plot, save and display
@@ -1063,6 +1084,7 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
                             transform=ccrs.PlateCarree())
     im1 = axs[1].pcolormesh(obs_coloc.lon, obs_coloc.lat, obs_coloc, vmin=vmin, vmax=vmax, cmap=cmap,
                             transform=ccrs.PlateCarree())
+
     im2 = axs[2].pcolormesh(mod_meta.lon, mod_meta.lat, mod_meta, vmin=vmin, vmax=vmax, cmap=cmap,
                             transform=ccrs.PlateCarree())
 
