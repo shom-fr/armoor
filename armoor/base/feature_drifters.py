@@ -66,6 +66,13 @@ def plot(config_obj):
                 raise Exception("Oops, pour calculer les trajectoires vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
 
+            # Retrieve the common period
+            date_start = max(observation["xarray_meta"].time[0].values,
+                             models[0]["xarray_meta_coloc"].time[0].values)
+            date_end = min(observation["xarray_meta"].time[-1].values,
+                           models[0]["xarray_meta_coloc"].time[-1].values)
+            observation['xarray_meta'] = observation['xarray_meta'].sel(time=slice(date_start, date_end))
+
             # Get the parameters for the OpenDrift calculation
             lons, lats, times, time_step, nb_step = param_pour_opendrift(observation)
 
@@ -135,6 +142,13 @@ def plot(config_obj):
             else:
                 raise Exception("Oops, pour calculer les trajectoires vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
+
+            # Retrieve the common period
+            date_start = max(observation["xarray_meta"].time[0].values,
+                             models[0]["xarray_meta_coloc"].time[0].values)
+            date_end = min(observation["xarray_meta"].time[-1].values,
+                           models[0]["xarray_meta_coloc"].time[-1].values)
+            observation['xarray_meta'] = observation['xarray_meta'].sel(time=slice(date_start, date_end))
 
             # Get the parameters for the OpenDrift calculation
             lons, lats, times, time_step, nb_step = param_pour_opendrift(observation)
