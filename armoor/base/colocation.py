@@ -5,15 +5,12 @@ from xoa.regrid import regrid1d
 import xoa.grid
 import xesmf as xe
 import logging
+
 logger = logging.getLogger(__name__)
 
-def colocate_all(obs,
-                 mod,
-                 horizontal_colocation_flag,
-                 vertical_colocation_flag,
-                 temporal_colocation_flag,
-                 coloc_method='nearest',
-                 opt_grid=None):
+
+def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag, temporal_colocation_flag,
+                 coloc_method='nearest', opt_grid=None):
     """
     Put the model and observation dataset on the same grid defined
     according to the selected method.
@@ -48,11 +45,7 @@ def colocate_all(obs,
     elif opt_grid == 'model':
         ds_tgt = mod
     elif opt_grid == 'auto':
-        ds_tgt = min_grid_all(obs,
-                              mod,
-                              horizontal_colocation_flag,
-                              vertical_colocation_flag,
-                              temporal_colocation_flag)
+        ds_tgt = min_grid_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag, temporal_colocation_flag)
     else:
         raise Warning('Caution, opt_grid values should be "observation" or "model" or "auto"')
 
@@ -61,13 +54,22 @@ def colocate_all(obs,
     # Time colocation
     if temporal_colocation_flag:
         time_values = np.unique(ds_tgt.time.values)
+
         logger.info("Temporal model colocation")
-        mod = mod.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+
+        if mod.dims["time"] > 1:
+            mod = mod.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+        else:
+            mod = pick_time(mod, time_values)
 
         logger.info("Temporal observation colocation")
-        obs = obs.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+        if obs.dims["time"] > 1:
+            obs = obs.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+        else:
+            obs = pick_time(obs, time_values)
 
-        # Horizontal colocation  # Colocation for observations whose positions depend on time (profilers etc.)
+    # Horizontal colocation
+    # Colocation for observations whose positions depend on time (profilers etc.)
     if horizontal_colocation_flag and 'time' in ds_tgt.lon.dims:
         logger.info("Target grid positions are depending on time")
         try:
@@ -128,12 +130,9 @@ def colocate_all(obs,
                     if 'sig' in mod[var].dims:
                         mod[var] = regrid1d(mod[var], depth)
 
-
             # Interpolation for other models
             else:
-                mod = mod.interp(depth=depth_values,
-                                 method=coloc_method,
-                                 kwargs={"fill_value": "extrapolate"})
+                mod = mod.interp(depth=depth_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
             logger.info("Vertical colocation of observation")
 
             # Interpolation for CMEMS in-situ when depth is calculated from pressure
@@ -146,20 +145,33 @@ def colocate_all(obs,
                     else:
                         ds_coloc[var] = obs[var]
                 obs = ds_coloc
-                obs['depth']=depth
+                obs['depth'] = depth
             else:
-                obs = obs.interp(depth=depth_values,
-                                 method=coloc_method,
-                                 kwargs={"fill_value": "extrapolate"})
-
-    return obs.squeeze(), mod.squeeze()
+                obs = obs.interp(depth=depth_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+    return obs, mod
 
 
-def min_grid_all(obs,
-                 mod,
-                 horizontal_colocation_flag,
-                 vertical_colocation_flag,
-                 temporal_colocation_flag):
+def pick_time(ds, time_values):
+    """Pick data in case of dims['time'] = 1.
+    Parameters
+    ----------
+    ds : xarray.Dataset
+    time_values : list of times
+
+    Returns
+    -------
+    ds : xarray.Dataset
+    """
+    dss = []
+    for time_value in time_values:
+        ds0 = ds.isel(time=[0])
+        ds0 = ds0.assign_coords({"time": [time_value]})
+        dss.append(ds0)
+    ds = xr.concat(dss, "time", compat="no_conflicts", coords="different", data_vars="all")
+    return ds
+
+
+def min_grid_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag, temporal_colocation_flag):
     """
     Gives the grid that has the minimum resolution along each dimension
     of the observation and model.
@@ -191,8 +203,7 @@ def min_grid_all(obs,
         dims.append('time')
 
     dict_coords = min_dimensions(obs, mod, dims)
-    tgt_grid = xr.DataArray(dims=dims,
-                            coords=dict(dict_coords))
+    tgt_grid = xr.DataArray(dims=dims, coords=dict(dict_coords))
     return tgt_grid
 
 
@@ -248,9 +259,7 @@ def colocate_lon_lat_time_mod(ds, tgt, method):
     list_ds = []
     for i, time in enumerate(tgt.time.values):
         # Colocation time
-        ds_interp = ds.interp(time=time,
-                              method=method,
-                              kwargs={"fill_value": "extrapolate"}).squeeze()
+        ds_interp = ds.interp(time=time, method=method, kwargs={"fill_value": "extrapolate"}).squeeze()
 
         # Colocation depth
         if 'depth' in tgt.squeeze().dims:
@@ -258,20 +267,15 @@ def colocate_lon_lat_time_mod(ds, tgt, method):
                 depth = np.unique(tgt.DEPH.fillna(0).values)
             else:
                 depth = np.unique(tgt.depth.values)
-            ds_interp = ds_interp.interp(depth=depth,
-                                         method=method,
-                                         kwargs={"fill_value": "extrapolate"}).squeeze()
+            ds_interp = ds_interp.interp(depth=depth, method=method, kwargs={"fill_value": "extrapolate"}).squeeze()
 
         # Colocation lon/lat
         if 'lon' in tgt.coords:
             lon = tgt.isel(time=[i]).lon.values
             lat = tgt.isel(time=[i]).lat.values
             if 'lon' in ds.dims:  # For rect. grids
-                ds_interp = ds_interp.interp(lon=lon,
-                                             lat=lat,
-                                             method=method,
-                                             kwargs={"fill_value": "extrapolate"}
-                                             ).squeeze()
+                ds_interp = ds_interp.interp(lon=lon, lat=lat, method=method,
+                                             kwargs={"fill_value": "extrapolate"}).squeeze()
             elif 'x' in ds.dims:  # For curv. grids
                 if __name__ == '__main__':
                     ds_interp = ds_interp.meta.sel_closest(lon, lat)
@@ -309,10 +313,8 @@ def colocate_lon_lat_time_obs(ds, tgt, method):  # quand lon et lat dependent de
                 ds_interp['depth'] = ds_interp['DEPH']
             else:
                 depth = np.unique(tgt.depth.values)
-            ds_interp = ds_interp.dropna('depth').interp(depth=depth,
-                                                         method=method,
-                                                         kwargs={"fill_value": "extrapolate"}
-                                                         ).squeeze()
+            ds_interp = ds_interp.dropna('depth').interp(depth=depth, method=method,
+                                                         kwargs={"fill_value": "extrapolate"}).squeeze()
         list_ds.append(ds_interp)
     ds = xr.concat(list_ds, 'time')
     return ds
