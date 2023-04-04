@@ -820,9 +820,14 @@ class MetazoneAccessor:
             same Dataset averaged over the time interval
         """
         logger.info(f"Applying filter - time_selection_interval")
+
         start = self._obj.isel(time=[0]).time.data[0]
         end = self._obj.isel(time=[-1]).time.data[0]
+
+        start, end, interval = self._obj.meta.format_interval(start, end, interval)
+
         time_interval = pandas.date_range(start=start, end=end, freq=interval)
+
         ds_group = self._obj.groupby_bins('time', time_interval)
         liste_ds = []
 
@@ -844,6 +849,31 @@ class MetazoneAccessor:
         ds['interval'] = ds['interval_label']
         ds = ds.drop('interval_label')
         return ds
+
+
+    def format_interval(self,start,end,interval):
+        """
+        Retrieve the right inteval for monthly, yearly interval.
+        Parameters
+        ----------
+        start : np.datime64
+            Date of start
+        end : np.datime64
+            Date of end
+        interval : str
+            Required interval
+
+        Returns
+        -------
+
+        """
+        if interval in ["1M", "M"]:
+            interval = "MS"
+            start = np.datetime_as_string(start)[:7]
+            day = np.datetime_as_string(end, unit='D').split('-')[2]
+            if int(day) > 2:
+                end = end + np.timedelta64(int(1 * 2.628e+15), 'ns')
+        return start, end, interval
 
     # Overload emulation
     def time_selection_climatological(self, *args):
