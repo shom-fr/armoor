@@ -1079,6 +1079,7 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
     vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap = get_min_max_values(vmin, vmax, obs_meta, comparison,
                                                                                        metric)
     # Plot
+
     f, axs = figure_5_maps(obs_coloc)
     im0 = axs[0].pcolormesh(obs_meta.lon.data, obs_meta.lat.data, obs_meta.data, vmin=vmin, vmax=vmax, cmap=cmap,
                             transform=ccrs.PlateCarree())
@@ -1849,6 +1850,10 @@ def plot_ts_metr_point(models, observation, metric, flag_interval, flag_slice, o
                     title = f'{var_title} : Bias and RMSE statistics'
                 f.suptitle(title, fontsize=17, fontweight='bold')
 
+                # Rotate x labels
+                for label in ax.get_xticklabels():
+                    label.set_rotation(25)
+
         else:  # No flag interval : difference only
 
             f, axs = figure_2lin_ts()
@@ -2272,6 +2277,7 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
 
     """
     logger.info('Statistical time series figure.')
+
     # MOYENNES
     mod_mean = mod_coloc.mean(list_dims_mean, skipna=True).squeeze()
     obs_mean = obs_coloc.mean(list_dims_mean, skipna=True).squeeze()
@@ -2306,6 +2312,9 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     else:
         ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30, transform=ccrs.PlateCarree())
 
+    # Rotate x labels
+    for label in ax.get_xticklabels():
+        label.set_rotation(25)
 
 def plot_profile_unique(models, observation, radius, output_path=None):
     """
