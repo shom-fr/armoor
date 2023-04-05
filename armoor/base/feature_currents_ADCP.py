@@ -34,8 +34,8 @@ def plot(config_obj):
 
     observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(['current'])
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read.decode().read_sst.sel(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read.decode().read_sst.sel(['current'])
+        mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(['current'])
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(['current'])
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(['current'])
 
     # SELECT THE USED MODEL POINT

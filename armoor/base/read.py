@@ -57,7 +57,7 @@ class ReadAccessor:
         """
         logger.info(f"Decoding data")
         # Remove QC from variables to prevent random behaviours
-        vars_to_remove = ['TEMP_QC', 'PSAL_QC', 'TIME_QC', 'POSITION_QC']
+        vars_to_remove = ['TEMP_QC', 'PSAL_QC', 'TIME_QC', 'POSITION_QC', 'DIRECTION']
         for var in vars_to_remove:
             if var in self._obj.variables:
                 self._obj = self._obj.drop(var)
@@ -80,6 +80,9 @@ class ReadAccessor:
                 self._obj = self._obj.read.decode_profiler()
             if 'depth' in self._obj.dims and 'depth' not in self._obj.coords and 'pres' in self._obj:  # In-situ depths
                 self._obj = self._obj.read.depth_from_press()
+            # if 'depth' in self._obj.coords and 'depth' not in list(self._obj.keys()) and 'depth' not in self._obj.dims:
+            #     self._obj = self._obj.reset_coords('depth', drop=False)
+
             try:
                 self._obj = self._obj.read.convert_lons().read.convert_depths()
                 return self._obj
