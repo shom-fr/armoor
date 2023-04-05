@@ -2188,7 +2188,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             title = f'{var_title} : Time series metrics - {label_title} Statistics \nSlice : {slice.values}m'
             f.suptitle(title, fontsize=17, fontweight='bold')
 
-            ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}', output_path)
+            ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_slice{idx_slice}', output_path)
     # Case no vertical slices
     else:
         obs_mean_0 = observation["xarray_meta_coloc"][0].mean(list_dims_mean).squeeze()
