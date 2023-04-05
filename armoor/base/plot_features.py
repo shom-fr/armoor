@@ -2603,6 +2603,8 @@ def plot_diag_ts_multi_figure(observation, mod, obs_name, mod_name, radius, vmin
                              edgecolors="black", linewidth=0.8, label=f'Mean {mod_name}', cmap='summer')
 
     # "en trait épais le profil moyen des observations"
+    if 'depth' in observation.coords and 'depth' not in list(observation.keys()) and 'depth' not in observation.dims:
+        observation = observation.reset_coords('depth', drop=False)
     obs_mean = observation.mean(["idx_time", 'interval'])
     im_obs_mean = ax.scatter(obs_mean.sal.values, obs_mean.temp.values, 40, obs_mean.depth.values, vmin=vmin, vmax=vmax,
                              marker="^", zorder=4, edgecolors="black", linewidth=0.6, label=f'Mean {obs_name}',

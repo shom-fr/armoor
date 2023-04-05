@@ -58,8 +58,8 @@ def plot(config_obj):
             var_mod.append(var)
 
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read.decode().read_sst.sel(var_mod)
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read.decode().read_sst.sel(var_mod)
+        mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(var_mod)
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(var_mod)
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(vars)
 
         # Remove missing values
