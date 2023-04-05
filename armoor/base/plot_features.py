@@ -2846,14 +2846,15 @@ def find_var_title(obs_name, da):
     if "units" in da.attrs:
         title_unit = da.attrs['units']
     else:
-        if obs_name in ['temp', 'ptemp', 'theta', 'TEMP', 'temperature', 'sst']:
-            title_unit = "°C"
-        elif obs_name in ['sal', 'sss', 'density', 'dens']:
-            title_unit = "g/kg"
-        elif obs_name in ['u', 'v', 'current', 'norm']:
-            title_unit = "m/s"
-        else:
-            title_unit = 'unit'
+        title_unit = "N/A"
+        # if obs_name in ['temp', 'ptemp', 'theta', 'TEMP', 'temperature', 'sst']:
+        #     title_unit = "°C"
+        # elif obs_name in ['sal', 'sss', 'density', 'dens']:
+        #     title_unit = "g/kg"
+        # elif obs_name in ['u', 'v', 'current', 'norm']:
+        #     title_unit = "m/s"
+        # else:
+        #     title_unit = 'unit'
 
     title = f"{title_name} - [{title_unit}]"
     return title
