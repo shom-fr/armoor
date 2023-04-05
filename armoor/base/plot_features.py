@@ -17,39 +17,25 @@ import gsw
 import armoor.base.feature_tools as ft
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-LABELS_TS = ['Obs Co-located / Model Co-located : Mean ',
-             'Mean(Model Colocated - Obs Co-located) : Bias',
-             'Obs Co-located / Model Co-located : Standard Deviation ',
-             'Obs Co-located / Model Co-located : RMSE',
-             'Obs Co-located / Model Co-located : Centered RMSE',
-             'Obs Co-located / Model Co-located : Values',
+LABELS_TS = ['Obs Co-located / Model Co-located : Mean ', 'Mean(Model Colocated - Obs Co-located) : Bias',
+             'Obs Co-located / Model Co-located : Standard Deviation ', 'Obs Co-located / Model Co-located : RMSE',
+             'Obs Co-located / Model Co-located : Centered RMSE', 'Obs Co-located / Model Co-located : Values',
              'Obs Co-located / Model Co-located : Difference']
 
-LABELS_DIFF = ['Obs Co-located ',
-               'Model Co-located',
-               'Difference']
+LABELS_DIFF = ['Obs Co-located ', 'Model Co-located', 'Difference']
 
 LABELS_PROFILE = ['Observation profile / Model profiles']
 LABELS_STICKPLOT = ['Current stick plot - models / observation']
-LABELS_MAP = ['Observation - Meta-zone',
-              'Observation - Co-located',
-              'Model - Meta-zone', 'Model - Co-located',
+LABELS_MAP = ['Observation - Meta-zone', 'Observation - Co-located', 'Model - Meta-zone', 'Model - Co-located',
               'Comparison Model / Obs']
 
-LABELS_MAP_HARM = ['Model - Amplitude [m/s]',
-                   'Model - Phase [°]',
-                   'Observation - Amplitude [m/s]',
-                   'Observation - Phase [°]',
-                   'Difference - Amplitude [m/s]',
-                   'Difference - Phase [°]']
+LABELS_MAP_HARM = ['Model - Amplitude [m/s]', 'Model - Phase [°]', 'Observation - Amplitude [m/s]',
+                   'Observation - Phase [°]', 'Difference - Amplitude [m/s]', 'Difference - Phase [°]']
 
-COLORS = ["tab:blue",
-          "tab:green",
-          "tab:orange",
-          "tab:red",
-          "tab:purple"]
+COLORS = ["tab:blue", "tab:green", "tab:orange", "tab:red", "tab:purple"]
 
 
 def figure_5_maps(ds):
@@ -464,7 +450,7 @@ def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, o
 
     """
     # Set the titles
-    var_title = find_var_title(obs_name)
+    var_title = find_var_title(obs_name, obs)
     if flag_slice:
         title_depth = ["Slice : " + str(obs.slice.values[i]) + 'm' for i in range(len(obs.slice.values))]
     elif diag_type == "diag_disp_g" and 'depth' in obs.dims and len(obs.depth) > 0:
@@ -573,11 +559,7 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
             y.append(mod.item(i))
 
     data, x_e, y_e = np.histogram2d(x, y, bins=20, density=True)
-    z = interpn((0.5 * (x_e[1:] + x_e[:-1]),
-                 0.5 * (y_e[1:] + y_e[:-1])),
-                data,
-                np.vstack([x, y]).T,
-                method="splinef2d",
+    z = interpn((0.5 * (x_e[1:] + x_e[:-1]), 0.5 * (y_e[1:] + y_e[:-1])), data, np.vstack([x, y]).T, method="splinef2d",
                 bounds_error=False)
 
     # To be sure to plot all data
@@ -648,7 +630,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
     if output_path:
         output_path += f'{obs_name}_{mod_name}'
 
-    var_title = find_var_title(obs_name)
+    var_title = find_var_title(obs_name, obs_coloc)
     if flag_slice:
         title_depth = ["Slice : " + str(obs_coloc.slice.values[i]) + 'm' for i in range(len(obs_coloc.slice.values))]
     elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
@@ -910,7 +892,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
     else:
         mod_name = 'model'
 
-    var_title = find_var_title(mod_coloc.name)
+    var_title = find_var_title(mod_coloc.name, mod_coloc)
 
     # Get the dimensions on which the stats are calculated
     list_dims_mean = []
@@ -981,7 +963,8 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                 mod_meta = mod_meta.sel(time=mod_coloc.time, method='nearest')
 
             # Plot, save and display
-            f, axs = plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title, metric)
+            f, axs = plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title,
+                                          metric)
 
             ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
 
@@ -1206,7 +1189,7 @@ def plot_map_current_trajectory(obs, mod, output_path=None):
     ft.manage_output(plt, f'current_along_traj_{obs_name}_{mod_name}', output_path)
 
 
-def plot_difference_trajectory(obs, mod, obs_name, mod_name,var, output_path=None):
+def plot_difference_trajectory(obs, mod, obs_name, mod_name, var, output_path=None):
     """
     Plot the difference in terms of distance and direction between the model and observation trajectories.
     Parameters
@@ -1386,7 +1369,7 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
     for i_wave, wave in enumerate(observations.wave):
         wave_name = str(observations.waveNames[i_wave].values).split('\'')[1]
         freq = observations.wave[i_wave].values
-        if freq > 0 :
+        if freq > 0:
             # If vertical immersions : on plot per immersion (depth)
             if 'depth' in observations.dims:
                 for i_depth, depth in enumerate(observations.depth):
@@ -1774,7 +1757,7 @@ def plot_ts_metr_point(models, observation, metric, flag_interval, flag_slice, o
     obs_coloc_base = observation["xarray_meta_coloc"][0]
     longitudes, latitudes = obs_coloc_base.lon, obs_coloc_base.lat
     obs_name = observation["xarray_meta"].name
-    var_title = find_var_title(obs_name)
+    var_title = find_var_title(obs_name, obs_meta)
 
     list_dims_mean = []
     label_title = ''
@@ -1974,7 +1957,7 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin=None, vmax
     time_min = np.datetime_as_string(obs_meta_coloc.time.min(skipna=True).data, unit='s')
     time_max = np.datetime_as_string(obs_meta_coloc.time.max(skipna=True).data, unit='s')
     title_time = f'{time_min} to {time_max}'
-    var_title = find_var_title(var)
+    var_title = find_var_title(var, obs_meta_coloc)
     title = f'2D graph \n{var_title} \n{title_time}'
     f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
@@ -2059,7 +2042,7 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, output_path=Non
     time_min = np.datetime_as_string(obs_meta_coloc.time.min(skipna=True).data, unit='s')
     time_max = np.datetime_as_string(obs_meta_coloc.time.max(skipna=True).data, unit='s')
     title_time = f'{time_min} to {time_max}'
-    var_title = find_var_title(var)
+    var_title = find_var_title(var, obs_meta_coloc)
     title = f'1D graph \n{var_title} \n{title_time}'
     f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
@@ -2150,7 +2133,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
     """
     logger.info('Statistical time series of model and observation.')
     obs_name = observation["xarray_meta_coloc"][0].name
-    var_title = find_var_title(obs_name)
+    var_title = find_var_title(obs_name, observation["xarray_meta"])
     obs_coloc_base = observation["xarray_meta_coloc"][0]
     list_dims_mean = []
     label_title = ''
@@ -2316,6 +2299,7 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     for label in ax.get_xticklabels():
         label.set_rotation(25)
 
+
 def plot_profile_unique(models, observation, radius, output_path=None):
     """
     Create the unique vertical profiles figures of a variable for feature 2
@@ -2366,7 +2350,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
         # Add the plot features
         plt.legend()
 
-        var_title = find_var_title(obs.name)
+        var_title = find_var_title(obs.name, obs)
 
         ax.set_ylabel('Depth [m]', fontsize=12)
         ax.set_xlabel(var_title, fontsize=12)
@@ -2483,7 +2467,7 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
     by_label = dict(zip(labels, handles))
     plt.legend(by_label.values(), by_label.keys())
 
-    var_title = find_var_title(observation.name)
+    var_title = find_var_title(observation.name, observation)
 
     ax.set_ylabel('Depth [m]')
     ax.set_xlabel(var_title)
@@ -2836,37 +2820,40 @@ def plot_stick_plots(models, observation, output_path=None):
 
 # Useful functions
 
-def find_var_title(obs_name):
+def find_var_title(obs_name, da):
     """
     return the string of the variable corresponding to the variable name in the DaraArray
     Parameters
     ----------
     obs_name : str
         Name of the variable to retrieve.
+    da : xr.DataArray
+        Data array in which the units may be stored
 
     Returns
     -------
     title : str
         Title of the variable with units.
     """
-    if ('sst' in obs_name):
-        title = 'SST °C'
-    elif (('temp' in obs_name) and ('potential' in obs_name)) or (
-            ('temp' in obs_name) and ('surface' not in obs_name)) or ('theta' in obs_name) or ('ptemp' in obs_name)\
-            or ("TEMP" in obs_name):
-        title = 'T °C'
-    elif ('sal' in obs_name) or ('sss' in obs_name):
-        title = 'SSS g/kg'
-    elif ('dens' in obs_name) or ('density' in obs_name):
-        title = 'SSS g/kg'
-    elif ('u' in obs_name):
-        title = 'U(m/s)'
-    elif (obs_name == 'v'):
-        title = 'V(m/s)'
-    elif ('norm' in obs_name):
-        title = 'Norm(m/s)'
+    # Title
+    if "long_name" in da.attrs:
+        title_name = da.attrs['long_name']
     else:
-        title = 'Var [unit]'
+        title_name = obs_name
+
+    if "units" in da.attrs:
+        title_unit = da.attrs['units']
+    else:
+        if obs_name in ['temp', 'ptemp', 'theta', 'TEMP', 'temperature', 'sst']:
+            title_unit = "°C"
+        elif obs_name in ['sal', 'sss', 'density', 'dens']:
+            title_unit = "g/kg"
+        elif obs_name in ['u', 'v', 'current', 'norm']:
+            title_unit = "m/s"
+        else:
+            title_unit = 'unit'
+
+    title = f"{title_name} - [{title_unit}]"
     return title
 
 
