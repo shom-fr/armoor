@@ -22,7 +22,8 @@ def manage_output(plot, figure_name, folder_path):
 
     """
     if folder_path:
-        path = f'{folder_path}{figure_name}.png'
+        date_now = np.datetime_as_string(np.datetime64('now'), unit='s').replace('-', '').replace(':', '')
+        path = f"{folder_path}{figure_name}_{date_now}.png"
         path = path.replace(':', '-')
         path = path.replace(' ', '')
         logger.info(f'Saving :: {path}')
