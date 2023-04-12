@@ -8,6 +8,7 @@ from xoa.regrid import grid2loc, regrid1d
 import xoa
 import xoa.cf as xcf
 import logging
+import gsw
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,17 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing temperature.
         """
-        return self._obj['ptemp'].read_sst.convert_K_C()
+        if 'ptemp' in self._obj:
+            return self._obj['ptemp'].read_sst.convert_K_C()
+        elif 'temp' in self._obj:
+            # verify salinity and pressure are also included
+            if 'sal' in self._obj and 'pres' in self._obj:
+                ptemp = gsw.conversions.pt0_from_t(self._obj.sal, self._obj.temp, self._obj.pres)
+                ptemp.attrs['standard_name'] = "sea_water_potential_temperature"
+                ptemp.attrs['units'] = "degrees_celsius"
+                ptemp.attrs['long_name'] = "Potential temperature"
+                self._obj['ptemp'] = ptemp
+                return self._obj
 
     def sel_density(self):
         """
