@@ -142,8 +142,8 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
                 for var in obs.variables:
                     if 'depth' in obs[var].coords and var != 'depth':
                         ds_coloc[var] = regrid1d(obs[var], depth)
-                    else:
-                        ds_coloc[var] = obs[var]
+                    elif var != 'depth':
+                        ds_coloc[var] = obs[var].data
                 obs = ds_coloc
                 obs['depth'] = depth
             else:

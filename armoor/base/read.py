@@ -57,7 +57,7 @@ class ReadAccessor:
         """
         logger.info(f"Decoding data")
         # Remove QC from variables to prevent random behaviours
-        vars_to_remove = ['TEMP_QC', 'PSAL_QC', 'TIME_QC', 'POSITION_QC', 'DIRECTION']
+        vars_to_remove = ['TEMP_QC','TEMP_ADJUSTED','PSAL_ADJUSTED', 'PSAL_QC', 'TIME_QC', 'POSITION_QC', 'DIRECTION']
         for var in vars_to_remove:
             if var in self._obj.variables:
                 self._obj = self._obj.drop(var)
@@ -71,6 +71,9 @@ class ReadAccessor:
             self._obj = xoa.grid.to_rect(self._obj)
 
             self._obj = self._obj.read.decode_model()
+
+            if 'N_prof' in self._obj.dims:
+                self._obj = self._obj.read.decode_cora()
             if 'lon' in self._obj.lon.dims and len(self._obj.lon.values) == len(self._obj.lat.values) and len(
                     self._obj.lon.values) == len(self._obj.time.values):
                 self._obj = self._obj.read.convert_trajectory()
@@ -131,6 +134,22 @@ class ReadAccessor:
         if 'sst' in list(self._obj.keys()) and 'adjusted_sea_surface_temperature' in list(self._obj.keys()):
             self._obj = self._obj.drop(['adjusted_sea_surface_temperature'])
         return self._obj.xoa.decode()
+
+    # CORA
+    def decode_cora(self):
+        # vars_to_keep = ['temp', 'PRES', 'PSAL', 'LONGITUDE', 'LATITUDE', 'JULD']
+        # self._obj = self._obj[vars_to_keep]
+        #Rename time
+        self._obj = self._obj.assign_coords({"N_prof": self._obj.time.values})
+        self._obj = self._obj.drop('time')
+        self._obj = self._obj.rename({'N_prof': 'time'})
+
+        #Convert depths
+        self._obj = self._obj.rename({'N_levels': 'depth'})
+        self._obj = self._obj.read.depth_from_press()
+
+        return self._obj
+
 
     # CROCO
     def decode_croco(self):
