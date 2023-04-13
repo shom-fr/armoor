@@ -202,7 +202,6 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(interval)
 
-
     return config_obj
 
 

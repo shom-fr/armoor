@@ -140,9 +140,11 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
                 depth = xr.DataArray(depth_values, name="depth", dims="depth")
                 ds_coloc = xr.Dataset()
                 for var in obs.variables:
-                    if 'depth' in obs[var].coords and var != 'depth':
+                    if var in ['lon', 'lat']:
+                        pass
+                    elif 'depth' in obs[var].coords and var != 'depth':
                         ds_coloc[var] = regrid1d(obs[var], depth)
-                    else:
+                    elif var != 'depth':
                         ds_coloc[var] = obs[var]
                 obs = ds_coloc
                 obs['depth'] = depth
