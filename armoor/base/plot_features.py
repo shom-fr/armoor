@@ -2576,8 +2576,25 @@ def plot_diag_ts_multi_figure(observation, mod, obs_name, mod_name, radius, vmin
     # "en traits fins, tous les profils observés"
     sals_mod, ptemps_mod, depths_mod = [], [], []
     for i_inter, inter in enumerate(observation.interval):
-        for i_idx_time, idx_time in enumerate(observation.idx_time):
-            obs = observation.isel(idx_time=[i_idx_time], interval=[i_inter])
+        if "idx_time" in observation.dims:
+            for i_idx_time, idx_time in enumerate(observation.idx_time):
+                obs = observation.isel(idx_time=[i_idx_time], interval=[i_inter])
+                im_obs = ax.scatter(obs.sal.values, obs.temp.values, 30, obs.depth.values, vmin=vmin, vmax=vmax,
+                                    marker="^", zorder=2, label=f'{obs_name}', alpha=0.3, cmap='autumn')
+
+                # "en traits fin les profils modèles des disques définis et temporellement les plus proches"
+                points = [obs.lon.data], [obs.lat.data]
+                time = obs.time.values[0]
+                mod_buffer = mod["xarray"].read.decode().sel(time=time, method='nearest')
+
+                mod_buffer = mod_buffer.meta.horizontal_selection_cloud_dots(points, radius)
+                for i_idx_point, idx_point in enumerate(mod_buffer.idx_point):
+                    mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
+                    sals_mod.append(mod_buffer_idx.sal.values)
+                    ptemps_mod.append(mod_buffer_idx.ptemp.values)
+                    depths_mod.append(mod_buffer_idx.depth.values)
+        else:
+            obs = observation.isel(interval=[i_inter])
             im_obs = ax.scatter(obs.sal.values, obs.temp.values, 30, obs.depth.values, vmin=vmin, vmax=vmax, marker="^",
                                 zorder=2, label=f'{obs_name}', alpha=0.3, cmap='autumn')
 
@@ -2605,7 +2622,10 @@ def plot_diag_ts_multi_figure(observation, mod, obs_name, mod_name, radius, vmin
     # "en trait épais le profil moyen des observations"
     if 'depth' in observation.coords and 'depth' not in list(observation.keys()) and 'depth' not in observation.dims:
         observation = observation.reset_coords('depth', drop=False)
-    obs_mean = observation.mean(["idx_time", 'interval'])
+    if "idx_time" in observation.dims:
+        obs_mean = observation.mean(["idx_time", 'interval'])
+    else:
+        obs_mean = observation.mean(['interval'])
     im_obs_mean = ax.scatter(obs_mean.sal.values, obs_mean.temp.values, 40, obs_mean.depth.values, vmin=vmin, vmax=vmax,
                              marker="^", zorder=4, edgecolors="black", linewidth=0.6, label=f'Mean {obs_name}',
                              cmap='autumn')
