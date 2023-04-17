@@ -257,6 +257,13 @@ def decode_hycom_3d(path_files):
                 var_name = var
 
         hycom[var_name] = ds_var[var_name]
+
+    if list(hycom.depth.dims) == ['level']:
+        depths = hycom.depth
+        hycom = hycom.drop('depth')
+        hycom = hycom.rename({'level':'depth'})
+        hycom['depth'] = depths.data
+
     return hycom
 
 
