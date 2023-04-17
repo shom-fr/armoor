@@ -117,9 +117,10 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
 
             # Interpolation for HYCOM
             if 'level' in mod.dims and 'depth' not in mod.dims:
-                if len(depth_values) > 50:
-                    logger.info("more than 50 depths, the grid is resampled with only 50 values")
-                    depth_values = np.linspace(depth_values[0], depth_values[-1], 50)
+                if len(depth_values) > len(mod.level.data):
+                    logger.info(f"too many unique depth values, the grid is resampled with only {len(mod.level.data)}"
+                                f" values")
+                    depth_values = np.linspace(depth_values[0], depth_values[-1], len(mod.level.data))
 
                 mod = mod.meta.vertical_selection_list(depth_values)
 

@@ -524,6 +524,15 @@ class MetazoneAccessor:
         """
         logger.info(f"Applying filter - vertical_selection_slice")
 
+        if 'depth' not in self._obj.dims:
+            depth_values = np.unique(self._obj.depth.data)
+
+            if len(depth_values) > len(self._obj.z.data):
+                logger.info(f"too many unique depth values, the grid is resampled with only {len(self._obj.z.data)}"
+                            f" values")
+                depth_values = np.linspace(depth_values[0], depth_values[-1], len(self._obj.z.data))
+            self._obj = self._obj.meta.vertical_selection_list(depth_values)
+
         start = self._obj.isel(depth=[0])[var_slice].data[0]
         end = self._obj.isel(depth=[-1])[var_slice].data[0]
         vertical_slice = pandas.interval_range(start=start, end=end, freq=float(slice))
