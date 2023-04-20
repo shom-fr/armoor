@@ -12,6 +12,7 @@ import gsw
 
 logger = logging.getLogger(__name__)
 
+
 @xr.register_dataarray_accessor("read_sst")
 @xr.register_dataset_accessor("read_sst")
 class SSTAccessor:
@@ -62,6 +63,7 @@ class SSTAccessor:
                 ds = self._obj.read_sst.sel_current()
 
             liste_ds.append(ds)
+
         if len(liste_ds) == 1:
             ds_all = xr.concat(liste_ds, 'mean_time', combine_attrs="drop")
         elif len(liste_ds) > 1:
@@ -110,22 +112,30 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing SST. If several depth temperature, the temperature of the min depth is taken.
         """
-        if 'depth' in self._obj.coords:
-            try:
-                return self._obj.xoa.temp.sel(depth=depth, method='nearest').read_sst.convert_K_C()
-            except:  # CROCO
-                try:
-                    return self._obj.xoa.temp.sel(z=depth).read_sst.convert_K_C()  # method='nearest'
-                except:
-                    return self._obj.xoa.temp.read_sst.convert_K_C()
-        elif 'depth' in self._obj.variables:
-            depth = xr.DataArray([0], name="depth", dims="depth")
-            return regrid1d(self._obj.xoa.temp, depth).read_sst.convert_K_C()
-        else:  # if no depth (obs sst for example)
-            try:
-                return self._obj.xoa.temp.read_sst.convert_K_C()
-            except:
-                return self._obj.sst.read_sst.convert_K_C()
+        if 'sst' in self._obj:
+            return self._obj.sst
+        elif 'temp' in self._obj:
+            logger.info('SST retrieved from temperature variable')
+            if 'depth' in self._obj.dims:
+                return self._obj.temp.sel(depth=depth, method='nearest').read_sst.convert_K_C()
+            elif 'z' in self._obj.dims:
+                return self._obj.temp.sel(z=depth).read_sst.convert_K_C()
+            elif 'depth' in self._obj.variables:
+                depth = xr.DataArray([0], name="depth", dims="depth")
+                return regrid1d(self._obj.temp, depth).read_sst.convert_K_C()
+            else:  # if no depth (obs sst for example)
+                return self._obj.temp.read_sst.convert_K_C()
+        elif 'ptemp' in self._obj:
+            logger.info('SST retrieved from potential temperature variable')
+            if 'depth' in self._obj.dims:
+                return self._obj.ptemp.sel(depth=depth, method='nearest').read_sst.convert_K_C()
+            elif 'z' in self._obj.dims:
+                return self._obj.ptemp.sel(z=depth).read_sst.convert_K_C()
+            elif 'depth' in self._obj.variables:
+                depth = xr.DataArray([0], name="depth", dims="depth")
+                return regrid1d(self._obj.ptemp, depth).read_sst.convert_K_C()
+            else:  # if no depth (obs sst for example)
+                return self._obj.ptemp.read_sst.convert_K_C()
 
     def sel_sal(self):
         """

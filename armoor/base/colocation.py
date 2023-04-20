@@ -117,10 +117,10 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
 
             # Interpolation for HYCOM
             if 'level' in mod.dims and 'depth' not in mod.dims:
-                if len(depth_values) > len(mod.level.data):
-                    logger.info(f"too many unique depth values, the grid is resampled with only {len(mod.level.data)}"
+                if len(depth_values) > 50:
+                    logger.info(f"too many unique depth values, the grid is resampled with only 50"
                                 f" values")
-                    depth_values = np.linspace(depth_values[0], depth_values[-1], len(mod.level.data))
+                    depth_values = np.linspace(depth_values[0], depth_values[-1], 50)
 
                 mod = mod.meta.vertical_selection_list(depth_values)
 
@@ -141,7 +141,7 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
                 depth = xr.DataArray(depth_values, name="depth", dims="depth")
                 ds_coloc = xr.Dataset()
                 for var in obs.variables:
-                    if var in ['lon', 'lat']:
+                    if var in ['lon', 'lat'] or obs[var].data.dtype == 'object':
                         pass
                     elif 'depth' in obs[var].coords and var != 'depth':
                         ds_coloc[var] = regrid1d(obs[var], depth)

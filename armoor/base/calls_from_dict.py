@@ -4,7 +4,9 @@ import xarray as xr
 from armoor import base
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def dict2call(config_obj: dict):
     """
@@ -18,14 +20,10 @@ def dict2call(config_obj: dict):
 
     """
     config_obj = get_observation_models_meta(config_obj)
-    features = {"sst": base.feature_sst,
-                "prof_hydro_vessel": base.feature_prof_hydro_vessel,
-                "prof_hydro_mooring": base.feature_prof_hydro_mooring,
-                "section_hydro": base.feature_section_hydro,
-                "clim_hydro": base.feature_clim_hydro,
-                "currents_hfr": base.feature_currents_hfr,
-                "currents_ADCP": base.feature_currents_ADCP,
-                "currents_VMADCP": base.feature_currents_VMADCP,
+    features = {"sst": base.feature_sst, "prof_hydro_vessel": base.feature_prof_hydro_vessel,
+                "prof_hydro_mooring": base.feature_prof_hydro_mooring, "section_hydro": base.feature_section_hydro,
+                "clim_hydro": base.feature_clim_hydro, "currents_hfr": base.feature_currents_hfr,
+                "currents_ADCP": base.feature_currents_ADCP, "currents_VMADCP": base.feature_currents_VMADCP,
                 "drifters": base.feature_drifters
                 }
 
@@ -71,11 +69,9 @@ def get_observation_models_meta(config_obj: dict):
 
     # Read observations
     logger.info(f"Opening observation from file(s)")
-    observation.update({"xarray": base.open_file(observation.pop("path"), config_obj['functionality'], obs_type)})
+    observation.update({"xarray": base.open_decode(observation.pop("path"), config_obj['functionality'], obs_type)})
     logger.info(f"Applying : decode and meta zone on observation")
-    observation.update({"xarray_meta": apply_metas2dataset(observation["xarray"].read.decode(),
-                                                           config_obj,
-                                                           get_method(observation))
+    observation.update({"xarray_meta": apply_metas2dataset(observation["xarray"], config_obj, get_method(observation))
                         })
 
     logger.info(f"File(s) read")
@@ -94,11 +90,9 @@ def get_observation_models_meta(config_obj: dict):
         else:
             mod_type = None
         logger.info(f"Opening model from file(s)")
-        model.update({"xarray": base.open_file(model.pop("path"), config_obj['functionality'], mod_type)})
+        model.update({"xarray": base.open_decode(model.pop("path"), config_obj['functionality'], mod_type)})
         logger.info(f"Applying : decode and meta zone on model")
-        model.update({"xarray_meta": apply_metas2dataset(model["xarray"].read.decode(),
-                                                         config_obj,
-                                                         get_method(model))
+        model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj, get_method(model))
                       })
 
         if 'depth' not in model["xarray_meta"] or model["xarray_meta"].depth.values.dtype == 'float32':
@@ -145,17 +139,14 @@ def get_observation_models_meta(config_obj: dict):
     if config_obj["functionality"] == "drifters":
         temporal_colocation_flag = False
         vertical_colocation_flag = False
-        horizontal_colocation_flag = False
+        horizontal_colocation_flag = True
 
     logger.info(f"Collocating model(s) and observation")
     for index_model, model in enumerate(models):
         # Colocation per model
-        obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"],
-                                                 model["xarray_meta"],
-                                                 horizontal_colocation_flag,
-                                                 vertical_colocation_flag,
-                                                 temporal_colocation_flag,
-                                                 coloc_method=get_method(model),
+        obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"],
+                                                 horizontal_colocation_flag, vertical_colocation_flag,
+                                                 temporal_colocation_flag, coloc_method=get_method(model),
                                                  opt_grid=config_obj["colocate"])
 
         observation["xarray_meta_coloc"].append(obs_coloc)
@@ -246,19 +237,15 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, meta_zones: dict, method: str) -
     """
     logger.info("Applying meta zone")
 
-    filters = {
-        "quality": lambda obj: obj.meta.quality_filter,
-        "vars": lambda obj: obj.meta.var_selection,
-        "depth": lambda obj: obj.meta.vertical_selection_depth,
-        "dens": lambda obj: obj.meta.vertical_selection_dens,
-        "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
-        "start": lambda obj: obj.meta.time_selection_start,
-        "end": lambda obj: obj.meta.time_selection_end,
-        "times": lambda obj: obj.meta.time_selection_list,
-        "frequency": lambda obj: obj.meta.time_selection_freq,
-        "time_restriction": lambda obj: obj.meta.time_restriction,
-        "cyclic": lambda obj: obj.meta.time_selection_climatological
-        }
+    filters = {"quality": lambda obj: obj.meta.quality_filter, "vars": lambda obj: obj.meta.var_selection,
+               "depth": lambda obj: obj.meta.vertical_selection_depth,
+               "dens": lambda obj: obj.meta.vertical_selection_dens,
+               "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
+               "start": lambda obj: obj.meta.time_selection_start, "end": lambda obj: obj.meta.time_selection_end,
+               "times": lambda obj: obj.meta.time_selection_list, "frequency": lambda obj: obj.meta.time_selection_freq,
+               "time_restriction": lambda obj: obj.meta.time_restriction,
+               "cyclic": lambda obj: obj.meta.time_selection_climatological
+               }
 
     if "meta_zones" in meta_zones:
         # Cloud horizontal selection
@@ -277,8 +264,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, meta_zones: dict, method: str) -
                 min_bath = meta_zones["meta_zones"]["bathy_min"] if "bathy_min" in meta_zones["meta_zones"] else None
                 max_bath = meta_zones["meta_zones"]["bathy_max"] if "bathy_max" in meta_zones["meta_zones"] else None
 
-                xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath,
-                                                                        maximum=max_bath)
+                xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath, maximum=max_bath)
         # Other meta-zones, one by one
         for name, filter in filters.items():
             if name in meta_zones["meta_zones"]:
