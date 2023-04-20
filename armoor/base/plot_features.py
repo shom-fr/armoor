@@ -1167,6 +1167,8 @@ def plot_map_current_trajectory(obs, mod, output_path=None):
               headaxislength=0.001, color='b', label=obs_name, transform=ccrs.PlateCarree())
 
     # Plot model current
+    print('mod', mod["xarray_meta_coloc"])
+    print('obs', obs)
     mod_name = mod.name
     mod = mod["xarray_meta_coloc"].squeeze()
     ax.quiver(mod.lon, mod.lat, mod.u, mod.v, angles='uv', width=0.001, headwidth=0.001, headlength=0.001,
@@ -2438,7 +2440,7 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
                 points = [obs.lon.data], [obs.lat.data]
                 time = obs.time.values
                 var = mod["xarray_meta"].name
-                mod_sel = mod["xarray"].read.decode().sel(time=time, method='nearest')[var]
+                mod_sel = mod["xarray"].sel(time=time, method='nearest')[var]
 
                 mod_buffer = mod_sel.meta.horizontal_selection_cloud_dots(points, radius)
                 dict_mod[str(i_mod) + 'depth'] = mod_buffer.depth.values
@@ -2585,7 +2587,7 @@ def plot_diag_ts_multi_figure(observation, mod, obs_name, mod_name, radius, vmin
                 # "en traits fin les profils modèles des disques définis et temporellement les plus proches"
                 points = [obs.lon.data], [obs.lat.data]
                 time = obs.time.values[0]
-                mod_buffer = mod["xarray"].read.decode().sel(time=time, method='nearest')
+                mod_buffer = mod["xarray"].sel(time=time, method='nearest')
 
                 mod_buffer = mod_buffer.meta.horizontal_selection_cloud_dots(points, radius)
                 for i_idx_point, idx_point in enumerate(mod_buffer.idx_point):
@@ -2601,7 +2603,7 @@ def plot_diag_ts_multi_figure(observation, mod, obs_name, mod_name, radius, vmin
             # "en traits fin les profils modèles des disques définis et temporellement les plus proches"
             points = [obs.lon.data], [obs.lat.data]
             time = obs.time.values[0]
-            mod_buffer = mod["xarray"].read.decode().sel(time=time, method='nearest')
+            mod_buffer = mod["xarray"].sel(time=time, method='nearest')
 
             mod_buffer = mod_buffer.meta.horizontal_selection_cloud_dots(points, radius)
             for i_idx_point, idx_point in enumerate(mod_buffer.idx_point):
@@ -2866,15 +2868,7 @@ def find_var_title(obs_name, da):
     if "units" in da.attrs:
         title_unit = da.attrs['units']
     else:
-        title_unit = "N/A"
-        # if obs_name in ['temp', 'ptemp', 'theta', 'TEMP', 'temperature', 'sst']:
-        #     title_unit = "°C"
-        # elif obs_name in ['sal', 'sss', 'density', 'dens']:
-        #     title_unit = "g/kg"
-        # elif obs_name in ['u', 'v', 'current', 'norm']:
-        #     title_unit = "m/s"
-        # else:
-        #     title_unit = 'unit'
+        title_unit = "N/A"  # if obs_name in ['temp', 'ptemp', 'theta', 'TEMP', 'temperature', 'sst']:  #     title_unit = "°C"  # elif obs_name in ['sal', 'sss', 'density', 'dens']:  #     title_unit = "g/kg"  # elif obs_name in ['u', 'v', 'current', 'norm']:  #     title_unit = "m/s"  # else:  #     title_unit = 'unit'
 
     title = f"{title_name} - [{title_unit}]"
     return title

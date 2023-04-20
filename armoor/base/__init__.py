@@ -17,3 +17,4 @@ from .comodo_tide_feature import *
 from .opendrift_trajectory import *
 from .colocation import *
 from .plot_features import *
+from .open_decode import *

@@ -22,6 +22,7 @@ def manage_output(plot, figure_name, folder_path):
 
     """
     if folder_path:
+        figure_name = figure_name.replace(' ', '_').replace('[', '').replace(']', '').replace('/', '')
         date_now = np.datetime_as_string(np.datetime64('now'), unit='s').replace('-', '').replace(':', '')
         path = f"{folder_path}{figure_name}_{date_now}.png"
         path = path.replace(':', '-')
@@ -95,7 +96,7 @@ def remove_missing_values(model, obs):
         model_nan = model.where(~np.isnan(obs))
         obs_nan = obs.where(~np.isnan(model))
         model_nan = model_nan.assign_coords(model.coords)
-        obs_nan = obs_nan.assign_coords(obs.coords)
+        obs_nan = obs_nan.squeeze().assign_coords(obs.coords)
         return model_nan, obs_nan
     else:
         return model, obs
