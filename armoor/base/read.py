@@ -144,7 +144,7 @@ class ReadAccessor:
         list_to_keep = [ 'temp', 'salt']
         for var in list(self._obj.keys()):
             if var not in list_to_keep:
-                self._obj = self._obj.drop(var)
+                self._obj = self._obj.drop_vars(var)
 
         # Depth becomes a variable
         if 'depth' in self._obj:
@@ -152,7 +152,7 @@ class ReadAccessor:
 
         # Rename coordinates
         self._obj = self._obj.rename_dims({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-        self._obj = self._obj.drop(['xi_rho', 'eta_rho'])
+        self._obj = self._obj.drop_vars(['xi_rho', 'eta_rho'])
 
         if len(self._obj['lon']) == len(np.unique(self._obj.lon_rho.data)):
             longitude = np.unique(self._obj.lon_rho.data)
