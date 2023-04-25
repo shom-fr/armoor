@@ -10,6 +10,11 @@ rootdir = os.path.abspath(os.path.dirname(__file__))
 cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "../tests.ini"))
 paths = cfgm_forecaster.load(os.path.join(rootdir, "../../config/tests.cfg"))
 
+cfgm_auth = cfgm.ConfigManager(os.path.join(rootdir, "..", "..", "armoor", "tick", 'auth.ini'))
+
+def get_auth_spec():
+    return cfgm_auth
+
 def copy_p2_forecaster_cfg_file():
     source_file = os.path.join(rootdir, "..", "..", "data", "P2", 'forecaster.cfg')
     destination_dir = os.path.join(paths["path_p2"], 'forecaster.cfg')
