@@ -69,7 +69,7 @@ setup(
             'armoor = armoor.cli.run:main',
             'armoor2 = armoor.cli.run:main_2',
             'armoor-tick-create = armoor.cli.tick:create',
-            'armoor-tick-search = armoor.tick.run:search',
+            'armoor-tick-search = armoor.cli.tick:search',
             'armoor-tick-description = armoor.tick.run:description',
             'armoor-tick-authentication-info = armoor.tick.run:authentication_info',
             'armoor-tick-authentication = armoor.tick.run:authentication_update',
