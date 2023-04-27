@@ -69,29 +69,6 @@ def show_tickets(tickets):
             print(gitlab_ticket)
 
 
-def description():
-    """
-    Retrieve ticket description from gitlab
-    For more information use : armoor-tick-description -h
-    Returns
-    -------
-    None
-    """
-    target_id = sys.argv[1]
-    try:
-        target_id = int(target_id)
-        ticket = Ticket()
-
-        print(f'Retrieving ticket {target_id} description from GitLab.')
-        show_description(ticket.get_description(target_id))
-
-    except gitlab.exceptions.GitlabGetError:
-        print(f'GitlabGetError : An error occurred while retrieving ticket number {target_id}.')
-        print('Most common error caused by a ticket that does not exist.')
-    except ValueError:
-        print(f'ValueError "{target_id}" : Please enter a number to retrieve the description.')
-
-
 def show_description(ticket):
     """
     Print ticket
