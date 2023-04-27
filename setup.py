@@ -68,7 +68,7 @@ setup(
         'console_scripts': [
             'armoor = armoor.cli.run:main',
             'armoor2 = armoor.cli.run:main_2',
-            'armoor-tick-create = armoor.tick.run:create',
+            'armoor-tick-create = armoor.cli.tick:create',
             'armoor-tick-search = armoor.tick.run:search',
             'armoor-tick-description = armoor.tick.run:description',
             'armoor-tick-authentication-info = armoor.tick.run:authentication_info',
