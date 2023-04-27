@@ -100,3 +100,14 @@ def description():
         print('Most common error caused by a ticket that does not exist.')
     except ValueError:
         print(f'ValueError "{target_id}" : Please enter a number to retrieve the description.')
+
+
+def authentication_info():
+    """
+    Displays the gitlab authentication information
+    Returns
+    -------
+    None
+    """
+    ticket = Ticket()
+    ticket.print_auth_info()

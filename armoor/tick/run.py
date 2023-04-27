@@ -83,17 +83,6 @@ def show_description(ticket):
     print(ticket)
 
 
-def authentication_info():
-    """
-    Displays the gitlab authentication information
-    Returns
-    -------
-    None
-    """
-    ticket = Ticket()
-    ticket.print_auth_info()
-
-
 def authentication_update(argv=None):
     """
     Update gitlab authentication information
