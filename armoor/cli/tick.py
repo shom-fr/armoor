@@ -1,5 +1,6 @@
 import os
 import sys
+import pathlib
 
 from argparse import ArgumentParser
 import gitlab
@@ -7,7 +8,7 @@ import gitlab
 from xoa import cfgm
 
 from armoor.tick.ticket import Ticket
-from armoor.tick.run import show_create, show_tickets, show_description
+from armoor.tick.cli_tools import show_create, show_tickets, show_description, update_auth_cfg
 
 
 def create(argv=None):
@@ -111,3 +112,37 @@ def authentication_info():
     """
     ticket = Ticket()
     ticket.print_auth_info()
+
+
+def authentication_update(argv=None):
+    """
+    Update gitlab authentication information
+
+    Parameters
+    ----------
+    argv : command line parameters
+
+    For more information use : armoor-tick-authentication -h
+
+    Returns
+    -------
+
+    """
+    rootdir = os.path.abspath(os.path.dirname(__file__))
+    current_dir = pathlib.Path().resolve()
+    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "..", "tick", "auth.ini"))
+
+    if not argv:
+        argv = sys.argv[1:]
+    parser = ArgumentParser(description="Update gitlab authentication information")
+    cfg_auth_lines, _ = cfgm_fields.arg_parse(parser=parser,
+                                              getargs=True,
+                                              args=argv,
+                                              cfgfile=os.path.join(current_dir, "auth.cfg"))
+
+    formatted_cfg_auth = update_auth_cfg(cfg_auth_lines)
+    with open(os.path.join(current_dir, "auth.cfg"), "w", encoding="utf-8") as auth_file:
+        auth_file.write("\n".join(formatted_cfg_auth))
+
+    print('Update done')
+    Ticket()

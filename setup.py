@@ -72,7 +72,7 @@ setup(
             'armoor-tick-search = armoor.cli.tick:search',
             'armoor-tick-description = armoor.cli.tick:description',
             'armoor-tick-authentication-info = armoor.cli.tick:authentication_info',
-            'armoor-tick-authentication = armoor.tick.run:authentication_update',
+            'armoor-tick-authentication = armoor.cli.tick:authentication_update',
             'armoor-script = armoor.hmi.run_script:main',
             'armoor-bull = armoor.bull.run_script:main',
             'armoor-bull-report = armoor.bull.run_script:only_report'

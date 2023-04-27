@@ -1,16 +1,6 @@
 """
 Functions to manage gitlab issues
 """
-import os
-import sys
-import pathlib
-from argparse import ArgumentParser
-
-from xoa import cfgm
-import gitlab
-
-from .ticket import Ticket
-
 
 def show_create(ticket):
     """
@@ -83,41 +73,7 @@ def show_description(ticket):
     print(ticket)
 
 
-def authentication_update(argv=None):
-    """
-    Update gitlab authentication information
-
-    Parameters
-    ----------
-    argv : command line parameters
-
-    For more information use : armoor-tick-authentication -h
-
-    Returns
-    -------
-
-    """
-    rootdir = os.path.abspath(os.path.dirname(__file__))
-    current_dir = pathlib.Path().resolve()
-    cfgm_fields = cfgm.ConfigManager(os.path.join(rootdir, "auth.ini"))
-
-    if not argv:
-        argv = sys.argv[1:]
-    parser = ArgumentParser(description="Update gitlab authentication information")
-    cfg_auth_lines, _ = cfgm_fields.arg_parse(parser=parser,
-                                              getargs=True,
-                                              args=argv,
-                                              cfgfile=os.path.join(current_dir, "auth.cfg"))
-
-    formatted_cfg_auth = create_update_auth_cfg(cfg_auth_lines)
-    with open(os.path.join(current_dir, "auth.cfg"), "w", encoding="utf-8") as auth_file:
-        auth_file.write("\n".join(formatted_cfg_auth))
-
-    print('Update done')
-    Ticket()
-
-
-def create_update_auth_cfg(cfg_auth_lines) -> list:
+def update_auth_cfg(cfg_auth_lines) -> list:
     """
     Format cfg to be writen in file
     Parameters
