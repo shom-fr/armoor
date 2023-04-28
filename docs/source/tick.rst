@@ -34,6 +34,20 @@ Here is an example to update your token :
 
     armoor-tick-authentication --gitlab-token your_token_with_read_write_api_scope
 
+Run unit tests
+--------------
+
+To run issues management unit tests, use the following command::
+
+    pytest your_path_to/tests/uni/test_ticket.py
+
+
+In the folder where you will run ``pytest`` please create a file named **tests.cfg**
+and add the following line by replacing ``/path/to/output/tests/P2/`` with your information::
+
+    path_p2 = '/path/to/output/tests/P2/'
+
+In the folder ``path_p2`` you just defined add a file named **auth.cfg** as describe in section above **How to setup**.
 
 How to use
 ----------
