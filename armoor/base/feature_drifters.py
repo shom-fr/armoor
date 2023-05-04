@@ -1,4 +1,5 @@
 """Create figures for feature 9:drifters"""
+import os
 import copy
 from armoor import base
 import pandas
@@ -40,7 +41,7 @@ def plot(config_obj):
     # PLOT
     for index_output, output in enumerate(outputs):
         if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
+            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
@@ -108,8 +109,8 @@ def plot(config_obj):
                                                                 lat_tgt)
 
                 # Create the formatted file for OpenDrift
-                output_file = f'{path_results}/trajectory_{observation.name}_{mod.name}.nc'
-                path_model = f'{path_results}/{mod.name}.nc'
+                output_file = os.path.join(path_results, f'trajectory_{observation.name}_{mod.name}.nc')
+                path_model = os.path.join(path_results, f'{mod.name}.nc')
                 base.opendrift_trajectory.format_opendrift(mod, path_model)
 
                 # Calculate the trajectories from the model
@@ -156,8 +157,8 @@ def plot(config_obj):
             # Calculate the trajectories
             for i_mod, mod in enumerate(models):
                 # Create the formatted file for OpenDrift
-                output_file = f'{path_results}/trajectory_{observation.name}_{mod.name}.nc'
-                path_model = f'{path_results}/{mod.name}.nc'
+                output_file = os.path.join(path_results, f'trajectory_{observation.name}_{mod.name}.nc')
+                path_model = os.path.join(path_results, f'{mod.name}.nc')
                 base.opendrift_trajectory.format_opendrift(mod, path_model)
 
                 # Calculate the trajectories from the model

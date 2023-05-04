@@ -1,4 +1,5 @@
 """Create figures for feature 1:sst"""
+import os
 import copy
 
 from armoor import base
@@ -49,7 +50,7 @@ def plot(config_obj):
     for index_output, output in enumerate(outputs):
         logger.info(f'Generating plot :: {output["plot"]}')
         if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
+            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             logger.info(f'Storing in folder :: {sub_func_output_folder}')
             st.create_folder(sub_func_output_folder)
         else:
@@ -58,9 +59,9 @@ def plot(config_obj):
         if 'attribute' in output and output['attribute'] != 'SST':
             logger.debug(f'{config_obj["functionality"]} should be used for SST only.')
         # get parameters from config obj
-        vmin = ft.get_output('vmin', output)
-        vmax = ft.get_output('vmax', output)
-        cmap = ft.get_output("colormap", output)
+        vmin = output.get('vmin')
+        vmax = output.get('vmax')
+        cmap = output.get("colormap")
         cmap = cmap if cmap is None else f'cmo.{cmap}'
 
         # PLOTS

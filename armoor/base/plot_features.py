@@ -1,4 +1,5 @@
 """Plot figures and outpout for all features"""
+import os
 import logging
 
 import matplotlib.pyplot as plt
@@ -15,6 +16,7 @@ import xarray as xr
 import math
 import gsw
 import armoor.base.feature_tools as ft
+import armoor.hmi.script_tools as st
 
 import logging
 
@@ -628,7 +630,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
     else:
         mod_name = 'Model'
     if output_path:
-        output_path += f'{obs_name}_{mod_name}'
+        output_path = os.path.join(output_path, f'{obs_name}_{mod_name}')
+        st.create_folder(output_path)
 
     var_title = find_var_title(obs_name, obs_coloc)
     if flag_slice:
@@ -2091,7 +2094,7 @@ def create_harmonic_table(models, observations, output_path):
                 ampl, phase = 'u_a', 'u_G'
             elif var == 'V':
                 ampl, phase = 'v_a', 'v_G'
-            harmonic_table_file = open(f'{output_path}{wave_name}_{var}_harm_table.csv', 'a')
+            harmonic_table_file = open(os.path.join(output_path, f'{wave_name}_{var}_harm_table.csv'), 'a')
             harmonic_table_file.write(f'{wave_name} tidal wave - {var} current constituent \n')
             harmonic_table_file.write(f'Model : {model.name} ; Analysis period : {model.analysis_period}\n')
             harmonic_table_file.write(

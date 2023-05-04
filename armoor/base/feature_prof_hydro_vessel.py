@@ -1,4 +1,5 @@
 """Create figures for feature 2:prof_hydro_vessel"""
+import os
 import copy
 from armoor import base
 import armoor.base.feature_tools as ft
@@ -68,14 +69,14 @@ def plot(config_obj):
     # PLOT THE OUTPUTS
     for index_output, output in enumerate(outputs):
         if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
+            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
         # get parameters from config obj
-        vmin = ft.get_output('vmin', output)
-        vmax = ft.get_output('vmax', output)
-        cmap = ft.get_output("colormap", output)
+        vmin = output.get('vmin')
+        vmax = output.get('vmax')
+        cmap = output.get("colormap")
         cmap = cmap if cmap is None else f'cmo.{cmap}'
 
         # PLOTS

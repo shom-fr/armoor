@@ -71,7 +71,7 @@ class MetazoneAccessor:
         # remove the other variables
         for var in self._obj.variables:
             if var not in list_names:
-                self._obj = self._obj.drop(var)
+                self._obj = self._obj.drop_vars(var)
 
         return self._obj
 
@@ -426,7 +426,7 @@ class MetazoneAccessor:
                 tgt_ds = ds
                 for var in self._obj.variables:
                     if var == 'depth' or 'DEPH' in var:
-                        tgt_ds = tgt_ds.drop(var)
+                        tgt_ds = tgt_ds.drop_vars(var)
                     else:
                         for var_depth in ['level', 'z', 'DEPTH', 'sig']:
                             if var_depth in ds[var].dims and len(ds[var][var_depth]) > 1:
@@ -502,7 +502,7 @@ class MetazoneAccessor:
             tgt_ds = self._obj
             for var in self._obj.variables:
                 if var == 'depth':
-                    tgt_ds = tgt_ds.drop(var)
+                    tgt_ds = tgt_ds.drop_vars(var)
                 elif 'level' in self._obj[var].dims or 'z' in self._obj[var].dims:
                     da = self._obj[var]
                     da_tgt = regrid1d(da, tgt_depth)
@@ -856,7 +856,7 @@ class MetazoneAccessor:
         ds = ds.rename({'time': 'idx_time'})
         ds = ds.rename({'date_time': 'time'})
         ds['interval'] = ds['interval_label']
-        ds = ds.drop('interval_label')
+        ds = ds.drop_vars('interval_label')
         return ds
 
 

@@ -60,7 +60,7 @@ class ReadAccessor:
         vars_to_remove = ['TEMP_QC','TEMP_ADJUSTED','PSAL_ADJUSTED', 'PSAL_QC', 'TIME_QC', 'POSITION_QC', 'DIRECTION']
         for var in vars_to_remove:
             if var in self._obj.variables:
-                self._obj = self._obj.drop(var)
+                self._obj = self._obj.drop_vars(var)
 
         # Decode CROCO models
         if 'xi_rho' in self._obj.dims or 'lon_rho' in self._obj.dims:
@@ -126,13 +126,13 @@ class ReadAccessor:
         list_to_drop = ['depth_bnds', 's_dd', 's_sd', 's_se']
         for var in list_to_drop:
             if var in list(self._obj.keys()):
-                self._obj = self._obj.drop([var])
+                self._obj = self._obj.drop_vars([var])
 
         if 's_mn' in list(self._obj.keys()):
             self._obj = self._obj.rename({'s_mn': 'sal'})
 
         if 'sst' in list(self._obj.keys()) and 'adjusted_sea_surface_temperature' in list(self._obj.keys()):
-            self._obj = self._obj.drop(['adjusted_sea_surface_temperature'])
+            self._obj = self._obj.drop_vars(['adjusted_sea_surface_temperature'])
         return self._obj.xoa.decode()
 
     # CORA
@@ -166,7 +166,7 @@ class ReadAccessor:
         list_to_keep = [ 'temp', 'salt']
         for var in list(self._obj.keys()):
             if var not in list_to_keep:
-                self._obj = self._obj.drop(var)
+                self._obj = self._obj.drop_vars(var)
 
         # Depth becomes a variable
         if 'depth' in self._obj:
@@ -174,7 +174,7 @@ class ReadAccessor:
 
         # Rename coordinates
         self._obj = self._obj.rename_dims({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-        self._obj = self._obj.drop(['xi_rho', 'eta_rho'])
+        self._obj = self._obj.drop_vars(['xi_rho', 'eta_rho'])
 
         if len(self._obj['lon']) == len(np.unique(self._obj.lon_rho.data)):
             longitude = np.unique(self._obj.lon_rho.data)
@@ -231,7 +231,7 @@ class ReadAccessor:
         """
         da_lon = xr.DataArray(self._obj.lon.values, coords=[self._obj.time.values], dims="time")
         da_lat = xr.DataArray(self._obj.lat.values, coords=[self._obj.time.values], dims="time")
-        self._obj = self._obj.drop(['lon', 'lat'])
+        self._obj = self._obj.drop_vars(['lon', 'lat'])
         self._obj = self._obj.assign_coords({'lon': da_lon})
         self._obj = self._obj.assign_coords({'lat': da_lat})
         return self._obj

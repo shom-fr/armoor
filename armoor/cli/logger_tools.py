@@ -13,8 +13,8 @@ def setup_logging():
 
     print(f'LOG START :: {timestamp}')
 
-    log_config_file = '../../config/log.cfg'
-    print(f'Using spec file :: {os.path.abspath(os.path.dirname(__file__))}/{log_config_file}')
+    log_config_file = os.path.join('..','..', 'config', 'log.cfg')
+    print(f'Using spec file :: {os.path.join(os.path.abspath(os.path.dirname(__file__)), log_config_file)}')
 
     rootdir = os.path.abspath(os.path.dirname(__file__))
     log_config_path = os.path.join(rootdir, log_config_file)
