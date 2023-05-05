@@ -46,6 +46,10 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
         logger.warning(f'using path : {directory}')
     xcf.register_cf_specs(path)
 
+
+    if isinstance(path_files, list) and len(path_files) == 1:
+        path_files = path_files[0]
+
     # Open file
     if func == 'forecaster':
         logger.info(f"forecaster")
