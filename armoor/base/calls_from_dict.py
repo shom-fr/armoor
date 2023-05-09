@@ -2,7 +2,7 @@
 
 import xarray as xr
 from armoor import base
-
+import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
@@ -58,47 +58,38 @@ def get_observation_models_meta(config_obj: dict):
 
     logger.info(f"Using functionality : {config_obj['functionality']}")
 
-    # Get observation type to read txt observation files
     logger.info(f"Reading observation files")
 
-    obs_type = config_obj['observation'].get('type')
-    if "ADCP" in config_obj['functionality'] and obs_type is None:
-        logger.warning("Pour lire les fichiers ADCP, vous devriez préciser le format dans la variable \"type\" du "
-                       "fichier de paramètres. Cette variable peut être \"LADCP\", \"VMADCP\" ou "
-                       "\"mouillage\". ")
-
-    # Read observations
+    # Open observation dataset from path then decode dataset and apply meta-zone
     logger.info(f"Opening observation from file(s)")
+    obs_type = config_obj['observation'].get('type')
     observation.update({"xarray": base.open_decode(observation.pop("path"), config_obj['functionality'], obs_type)})
     logger.info(f"Applying : decode and meta zone on observation")
     observation.update({"xarray_meta": apply_metas2dataset(observation["xarray"], config_obj, get_method(observation))
                         })
+    logger.info(f"File(s) read for observation")
 
-    logger.info(f"File(s) read")
     # Set initial colocation flags
     temporal_colocation_flag = True
     vertical_colocation_flag = True
     horizontal_colocation_flag = True
 
-    # Open dataset from path then decode dataset and apply meta-zone
+    # Open model dataset from path then decode dataset and apply meta-zone
     for imod, model in enumerate(models):
-        logger.info(f"Reading model : {imod}")
 
-        # Get type of model (in case HYCOM)
-        if "type" in model:
-            mod_type = model['type']
-        else:
-            mod_type = None
+        logger.info(f"Reading model : {imod}")
+        mod_type = model.get('type')
         logger.info(f"Opening model from file(s)")
         model.update({"xarray": base.open_decode(model.pop("path"), config_obj['functionality'], mod_type)})
         logger.info(f"Applying : decode and meta zone on model")
-        model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj, get_method(model))
+        model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj, get_method(model), mod_obs='mod')
                       })
 
         if 'depth' not in model["xarray_meta"] or model["xarray_meta"].depth.values.dtype == 'float32':
             vertical_colocation_flag = False
         elif 'depth' not in model["xarray_meta"]:
             vertical_colocation_flag = False
+
         logger.info(f"File(s) read for model {imod}")
 
     observation.update({"xarray_meta_coloc": []})
@@ -216,7 +207,7 @@ def get_method(data) -> str:
     return method
 
 
-def apply_metas2dataset(xarray_obj: xr.Dataset, meta_zones: dict, method: str) -> xr.Dataset:
+def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str, mod_obs='obs') -> xr.Dataset:
     """
     Apply meta zone to subset dataset.
 
@@ -224,10 +215,12 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, meta_zones: dict, method: str) -
     ----------
     xarray_obj : dict
         Parser defined by user, containing xarray.Datasets.
-    meta_zones : dict
+    config_obj : dict
         Meta-zone from the parser, defines the regions and periods to study.
     method : str
         Method to interpolate / select data.
+    mod_obs : str
+        Indicates if the model or the obs is being meta-zoned.
 
     Returns
     -------
@@ -247,28 +240,35 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, meta_zones: dict, method: str) -
                "cyclic": lambda obj: obj.meta.time_selection_climatological
                }
 
-    if "meta_zones" in meta_zones:
+    if "meta_zones" in config_obj:
         # Cloud horizontal selection
-        if "cloud" in meta_zones["meta_zones"]:
-            radius = meta_zones["meta_zones"]["radius"] if "radius" in meta_zones["meta_zones"] else None
+        if "cloud" in config_obj["meta_zones"]:
+            radius = config_obj["meta_zones"]["radius"] if "radius" in config_obj["meta_zones"] else None
             logger.info(f"Applying : cloud")
-            points = meta_zones["meta_zones"]["cloud"]
+            points = config_obj["meta_zones"]["cloud"]
             xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
 
         # Bathymetry threshold
         if 'h' in xarray_obj:
             xarray_obj = xarray_obj.rename({'h': 'bathy'})
-        if 'bathy_min' in meta_zones["meta_zones"] or 'bathy_max' in meta_zones["meta_zones"]:
+
+        if 'bathy_min' in config_obj["meta_zones"] or 'bathy_max' in config_obj["meta_zones"]:
             logger.info(f"Applying : bathymetry threshold")
             if 'bathy' in xarray_obj:
-                min_bath = meta_zones["meta_zones"]["bathy_min"] if "bathy_min" in meta_zones["meta_zones"] else None
-                max_bath = meta_zones["meta_zones"]["bathy_max"] if "bathy_max" in meta_zones["meta_zones"] else None
+                min_bath = config_obj["meta_zones"]["bathy_min"] if "bathy_min" in config_obj["meta_zones"] else None
+                max_bath = config_obj["meta_zones"]["bathy_max"] if "bathy_max" in config_obj["meta_zones"] else None
 
                 xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath, maximum=max_bath)
+
+        # Radius for ADCP feature
+        if "radius" in config_obj["meta_zones"] and mod_obs == 'mod':
+            xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
+
+
         # Other meta-zones, one by one
         for name, filter in filters.items():
-            if name in meta_zones["meta_zones"]:
+            if name in config_obj["meta_zones"]:
                 logger.info(f"Applying : {name}")
-                xarray_obj = filter(xarray_obj)(meta_zones["meta_zones"][name])
+                xarray_obj = filter(xarray_obj)(config_obj["meta_zones"][name])
 
     return xarray_obj

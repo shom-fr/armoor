@@ -5,7 +5,9 @@ import numpy as np
 import armoor.hmi.script_tools as st
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def plot(config_obj):
     """
@@ -37,10 +39,6 @@ def plot(config_obj):
         mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(['current'])
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(['current'])
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(['current'])
-
-    # SELECT THE USED MODEL POINT
-    # For feature 7, we do not make horizontal colocation, the point is defined from radius and bathymetry threshold
-    models = select_point_bathy_radius(config_obj, observation, models)
 
     # PLOT
     for index_output, output in enumerate(outputs):
@@ -87,14 +85,10 @@ def plot(config_obj):
                 mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute]
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute]
                 # Remove missing values
-                models, observation = base.remove_missing_values_ds(models, observation, i_mod,
-                                                                    [attribute], [attribute])
+                models, observation = base.remove_missing_values_ds(models, observation, i_mod, [attribute],
+                                                                    [attribute])
 
-            base.plot_features.plot_variable_3d(models,
-                                                observation,
-                                                cmap,
-                                                vmin,
-                                                vmax,
+            base.plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax,
                                                 output_path=sub_func_output_folder)
 
         ################################################################################################################
@@ -146,8 +140,7 @@ def plot(config_obj):
 
             # Calculate harmonic analysis
             ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
-                                                                path_results,
-                                                                path_tools, list_waves, 'obs')
+                                                                path_results, path_tools, list_waves, 'obs')
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
             # Re-add the depth / slice values
@@ -167,8 +160,7 @@ def plot(config_obj):
 
                 # Calculate harmonic analysis
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'], 'u v', path_nc,
-                                                                    path_results,
-                                                                    path_tools, list_waves, 'mod')
+                                                                    path_results, path_tools, list_waves, 'mod')
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
 
                 # Re-add the depth / slice values + colocate
@@ -181,9 +173,7 @@ def plot(config_obj):
 
                 # Create the table
                 logger.info(f"Creation of tables in the directory : {sub_func_output_folder}")
-                base.plot_features.create_harmonic_table(ds_mod,
-                                                         ds_obs,
-                                                         output_path=sub_func_output_folder)
+                base.plot_features.create_harmonic_table(ds_mod, ds_obs, output_path=sub_func_output_folder)
 
         ################################################################################################################
         # ELLIPSES TIDAL CURRENTS
@@ -233,13 +223,8 @@ def plot(config_obj):
                     observation["xarray_meta"] = observation["xarray_meta"].mean('idx_depth')
 
             # Calculate harmonic analysis
-            ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"],
-                                                                'u v',
-                                                                path_nc,
-                                                                path_results,
-                                                                path_tools,
-                                                                list_waves,
-                                                                'obs')
+            ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
+                                                                path_results, path_tools, list_waves, 'obs')
 
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
@@ -259,24 +244,14 @@ def plot(config_obj):
                         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].mean('idx_depth')
 
                 # Calculate harmonic analysis
-                ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'],
-                                                                    'u v',
-                                                                    path_nc,
-                                                                    path_results,
-                                                                    path_tools,
-                                                                    list_waves,
-                                                                    'mod')
+                ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'], 'u v', path_nc,
+                                                                    path_results, path_tools, list_waves, 'mod')
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
 
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    ds_obs, ds_mod = base.colocate_all(ds_obs,
-                                                       ds_mod,
-                                                       False,
-                                                       True,
-                                                       False,
-                                                       coloc_method='nearest',
+                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, False, True, False, coloc_method='nearest',
                                                        opt_grid='observation')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
@@ -329,8 +304,8 @@ def select_point_bathy_radius(config_obj, observation, models):
                             "le critère ne peut donc pas être appliqué...")
 
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel(lon=obs_lon, lat=obs_lat, method='nearest')
-            distance = np.sqrt((mod["xarray_meta_coloc"].lon.values - obs_lon) ** 2
-                               + (mod["xarray_meta_coloc"].lat.values - obs_lat) ** 2)
+            distance = np.sqrt((mod["xarray_meta_coloc"].lon.values - obs_lon) ** 2 + (
+                        mod["xarray_meta_coloc"].lat.values - obs_lat) ** 2)
             radius_km = observation["xarray_meta"].meta.km_to_deg(radius)
             if distance > radius_km:
                 logger.info(f'Oops, le modèle ne contient pas de point qui respecte le critère '
