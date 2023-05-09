@@ -15,6 +15,22 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_variable_2d_seasor(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_2d_seasor')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_variable_2d_scanfish(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_2d_scanfish')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_2d_scanfish.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
     def test_variable_3d(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_3d')
