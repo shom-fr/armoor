@@ -5,6 +5,9 @@ from armoor import base
 import numpy as np
 import logging
 
+from pprint import pprint
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -132,13 +135,21 @@ def get_observation_models_meta(config_obj: dict):
         vertical_colocation_flag = False
         horizontal_colocation_flag = True
 
+
+    print('*'*100)
+    pprint(observation.dict())
+    print('*'*100)
+
     logger.info(f"Collocating model(s) and observation")
+    vertical_step = config_obj.get('vertical_step')
+    horizontal_step = config_obj.get('horizontal_step')
     for index_model, model in enumerate(models):
         # Colocation per model
         obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"],
                                                  horizontal_colocation_flag, vertical_colocation_flag,
                                                  temporal_colocation_flag, coloc_method=get_method(model),
-                                                 opt_grid=config_obj["colocate"])
+                                                 opt_grid=config_obj["colocate"],
+                                                 vertical_step=vertical_step, horizontal_step=horizontal_step )
 
         observation["xarray_meta_coloc"].append(obs_coloc)
         model.update({"xarray_meta_coloc": mod_coloc})

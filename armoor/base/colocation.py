@@ -5,12 +5,13 @@ from xoa.regrid import regrid1d
 import xoa.grid
 import xesmf as xe
 import logging
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
 def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag, temporal_colocation_flag,
-                 coloc_method='nearest', opt_grid=None):
+                 coloc_method='nearest', opt_grid=None, vertical_step=None, horizontal_step=None):
     """
     Put the model and observation dataset on the same grid defined
     according to the selected method.
@@ -31,6 +32,10 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
         Method to use for the colocation
     opt_grid : str
         Defines the targeted grid on which to colocate the datasets : model, observation or auto.
+    vertical_step : float
+        Vertical step of the grid on which to colocate.
+    horizontal_step : float
+        Horizontal step of the grid on which to colocate.
 
     Returns
     -------
@@ -105,6 +110,9 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
         except:
             logger.warning("Horizontal observation colocation : Failed.")
 
+    if horizontal_step:
+        obs, mod = set_hor_step(mod, obs, horizontal_step)
+
     # Vertical colocation
     if vertical_colocation_flag:
         if 'DEPH' in ds_tgt.variables:
@@ -151,6 +159,78 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
                 obs['depth'] = depth
             else:
                 obs = obs.interp(depth=depth_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+
+        if vertical_step:
+            obs, mod = set_vert_step(mod, obs, vertical_step)
+    return obs, mod
+
+
+def set_hor_step(mod, obs, hor_step):
+    """
+    Colocate the model and obs on the chosen horizontal grid.
+    Parameters
+    ----------
+    obs : xarray.Dataset
+        Observation dataset.
+    mod : xarray.Dataset
+        Model dataset.
+    hor_step : float
+        Horizontal step of the grid on which to colocate.
+    Returns
+    -------
+    models : dict
+        Dictionnary with models with the updated projection grid.
+    observation : dict
+        Dictionnary with models with the updated projection grid.
+    """
+
+    hor_step = obs.meta.km_to_deg(hor_step)
+
+    # Calculate the time step and distance step in the data
+    pos0, pos1 = mod.isel(time=0), mod.isel(time=1)
+    time_step_data = pos1.time.data - pos0.time.data
+    dist_step = np.sqrt((pos1.lon - pos0.lon) ** 2 + (pos1.lat - pos0.lat) ** 2)
+    time_step = time_step_data * hor_step / dist_step
+    time_step = time_step.data.astype('timedelta64[s]')
+    time_step = str(time_step).split()[0] + 'S'
+    time_min, time_max = mod.time[0].data, mod.time[-1].data
+    time_min, time_max = np.datetime64(time_min), np.datetime64(time_max)
+
+    # Create the new times array to select to retrieve the horizontal resolution
+    tgt_time = pd.date_range(time_min, time_max, freq=time_step)
+
+    # Interpolate the model and obs on the targeted times
+    mod = mod.interp(time=tgt_time, method='linear')
+    obs = obs.interp(time=tgt_time, method='linear')
+    return obs, mod
+
+
+def set_vert_step(mod, obs, vert_step):
+    """
+    Colocate the model and obs on the chosen vertical grid.
+    Parameters
+    ----------
+    obs : xarray.Dataset
+        Observation dataset.
+    mod : xarray.Dataset
+        Model dataset.
+    vert_step : float
+        Vertical step of the grid on which to colocate.
+    Returns
+    -------
+    models : dict
+        Dictionnary with models with the updated projection grid.
+    observation : dict
+        Dictionnary with models with the updated projection grid.
+    """
+
+    depth_min, depth_max = mod.depth.min(), mod.depth.max()
+    tgt_depth = np.arange(depth_min, depth_max, vert_step)
+    if 'depth' in mod.dims:
+        mod = mod.interp(depth=tgt_depth, method="linear")
+    if 'depth' in obs.dims:
+        obs = obs.interp(depth=tgt_depth, method="linear")
+
     return obs, mod
 
 
