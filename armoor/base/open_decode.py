@@ -36,10 +36,10 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
     xoa.register_accessors(decode_sigma=True)
 
     # Read cfg file
-    path_cfg = '../../config/cf.cfg'
     try:
         rootdir = os.path.abspath(os.path.dirname(__file__))
-        path = os.path.join(rootdir, path_cfg)
+        path = os.path.join(rootdir, '..', '..', 'config', 'cf.cfg')
+        logger.info(f'using path : {path}')
     except:
         logger.warning('cf.cfg file not found')
         directory = os.getcwd()
@@ -64,19 +64,19 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
             return open_decode_cmems(path_files)
         elif type == "scanfish":
             logger.info(f"Opening Scanfish")
-            return open_decode_scanfish(path_files)
+            return open_decode_scanfish(path_files[0])
         elif type == "seasoar":
             logger.info(f"Opening Seasoar")
-            return open_decode_seasoar(path_files)
+            return open_decode_seasoar(path_files[0])
         elif type == "LADCP":
             logger.info(f"Opening L-ADCP")
             return open_decode_l_adcp(path_files[0])
         elif type == "mouillage":
             logger.info(f"Opening Mooring")
-            return open_decode_mouillages(path_files)
+            return open_decode_mouillages(path_files[0])
         elif type == "VMADCP":
             logger.info(f"Opening VMADCP")
-            return open_decode_vmadcp(path_files)
+            return open_decode_vmadcp(path_files[0])
         elif type == 'CROCO':
             logger.info(f"Opening CROCO")
             return open_decode_croco(path_files[0])
