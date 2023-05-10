@@ -1170,8 +1170,6 @@ def plot_map_current_trajectory(obs, mod, output_path=None):
               headaxislength=0.001, color='b', label=obs_name, transform=ccrs.PlateCarree())
 
     # Plot model current
-    print('mod', mod["xarray_meta_coloc"])
-    print('obs', obs)
     mod_name = mod.name
     mod = mod["xarray_meta_coloc"].squeeze()
     ax.quiver(mod.lon, mod.lat, mod.u, mod.v, angles='uv', width=0.001, headwidth=0.001, headlength=0.001,
