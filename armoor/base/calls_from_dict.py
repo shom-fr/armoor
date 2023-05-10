@@ -78,7 +78,10 @@ def get_observation_models_meta(config_obj: dict):
     for imod, model in enumerate(models):
 
         logger.info(f"Reading model : {imod}")
+
+        # Get type of model (in case HYCOM)
         mod_type = model.get('type')
+
         logger.info(f"Opening model from file(s)")
         model.update({"xarray": base.open_decode(model.pop("path"), config_obj['functionality'], mod_type)})
         logger.info(f"Applying : decode and meta zone on model")

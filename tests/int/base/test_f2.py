@@ -1,8 +1,9 @@
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
-from tests.int.base import change_path
+from tests.int.base import change_path, copy_test_files
 
 folder_test = 'test_f2'
+copy_test_files(folder_test)
 
 class TestBulletins:
 
@@ -34,6 +35,14 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_diag_theta_s_unique')
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_unique.ini"])
+        parser.update({'output_path' : out_path })
+        dict2call(parser)
+        assert True
+
+    def test_diag_disp_tranche_intervalle(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_diag_disp_tranche_intervalle')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_disp_tranche_intervalle.ini"])
         parser.update({'output_path' : out_path })
         dict2call(parser)
         assert True

@@ -1,4 +1,5 @@
 """Common tools for all features"""
+import os
 import logging
 
 import numpy as np
@@ -24,7 +25,7 @@ def manage_output(plot, figure_name, folder_path):
     if folder_path:
         figure_name = figure_name.replace(' ', '_').replace('[', '').replace(']', '').replace('/', '')
         date_now = np.datetime_as_string(np.datetime64('now'), unit='s').replace('-', '').replace(':', '')
-        path = f"{folder_path}{figure_name}_{date_now}.png"
+        path = os.path.join(folder_path, f'{figure_name}_{date_now}.png')
         path = path.replace(':', '-')
         path = path.replace(' ', '')
         logger.info(f'Saving :: {path}')
@@ -32,28 +33,6 @@ def manage_output(plot, figure_name, folder_path):
         plot.close('all')
     else:
         plot.show()
-
-
-def get_output(param, outputs):
-    """
-    Returns, if specified in the ConfigObj, the parameter (sst, current etc.) to plot.
-    Parameters
-    ----------
-    param : str
-        Parameters to retrieve.
-    outputs : dict
-        Dictionary which contains all the required outputs.
-
-    Returns
-    -------
-    outputs : str
-        Parameter to be plotted.
-
-    """
-    if param in outputs:
-        return outputs[param]
-    else:
-        return None
 
 
 def remove_missing_values_ds(models, observation, i, var_mod, vars):

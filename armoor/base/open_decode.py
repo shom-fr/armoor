@@ -36,15 +36,19 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
     xoa.register_accessors(decode_sigma=True)
 
     # Read cfg file
-    path_cfg = '../../config/cf.cfg'
     try:
         rootdir = os.path.abspath(os.path.dirname(__file__))
-        path = os.path.join(rootdir, path_cfg)
+        path = os.path.join(rootdir, '..', '..', 'config', 'cf.cfg')
+        logger.info(f'using path : {path}')
     except:
         logger.warning('cf.cfg file not found')
         directory = os.getcwd()
         logger.warning(f'using path : {directory}')
     xcf.register_cf_specs(path)
+
+
+    if not isinstance(path_files, list) :
+        raise TypeError(f"Only list are allowed : {path_files} ")
 
     # Open file
     if func == 'forecaster':
@@ -60,25 +64,25 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
             return open_decode_cmems(path_files)
         elif type == "scanfish":
             logger.info(f"Opening Scanfish")
-            return open_decode_scanfish(path_files)
+            return open_decode_scanfish(path_files[0])
         elif type == "seasoar":
             logger.info(f"Opening Seasoar")
-            return open_decode_seasoar(path_files)
+            return open_decode_seasoar(path_files[0])
         elif type == "LADCP":
             logger.info(f"Opening L-ADCP")
-            return open_decode_l_adcp(path_files)
+            return open_decode_l_adcp(path_files[0])
         elif type == "mouillage":
             logger.info(f"Opening Mooring")
-            return open_decode_mouillages(path_files)
+            return open_decode_mouillages(path_files[0])
         elif type == "VMADCP":
             logger.info(f"Opening VMADCP")
-            return open_decode_vmadcp(path_files)
+            return open_decode_vmadcp(path_files[0])
         elif type == 'CROCO':
             logger.info(f"Opening CROCO")
-            return open_decode_croco(path_files)
+            return open_decode_croco(path_files[0])
         elif type == 'CROCO_currents':
             logger.info(f"Opening CROCO currents")
-            return open_decode_croco_currents(path_files)
+            return open_decode_croco_currents(path_files[0])
         elif type == 'HYCOM_currents':
             logger.info(f"Opening HYCOM currents")
             return open_decode_hycom_currents(path_files)
@@ -87,7 +91,7 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
             return open_decode_hycom_3d(path_files)
         elif type == 'CORA':
             logger.info(f"Opening CORA")
-            return open_decode_cora(path_files)
+            return open_decode_cora(path_files[0])
         else:
             logger.info(f"Opening non specific file type")
             return open_decode_basic(path_files)
@@ -145,7 +149,7 @@ def open_decode_cmems(path_files):
          CMEMS dataset.
      """
     # Open
-    if isinstance(path_files, list) and len(path_files) > 1:
+    if len(path_files) > 1:
         list_ds_cmems = []
         for path in path_files:
             ds = xr.open_dataset(path)
@@ -157,7 +161,7 @@ def open_decode_cmems(path_files):
             list_ds_cmems.append(ds)
         cmems = xr.concat(list_ds_cmems, dim='TIME')
     else:
-        cmems = xr.open_dataset(path_files)
+        cmems = xr.open_dataset(path_files[0])
 
     # Variables to drop/rename to prevent random behaviours
     for var in list(cmems.keys()):
@@ -192,12 +196,12 @@ def open_decode_cmems(path_files):
     return cmems
 
 
-def open_decode_l_adcp(path_files):
+def open_decode_l_adcp(path_file):
     """
     Open txt file form L-ADCP observation and store it in a ready-to-use dataset.
     Parameters
     ----------
-    path_files : str
+    path_file : str
         Path to the L-ADCP txt file.
 
     Returns
@@ -206,8 +210,8 @@ def open_decode_l_adcp(path_files):
         L-ADCP observation dataset.
     """
     # Read the .txt file
-    file = open(path_files, 'r',
-                encoding="ISO-8859-1")  # TODO: quand tous les inputs seront en liste, remettre path_files[0]
+    file = open(path_file, 'r',
+                encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -259,12 +263,12 @@ def open_decode_l_adcp(path_files):
     return ladcp
 
 
-def open_decode_vmadcp(path_files) -> xr.Dataset:
+def open_decode_vmadcp(path_file) -> xr.Dataset:
     """
     Open txt file form VMADCP observation and store it in dataset.
     Parameters
     ----------
-    path_files : str
+    path_file : str
         Path to the VMADCP txt file.
 
     Returns
@@ -274,7 +278,7 @@ def open_decode_vmadcp(path_files) -> xr.Dataset:
     """
     logger.info("VMADCP")
     # Read the .txt file
-    file = open(path_files, 'r', encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -320,12 +324,12 @@ def open_decode_vmadcp(path_files) -> xr.Dataset:
     return vmadcp
 
 
-def open_decode_mouillages(path_files):
+def open_decode_mouillages(path_file):
     """
     Open txt file form mooring observation and store it in dataset.
     Parameters
     ----------
-    path_files : str
+    path_file : str
         Path to the mooring txt file.
 
     Returns
@@ -335,7 +339,7 @@ def open_decode_mouillages(path_files):
     """
     logger.info("mooring")
     # Read the .txt file
-    file = open(path_files, 'r', encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -374,12 +378,12 @@ def open_decode_mouillages(path_files):
     return mouillage
 
 
-def open_decode_scanfish(path_files):
+def open_decode_scanfish(path_file):
     """
     Open txt file form scanfish observation and store it in dataset.
     Parameters
     ----------
-    path_files : str
+    path_file : str
         Path to the scanfish txt file.
 
     Returns
@@ -388,7 +392,7 @@ def open_decode_scanfish(path_files):
         scanfish observation dataset.
     """
     # Read the .txt file
-    file = open(path_files, 'r', encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -432,12 +436,12 @@ def open_decode_scanfish(path_files):
     return scanfish
 
 
-def open_decode_seasoar(path_files):
+def open_decode_seasoar(path_file):
     """
     Open txt file form seasoar observation and store it in dataset.
     Parameters
     ----------
-    path : str
+    path_file : str
         Path to the seasoar txt file.
 
     Returns
@@ -446,7 +450,7 @@ def open_decode_seasoar(path_files):
         seasoar observation dataset.
     """
     # Read the .txt file
-    file = open(path_files, 'r', encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -492,12 +496,12 @@ def open_decode_seasoar(path_files):
     return seasoar
 
 
-def open_decode_croco(path_files):
+def open_decode_croco(path_file):
     """
     Open netcdf file from CROCO model.
     Parameters
     ----------
-    path_files : list of str
+    path_file : list of str
         List of the file to decode.
 
     Returns
@@ -505,7 +509,7 @@ def open_decode_croco(path_files):
     croco : xarray.Dataset
          Model dataset decoded.
     """
-    croco = xr.open_dataset(path_files)
+    croco = xr.open_dataset(path_file)
 
     croco = croco.decode_sigma()
 
@@ -774,10 +778,10 @@ def open_decode_basic(path_files):
          dataset.
      """
     # Open
-    if isinstance(path_files, list) and len(path_files) > 1:
+    if len(path_files) > 1:
         ds = xr.open_mfdataset(path_files)
     else:
-        ds = xr.open_dataset(path_files)
+        ds = xr.open_dataset(path_files[0])
 
     # Decode
     ds = ds.xoa.decode()

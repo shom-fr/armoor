@@ -1,4 +1,5 @@
 """Create figures for feature 7:currents_ADCP"""
+import os
 import copy
 from armoor import base
 import numpy as np
@@ -43,7 +44,7 @@ def plot(config_obj):
     # PLOT
     for index_output, output in enumerate(outputs):
         if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
+            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
@@ -114,7 +115,7 @@ def plot(config_obj):
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
-                path_nc = f"{path_results}obs_tide_uv.nc"
+                path_nc = os.path.join(path_results,'obs_tide_uv.nc')
             else:
                 raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
@@ -152,7 +153,7 @@ def plot(config_obj):
             # Process harmonic analysis on models
             logger.info("Beginning of the harmonic analysis on the models.")
             for i_mod, mod in enumerate(models):
-                path_nc = f"{path_results}mod_tide_uv.nc"
+                path_nc = os.path.join(path_results,'mod_tide_uv.nc')
                 # If metazone per slice, calculate average per slice
                 if flag_slice:
                     if len(mod["xarray_meta_coloc"]['idx_depth'].values) > 1:
@@ -198,7 +199,7 @@ def plot(config_obj):
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
-                path_nc = f"{path_results}obs_tide_uv.nc"
+                path_nc = os.path.join(path_results,'obs_tide_uv.nc')
             else:
                 raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
@@ -237,7 +238,7 @@ def plot(config_obj):
             # Process harmonic analysis on models
             ds_models = []
             for i_mod, mod in enumerate(models):
-                path_nc = f"{path_results}mod_tide_uv.nc"
+                path_nc = os.path.join(path_results,'mod_tide_uv.nc')
                 # If metazone per slice, calculate average per slice
                 if flag_slice:
                     if len(mod["xarray_meta_coloc"]['idx_depth'].values) > 1:
