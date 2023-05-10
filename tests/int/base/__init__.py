@@ -16,13 +16,13 @@ def change_path(folder_test):
     os.chdir(paths["path_p1"])
 
     out_path = f'output_{folder_test}/'
-    create_folder(f'{paths["path_p1"]}{out_path}')
-    os.chdir(f'{paths["path_p1"]}{out_path}')
+    create_folder(os.path.join(paths["path_p1"], out_path))
+    os.chdir(os.path.join(paths["path_p1"], out_path))
 
     log.setup_logging()
     logger = logging.getLogger(__name__)
 
-    return f'{paths["path_p1"]}{out_path}', logger
+    return os.path.join(paths["path_p1"], out_path), logger
 
 
 def copy_test_files(test):
