@@ -5,9 +5,6 @@ from armoor import base
 import numpy as np
 import logging
 
-from pprint import pprint
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -134,11 +131,6 @@ def get_observation_models_meta(config_obj: dict):
         temporal_colocation_flag = False
         vertical_colocation_flag = False
         horizontal_colocation_flag = True
-
-
-    print('*'*100)
-    pprint(observation.dict())
-    print('*'*100)
 
     logger.info(f"Collocating model(s) and observation")
     vertical_step = config_obj.get('vertical_step')
