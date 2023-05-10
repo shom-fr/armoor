@@ -10,6 +10,7 @@ import matplotlib.path as path
 import math
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -225,6 +226,39 @@ class MetazoneAccessor:
                 return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
         elif 'x' in self._obj.dims:  # Curvilinear grid
             return self._obj.meta.sel_closest(lon_target, lat_target)
+
+    def horizontal_selection_from_obs_radius(self, config_obj) -> xr.Dataset:
+        """
+        Subset dataset selecting the closest elements to the observations point located within the specified radius.
+
+        Parameters
+        ----------
+        config_obj : dict
+            Models, observation and meta-zone zone parameters from the parser.
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset with elements included inside the cloud/area.
+        """
+
+        radius = config_obj["meta_zones"]["radius"]
+
+        obs = config_obj['observation']["xarray_meta"]
+        obs_lon, obs_lat = obs.lon.values, obs.lat.values
+        if obs_lon.size > 1:
+            obs_lon, obs_lat = obs_lon[0], obs_lat[0]
+
+        self._obj = self._obj.sel(lon=obs_lon, lat=obs_lat, method='nearest')
+        distance = np.sqrt((self._obj.lon.values - obs_lon) ** 2 + (self._obj.lat.values - obs_lat) ** 2)
+        radius_km = self._obj.meta.km_to_deg(radius)
+
+        if distance > radius_km:
+            logger.info(f'Oops, le modèle ne contient pas de point qui respecte le critère '
+                        f'de rayon. Le point le plus proche est utilisé, à la position {xarray_obj.lat.data}N '
+                        f'{xarray_obj.lon.data}E .')
+
+        return self._obj
 
     def sel_closest(self, lon_target, lat_target):
         """
@@ -557,34 +591,6 @@ class MetazoneAccessor:
         ds['slice'] = ds['slice_label']
         return ds
 
-    def vertical_selection_density(self, density: float = None, minimum: float = None,
-                                   maximum: float = None, ) -> xr.Dataset:
-
-        """
-        Subset dataset selecting elements whom density values are included in the specified density range.
-
-        Parameters
-        ----------
-        density : float
-            Only density value kept (i.e. maximum = minimum).
-        minimum : float
-            Minimum density value kept.
-        maximum : float
-            Maximum density value kept.
-
-        Returns
-        -------
-        xarray.Dataset
-             Dataset with density values meeting the condition(s).
-
-        See Also
-        --------
-        cli.base.meta_zone.MetazoneAccessor.data_selection
-        """
-        logger.info(f"Applying filter - vertical_selection_density")
-
-        return self.data_selection(dim='density', value=density, minimum=minimum, maximum=maximum)
-
     def time_selection_start(self, start=None) -> xr.Dataset:
         """
         Subset dataset selecting elements starting after one defined date.
@@ -680,54 +686,6 @@ class MetazoneAccessor:
         if end is not None:
             end = now + pandas.offsets.Day(end + 1)
         return self._obj.sel(time=slice(start, end))
-
-    def depth_selection(self, depth):
-        """
-
-        Parameters
-        ----------
-        depth
-
-        Returns
-        -------
-
-        """
-        logger.info(f"Applying filter - depth_selection")
-        if 'depth' in self._obj.dims:
-            return self._obj.sel(depth=depth)
-        elif 'depth' in self._obj.variables:
-            da_depth = xr.DataArray([depth], name="depth", dims="depth")
-            for var in self._obj.variables:
-                if 'z' in self._obj[var].dims and var != 'depth':
-                    da_var = regrid1d(self._obj[var], da_depth)
-                    self._obj.assign({var: da_var})
-
-            return regrid1d(self._obj, depth)
-
-    def time_selection(self, *args, method: str = None):
-        """
-        Manage overload for :
-            - param times: values kept are those in this list
-            def time_selection(self, times: list) -> xr.Dataset:
-        and
-            - param freq: frequency between values, can be hours, days or months.
-            - param start: values kept from "start" (this is the reference for the frequency).
-            def time_selection(self, freq: str = None, start: str = None) -> xr.Dataset:
-
-        See Also
-        --------
-        cli.base.meta_zone.MetazoneAccessor.time_selection_list
-        cli.base.meta_zone.MetazoneAccessor.time_selection_freq
-        """
-        logger.info(f"Applying filter - time_selection")
-
-        if len(args) == 1 and isinstance(args[0], list):
-            return self.time_selection_list(args[0], method)
-        elif len(args) == 1 and isinstance(args[0], str):
-            return self.time_selection_freq(args[0], method)
-        elif len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], str):
-            return self.time_selection_freq(args[0], args[1], method)
-        return None
 
     # Overload time_selection
     def time_selection_list(self, times: list, method: str = 'nearest') -> xr.Dataset:
@@ -859,8 +817,7 @@ class MetazoneAccessor:
         ds = ds.drop('interval_label')
         return ds
 
-
-    def format_interval(self,start,end,interval):
+    def format_interval(self, start, end, interval):
         """
         Retrieve the right inteval for monthly, yearly interval.
         Parameters

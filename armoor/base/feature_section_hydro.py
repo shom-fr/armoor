@@ -42,8 +42,8 @@ def plot(config_obj):
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(vars)
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(vars)
 
-    # Set horizontal and vertical steps
-    models, observation = base.set_hor_vert_step(config_obj, models, observation)
+    # # Set horizontal and vertical steps
+    # models, observation = base.set_hor_vert_step(config_obj, models, observation)
 
     # Remove missing values
     for i_mod, mod in enumerate(models):

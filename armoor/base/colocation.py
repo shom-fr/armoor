@@ -5,12 +5,13 @@ from xoa.regrid import regrid1d
 import xoa.grid
 import xesmf as xe
 import logging
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
 def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag, temporal_colocation_flag,
-                 coloc_method='nearest', opt_grid=None):
+                 coloc_method='nearest', opt_grid=None, vertical_step=None, horizontal_step=None):
     """
     Put the model and observation dataset on the same grid defined
     according to the selected method.
@@ -31,6 +32,10 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
         Method to use for the colocation
     opt_grid : str
         Defines the targeted grid on which to colocate the datasets : model, observation or auto.
+    vertical_step : float
+        Vertical step of the grid on which to colocate.
+    horizontal_step : float
+        Horizontal step of the grid on which to colocate.
 
     Returns
     -------
@@ -53,24 +58,46 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
 
     # Time colocation
     if temporal_colocation_flag:
-        time_values = np.unique(ds_tgt.time.values)
-
-        logger.info("Temporal model colocation")
-
-        if mod.dims["time"] > 1:
-            mod = mod.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
-        else:
-            mod = pick_time(mod, time_values)
-
-        logger.info("Temporal observation colocation")
-        if obs.dims["time"] > 1:
-            obs = obs.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
-        else:
-            obs = pick_time(obs, time_values)
+        mod, obs = temporal_colocation(mod, obs, ds_tgt, coloc_method)
 
     # Horizontal colocation
+    if horizontal_colocation_flag:
+        mod, obs = horizontal_colocation(mod, obs, ds_tgt, coloc_method)
+
+    if horizontal_step:
+        mod, obs = set_hor_step(mod, obs, horizontal_step)
+
+    # Vertical colocation
+    if vertical_colocation_flag:
+        mod, obs = vertical_colocation(mod, obs, ds_tgt, coloc_method)
+
+    if vertical_step:
+        mod, obs = set_vert_step(mod, obs, vertical_step)
+    return obs, mod
+
+
+def temporal_colocation(mod, obs, ds_tgt, coloc_method):
+    time_values = np.unique(ds_tgt.time.values)
+
+    logger.info("Temporal model colocation")
+
+    if mod.dims["time"] > 1:
+        mod = mod.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+    else:
+        mod = pick_time(mod, time_values)
+
+    logger.info("Temporal observation colocation")
+    if obs.dims["time"] > 1:
+        obs = obs.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+    else:
+        obs = pick_time(obs, time_values)
+
+    return mod, obs
+
+
+def horizontal_colocation(mod, obs, ds_tgt, coloc_method):
     # Colocation for observations whose positions depend on time (profilers etc.)
-    if horizontal_colocation_flag and 'time' in ds_tgt.lon.dims:
+    if 'time' in ds_tgt.lon.dims:
         logger.info("Target grid positions are depending on time")
         try:
             logger.info("Observation positions colocation")
@@ -82,7 +109,7 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
         logger.info("Model positions colocation")
         mod = colocate_lon_lat_time_mod(mod, ds_tgt, coloc_method)
 
-    elif horizontal_colocation_flag:
+    else:
         lon_values = np.unique(ds_tgt.lon.values)
         lat_values = np.unique(ds_tgt.lat.values)
 
@@ -91,6 +118,7 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
             logger.info("Curvilinear to rectilinear conversion")
             mod = convert_curv_rect(mod, lon_values, lat_values)
             logger.info("Curvilinear to rectilinear conversion : done.")
+
         # Colocate model
         try:
             logger.info("Horizontal model colocation")
@@ -105,53 +133,124 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
         except:
             logger.warning("Horizontal observation colocation : Failed.")
 
-    # Vertical colocation
-    if vertical_colocation_flag:
-        if 'DEPH' in ds_tgt.variables:
-            depth_values = np.unique(ds_tgt.DEPH.fillna(0).values)
+    return mod, obs
+
+
+def vertical_colocation(mod, obs, ds_tgt, coloc_method):
+    if 'DEPH' in ds_tgt.variables:
+        depth_values = np.unique(ds_tgt.DEPH.fillna(0).values)
+    else:
+        depth_values = np.unique(ds_tgt.depth.fillna(0).values)
+
+    if len(depth_values) != 1:
+        logger.info(f"Vertical model colocation.")
+
+        # Interpolation for HYCOM
+        if 'level' in mod.dims and 'depth' not in mod.dims:
+            if len(depth_values) > 50:
+                logger.info(f"too many unique depth values, the grid is resampled with only 50"
+                            f" values")
+                depth_values = np.linspace(depth_values[0], depth_values[-1], 50)
+
+            mod = mod.meta.vertical_selection_list(depth_values)
+
+        # Interpolation for CROCO
+        elif 'sig' in mod.dims:
+            depth = xr.DataArray(depth_values, name="depth", dims="depth")
+            for var in mod.variables:
+                if 'sig' in mod[var].dims:
+                    mod[var] = regrid1d(mod[var], depth)
+
+        # Interpolation for other models
         else:
-            depth_values = np.unique(ds_tgt.depth.fillna(0).values)
+            mod = mod.interp(depth=depth_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+        logger.info("Vertical colocation of observation")
 
-        if len(depth_values) != 1:
-            logger.info(f"Vertical model colocation.")
+        # Interpolation for CMEMS in-situ when depth is calculated from pressure
+        if 'depth' not in obs.dims and 'depth' in obs.coords:
+            depth = xr.DataArray(depth_values, name="depth", dims="depth")
+            ds_coloc = xr.Dataset()
+            for var in obs.variables:
+                if var in ['lon', 'lat'] or obs[var].data.dtype == 'object':
+                    pass
+                elif 'depth' in obs[var].coords and var != 'depth':
+                    ds_coloc[var] = regrid1d(obs[var], depth)
+                elif var != 'depth':
+                    ds_coloc[var] = obs[var]
+            obs = ds_coloc
+            obs['depth'] = depth
+        else:
+            obs = obs.interp(depth=depth_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
 
-            # Interpolation for HYCOM
-            if 'level' in mod.dims and 'depth' not in mod.dims:
-                if len(depth_values) > 50:
-                    logger.info(f"too many unique depth values, the grid is resampled with only 50"
-                                f" values")
-                    depth_values = np.linspace(depth_values[0], depth_values[-1], 50)
+    return mod, obs
 
-                mod = mod.meta.vertical_selection_list(depth_values)
+def set_hor_step(mod, obs, hor_step):
+    """
+    Colocate the model and obs on the chosen horizontal grid.
+    Parameters
+    ----------
+    obs : xarray.Dataset
+        Observation dataset.
+    mod : xarray.Dataset
+        Model dataset.
+    hor_step : float
+        Horizontal step of the grid on which to colocate.
+    Returns
+    -------
+    models : dict
+        Dictionnary with models with the updated projection grid.
+    observation : dict
+        Dictionnary with models with the updated projection grid.
+    """
 
-            # Interpolation for CROCO
-            elif 'sig' in mod.dims:
-                depth = xr.DataArray(depth_values, name="depth", dims="depth")
-                for var in mod.variables:
-                    if 'sig' in mod[var].dims:
-                        mod[var] = regrid1d(mod[var], depth)
+    hor_step = obs.meta.km_to_deg(hor_step)
 
-            # Interpolation for other models
-            else:
-                mod = mod.interp(depth=depth_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
-            logger.info("Vertical colocation of observation")
+    # Calculate the time step and distance step in the data
+    pos0, pos1 = mod.isel(time=0), mod.isel(time=1)
+    time_step_data = pos1.time.data - pos0.time.data
+    dist_step = np.sqrt((pos1.lon - pos0.lon) ** 2 + (pos1.lat - pos0.lat) ** 2)
+    time_step = time_step_data * hor_step / dist_step
+    time_step = time_step.data.astype('timedelta64[s]')
+    time_step = str(time_step).split()[0] + 'S'
+    time_min, time_max = mod.time[0].data, mod.time[-1].data
+    time_min, time_max = np.datetime64(time_min), np.datetime64(time_max)
 
-            # Interpolation for CMEMS in-situ when depth is calculated from pressure
-            if 'depth' not in obs.dims and 'depth' in obs.coords:
-                depth = xr.DataArray(depth_values, name="depth", dims="depth")
-                ds_coloc = xr.Dataset()
-                for var in obs.variables:
-                    if var in ['lon', 'lat'] or obs[var].data.dtype == 'object':
-                        pass
-                    elif 'depth' in obs[var].coords and var != 'depth':
-                        ds_coloc[var] = regrid1d(obs[var], depth)
-                    elif var != 'depth':
-                        ds_coloc[var] = obs[var]
-                obs = ds_coloc
-                obs['depth'] = depth
-            else:
-                obs = obs.interp(depth=depth_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
-    return obs, mod
+    # Create the new times array to select to retrieve the horizontal resolution
+    tgt_time = pd.date_range(time_min, time_max, freq=time_step)
+
+    # Interpolate the model and obs on the targeted times
+    mod = mod.interp(time=tgt_time, method='linear')
+    obs = obs.interp(time=tgt_time, method='linear')
+    return mod, obs
+
+
+def set_vert_step(mod, obs, vert_step):
+    """
+    Colocate the model and obs on the chosen vertical grid.
+    Parameters
+    ----------
+    obs : xarray.Dataset
+        Observation dataset.
+    mod : xarray.Dataset
+        Model dataset.
+    vert_step : float
+        Vertical step of the grid on which to colocate.
+    Returns
+    -------
+    models : dict
+        Dictionnary with models with the updated projection grid.
+    observation : dict
+        Dictionnary with models with the updated projection grid.
+    """
+
+    depth_min, depth_max = mod.depth.min(), mod.depth.max()
+    tgt_depth = np.arange(depth_min, depth_max, vert_step)
+    if 'depth' in mod.dims:
+        mod = mod.interp(depth=tgt_depth, method="linear")
+    if 'depth' in obs.dims:
+        obs = obs.interp(depth=tgt_depth, method="linear")
+
+    return mod, obs
 
 
 def pick_time(ds, time_values):
