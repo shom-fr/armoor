@@ -263,12 +263,12 @@ def open_decode_l_adcp(path_file):
     return ladcp
 
 
-def open_decode_vmadcp(path_files) -> xr.Dataset:
+def open_decode_vmadcp(path_file) -> xr.Dataset:
     """
     Open txt file form VMADCP observation and store it in dataset.
     Parameters
     ----------
-    path_files : str
+    path_file : str
         Path to the VMADCP txt file.
 
     Returns
@@ -278,7 +278,7 @@ def open_decode_vmadcp(path_files) -> xr.Dataset:
     """
     logger.info("VMADCP")
     # Read the .txt file
-    file = open(path_files, 'r', encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -324,12 +324,12 @@ def open_decode_vmadcp(path_files) -> xr.Dataset:
     return vmadcp
 
 
-def open_decode_mouillages(path_files):
+def open_decode_mouillages(path_file):
     """
     Open txt file form mooring observation and store it in dataset.
     Parameters
     ----------
-    path_files : str
+    path_file : str
         Path to the mooring txt file.
 
     Returns
@@ -339,7 +339,7 @@ def open_decode_mouillages(path_files):
     """
     logger.info("mooring")
     # Read the .txt file
-    file = open(path_files, 'r', encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -378,12 +378,12 @@ def open_decode_mouillages(path_files):
     return mouillage
 
 
-def open_decode_scanfish(path_files):
+def open_decode_scanfish(path_file):
     """
     Open txt file form scanfish observation and store it in dataset.
     Parameters
     ----------
-    path_files : str
+    path_file : str
         Path to the scanfish txt file.
 
     Returns
@@ -392,7 +392,7 @@ def open_decode_scanfish(path_files):
         scanfish observation dataset.
     """
     # Read the .txt file
-    file = open(path_files, 'r', encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -436,12 +436,12 @@ def open_decode_scanfish(path_files):
     return scanfish
 
 
-def open_decode_seasoar(path_files):
+def open_decode_seasoar(path_file):
     """
     Open txt file form seasoar observation and store it in dataset.
     Parameters
     ----------
-    path : str
+    path_file : str
         Path to the seasoar txt file.
 
     Returns
@@ -450,7 +450,7 @@ def open_decode_seasoar(path_files):
         seasoar observation dataset.
     """
     # Read the .txt file
-    file = open(path_files, 'r', encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
