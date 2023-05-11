@@ -147,8 +147,12 @@ class TestTicket:
         logger.info('test_search_tickets')
 
         ticket = Ticket()
-        out_search = ticket.search_tickets('hycom3d_med', 'VA P2')
 
+        config = 'hycom3d_med'
+        request = 'VA P2'
+        out_search = ticket.search_tickets(config, request)
+
+        logger.info(f'output with config : {config} and request : {request} :: {out_search}')
         logger.info(f'out_search only issue {pytest.ticket_issue_id} :: {out_search[pytest.ticket_issue_id]}')
 
         assert out_search[pytest.ticket_issue_id]['title'] == 'hycom3d_med - 25/04/2023 - VA P2'
