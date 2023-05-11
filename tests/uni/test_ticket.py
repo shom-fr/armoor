@@ -1,6 +1,7 @@
 from tests.uni import copy_p2_forecaster_cfg_file, init_status, change_path_p2, get_auth_spec
 from armoor.tick.ticket import Ticket
 import pytest
+import time
 
 pytest.ticket_issue_id = -1
 
@@ -145,6 +146,8 @@ class TestTicket:
     def test_search_tickets(self):
         logger = change_path_p2()
         logger.info('test_search_tickets')
+
+        time.sleep(60)
 
         ticket = Ticket()
 
