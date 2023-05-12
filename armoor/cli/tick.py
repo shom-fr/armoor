@@ -68,14 +68,15 @@ def search(argv=None):
     parser = ArgumentParser(description="Search for gitlab tickets")
     cfg_ticket_lines, _ = cfgm_fields.arg_parse(parser=parser,
                                                 getargs=True,
+                                                cfgfileopt=False,
                                                 args=argv)
 
     ticket = Ticket()
     formated_ticket = ticket.format_ticket_from_cli(cfg_ticket_lines)
 
-    request = formated_ticket['request']
-    config = formated_ticket['config']
-    state = formated_ticket['state']
+    request = formated_ticket.get('request')
+    config = formated_ticket.get('config')
+    state = formated_ticket.get('state')
 
     show_tickets(ticket.search_tickets(request, config, state))
 
