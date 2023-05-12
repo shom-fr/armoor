@@ -8,7 +8,7 @@ import gitlab
 from xoa import cfgm
 
 from armoor.tick.ticket import Ticket
-from armoor.tick.cli_tools import show_create, show_tickets, show_description, update_auth_cfg
+from armoor.tick.misc import show_create, show_tickets, show_description, update_auth_cfg
 
 
 def create(argv=None):
@@ -36,15 +36,20 @@ def create(argv=None):
                                                 getargs=True,
                                                 args=argv)
 
-    ticket = Ticket()
-    formatted_ticket = ticket.format_ticket_from_cli(cfg_ticket_lines)
+    extra_key = set(cfg_ticket_lines.keys()).difference(cfgm_fields.defaults.dict().keys())
+    if len(extra_key) == 0:
+        ticket = Ticket()
+        formatted_ticket = ticket.format_ticket_from_cli(cfg_ticket_lines)
 
-    show_create(formatted_ticket)
-    if ticket.query_yes_no('Do you want to create a ticket with the information above ?'):
-        issue_id = ticket.create_ticket(formatted_ticket)
-        print(f"Ticket created : {issue_id}")
+        show_create(formatted_ticket)
+        if ticket.query_yes_no('Do you want to create a ticket with the information above ?'):
+            issue_id = ticket.create_ticket(formatted_ticket)
+            print(f"Ticket created : {issue_id}")
+        else:
+            print('Ticket aborted')
     else:
         print('Ticket aborted')
+        print(f'armoor-tick-create: error: unrecognized arguments in cfgfile: {extra_key}')
 
 
 def search(argv=None):
