@@ -8,7 +8,7 @@ import gitlab
 from xoa import cfgm
 
 from armoor.tick.ticket import Ticket
-from armoor.tick.cli_tools import show_create, show_tickets, show_description, update_auth_cfg
+from armoor.tick.misc import show_create, show_tickets, show_description, update_auth_cfg
 
 
 def create(argv=None):
