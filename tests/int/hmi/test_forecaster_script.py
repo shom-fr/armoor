@@ -2,71 +2,59 @@ import sys
 import os
 from xoa import cfgm
 from armoor.hmi.run_script import main
-from armoor.hmi.script_tools import create_folder
+from tests.int.hmi import copy_test_files, change_path
 
-rootdir = os.path.abspath(os.path.dirname(__file__))
-cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "../../tests.ini"))
-paths = cfgm_forecaster.load(os.path.join(rootdir, "../../../config/tests.cfg"))
+copy_test_files()
 
-def change_path():
-    os.chdir(paths["path_p3"])
 
 class TestForecasterScripts:
 
     def test_med_1(self):
-        change_path()
-        out_path = 'out/test_med_1/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_1.ini'])
+        test_name = 'hycom3d_med_1'
+        out_path, logger = change_path(f'test_{test_name}')
+        main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
     def test_med_2(self):
-        change_path()
-        out_path = 'out/test_med_2/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_2.ini'])
+        test_name = 'hycom3d_med_2'
+        out_path, logger = change_path(f'test_{test_name}')
+        main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
     def test_med_3(self):
-        change_path()
-        out_path = 'out/test_med_3/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_3.ini'])
+        test_name = 'hycom3d_med_3'
+        out_path, logger = change_path(f'test_{test_name}')
+        main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
     def test_med_4(self):
-        change_path()
-        out_path = 'out/test_med_4/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_4.ini'])
+        test_name = 'hycom3d_med_4'
+        out_path, logger = change_path(f'test_{test_name}')
+        main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
     def test_med_5(self):
-        change_path()
-        out_path = 'out/test_med_5/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_5.ini'])
+        test_name = 'hycom3d_med_5'
+        out_path, logger = change_path(f'test_{test_name}')
+        main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
     def test_med_10(self):
-        change_path()
-        out_path = 'out/test_med_10/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_10.ini'])
+        test_name = 'hycom3d_med_10'
+        out_path, logger = change_path(f'test_{test_name}')
+        main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
     def test_med_11(self):
-        change_path()
-        out_path = 'out/test_med_11/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_11.ini'])
+        test_name = 'hycom3d_med_11'
+        out_path, logger = change_path(f'test_{test_name}')
+        main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
     def test_med_12(self):
-        change_path()
-        out_path = 'out/test_med_12/'
-        create_folder(out_path)
-        main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_12.ini'])
+        test_name = 'hycom3d_med_12'
+        out_path, logger = change_path(f'test_{test_name}')
+        main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
     # #TODO uncomment : Caution next tests takes around 1h each
@@ -75,19 +63,19 @@ class TestForecasterScripts:
     #     change_path()
     #     out_path = 'out/test_med/'
     #     create_folder(out_path)
-    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_12345101112.ini'])
+    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_12345101112.cfg'])
     #     assert True
     #
     # def test_indien(self):
     #     change_path()
     #     out_path = 'out/test_indien/'
     #     create_folder(out_path)
-    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_indien_1234589.ini'])
+    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_indien_1234589.cfg'])
     #     assert True
     #
     # def test_manga(self):
     #     change_path()
     #     out_path = 'out/test_manga/'
     #     create_folder(out_path)
-    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_manga_1234567.ini'])
+    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_manga_1234567.cfg'])
     #     assert True
