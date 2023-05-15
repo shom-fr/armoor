@@ -501,11 +501,10 @@ class MetazoneAccessor:
         # Select all depth between min and max
         if len(depth) == 2:
             selection = ((self._obj[var_vert] >= min) & (self._obj[var_vert] <= max))
-            # return self._obj.where(selection, drop=True)
-            return self._obj.where(self._obj.depth < 130, drop=True)
+            return self._obj.where(selection, drop=True)
 
         # Select between min and max with a specific number of depths between
-        elif len(depth) > 2:
+        elif len(depth) == 3:
             step = depth[2]
             depths = np.linspace(min, max, int(step))
             return self.vertical_selection_list(depths)
