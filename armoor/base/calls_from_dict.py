@@ -68,7 +68,6 @@ def get_observation_models_meta(config_obj: dict):
     observation.update({"xarray_meta": apply_metas2dataset(observation["xarray"], config_obj, get_method(observation))
                         })
     logger.info(f"File(s) read for observation")
-
     # Set initial colocation flags
     temporal_colocation_flag = True
     vertical_colocation_flag = True
@@ -84,6 +83,7 @@ def get_observation_models_meta(config_obj: dict):
 
         logger.info(f"Opening model from file(s)")
         model.update({"xarray": base.open_decode(model.pop("path"), config_obj['functionality'], mod_type)})
+
         logger.info(f"Applying : decode and meta zone on model")
         model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj, get_method(model), mod_obs='mod')
                       })
@@ -127,7 +127,7 @@ def get_observation_models_meta(config_obj: dict):
     if config_obj["functionality"] == "currents_ADCP":
         temporal_colocation_flag = True
         vertical_colocation_flag = True
-        horizontal_colocation_flag = False
+        horizontal_colocation_flag = True
 
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
@@ -143,8 +143,8 @@ def get_observation_models_meta(config_obj: dict):
         obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"],
                                                  horizontal_colocation_flag, vertical_colocation_flag,
                                                  temporal_colocation_flag, coloc_method=get_method(model),
-                                                 opt_grid=config_obj["colocate"],
-                                                 vertical_step=vertical_step, horizontal_step=horizontal_step )
+                                                 opt_grid=config_obj["colocate"], vertical_step=vertical_step,
+                                                 horizontal_step=horizontal_step)
 
         observation["xarray_meta_coloc"].append(obs_coloc)
         model.update({"xarray_meta_coloc": mod_coloc})
@@ -267,9 +267,8 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str, m
                 xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath, maximum=max_bath)
 
         # Radius for ADCP feature
-        if "radius" in config_obj["meta_zones"] and mod_obs == 'mod':
+        if "radius" in config_obj["meta_zones"] and mod_obs == 'mod' and config_obj["functionality"] in ['ADCP']:
             xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
-
 
         # Other meta-zones, one by one
         for name, filter in filters.items():

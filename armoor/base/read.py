@@ -57,7 +57,7 @@ class ReadAccessor:
         """
         logger.info(f"Decoding data")
         # Remove QC from variables to prevent random behaviours
-        vars_to_remove = ['TEMP_QC','TEMP_ADJUSTED','PSAL_ADJUSTED', 'PSAL_QC', 'TIME_QC', 'POSITION_QC', 'DIRECTION']
+        vars_to_remove = ['TEMP_QC', 'TEMP_ADJUSTED', 'PSAL_ADJUSTED', 'PSAL_QC', 'TIME_QC', 'POSITION_QC', 'DIRECTION']
         for var in vars_to_remove:
             if var in self._obj.variables:
                 self._obj = self._obj.drop_vars(var)
@@ -139,17 +139,16 @@ class ReadAccessor:
     def decode_cora(self):
         # vars_to_keep = ['temp', 'PRES', 'PSAL', 'LONGITUDE', 'LATITUDE', 'JULD']
         # self._obj = self._obj[vars_to_keep]
-        #Rename time
+        # Rename time
         self._obj = self._obj.assign_coords({"N_prof": self._obj.time.values})
         self._obj = self._obj.drop('time')
         self._obj = self._obj.rename({'N_prof': 'time'})
 
-        #Convert depths
+        # Convert depths
         self._obj = self._obj.rename({'N_levels': 'depth'})
         self._obj = self._obj.read.depth_from_press()
 
         return self._obj
-
 
     # CROCO
     def decode_croco(self):
@@ -163,7 +162,7 @@ class ReadAccessor:
         self._obj = self._obj.decode_sigma()
 
         # Remove variables that are never used in the features. May need to be completed.
-        list_to_keep = [ 'temp', 'salt']
+        list_to_keep = ['temp', 'salt']
         for var in list(self._obj.keys()):
             if var not in list_to_keep:
                 self._obj = self._obj.drop_vars(var)

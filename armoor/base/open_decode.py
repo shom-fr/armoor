@@ -46,8 +46,7 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
         logger.warning(f'using path : {directory}')
     xcf.register_cf_specs(path)
 
-
-    if not isinstance(path_files, list) :
+    if not isinstance(path_files, list):
         raise TypeError(f"Only list are allowed : {path_files} ")
 
     # Open file
@@ -210,8 +209,7 @@ def open_decode_l_adcp(path_file):
         L-ADCP observation dataset.
     """
     # Read the .txt file
-    file = open(path_file, 'r',
-                encoding="ISO-8859-1")
+    file = open(path_file, 'r', encoding="ISO-8859-1")
     lines = file.readlines()
     n_line = len(lines)
     for i in range(n_line):
@@ -260,6 +258,14 @@ def open_decode_l_adcp(path_file):
 
     # Decode
     ladcp = ladcp.xoa.decode()
+
+    # Clean lon/lat
+    if len(np.unique(ladcp.lon.values)) == 1:
+        lon_values = np.unique(ladcp.lon.values)
+        lat_values = np.unique(ladcp.lat.values)
+        ladcp = ladcp.drop(['lon', 'lat'])
+        ladcp = ladcp.assign_coords({'lon': lon_values, 'lat': lat_values})
+
     return ladcp
 
 
@@ -785,6 +791,8 @@ def open_decode_basic(path_files):
 
     # Decode
     ds = ds.xoa.decode()
+    if "lon_longitude" in ds:
+        ds = ds.drop_vars(["lon_longitude", 'lat_latitude'])
 
     # Regrid if necessary
     ds = xoa.grid.to_rect(ds)

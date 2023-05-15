@@ -34,9 +34,6 @@ def plot(config_obj):
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(['current'])
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(['current'])
 
-    # Set horizontal and vertical steps
-    models, observation = base.set_hor_vert_step(config_obj, models, observation)
-
     # PLOT
     for index_output, output in enumerate(outputs):
         if output_path:
@@ -69,17 +66,11 @@ def plot(config_obj):
             for i_mod, mod in enumerate(models):
                 models, observation = base.remove_missing_values_ds(models, observation, i_mod, ['norm'], ['norm'])
 
-            base.plot_features.plot_variable_3d(models,
-                                                observation,
-                                                cmap,
-                                                vmin,
-                                                vmax,
+            base.plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax,
                                                 output_path=sub_func_output_folder)
 
         ################################################################################################################
         # STICKS PLOT
         plot_stick_plot = {"plot_stick_plot": 'stick_plot'}
         if output["plot"] in plot_stick_plot:
-            base.plot_features.plot_stick_plots(models,
-                                                observation,
-                                                output_path=sub_func_output_folder)
+            base.plot_features.plot_stick_plots(models, observation, output_path=sub_func_output_folder)

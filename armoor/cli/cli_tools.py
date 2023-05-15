@@ -232,8 +232,8 @@ def format_cofigObj2Dict(config: dict) -> dict:
     config : dict
         formatted dictionary
     """
-    print('config   IN :::')
-    pprint(config.dict())
+    # print('config   IN :::')
+    # pprint(config.dict())
     # Clean observation if method_z not provided
     observation = remove_keys_with_none_value(config.pop("observation"))
     config.update({"observation": observation})

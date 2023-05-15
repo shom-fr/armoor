@@ -153,6 +153,7 @@ class MetazoneAccessor:
             mask_poly = np.reshape(flags, [len(self._obj.y.data), len(self._obj.x.data)])
             mask_poly = xr.DataArray(data=mask_poly, dims=['y', 'x'],
                                      coords=dict(x=(['x'], self._obj.x.data), y=(['y'], self._obj.y.data)), )
+
         # Check if the polygon matches the coordinates of the data
         if True not in mask_poly:
             raise Exception('The polygon you have defined is not included in the data grid. '

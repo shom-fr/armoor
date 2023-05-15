@@ -34,8 +34,8 @@ def plot(config_obj):
     # SELECT THE VARIABLES
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
-
     observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(['current'])
+
     for i_mod, mod in enumerate(models):
         mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(['current'])
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(['current'])
@@ -115,7 +115,7 @@ def plot(config_obj):
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
-                path_nc = os.path.join(path_results,'obs_tide_uv.nc')
+                path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
             else:
                 raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
@@ -153,7 +153,7 @@ def plot(config_obj):
             # Process harmonic analysis on models
             logger.info("Beginning of the harmonic analysis on the models.")
             for i_mod, mod in enumerate(models):
-                path_nc = os.path.join(path_results,'mod_tide_uv.nc')
+                path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
                 # If metazone per slice, calculate average per slice
                 if flag_slice:
                     if len(mod["xarray_meta_coloc"]['idx_depth'].values) > 1:
@@ -181,6 +181,7 @@ def plot(config_obj):
         plot_tide_current_ellipses = {"plot_tide_current_ellipses": 'plot_tide_current_ellipses'}
 
         if output["plot"] in plot_tide_current_ellipses:
+
             # Check if all the required data are in the configObj
             # List of tidal waves to calculate
             if "tidal_waves" in output:
@@ -199,7 +200,7 @@ def plot(config_obj):
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
-                path_nc = os.path.join(path_results,'obs_tide_uv.nc')
+                path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
             else:
                 raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
@@ -238,7 +239,7 @@ def plot(config_obj):
             # Process harmonic analysis on models
             ds_models = []
             for i_mod, mod in enumerate(models):
-                path_nc = os.path.join(path_results,'mod_tide_uv.nc')
+                path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
                 # If metazone per slice, calculate average per slice
                 if flag_slice:
                     if len(mod["xarray_meta_coloc"]['idx_depth'].values) > 1:
@@ -306,7 +307,7 @@ def select_point_bathy_radius(config_obj, observation, models):
 
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel(lon=obs_lon, lat=obs_lat, method='nearest')
             distance = np.sqrt((mod["xarray_meta_coloc"].lon.values - obs_lon) ** 2 + (
-                        mod["xarray_meta_coloc"].lat.values - obs_lat) ** 2)
+                    mod["xarray_meta_coloc"].lat.values - obs_lat) ** 2)
             radius_km = observation["xarray_meta"].meta.km_to_deg(radius)
             if distance > radius_km:
                 logger.info(f'Oops, le modèle ne contient pas de point qui respecte le critère '

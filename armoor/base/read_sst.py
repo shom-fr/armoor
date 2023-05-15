@@ -68,7 +68,7 @@ class SSTAccessor:
             ds_all = xr.concat(liste_ds, 'mean_time', combine_attrs="drop")
         elif len(liste_ds) > 1:
             ds_all = xr.merge(liste_ds)  # xr.concat(liste_ds, 'mean_time', combine_attrs="drop")
-        return ds_all.squeeze()
+        return ds_all
 
     def convert_current(self):
         """
@@ -79,7 +79,6 @@ class SSTAccessor:
         """
         speed = self._obj.HCSP
         direction = self._obj.HCDT
-
         u = speed / np.sin(direction)
         v = speed / np.cos(direction)
         self._obj['u'] = u
@@ -94,14 +93,15 @@ class SSTAccessor:
 
         """
         if 'u' in self._obj.variables:
-            self._obj = self._obj[['u', 'v']]
+            current = self._obj[['u', 'v']]
+            current = current.assign_coords(self._obj.coords)
         else:
-            self._obj = self._obj.read_sst.convert_current()
+            current = self._obj.read_sst.convert_current()
         if 'HCSP' in self._obj.variables:
-            self._obj['norm'] = self._obj['HCSP']
+            current['norm'] = self._obj['HCSP']
         else:
-            self._obj['norm'] = (self._obj.u ** 2 + self._obj.v ** 2) ** 0.5
-        return self._obj
+            current['norm'] = (current.u ** 2 + current.v ** 2) ** 0.5
+        return current
 
     def sel_sst(self, depth=0):
         """
