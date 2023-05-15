@@ -1523,6 +1523,7 @@ def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
 
     # Create the arrays to plot the ellipse and display the hours
     time_1 = np.linspace(0, T, 100)
+
     u_1 = lon + u_a * np.cos(omega * time_1 + u_g) * scale
     v_1 = lat + v_a * np.cos(omega * time_1 + v_g) * scale
 

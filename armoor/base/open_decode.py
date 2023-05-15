@@ -258,6 +258,14 @@ def open_decode_l_adcp(path_file):
 
     # Decode
     ladcp = ladcp.xoa.decode()
+
+    # Clean lon/lat
+    if len(np.unique(ladcp.lon.values)) == 1:
+        lon_values = np.unique(ladcp.lon.values)
+        lat_values = np.unique(ladcp.lat.values)
+        ladcp = ladcp.drop(['lon', 'lat'])
+        ladcp = ladcp.assign_coords({'lon':lon_values,'lat':lat_values})
+
     return ladcp
 
 

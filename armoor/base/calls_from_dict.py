@@ -88,7 +88,6 @@ def get_observation_models_meta(config_obj: dict):
         model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj, get_method(model), mod_obs='mod')
                       })
 
-
         if 'depth' not in model["xarray_meta"] or model["xarray_meta"].depth.values.dtype == 'float32':
             vertical_colocation_flag = False
         elif 'depth' not in model["xarray_meta"]:
@@ -128,7 +127,7 @@ def get_observation_models_meta(config_obj: dict):
     if config_obj["functionality"] == "currents_ADCP":
         temporal_colocation_flag = True
         vertical_colocation_flag = True
-        horizontal_colocation_flag = False
+        horizontal_colocation_flag = True
 
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
@@ -144,8 +143,8 @@ def get_observation_models_meta(config_obj: dict):
         obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"],
                                                  horizontal_colocation_flag, vertical_colocation_flag,
                                                  temporal_colocation_flag, coloc_method=get_method(model),
-                                                 opt_grid=config_obj["colocate"],
-                                                 vertical_step=vertical_step, horizontal_step=horizontal_step )
+                                                 opt_grid=config_obj["colocate"], vertical_step=vertical_step,
+                                                 horizontal_step=horizontal_step)
 
         observation["xarray_meta_coloc"].append(obs_coloc)
         model.update({"xarray_meta_coloc": mod_coloc})
@@ -191,6 +190,13 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(interval)
 
+    # print("obs", observation["xarray"])
+    # print("obs meta ", observation["xarray_meta"])
+    # print("obs meta coloc", observation["xarray_meta_coloc"])
+    #
+    # print('mod', model['xarray'])
+    # print('mod meta ', model['xarray_meta'])
+    # print('mod meta coloc', model['xarray_meta_coloc'])
     return config_obj
 
 
@@ -270,7 +276,6 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str, m
         # Radius for ADCP feature
         if "radius" in config_obj["meta_zones"] and mod_obs == 'mod' and config_obj["functionality"] in ['ADCP']:
             xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
-
 
         # Other meta-zones, one by one
         for name, filter in filters.items():
