@@ -1,7 +1,7 @@
 import sys
 import os
 from xoa import cfgm
-from armoor.hmi.run_script import main
+from armoor.cli.hmi import main
 from tests.int.hmi import copy_test_files, change_path
 
 copy_test_files()
