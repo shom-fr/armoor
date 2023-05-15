@@ -8,7 +8,8 @@ import argparse
 import time
 from xoa import cfgm
 
-import armoor.hmi.script as s
+from armoor.hmi.script import create_images
+from armoor.cli.cli_tools import folder_path, file_path
 
 import armoor.cli.logger_tools as log
 
@@ -75,7 +76,7 @@ def main(argv=None):
     logger.info(f'saved in folder : {output_folder_path}')
     logger.info(f'data comes from : {input_folder_path}')
 
-    s.create_images(dict_configuration, input_folder_path, output_folder_path)
+    create_images(dict_configuration, input_folder_path, output_folder_path)
     logger.info(f"--- {time.time() - start_time} seconds ---")
 
 
@@ -92,44 +93,3 @@ def format_hmi_dict(dict_configuration: dict) -> dict:
 
 
     return dict_configuration
-
-def folder_path(path_name: str) -> str:
-    """ @2BIS
-    use when a directory is provided
-    check "directory" type, check if path to folder exist.
-
-    Parameters
-    ----------
-    path_name : str
-        path to the folder
-
-    Returns
-    -------
-    path : str
-        path to wanted folder.
-    """
-    if os.path.isdir(path_name):
-        return path_name
-
-    raise NotADirectoryError(path_name)
-
-
-def file_path(path_name: str) -> str:
-    """ @2
-    use when a path is provided
-    check "path" type, check if path exist.
-
-    Parameters
-    ----------
-    path_name : str
-        path to the file
-
-    Returns
-    -------
-    path : str
-        path to wanted file.
-    """
-    if os.path.isfile(path_name):
-        return path_name
-
-    raise FileNotFoundError(path_name)

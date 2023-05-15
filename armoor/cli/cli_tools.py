@@ -61,8 +61,8 @@ def file_path(path_name: str) -> str:
     """
     if os.path.isfile(path_name):
         return path_name
-    else:
-        raise FileNotFoundError(path_name)
+
+    raise FileNotFoundError(path_name)
 
 
 def folder_path(path_name: str) -> str:
@@ -80,10 +80,10 @@ def folder_path(path_name: str) -> str:
     path : str
         path to wanted folder.
     """
-    if os.path.isdir(path_name) and path_name[-1:] == '/':
+    if os.path.isdir(path_name):
         return path_name
-    else:
-        raise NotADirectoryError(path_name)
+
+    raise NotADirectoryError(path_name)
 
 
 def file_force_list_path_configObj(path_names):
