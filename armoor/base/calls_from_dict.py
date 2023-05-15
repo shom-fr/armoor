@@ -190,13 +190,6 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(interval)
 
-    # print("obs", observation["xarray"])
-    # print("obs meta ", observation["xarray_meta"])
-    # print("obs meta coloc", observation["xarray_meta_coloc"])
-    #
-    # print('mod', model['xarray'])
-    # print('mod meta ', model['xarray_meta'])
-    # print('mod meta coloc', model['xarray_meta_coloc'])
     return config_obj
 
 
