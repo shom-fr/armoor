@@ -184,6 +184,7 @@ def vertical_colocation(mod, obs, ds_tgt, coloc_method):
 
     return mod, obs
 
+
 def set_hor_step(mod, obs, hor_step):
     """
     Colocate the model and obs on the chosen horizontal grid.

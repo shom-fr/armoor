@@ -32,7 +32,7 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
         logger.info(f"forecaster")
         return open_forecaster(path_files, type)
 
-    elif type == 'CMEMS' and  len(path_files)>1:
+    elif type == 'CMEMS' and len(path_files) > 1:
         return open_several_obs(path_files)
 
     elif type == 'HYCOM_currents':
@@ -263,7 +263,7 @@ def decode_hycom_3d(path_files):
     if list(hycom.depth.dims) == ['level']:
         depths = hycom.depth
         hycom = hycom.drop('depth')
-        hycom = hycom.rename({'level':'depth'})
+        hycom = hycom.rename({'level': 'depth'})
         hycom['depth'] = depths.data
 
     return hycom
@@ -568,6 +568,7 @@ def open_seasoar(path_files):
 
     return ds
 
+
 def open_scanfish(path_files):
     """
     Open txt file form scanfish observation and store it in dataset.
@@ -624,6 +625,7 @@ def open_scanfish(path_files):
 
     ds = xr.concat(list_ds, dim='time')
     return ds
+
 
 def array2ds(array_series, lon, lat, date, bot_depth, type):
     """

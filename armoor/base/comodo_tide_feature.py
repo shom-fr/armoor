@@ -4,7 +4,9 @@ import os
 import numpy as np
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def harmonic_analysis(ds, var, path_nc, path_atlas, path_tools, list_waves, name):
     """

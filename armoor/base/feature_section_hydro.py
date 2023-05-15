@@ -30,8 +30,7 @@ def plot(config_obj):
     if 'attribute' in outputs[0]:
         var0 = outputs[0]['attribute']
     else:
-        raise Exception(
-            "Oops, pour utiliser cette fonctionnalité, vous devriez spécifier un attribut...")
+        raise Exception("Oops, pour utiliser cette fonctionnalité, vous devriez spécifier un attribut...")
     if "list" not in str(type(var0)):
         vars = [var0]
     else:
@@ -42,9 +41,6 @@ def plot(config_obj):
         mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(vars)
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(vars)
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(vars)
-
-    # # Set horizontal and vertical steps
-    # models, observation = base.set_hor_vert_step(config_obj, models, observation)
 
     # Remove missing values
     for i_mod, mod in enumerate(models):
@@ -61,14 +57,10 @@ def plot(config_obj):
         # VARIABLE 3D SECTION
         plot_variable_3d = {"plot_variable_3d": 'variable_3d'}
         if output["plot"] in plot_variable_3d:
-            base.plot_features.plot_variable_3d(models,
-                                                observation,
-                                                output_path=sub_func_output_folder)
+            base.plot_features.plot_variable_3d(models, observation, output_path=sub_func_output_folder)
 
         ################################################################################################################
         # TIMESERIES
         plot_variable_2d = {"plot_variable_2d": 'variable_2d'}
         if output["plot"] in plot_variable_2d:
-            base.plot_features.plot_variable_2d(models,
-                                                observation,
-                                                output_path=sub_func_output_folder)
+            base.plot_features.plot_variable_2d(models, observation, output_path=sub_func_output_folder)

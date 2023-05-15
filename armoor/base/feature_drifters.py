@@ -7,7 +7,9 @@ import numpy as np
 import armoor.hmi.script_tools as st
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def plot(config_obj):
     """
@@ -52,9 +54,7 @@ def plot(config_obj):
         plot_map_current_traj = {"map_current_trajectroy": 'map_current_trajectroy'}
         if output["plot"] in plot_map_current_traj:
             for i_mod, mod in enumerate(models):
-                base.plot_features.plot_map_current_trajectory(observation,
-                                                               mod,
-                                                               output_path=sub_func_output_folder)
+                base.plot_features.plot_map_current_trajectory(observation, mod, output_path=sub_func_output_folder)
 
         ################################################################################################################
         # MAP TRAJECTORY
@@ -68,10 +68,8 @@ def plot(config_obj):
                                 " le chemin où sauvegarder les fichiers résultats...")
 
             # Retrieve the common period
-            date_start = max(observation["xarray_meta"].time[0].values,
-                             models[0]["xarray_meta_coloc"].time[0].values)
-            date_end = min(observation["xarray_meta"].time[-1].values,
-                           models[0]["xarray_meta_coloc"].time[-1].values)
+            date_start = max(observation["xarray_meta"].time[0].values, models[0]["xarray_meta_coloc"].time[0].values)
+            date_end = min(observation["xarray_meta"].time[-1].values, models[0]["xarray_meta_coloc"].time[-1].values)
             observation['xarray_meta'] = observation['xarray_meta'].sel(time=slice(date_start, date_end))
 
             # Get the parameters for the OpenDrift calculation
@@ -98,15 +96,9 @@ def plot(config_obj):
                 # If curviliear data, regrid
                 mod_meta = mod['xarray_meta']
                 if 'x' in mod_meta.dims:
-                    lon_tgt = np.linspace(mod_meta.lon.min(skipna=True),
-                                          mod_meta.lon.max(skipna=True),
-                                          len(mod_meta.x))
-                    lat_tgt = np.linspace(mod_meta.lat.min(skipna=True),
-                                          mod_meta.lat.max(skipna=True),
-                                          len(mod_meta.y))
-                    mod['xarray_meta'] = base.convert_curv_rect(mod_meta,
-                                                                lon_tgt,
-                                                                lat_tgt)
+                    lon_tgt = np.linspace(mod_meta.lon.min(skipna=True), mod_meta.lon.max(skipna=True), len(mod_meta.x))
+                    lat_tgt = np.linspace(mod_meta.lat.min(skipna=True), mod_meta.lat.max(skipna=True), len(mod_meta.y))
+                    mod['xarray_meta'] = base.convert_curv_rect(mod_meta, lon_tgt, lat_tgt)
 
                 # Create the formatted file for OpenDrift
                 output_file = os.path.join(path_results, f'trajectory_{observation.name}_{mod.name}.nc')
@@ -114,27 +106,17 @@ def plot(config_obj):
                 base.opendrift_trajectory.format_opendrift(mod, path_model)
 
                 # Calculate the trajectories from the model
-                mod_traj = base.opendrift_trajectory.calculate_trajectory(path_model,
-                                                                          lons,
-                                                                          lats,
-                                                                          times,
-                                                                          time_step,
-                                                                          nb_step,
-                                                                          output_file)
+                mod_traj = base.opendrift_trajectory.calculate_trajectory(path_model, lons, lats, times, time_step,
+                                                                          nb_step, output_file)
                 models[i_mod]['traj'] = mod_traj
 
             # Plot the trajectories
-            base.plot_features.plot_map_trajectory(observation,
-                                                   models,
-                                                   traj_duration_plot,
-                                                   traj_freq_plot,
-                                                   time_step,
+            base.plot_features.plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot, time_step,
                                                    output_path=sub_func_output_folder)
 
         ################################################################################################################
         # PLOT DIFFERENCE DISTANCE DIRECTION
-        plot_diff_traj = {"plot_diff_traj_dist": 'distance',
-                          "plot_diff_traj_dir": 'direction'
+        plot_diff_traj = {"plot_diff_traj_dist": 'distance', "plot_diff_traj_dir": 'direction'
                           }
         if output["plot"] in plot_diff_traj:
             # Define path where to save the trajectories
@@ -145,10 +127,8 @@ def plot(config_obj):
                                 " le chemin où sauvegarder les fichiers résultats...")
 
             # Retrieve the common period
-            date_start = max(observation["xarray_meta"].time[0].values,
-                             models[0]["xarray_meta_coloc"].time[0].values)
-            date_end = min(observation["xarray_meta"].time[-1].values,
-                           models[0]["xarray_meta_coloc"].time[-1].values)
+            date_start = max(observation["xarray_meta"].time[0].values, models[0]["xarray_meta_coloc"].time[0].values)
+            date_end = min(observation["xarray_meta"].time[-1].values, models[0]["xarray_meta_coloc"].time[-1].values)
             observation['xarray_meta'] = observation['xarray_meta'].sel(time=slice(date_start, date_end))
 
             # Get the parameters for the OpenDrift calculation
@@ -162,21 +142,13 @@ def plot(config_obj):
                 base.opendrift_trajectory.format_opendrift(mod, path_model)
 
                 # Calculate the trajectories from the model
-                mod_traj = base.opendrift_trajectory.calculate_trajectory(path_model,
-                                                                          lons,
-                                                                          lats,
-                                                                          times,
-                                                                          time_step,
-                                                                          nb_step,
-                                                                          output_file)
+                mod_traj = base.opendrift_trajectory.calculate_trajectory(path_model, lons, lats, times, time_step,
+                                                                          nb_step, output_file)
                 models[i_mod]['traj'] = mod_traj
 
             # Plot the trajectories
-            base.plot_features.plot_difference_trajectory(observation['xarray_meta'],
-                                                          models[0]['traj'],
-                                                          observation['name'],
-                                                          models[0]['name'],
-                                                          'distance',
+            base.plot_features.plot_difference_trajectory(observation['xarray_meta'], models[0]['traj'],
+                                                          observation['name'], models[0]['name'], 'distance',
                                                           output_path=sub_func_output_folder)
 
 
@@ -205,8 +177,8 @@ def param_pour_opendrift(observation):
         Number of time step to run in the calculation
 
     """
-    duration = (observation["xarray_meta"].time[-1].values
-                - observation["xarray_meta"].time[0].values).astype('timedelta64[s]').item().total_seconds()
+    duration = (observation["xarray_meta"].time[-1].values - observation["xarray_meta"].time[0].values).astype(
+        'timedelta64[s]').item().total_seconds()
     nb_step = len(observation["xarray_meta"].time)
     time_step = duration / nb_step
     lons = observation["xarray_meta"].lon.values
