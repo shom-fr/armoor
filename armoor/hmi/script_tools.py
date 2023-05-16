@@ -8,8 +8,7 @@ import xarray as xr
 
 import xoa
 
-from armoor import hmi
-
+from armoor.hmi.read_configuration import read_config_obj
 import logging
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ def return_dict(path: str, spec_config_file: str) -> dict:
     -------
     Dictionary with configObj information
     """
-    return hmi.read_configuration.read_config_obj(path, spec_config_file)
+    return read_config_obj(path, spec_config_file)
 
 
 def create_folder(path: str):
