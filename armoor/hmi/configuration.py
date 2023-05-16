@@ -9,7 +9,7 @@ import xoa
 
 from armoor.hmi.path_tools import get_config_reg_path, get_obs_path, get_forcing_model_path
 from armoor.hmi.script_tools import get_t0
-from armoor.base.open_data import open_file
+from armoor.base.open_decode import open_decode
 
 import logging
 logger = logging.getLogger(__name__)
@@ -269,10 +269,8 @@ def read_netcdfs(paths: list, data_type: str = None) -> xr.Dataset:
         xarray.Dataset
              Dataset with decoded parameters
     """
-    if len(paths) == 1 and data_type not in ['rivers']:
-        paths = paths[0]
     logger.info('Opening file(s)')
-    xarray_obj = open_file(paths, func='forecaster', type=data_type)
+    xarray_obj = open_decode(paths, func='forecaster', type=data_type)
 
     if data_type not in ['rivers']:
         logger.info('Decoding xarray')
