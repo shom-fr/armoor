@@ -46,8 +46,8 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
         logger.warning(f'using path : {directory}')
     xcf.register_cf_specs(path)
 
-    if not isinstance(path_files, list):
-        raise TypeError(f"Only list are allowed : {path_files} ")
+    if not isinstance(path_files, (list, dict)):
+        raise TypeError(f"Only list or dict are allowed : {path_files} ")
 
     # Open file
     if func == 'forecaster':
@@ -857,13 +857,13 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         ds_insta = ds_insta.sortby('time')
         return ds_insta
 
-    elif isinstance(path_files, list):
+    elif len(path_files) > 1:
         logger.info("multiple files from list")
         return xr.open_mfdataset(path_files)
 
     else:
         logger.info("single file")
-        return xr.open_dataset(path_files)
+        return xr.open_dataset(path_files[0])
 
 
 ####################### Tools #######################
