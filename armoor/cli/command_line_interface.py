@@ -5,7 +5,7 @@ from xoa import cfgm
 
 from argparse import ArgumentParser
 
-from armoor import cli
+from armoor.cli.cli_tools import int_or_string_configobj, depth_configObj, coords_configObj, format_cofigObj2Dict
 
 import logging
 logger = logging.getLogger(__name__)
@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 # @suppress
 from xoa.cfgm import register_validation_functions
 
-register_validation_functions(absolute_or_relative_time=cli.cli_tools.int_or_string_configobj)
-register_validation_functions(depth=cli.cli_tools.depth_configObj)
-register_validation_functions(coordinates=cli.cli_tools.coords_configObj)
+register_validation_functions(absolute_or_relative_time=int_or_string_configobj)
+register_validation_functions(depth=depth_configObj)
+register_validation_functions(coordinates=coords_configObj)
 
 def command_line_interface(argv=None):
 
@@ -33,6 +33,6 @@ def command_line_interface(argv=None):
                                                 getargs=True,
                                                 args=argv)
 
-    formated_data = cli.cli_tools.format_cofigObj2Dict(cfg_ticket_lines)
+    formated_data = format_cofigObj2Dict(cfg_ticket_lines)
 
     return formated_data

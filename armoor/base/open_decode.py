@@ -46,8 +46,8 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
         logger.warning(f'using path : {directory}')
     xcf.register_cf_specs(path)
 
-    if not isinstance(path_files, list):
-        raise TypeError(f"Only list are allowed : {path_files} ")
+    if not isinstance(path_files, (list, dict)):
+        raise TypeError(f"Only list or dict are allowed : {path_files} ")
 
     # Open file
     if func == 'forecaster':
@@ -115,19 +115,19 @@ def open_decode_woa18(path_files):
     vars_to_drop = ['_dd', '_gp', '_oa', '_sd', '_se', 'bnds', 'bounds']
     for var in list(woa18.keys()):
         if any(item in var for item in vars_to_drop):
-            woa18 = woa18.drop(var)
+            woa18 = woa18.drop_vars(var)
 
     if 's_an' in woa18:
         woa18 = woa18.rename({'s_an': 'sal'})
         if 's_mn' in woa18:
-            woa18 = woa18.drop({'s_mn'})
+            woa18 = woa18.drop_vars({'s_mn'})
     elif 's_mn' in woa18:
         woa18 = woa18.rename({'s_mn': 'sal'})
 
     if 't_an' in woa18:
         woa18 = woa18.rename({'t_an': 'temp'})
         if 't_mn' in woa18:
-            woa18 = woa18.drop({'t_mn'})
+            woa18 = woa18.drop_vars({'t_mn'})
     elif 't_mn' in woa18:
         woa18 = woa18.rename({'t_mn': 'temp'})
 
@@ -154,7 +154,7 @@ def open_decode_cmems(path_files):
             ds = xr.open_dataset(path)
             lon_ds = ds.LONGITUDE.assign_coords(LONGITUDE=ds.TIME.data).rename({'LONGITUDE': 'TIME'})
             lat_ds = ds.LATITUDE.assign_coords(LATITUDE=ds.TIME.data).rename({'LATITUDE': 'TIME'})
-            ds = ds.drop(['LONGITUDE', 'LATITUDE'])
+            ds = ds.drop_vars(['LONGITUDE', 'LATITUDE'])
             ds['LATITUDE'] = lat_ds
             ds['LONGITUDE'] = lon_ds
             list_ds_cmems.append(ds)
@@ -165,14 +165,14 @@ def open_decode_cmems(path_files):
     # Variables to drop/rename to prevent random behaviours
     for var in list(cmems.keys()):
         if "POSITION" in var:
-            cmems = cmems.drop(var)
+            cmems = cmems.drop_vars(var)
         elif var[-3:] == "_QC":
             cmems = cmems.rename({var: f"QC_{var[:-3]}"})
         if len(var) == 4:
             if f"{var}_ADJUSTED" in cmems:
-                cmems = cmems.drop(f"{var}_ADJUSTED")
+                cmems = cmems.drop_vars(f"{var}_ADJUSTED")
             if f"{var}_ADJUSTED_ERROR" in cmems:
-                cmems = cmems.drop(f"{var}_ADJUSTED_ERROR")
+                cmems = cmems.drop_vars(f"{var}_ADJUSTED_ERROR")
 
     # Decode
     cmems = cmems.xoa.decode()
@@ -263,7 +263,7 @@ def open_decode_l_adcp(path_file):
     if len(np.unique(ladcp.lon.values)) == 1:
         lon_values = np.unique(ladcp.lon.values)
         lat_values = np.unique(ladcp.lat.values)
-        ladcp = ladcp.drop(['lon', 'lat'])
+        ladcp = ladcp.drop_vars(['lon', 'lat'])
         ladcp = ladcp.assign_coords({'lon': lon_values, 'lat': lat_values})
 
     return ladcp
@@ -523,7 +523,7 @@ def open_decode_croco(path_file):
     list_to_keep = ['temp', 'salt']
     for var in list(croco.keys()):
         if var not in list_to_keep:
-            croco = croco.drop(var)
+            croco = croco.drop_vars(var)
 
     # Depth becomes a variable
     if 'depth' in croco:
@@ -531,7 +531,7 @@ def open_decode_croco(path_file):
 
     # Rename coordinates
     croco = croco.rename_dims({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-    croco = croco.drop(['xi_rho', 'eta_rho'])
+    croco = croco.drop_vars(['xi_rho', 'eta_rho'])
 
     if len(croco['lon']) == len(np.unique(croco.lon_rho.data)):
         longitude = np.unique(croco.lon_rho.data)
@@ -600,13 +600,13 @@ def open_decode_croco_currents(path_files):
     depth = depth.rename({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
     depth['lat'] = latitude
     depth['lon'] = longitude
-    depth = depth.drop(['lon_rho', 'lat_rho'])
+    depth = depth.drop_vars(['lon_rho', 'lat_rho'])
 
     # U processing
     u = shift(ds.u, {"xi_u": "left"}).xoa.reloc(u=False)
     longitude_u = np.unique(u.lon.data)[:-2]
     latitude_u = np.unique(u.lat.data)[:-2]
-    u = u.drop(['lon', 'lat'])
+    u = u.drop_vars(['lon', 'lat'])
     u = u.rename({'eta_rho': 'lat', 'xi': 'lon', 's_rho': 'z'})
     u['lon'] = longitude_u
     u['lat'] = latitude_u
@@ -617,7 +617,7 @@ def open_decode_croco_currents(path_files):
     v = shift(ds.v, {"eta_v": "left"}).xoa.reloc(v=False)
     longitude_v = np.unique(v.lon.data)[:-2]
     latitude_v = np.unique(v.lat.data)[:-2]
-    v = v.drop(['lon', 'lat'])
+    v = v.drop_vars(['lon', 'lat'])
     v = v.rename({'eta': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
     v['lon'] = longitude_v
     v['lat'] = latitude_v
@@ -676,7 +676,7 @@ def open_decode_hycom_currents(path_files):
     hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
     hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
     if 'level' in hycom:
-        hycom = hycom.drop('level')
+        hycom = hycom.drop_vars('level')
 
     # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)
@@ -721,7 +721,7 @@ def open_decode_hycom_3d(path_files):
 
     if list(hycom.depth.dims) == ['level']:
         depths = hycom.depth
-        hycom = hycom.drop('depth')
+        hycom = hycom.drop_vars('depth')
         hycom = hycom.rename({'level': 'depth'})
         hycom['depth'] = depths.data
 
@@ -748,20 +748,20 @@ def open_decode_cora(path_files):
     # Variables to drop/rename to prevent random behaviours
     for var in list(cora.keys()):
         if "POSITION" in var:
-            cora = cora.drop(var)
+            cora = cora.drop_vars(var)
         elif var[-3:] == "_QC":
             cora = cora.rename({var: f"QC_{var[:-3]}"})
         if len(var) == 4:
             if f"{var}_ADJUSTED" in cora:
-                cora = cora.drop(f"{var}_ADJUSTED")
+                cora = cora.drop_vars(f"{var}_ADJUSTED")
             if f"{var}_ADJUSTED_ERROR" in cora:
-                cora = cora.drop(f"{var}_ADJUSTED_ERROR")
+                cora = cora.drop_vars(f"{var}_ADJUSTED_ERROR")
     # Decode
     cora = cora.xoa.decode()
 
     # Rename time
     cora = cora.assign_coords({"N_prof": cora.time.values})
-    cora = cora.drop('time')
+    cora = cora.drop_vars('time')
     cora = cora.rename({'N_prof': 'time'})
 
     # Convert depths
@@ -812,7 +812,7 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
     elif model_type == 'woa18':
         logger.info("woa18")
         data_set_temp = xr.open_mfdataset(path_files, decode_times=False)
-        data_set_temp = data_set_temp.drop('depth_bnds')
+        data_set_temp = data_set_temp.drop_vars('depth_bnds')
         return data_set_temp
 
     elif model_type == 'rivers':
@@ -830,7 +830,7 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
             dss_cumul.append(xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": ""}))
 
         ds_cumul = xr.combine_nested(dss_cumul, concat_dim="valid_time", combine_attrs="override")
-        ds_cumul = ds_cumul.drop(["time", "surface"])
+        ds_cumul = ds_cumul.drop_vars(["time", "surface"])
         ds_cumul = ds_cumul.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
         ds_cumul = ds_cumul.sortby('time')
         return ds_cumul
@@ -852,18 +852,18 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
             dss_insta.append(xr.merge(dss, combine_attrs="override"))
 
         ds_insta = xr.combine_nested(dss_insta, concat_dim="valid_time", combine_attrs="override")
-        ds_insta = ds_insta.drop(["step", "time"])
+        ds_insta = ds_insta.drop_vars(["step", "time"])
         ds_insta = ds_insta.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
         ds_insta = ds_insta.sortby('time')
         return ds_insta
 
-    elif isinstance(path_files, list):
+    elif len(path_files) > 1:
         logger.info("multiple files from list")
         return xr.open_mfdataset(path_files)
 
     else:
         logger.info("single file")
-        return xr.open_dataset(path_files)
+        return xr.open_dataset(path_files[0])
 
 
 ####################### Tools #######################
@@ -900,7 +900,7 @@ def convert_trajectory(profiler):
     """
     da_lon = xr.DataArray(profiler.lon.values, coords=[profiler.time.values], dims="time")
     da_lat = xr.DataArray(profiler.lat.values, coords=[profiler.time.values], dims="time")
-    profiler = profiler.drop(['lon', 'lat'])
+    profiler = profiler.drop_vars(['lon', 'lat'])
     profiler = profiler.assign_coords({'lon': da_lon})
     profiler = profiler.assign_coords({'lat': da_lat})
     return profiler

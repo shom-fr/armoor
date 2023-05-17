@@ -8,51 +8,10 @@ import argparse
 import time
 from xoa import cfgm
 
-import armoor.hmi.script_tools as st
-import armoor.hmi.script as s
+from armoor.hmi.script import create_images
+from armoor.cli.cli_tools import directory_type
 
 import armoor.cli.logger_tools as log
-
-def folder_path(path_name: str) -> str:
-    """ @2BIS
-    use when a directory is provided
-    check "directory" type, check if path to folder exist.
-
-    Parameters
-    ----------
-    path_name : str
-        path to the folder
-
-    Returns
-    -------
-    path : str
-        path to wanted folder.
-    """
-    if os.path.isdir(path_name):
-        return path_name
-
-    raise NotADirectoryError(path_name)
-
-
-def file_path(path_name: str) -> str:
-    """ @2
-    use when a path is provided
-    check "path" type, check if path exist.
-
-    Parameters
-    ----------
-    path_name : str
-        path to the file
-
-    Returns
-    -------
-    path : str
-        path to wanted file.
-    """
-    if os.path.isfile(path_name):
-        return path_name
-
-    raise FileNotFoundError(path_name)
 
 
 def read_args(argv):
@@ -70,15 +29,15 @@ def read_args(argv):
     parser = argparse.ArgumentParser(description='Command to create images needed'
                                                  ' for the web interface')
     parser.add_argument('-o', '--output-folder',
-                        type=folder_path,
+                        type=directory_type,
                         help='Folder path to store outputs created by the script'
                              ' for the web interface')
     parser.add_argument('-i', '--input-folder',
-                        type=folder_path,
+                        type=directory_type,
                         help='Root folder path from which the data is retrieved'
                              ' to creating the web interface images')
     parser.add_argument('-c', '--input-configuration',
-                        type=file_path,
+                        type=argparse.FileType('r'),
                         help='File with details on the models and configurations'
                              ' to be generate')
     paths = vars(parser.parse_args(argv))
@@ -108,7 +67,7 @@ def main(argv=None):
     logger.info(f'details of configuration from file : {input_configuration_path}')
 
     rootdir = os.path.abspath(os.path.dirname(__file__))
-    cfgm_hmi_script = cfgm.ConfigManager(os.path.join(rootdir, "hmi.ini"))
+    cfgm_hmi_script = cfgm.ConfigManager(os.path.join(rootdir, "..", "hmi", "hmi.ini"))
 
     dict_configuration = cfgm_hmi_script.load(input_configuration_path)
 
@@ -117,7 +76,7 @@ def main(argv=None):
     logger.info(f'saved in folder : {output_folder_path}')
     logger.info(f'data comes from : {input_folder_path}')
 
-    s.create_images(dict_configuration, input_folder_path, output_folder_path)
+    create_images(dict_configuration, input_folder_path, output_folder_path)
     logger.info(f"--- {time.time() - start_time} seconds ---")
 
 
