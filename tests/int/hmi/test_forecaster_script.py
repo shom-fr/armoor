@@ -57,25 +57,22 @@ class TestForecasterScripts:
         main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
-    # #TODO uncomment : Caution next tests takes around 1h each
+    #  Please note that the next tests take approximately 1 hour each.
     #
     # def test_med(self):
-    #     change_path()
-    #     out_path = 'out/test_med/'
-    #     create_folder(out_path)
-    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_med_12345101112.cfg'])
+    #     test_name = 'hycom3d_med_12345101112'
+    #     out_path, logger = change_path(f'test_{test_name}')
+    #     main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
     #     assert True
     #
     # def test_indien(self):
-    #     change_path()
-    #     out_path = 'out/test_indien/'
-    #     create_folder(out_path)
-    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_indien_1234589.cfg'])
+    #     test_name = 'hycom3d_indien_1234589'
+    #     out_path, logger = change_path(f'test_{test_name}')
+    #     main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
     #     assert True
     #
     # def test_manga(self):
-    #     change_path()
-    #     out_path = 'out/test_manga/'
-    #     create_folder(out_path)
-    #     main(['-o', out_path, '-i', 'data/', '-c', 'config/hycom3d_manga_1234567.cfg'])
+    #     test_name = 'hycom3d_manga_1234567'
+    #     out_path, logger = change_path(f'test_{test_name}')
+    #     main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
     #     assert True
