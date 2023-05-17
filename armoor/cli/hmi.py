@@ -9,7 +9,7 @@ import time
 from xoa import cfgm
 
 from armoor.hmi.script import create_images
-from armoor.cli.cli_tools import folder_path, file_path
+from armoor.cli.cli_tools import directory_type
 
 import armoor.cli.logger_tools as log
 
@@ -29,15 +29,15 @@ def read_args(argv):
     parser = argparse.ArgumentParser(description='Command to create images needed'
                                                  ' for the web interface')
     parser.add_argument('-o', '--output-folder',
-                        type=folder_path,
+                        type=directory_type,
                         help='Folder path to store outputs created by the script'
                              ' for the web interface')
     parser.add_argument('-i', '--input-folder',
-                        type=folder_path,
+                        type=directory_type,
                         help='Root folder path from which the data is retrieved'
                              ' to creating the web interface images')
     parser.add_argument('-c', '--input-configuration',
-                        type=file_path,
+                        type=argparse.FileType('r'),
                         help='File with details on the models and configurations'
                              ' to be generate')
     paths = vars(parser.parse_args(argv))
