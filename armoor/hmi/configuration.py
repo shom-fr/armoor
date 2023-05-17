@@ -59,6 +59,7 @@ def get_obs(input_folder_path, config_reg, production_day, obs_name, var):
     -------
 
     """
+    logger.info('Retrieving obs')
     config_reg_path = get_obs_path(input_folder_path,
                                    f"{config_reg}_{production_day}",
                                    obs_name,
@@ -81,6 +82,7 @@ def get_forcing_model(input_folder_path, config_reg, production_day, forcing_mod
     -------
 
     """
+    logger.info('Retrieving forcing model')
     forcing_model_path = get_forcing_model_path(input_folder_path,
                                                 f"{config_reg}_{production_day}",
                                                 forcing_model,
