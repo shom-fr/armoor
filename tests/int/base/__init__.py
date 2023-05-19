@@ -29,3 +29,23 @@ def copy_test_files(test):
     source_dir = os.path.join(rootdir, "..", "..", "..", "data", "P1", "single_tests", test)
     destination_dir = os.path.join(paths["path_p1"],"single_tests", test)
     shutil.copytree(source_dir, destination_dir, dirs_exist_ok=True)
+
+
+
+def change_path_bull(test):
+    os.chdir(paths["path_p1"])
+
+    out_path = f"bull_{test}"
+    create_folder(os.path.join(paths["path_p1"], out_path))
+    os.chdir(os.path.join(paths["path_p1"], out_path))
+
+    log.setup_logging()
+    logger = logging.getLogger(__name__)
+
+    return os.path.join(paths["path_p1"], out_path), logger
+
+
+def copy_bull_test_files(test):
+    source_dir = os.path.join(rootdir, "..", "..", "..", "data", "P1", "bull", test)
+    destination_dir = os.path.join(paths["path_p1"],f"bull_{test}")
+    shutil.copytree(source_dir, destination_dir, dirs_exist_ok=True)
