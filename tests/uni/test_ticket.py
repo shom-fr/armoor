@@ -118,7 +118,7 @@ class TestTicket:
         logger = change_path_p2()
         logger.info('test_create_ticket')
 
-        formatted_ticket = {'title': 'VA P2',
+        formatted_ticket = {'title': 'Test unitaire : gestion des anomalies',
                             'kind': 'nodata',
                             'production_time': '25/04/2023',
                             'comment': 'Ceci est un commentaire dans le ticket gitlab',
@@ -152,13 +152,13 @@ class TestTicket:
         ticket = Ticket()
 
         config = 'hycom3d_med'
-        request = 'VA P2'
+        request = 'Test unitaire : gestion des anomalies'
         out_search = ticket.search_tickets(config, request)
 
         logger.info(f'output with config : {config} and request : {request} :: {out_search}')
         logger.info(f'out_search only issue {pytest.ticket_issue_id} :: {out_search[pytest.ticket_issue_id]}')
 
-        assert out_search[pytest.ticket_issue_id]['title'] == 'hycom3d_med - 25/04/2023 - VA P2'
+        assert out_search[pytest.ticket_issue_id]['title'] == 'hycom3d_med - 25/04/2023 - Test unitaire : gestion des anomalies'
 
     def test_get_description(self):
         logger = change_path_p2()
@@ -166,7 +166,7 @@ class TestTicket:
 
         description_expected = f'| Champ                | Description                                                                                          |\n'\
                                f'| :---                 | :---                                                                                                 |\n'\
-                               f'| title                | VA P2                                                                                                |\n'\
+                               f'| title                | Test unitaire : gestion des anomalies                                                                |\n'\
                                f'| kind                 | nodata                                                                                               |\n'\
                                f'| production_time      | 25/04/2023                                                                                           |\n'\
                                f'| comment              | Ceci est un commentaire dans le ticket gitlab                                                        |\n'\
@@ -195,7 +195,7 @@ class TestTicket:
         logger = change_path_p2()
         logger.info('test_get_links')
 
-        formatted_ticket = {'title': 'VA P2',
+        formatted_ticket = {'title': 'Test unitaire : gestion des anomalies',
                             'kind': 'nodata',
                             'production_time': '25/04/2023',
                             'comment': 'Ceci est un commentaire dans le ticket gitlab',
