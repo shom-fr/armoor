@@ -11,5 +11,5 @@ class TestBulletins:
     def test_f3(self):
         out_path, logger = change_path_bull(test)
         logger.info(f'Test bulletin {test}')
-        main(['-o', '.', '-c', 'Bulletin.ini'])
+        main(['-o', './', '-c', 'Bulletin.ini'])
         assert True

@@ -21,11 +21,11 @@ class Report:
     """
 
     def __init__(self, output_folder_path):
-        self.output_folder_path = f'{output_folder_path}sources/'
+        self.output_folder_path = os.path.join(output_folder_path, 'sources')
         self.rootdir = os.path.abspath(os.path.dirname(__file__))
         self.copy_logo()
 
-        with open(f'{self.output_folder_path}data.json', "r", encoding="utf-8") as file:
+        with open(os.path.join(self.output_folder_path, 'data.json'), "r", encoding="utf-8") as file:
             # returns JSON object as
             # a dictionary
             logger.info('Loading parameters from configuration file.')
@@ -39,8 +39,10 @@ class Report:
         -------
         None
         """
-        src = f'{self.rootdir}/templates/logo_shom.png'
-        dst = f'{self.output_folder_path}logo_shom.png'
+        src = os.path.join(self.rootdir, 'templates', 'logo_shom.png')
+        logger.info(f'source logo : {src}')
+        dst = os.path.join(self.output_folder_path, 'logo_shom.png')
+        logger.info(f'destination logo : {dst}')
         shutil.copyfile(src, dst)
 
     def __format_metazone_properties(self, properties: dict, translations: dict) -> list:
@@ -80,25 +82,25 @@ class Report:
         generated_pdfs = []
 
         # Generate the report index
-        template = env.get_template('templates/index.html.jinja')
+        template = env.get_template(os.path.join('templates', 'index.html.jinja'))
         render = template.render(self.data_report)
         html = HTML(string=render, base_url=self.output_folder_path)
-        output_pdf = tmp_directory + 'index.pdf'
+        output_pdf = os.path.join(tmp_directory, 'index.pdf')
         html.write_pdf(target=output_pdf)
         generated_pdfs.append(output_pdf)
 
         # Generate the report metazones index
-        template = env.get_template('templates/index-metazones.html.jinja')
+        template = env.get_template(os.path.join('templates', 'index-metazones.html.jinja'))
         render = template.render(self.data_report)
         html = HTML(string=render, base_url=self.output_folder_path)
-        output_pdf = tmp_directory + 'index-metazones.pdf'
+        output_pdf = os.path.join(tmp_directory, 'index-metazones.pdf')
         html.write_pdf(target=output_pdf)
         generated_pdfs.append(output_pdf)
 
         # Generate each metazone
         for index_metazone, metazone in enumerate(self.data_report['report']['metazones']):
             # Render the metazone index
-            template = env.get_template('templates/metazone.html.jinja')
+            template = env.get_template(os.path.join('templates', 'metazone.html.jinja'))
             properties = self.__format_metazone_properties(metazone['properties'],
                                                            self.data_report['meta_zone_desc']
                                                            )
@@ -109,33 +111,29 @@ class Report:
 
             # Convert to PDF
             html = HTML(string=render, base_url=self.output_folder_path)
-            output_pdf = tmp_directory + 'metazone' + \
-                str(index_metazone) + '.pdf'
+            output_pdf = os.path.join(tmp_directory, f'metazone{index_metazone}.pdf')
             html.write_pdf(target=output_pdf)
             generated_pdfs.append(output_pdf)
 
             # Then each functionalities
             for index_functionality, functionality in enumerate(metazone['functionalities']):
-                template = env.get_template(
-                    'templates/functionality.html.jinja')
+                template = env.get_template(os.path.join('templates', 'functionality.html.jinja'))
                 render = template.render(self.data_report,
                                          metazone=metazone,
                                          functionality=functionality
                                          )
 
-                base_name = tmp_directory + 'metazone' + \
-                    str(index_metazone) + 'functionality' + \
-                    str(index_functionality)
+                base_name = os.path.join(tmp_directory, f'metazone{index_metazone}functionality{index_functionality}')
 
                 html = HTML(string=render, base_url=self.output_folder_path)
-                html.write_pdf(target=base_name + '.pdf')
-                generated_pdfs.append(base_name + '.pdf')
+                html.write_pdf(target=f'{base_name}.pdf')
+                generated_pdfs.append(f'{base_name}.pdf')
 
         # Merge the generated pdfs
         merger = PdfMerger()
         for pdf in generated_pdfs:
             merger.append(pdf)
-        merger.write(self.output_folder_path + "../output.pdf")
+        merger.write(os.path.join(self.output_folder_path, '..', 'output.pdf'))
         merger.close()
 
     def __generate_html_report(self):
@@ -148,12 +146,12 @@ class Report:
         env = Environment(loader=loader)
 
         # Get template
-        template = env.get_template('templates/raw-html.html.jinja')
+        template = env.get_template(os.path.join('templates', 'raw-html.html.jinja'))
 
         # Render template
         render = template.render(self.data_report)
 
-        with open(f'{self.output_folder_path}../report.html', "w", encoding="utf-8") as output:
+        with open(os.path.join(self.output_folder_path, '..', 'report.html'), "w", encoding="utf-8") as output:
             output.write(render)
             output.close()
 

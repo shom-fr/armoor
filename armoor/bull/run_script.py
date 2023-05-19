@@ -6,6 +6,7 @@ import os
 import sys
 import argparse
 import time
+from xoa import cfgm
 
 from armoor.cli.cli_tools import directory_type
 
@@ -62,11 +63,13 @@ def main(argv=None):
     if not argv:
         argv = sys.argv[1:]
     output_folder_path, input_configuration_path = read_args(argv)
-    rootdir = os.path.abspath(os.path.dirname(__file__))
-    spec_config_file = os.path.join(rootdir, "..", "bull", "bull.ini")
 
     logger.info(f'details of configuration from file : {input_configuration_path}')
-    dict_configuration = st.return_dict(input_configuration_path, spec_config_file)
+
+    rootdir = os.path.abspath(os.path.dirname(__file__))
+    cfgm_bull_script = cfgm.ConfigManager(os.path.join(rootdir, "..", "bull", "bull.ini"))
+
+    dict_configuration = cfgm_bull_script.load(input_configuration_path)
 
     s.create_reports(dict_configuration, output_folder_path)
     logger.info(f'Done - all images for report in : {output_folder_path}sources')
