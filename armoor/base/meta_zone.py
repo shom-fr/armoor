@@ -226,7 +226,10 @@ class MetazoneAccessor:
             else:
                 return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
         elif 'x' in self._obj.dims:  # Curvilinear grid
-            return self._obj.meta.sel_closest(lon_target, lat_target)
+            list_ds_point = []
+            for i_lon, lon in enumerate(lon_target):
+                list_ds_point.append(self._obj.meta.sel_closest(lon_target[i_lon], lat_target[i_lon]))
+            return xr.concat(list_ds_point,dim='x')
 
     def horizontal_selection_from_obs_radius(self, config_obj) -> xr.Dataset:
         """
@@ -277,10 +280,9 @@ class MetazoneAccessor:
         mindist = 100000
         i = 0
         j = 0
-        for it in self._obj.x.values:
-            for jt in self._obj.y.values:
-                ds = self._obj.isel(x=it, y=jt)
-
+        for i_x, x in enumerate(self._obj.x.values):
+            for i_y, y in enumerate(self._obj.y.values):
+                ds = self._obj.isel(x=i_x, y=i_y)
                 lon0, lat0, lon1, lat1 = ds.lon.values, ds.lat.values, lon_target, lat_target
                 deg2rad = math.pi / 180.0
                 dist = math.sin(deg2rad * (lat0 - lat1) * 0.5) ** 2
@@ -289,11 +291,11 @@ class MetazoneAccessor:
                 dist = 2.0 * math.asin(math.sqrt(dist))
 
                 if dist <= mindist:
-                    i = it
-                    j = jt
+                    i_x_min = i_x
+                    i_y_min = i_y
                     mindist = dist
 
-        ds = self._obj.isel(x=i, y=j)
+        ds = self._obj.isel(x=i_x_min, y=i_y_min)
 
         return ds
 

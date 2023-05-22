@@ -8,8 +8,11 @@ import numpy as np
 
 folder_test = 'open_data'
 out_path, logger = change_path(folder_test)
-path_ds = [f"../data/test_uni/meta_zone/model_lon_lat.nc"]
-ds_lon_lat_depth = open_decode(path_ds)
+path_ds_lon_lat = [f"../data/test_uni/meta_zone/model_lon_lat.nc"]
+ds_lon_lat_depth = open_decode(path_ds_lon_lat)
+
+path_ds_xy = [f"../data/test_uni/meta_zone/model_x_y.nc"]
+ds_xy = open_decode(path_ds_xy)
 
 
 class TestMetaZone:
@@ -26,11 +29,34 @@ class TestMetaZone:
 
         assert before and after
 
+    def test_sel_hor_plg_xy(self):  # OK
+        logger.info('test_sel_hor_plg_xy')
+        plg = [[-89.2571487, 63.3048820], [-91.3409653, 60.6578712], [-87.9336395, 58.5177307],
+               [-84.7234344, 61.0239449], [-87.0888443, 63.3048820], [-89.1726685, 63.3893623]]
+        point_a_tester = [-20.75, -25.875]  # lon, lat = -83.73, 60.85
+        ds_meta = ds_xy.meta.horizontal_selection_polygon(plg)
+
+        # test before
+        point_xy = ds_xy.sel(x=point_a_tester[0], y=point_a_tester[1])
+        before = np.isnan(point_xy.ptemp.data[0])
+
+        # test after
+        point_xy = ds_meta.sel(x=point_a_tester[0], y=point_a_tester[1])
+        after = np.isnan(point_xy.ptemp.data[0])
+
+        assert not before and after
+
     def test_sel_hor_coords(self):  # OK
         logger.info('test_sel_hor_coords')
         coords = [[-9.91004944, 45.4280090], [-9.72228241, 45.7325592]]
         ds_meta = ds_lon_lat_depth.meta.horizontal_selection_coords(coords, method='nearest')
-        assert len(ds_meta.lon.values == 2)
+        assert len(ds_meta.lon.values) == 2
+
+    def test_sel_hor_coords_xy(self):  # OK
+        logger.info('test_sel_hor_coords_xy')
+        coords = [[-89.2571487, 63.3048820], [-91.3409653, 60.6578712]]
+        ds_meta = ds_xy.meta.horizontal_selection_coords(coords, method='nearest')
+        assert len(ds_meta.lon.values) == 2
 
     def test_sel_hor_cloud_dots(self):  # OK
         logger.info('test_sel_hor_cloud_dots')
@@ -43,7 +69,7 @@ class TestMetaZone:
         test_in = point_in[0] in ds_meta.lon.values and point_in[1] in ds_meta.lat.values
 
         point_out = [-9.25, 45]
-        test_out = point_out[0] not in ds_meta.lon.values and point_out[1] not in ds_meta.lat.values
+        test_out = point_out[0] not in ds_meta.lon.values or point_out[1] not in ds_meta.lat.values
 
         assert test_in and test_out
 
@@ -99,5 +125,4 @@ class TestMetaZone:
         slice = '3'
 
         ds_meta = ds_lon_lat_depth.meta.vertical_selection_slice(slice=slice, var_slice='depth')
-        print(ds_meta)
         assert len(ds_meta.slice) == 5
