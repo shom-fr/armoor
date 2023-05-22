@@ -192,6 +192,9 @@ def open_decode_cmems(path_files):
     if 'depth' in cmems.dims and 'depth' not in cmems.coords and 'pres' in cmems:
         cmems = depth_from_press(cmems)
 
+    # Convert depth
+    cmems = convert_depths(cmems)
+
     return cmems
 
 
@@ -797,6 +800,9 @@ def open_decode_basic(path_files):
     # Regrid if necessary
     ds = xoa.grid.to_rect(ds)
 
+    # Convert depths
+    ds = convert_depths(ds)
+
     return ds
 
 
@@ -1025,11 +1031,12 @@ def convert_depths(ds):
         Dataset with positive depths.
     """
     if 'depth' in ds.variables:
-        if np.nanmin(ds.depth.data) < 0:
-            ds.coords["depth"] = -ds.depth
+        if np.nanmax(ds.depth.data) < 0:
+            ds["depth"] = -ds.depth
     elif 'depth' in ds.dims:
-        if np.nanmin(ds.depth.data) < 0:
-            ds.coords["depth"] = -ds.depth
+        if np.nanmax(ds.depth.data) < 0:
+            ds["depth"] = -ds.depth
+
     return ds
 
 
