@@ -2,15 +2,15 @@
 Create images needed for the web interface
 """
 import logging
+import os
 import sys
 import argparse
 import time
+from xoa import cfgm
 
-import armoor.hmi.script_tools as st
-import armoor.hmi.read_configuration as rc
-import armoor.bull.script as s
-
-from .report import Report
+from armoor.cli.cli_tools import directory_type
+from armoor.bull.misc import create_reports
+from armoor.bull.report import Report
 
 import armoor.cli.logger_tools as log
 
@@ -29,11 +29,11 @@ def read_args(argv):
     parser = argparse.ArgumentParser(description='Command to create images and files needed'
                                                  ' for the weather report')
     parser.add_argument('-o', '--output-folder',
-                        type=rc.folder_path,
+                        type=directory_type,
                         help='Folder path to store outputs created by the script'
                              ' for the weather report')
     parser.add_argument('-c', '--input-configuration',
-                        type=rc.file_path,
+                        type=argparse.FileType('r'),
                         help='File with configurations details to generate the weather report')
     paths = vars(parser.parse_args(argv))
 
@@ -59,12 +59,15 @@ def main(argv=None):
     if not argv:
         argv = sys.argv[1:]
     output_folder_path, input_configuration_path = read_args(argv)
-    spec_config_file = '../bull/bull.ini'
 
     logger.info(f'details of configuration from file : {input_configuration_path}')
-    dict_configuration = st.return_dict(input_configuration_path, spec_config_file)
 
-    s.create_reports(dict_configuration, output_folder_path)
+    rootdir = os.path.abspath(os.path.dirname(__file__))
+    cfgm_bull_script = cfgm.ConfigManager(os.path.join(rootdir, "..", "bull", "bull.ini"))
+
+    dict_configuration = cfgm_bull_script.load(input_configuration_path)
+
+    create_reports(dict_configuration, output_folder_path)
     logger.info(f'Done - all images for report in : {output_folder_path}sources')
 
     logger.info('Creating report from sources.')

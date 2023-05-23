@@ -340,3 +340,20 @@ Example of configuration file::
                 var = uv
                 depth = 300
                 rarification = 4
+
+Run tests
+---------
+
+To run Forecaster unit tests, use the following commands::
+
+    pytest your_path_to/tests/uni/hmi/test_path_tools.py
+    pytest your_path_to/tests/uni/test_approval.py
+
+
+In the folder where you will run ``pytest`` please create a file named **tests.cfg**
+and add the following lines by replacing ``/path/to/output/tests/P2/`` and ``/path/to/output/tests/P3/`` with your information::
+
+    path_p2 = '/path/to/output/tests/P2/'
+    path_p3 = '/path/to/output/tests/P3/'
+
+The ``path_p2`` folder is for ``test_approval.py``, and the ``path_p3`` folder is for ``test_path_tools.py``.
