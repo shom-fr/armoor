@@ -44,27 +44,6 @@ def int_or_string_configobj(value):
     return value
 
 
-def file_path(path_name: str) -> str:
-    """ @2 TODO DELETE
-    use when a path is provided
-    check "path" type, check if path exist.
-
-    Parameters
-    ----------
-    path_name : str
-        path to the file
-
-    Returns
-    -------
-    path : str
-        path to wanted file.
-    """
-    if os.path.isfile(path_name):
-        return path_name
-
-    raise FileNotFoundError(path_name)
-
-
 def directory_type(path: str) -> str:
     """
     use when a directory is provided
@@ -84,29 +63,6 @@ def directory_type(path: str) -> str:
         return path
 
     raise NotADirectoryError(f"{path} is not a valid directory.")
-
-
-def file_force_list_path_configObj(path_names):
-    """ @3
-    use when a list of path is provided
-    check "force_list_path" type, check if paths exist.
-
-    Parameters
-    ----------
-    path_name : str
-        path(s) to the file(s)
-
-    Returns
-    -------
-    path : str or list(str)
-        path(s) to wanted file(s).
-    """
-    if isinstance(path_names, list):
-        for arg in path_names:
-            file_path(arg)
-        return path_names
-    else:
-        return file_path(path_names)
 
 
 def try_str2float(value) -> float:

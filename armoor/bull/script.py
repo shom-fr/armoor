@@ -11,8 +11,8 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 
-from armoor import cli
-from armoor import base
+from armoor.cli.command_line_interface import command_line_interface
+from armoor.base.calls_from_dict import dict2call
 from armoor.hmi.script_tools import create_folder
 
 import logging
@@ -58,7 +58,7 @@ def create_report(config_functionality: dict) -> None:
     -------
     None
     """
-    base.calls_from_dict.dict2call(config_functionality)
+    dict2call(config_functionality)
 
 
 def get_minimap_path(meta_zone_name: str, output_path_base: str) -> str:
@@ -236,7 +236,7 @@ def incorporate_functionality(dict_configuration: dict,
     The dictionary updated with the details of the functionality
     """
     path_to_config = dict_configuration['functionalities'][functionality]['path_to_config']
-    parser = cli.command_line_interface(['--cfgfile', path_to_config])
+    parser = command_line_interface(['--cfgfile', path_to_config])
     parser = add_meta_zone_from_name(parser, dict_configuration, meta_zone)
     dict_configuration['report'][meta_zone][functionality] = parser
     return dict_configuration

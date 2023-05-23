@@ -9,12 +9,8 @@ import time
 from xoa import cfgm
 
 from armoor.cli.cli_tools import directory_type
-
-import armoor.hmi.script_tools as st
-import armoor.hmi.read_configuration as rc
-import armoor.bull.script as s
-
-from .report import Report
+from armoor.bull.script import create_reports
+from armoor.bull.report import Report
 
 import armoor.cli.logger_tools as log
 
@@ -71,7 +67,7 @@ def main(argv=None):
 
     dict_configuration = cfgm_bull_script.load(input_configuration_path)
 
-    s.create_reports(dict_configuration, output_folder_path)
+    create_reports(dict_configuration, output_folder_path)
     logger.info(f'Done - all images for report in : {output_folder_path}sources')
 
     logger.info('Creating report from sources.')
