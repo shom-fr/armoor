@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag, temporal_colocation_flag,
-                 coloc_method='nearest', opt_grid=None, vertical_step=None, horizontal_step=None):
+                 coloc_method='nearest', opt_grid=None, vertical_step=None, horizontal_step=None, coloc_method_z='nearest'):
     """
     Put the model and observation dataset on the same grid defined
     according to the selected method.
@@ -61,18 +61,23 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
         mod, obs = temporal_colocation(mod, obs, ds_tgt, coloc_method)
 
     # Horizontal colocation
-    if horizontal_colocation_flag:
+    if horizontal_step:
+        mod, obs = set_hor_step(mod, obs, horizontal_step, coloc_method)
+
+    elif horizontal_colocation_flag:
         mod, obs = horizontal_colocation(mod, obs, ds_tgt, coloc_method)
 
-    if horizontal_step:
-        mod, obs = set_hor_step(mod, obs, horizontal_step)
+
 
     # Vertical colocation
-    if vertical_colocation_flag:
-        mod, obs = vertical_colocation(mod, obs, ds_tgt, coloc_method)
 
     if vertical_step:
-        mod, obs = set_vert_step(mod, obs, vertical_step)
+        mod, obs = set_vert_step(mod, obs, vertical_step, coloc_method_z)
+
+    elif vertical_colocation_flag:
+        mod, obs = vertical_colocation(mod, obs, ds_tgt, coloc_method_z)
+
+
     return obs, mod
 
 
@@ -225,7 +230,7 @@ def set_hor_step(mod, obs, hor_step):
     return mod, obs
 
 
-def set_vert_step(mod, obs, vert_step):
+def set_vert_step(mod, obs, vert_step, coloc_method ='linear'):
     """
     Colocate the model and obs on the chosen vertical grid.
     Parameters
@@ -247,9 +252,9 @@ def set_vert_step(mod, obs, vert_step):
     depth_min, depth_max = mod.depth.min(), mod.depth.max()
     tgt_depth = np.arange(depth_min, depth_max, vert_step)
     if 'depth' in mod.dims:
-        mod = mod.interp(depth=tgt_depth, method="linear")
+        mod = mod.interp(depth=tgt_depth, method=coloc_method)
     if 'depth' in obs.dims:
-        obs = obs.interp(depth=tgt_depth, method="linear")
+        obs = obs.interp(depth=tgt_depth, method=coloc_method)
 
     return mod, obs
 

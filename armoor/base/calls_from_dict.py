@@ -144,7 +144,7 @@ def get_observation_models_meta(config_obj: dict):
                                                  horizontal_colocation_flag, vertical_colocation_flag,
                                                  temporal_colocation_flag, coloc_method=get_method(model),
                                                  opt_grid=config_obj["colocate"], vertical_step=vertical_step,
-                                                 horizontal_step=horizontal_step)
+                                                 horizontal_step=horizontal_step, coloc_method_z=get_method(model, z=True))
 
         observation["xarray_meta_coloc"].append(obs_coloc)
         model.update({"xarray_meta_coloc": mod_coloc})
@@ -193,7 +193,7 @@ def get_observation_models_meta(config_obj: dict):
     return config_obj
 
 
-def get_method(data) -> str:
+def get_method(data, z=False) -> str:
     """
     Get the method to use.
     Parameters
@@ -205,7 +205,12 @@ def get_method(data) -> str:
         str
         Method to use.
     """
-    method = data.get('method')
+    if z:
+        method = data.get('method-z')
+        if method is None:
+            method = data.get('method')
+    else:
+        method = data.get('method')
 
     if method is None:
         logger.warning(f'No method provided for {data.get("name")}')
