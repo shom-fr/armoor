@@ -99,3 +99,19 @@ Example of configuration file::
             name = "Polygon 1"
             description = Description de la meta_zone_simple_polygon_1
             polygon = [-3.5,46], [-3.5, 48],[-2, 48], [-2, 46]
+
+
+Run test
+--------
+
+To run the report's test, use the following command::
+
+    pytest your_path_to/tests/int/bull/test_bull.py
+
+
+In the folder where you will run ``pytest`` please create a file named **tests.cfg**
+and add the following line by replacing ``/path/to/output/tests/P1/`` with your information::
+
+    path_p1 = '/path/to/output/tests/P1/'
+
+In the ``path_p1`` folder, you must have the ``data`` folder provided with the netCDF files.
