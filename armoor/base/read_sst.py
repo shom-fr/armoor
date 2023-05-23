@@ -187,6 +187,34 @@ class SSTAccessor:
                 self._obj['ptemp'] = ptemp
                 return self._obj
 
+    def sel_sound_speed(self):
+        """
+        Calculate sound sp
+        Returns
+        -------
+
+        """
+        # Verify all the required variables are included in the dataset
+        sal = self._obj.read_sst.sel_sal()
+
+        ptemp = self._obj.read_sst.sel_ptemp()
+        cons_temp = gsw.CT_from_pt(sal, ptemp)
+
+        depth = self._obj.depth
+        lat = self._obj.lat
+        pres = gsw.p_from_z(depth, lat, geo_strf_dyn_height=0, sea_surface_geopotential=0)
+
+        if sal is not None and cons_temp is not None and pres is not None:
+            return gsw.sound_speed(sal, cons_temp, pres)
+        else:
+            logger.warning("To compute sound speed you need to have salinity, potential temperature and depth in your"
+                           "dataset.")
+            return self._obj
+
+
+
+
+
     def sel_density(self):
         """
         Select density from the dataset.
