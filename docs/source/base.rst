@@ -30,8 +30,8 @@ In the header there are 5 attributes:
     * ``functionality`` : There are 9 functionalities : *sst*, *prof_hydro_vessel*, *prof_hydro_mooring*, *section_hydro*, *clim_hydro*, *currents_hfr*, *currents_ADCP*, *currents_VMADCP* and *drifters*. For more information refer to the :doc:`functionalities` chapter.
     * ``colocate`` : Put the model and observation dataset on the same grid defined according to the selected target: model's, observation's or auto (less dense grid, default).
     * ``output-path`` : Directory path to store the outputs. If no path is provided the plots will pop up.
-    * ``horizontal_step`` : @TODO
-    * ``vertical_step`` : @TODO
+    * ``horizontal_step`` : The products can be projected on a grid with the horizontal resolution, in meters, you set.
+    * ``vertical_step`` : The products can be projected on a grid with the vertical resolution, in meters, you set.
 
 
 2. Observation
@@ -41,9 +41,11 @@ To specify the observation, 5 attributes can be provided after ``[observation]``
 
     * ``name`` : Observation name appearing in the plots.
     * ``path`` : Path to the observation file(s).
-    * ``type`` : Observation type, to be used if there is a specific method to open the dataset : *mouillage*, *LADCP* and *VMADCP*.
+    * ``type`` : Observation type, to be used if there is a specific method to open the dataset : *WOA18*, *CMEMS*, *scanfish*, *seasoar*, *mouillage*, *LADCP* and *VMADCP*. Any other type of observation will be automatically decoded.
     * ``method`` : Horizontal colocation method.
     * ``method-z`` : Vertical colocation method if different from ``method``.
+
+If several paths are given, the files will be merged along the time dimension.
 
 3. Models
 ---------
@@ -53,7 +55,7 @@ The model's section is very similar to the observation's one, the main differenc
 .. IMPORTANT::
     For each model, you must provide a unique model name in double brackets ``[[model_name]]`` then provide the same 5 attributes as the observation.
 
-The only other difference concerns the ``type`` values, that are specific regarding the models : *HYCOM_currents*, *HYCOM_3D* and *CROCO_currents*.
+The only other difference concerns the ``type`` values, that are specific regarding the models : *CROCO*, *CROCO_currents*, *HYCOM_currents*, *HYCOM_3D* and *CORA*. Any other type of model will be automatically decoded.
 
 4. Meta-zones
 -------------
@@ -75,7 +77,7 @@ Relative to time restriction:
 Relative to horizontal restriction:
 
     * ``cloud`` : To indicate the list of points of interest
-    * ``radius`` : To expand the area of interest to a radius (in km). This option is in combination with 'cloud'.
+    * ``radius`` : To expand the area of interest to a radius (in km). This option is in combination with ``[[cloud]]``.
     * ``polygon`` : To consider only the region inside the polygon defined by a list of points.
     * ``bathy_min`` : Minimum authorized bathymetry value.
     * ``bathy_max`` : Maximum authorized bathymetry value.
@@ -89,10 +91,11 @@ Relative to vertical restriction:
         #. a slice of water (z ∈ [x0 meters, x1 meters])
 
     * ``density`` : The selection of immersions and slices of water is done in the same way as with *depth*, except that we indicate potential densities (instead of depths in meters).
+    * ``slice`` : To group into vertical slices, in meters.
 
 Other restrictions :
 
-    * ``quality`` : To set minimum and maximum quality thresholds.
+    * ``quality`` : To set minimum and maximum quality thresholds on a variable.
     * ``vars`` : To select the variables of interest.
 
 5. Outputs
@@ -113,43 +116,42 @@ For each output here is the list of possible options (with their associated desc
 
     * ``plot`` : Plot options :
 
-        #. ``map_current_trajectroy`` : @TODO
-        #. ``plot_stick_plot``: @TODO
-        #. ``plot_diff_traj_dist``: @TODO
-        #. ``map_trajectroy``: @TODO
-        #. ``plot_map_current_harmonic``: @TODO
-        #. ``plot_tide_current_ellipses``: @TODO
-        #. ``harmonic_table``: @TODO
-        #. ``plot_hovmoller``: @TODO
-        #. ``plot_variable_3d``: @TODO
-        #. ``plot_variable_2d``: @TODO
-        #. ``plot_ts_metr_point``: @TODO
+        #. ``map_current_trajectroy`` : Plot the current vectors along the trajectories.
+        #. ``plot_stick_plot``: Plot stick plots for current data
+        #. ``plot_diff_traj_dist``: Plot the difference in terms of distance and direction between the model and observation trajectories.
+        #. ``map_trajectroy``: Plot the modelled and observed trajectories
+        #. ``plot_map_current_harmonic``: Plot the map of amplitude, phase and norm of each tidal harmonic.
+        #. ``plot_tide_current_ellipses``: Plot the map with the tidal current ellipses
+        #. ``harmonic_table``: Create a table per tidal wave and per current constituent(u & v) with, for each depth, the amplitude and phase of the observation and the model and their differences
+        #. ``plot_hovmoller``: Plot 2d figure, Hovmoller diagram
+        #. ``plot_variable_3d``: Plot 3D variable section difference between observation and model
+        #. ``plot_variable_2d``: Plot 2d figure, Hovmoller diagram
+        #. ``plot_ts_metr_point``: Plot punctual time series of model and observation and the associated metric.
         #. ``diag_ts_unique``: Single theta s diagram
         #. ``diag_ts_multi``: Multi theta s diagram
-        #. ``plot_ts_metr_stats``: @TODO
-        #. ``plot_ts_metr_ecart_point``: @TODO
-        #. ``diag_disp``: Scatter plot
-        #. ``diag_disp_g``: Global scatter plot
+        #. ``plot_ts_metr_stats``: Plot statistical time series of model and observation.
+        #. ``diag_disp``: Scatter plot dispersion diagram
+        #. ``diag_disp_g``: Global scatter plot dispersion diagram
         #. ``plot_map_metr_ecart``: 2D map with deviation metric
         #. ``plot_map_metr_biais``: 2D map with bias metric
-        #. ``plot_map_metr_RMSEc``: @TODO
-        #. ``plot_map_metr_RMSEcentree``: @TODO
-        #. ``plot_profile_u``: @TODO
-        #. ``plot_profile_multi``: @TODO
+        #. ``plot_map_metr_RMSEc``: Plot RMSE map
+        #. ``plot_map_metr_RMSEcentree``: Plot centered RMSE map
+        #. ``plot_profile_u``: Create unique vertical profiles figures of a variable
+        #. ``plot_profile_multi``: Create multi vertical profiles figures of a variable
 
     * ``attribute`` : List of attributes to process
-    * ``colormap`` : Name of the colormap, ex: *solar*, *thermal*.
+    * ``colormap`` : Name of the colormap, ex: *solar*, *thermal*
     * ``vmin`` : To fix minimum value scale
     * ``vmax`` : To fix maximum value scale
     * ``path_results_traj`` : Path to store temporary dataset files
-    * ``traj_duration_plot`` : @TODO
-    * ``traj_freq_plot`` : @TODO
-    * ``scale`` : @TODO
-    * ``analysis_start`` : @TODO
-    * ``analysis_end`` : @TODO
-    * ``tidal_waves`` : @TODO
-    * ``path_results`` : @TODO
-    * ``path_comodo`` : @TODO
+    * ``traj_duration_plot`` : duration of the simulated trajectory to plot
+    * ``traj_freq_plot`` : frequency at which the trajectories are plotted (ex : one ine 3)
+    * ``scale`` : Scale to adapt the size of the ellipses/vectors
+    * ``analysis_start`` : Date to start the harmonic analysis
+    * ``analysis_end`` : Date to end the harmonic analysis
+    * ``tidal_waves`` : List of the tidal waves to compute
+    * ``path_results`` : Path where to save the detided result files
+    * ``path_comodo`` : Path of the comodo-detidor executable
 
 
 
