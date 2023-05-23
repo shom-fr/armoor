@@ -93,8 +93,7 @@ def plot(config_obj):
 
         ################################################################################################################
         # TIME SERIES STATS
-        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats', "plot_ts_metr_bias_stats": 'bias_stats',
-                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
+        plot_ts_metr_stats = {"plot_ts_metr_stats": 'all_metrics'
                               }
         if output["plot"] in plot_ts_metr_stats:
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
@@ -102,7 +101,7 @@ def plot(config_obj):
 
         ################################################################################################################
         # MAP METRIC
-        plot_map_metr = {"plot_map_metr_ecart_interval": 'difference', "plot_map_metr_ecart": 'difference',
+        plot_map_metr = {"plot_map_metr_ecart": 'difference',
                          "plot_map_metr_biais": 'bias', "plot_map_metr_RMSEc": 'RMSEc',
                          "plot_map_metr_RMSEcentree": 'RMSEcentree'
                          }

@@ -9,112 +9,108 @@ In this chapter you will find more details and specifics on the 9 armoor's funct
 1. SST
 ------
 
-Comparison to satellite SST:
+Comparison to satellite SST.
 
 Available outputs :
 
-* Global scatter plots : ``diag_disp_g``
-* Selective scatter plots : ``diag_disp``
+* Global dispersion diagram  : ``diag_disp_g``
+* Selective  dispersion diagram  : ``diag_disp``
 * Punctual time series : ``plot_ts_metr_ecart_point``
 * Statistical time series : ``plot_ts_metr_stats``
-* SST map : ``plot_map_metr_ecart``, ``plot_map_metr_biais``, ``plot_map_metr_RMSEc`` and ``plot_map_metr_RMSEcentree``.
+* SST map : ``plot_map_metr_ecart``, ``plot_map_metr_biais``, ``plot_map_metr_RMSEc`` and ``plot_map_metr_RMSEcentree``
 
 
 2. PROF_HYDRO_VESSEL
 --------------------
 
-Fonctionnalité 2 : comparaison aux profils hydrologiques:
+Comparison to hydrological profiles.
 
 Available outputs :
 
-* Cartes par variable :
-* Diagrammes de dispersion globaux :
-* Courbes temporelles de statistiques :
-* Courbes « multi-profils » de profils verticaux :
-* Courbes « profil unique » de profils verticaux :
-* Diagramme θ-S « multi-profils » :
-* Diagramme θ-S « profil unique » :
+* Variable map : ``plot_map_metr_ecart``, ``plot_map_metr_biais``, ``plot_map_metr_RMSEc`` and ``plot_map_metr_RMSEcentree``
+* Global dispersion diagram  : ``diag_disp_g``
+* Statistical time series : ``plot_ts_metr_stats``
+* « Multi-profile » vertical plot : ``plot_profile_multi``
+* « One-profile » vertical plot : ``plot_profile_u``
+* « Multi-profile »  θ-S diagram : ``diag_ts_multi``
+* « One-profile »  θ-S diagram : ``diag_ts_unique``
 
 
 3. PROF_HYDRO_MOORING
 ---------------------
 
-Fonctionnalité 3 : comparaison aux mouillages fixes hydrologiques:
+Comparison to hydrological moorings.
 
 Available outputs :
 
-* Courbes temporelles de statistique :
+* Statistical time series : ``plot_ts_metr_stats``
 
 
 4. SECTION_HYDRO
 ----------------
 
-Fonctionnalité 4 : comparaisons aux sections hydrologiques:
+Comparison to hydrological sections.
 
 Available outputs :
 
-* Variables 3D :
-* Variables 2D :
+* 3D variables : ``plot_variable_3d``
+* 2D variables : ``plot_variable_2d``
 
 
 5. CLIM_HYDRO
 -------------
 
-Fonctionnalité 5 : comparaison à une climatologie observée d’hydrologie:
+Comparison to hydrological climatologies.
 
 Available outputs :
 
-* Cartes :
-* Courbes de statistiques :
-* Courbes ponctuelles :
+* Punctual time series : ``plot_ts_metr_ecart_point``
+* Statistical time series : ``plot_ts_metr_stats``
+* Maps : ``plot_map_metr_ecart``
 
 
 6. CURRENTS_HFR
 ---------------
 
-Fonctionnalité 6 : comparaison des courants de surface aux observations radars HF:
+Comparison to HF radar surface currents.
 
 Available outputs :
 
-* Cartes :
-* Ellipses de courant de marée :
-* Courbes temporelles ponctuelles :
-* Courbes temporelles de statistiques :
-* Co-spectres :
+* Current maps : * Variable map : ``plot_map_metr_ecart``, ``plot_map_metr_biais``, ``plot_map_metr_RMSEc`` and ``plot_map_metr_RMSEcentree``
+* Tidal current ellipsis : ``plot_tide_current_ellipses``
+* Punctual time series : ``plot_ts_metr_ecart_point``
 
 
 7. CURRENTS_ADCP
 ----------------
 
-Fonctionnalité 7 : comparaison aux mesures ADCP au point fixe
+Comparison to ADCP measurements.
 
 Available outputs :
 
-* Diagramme de Hovmöller (temps-profondeur) :
-* Co-spectres :
-* Tableaux « analyse harmonique » :
-* Ellipses de marée :
+* Hovmöller diagrams : ``plot_hovmoller``
+* Tidal harmonic tables : ``harmonic_table``
+* Tidal current ellipsis : ``plot_tide_current_ellipses``
 
 
 8. CURRENTS_VMADCP
 ------------------
 
-Fonctionnalité 8 : comparaison aux mesures VM-ADCP:
+Comparison to VM-ADCP measurements.
 
 Available outputs :
 
-* Graphes 2D  :
-* Stick plots :
+* 2D graphs  : ``plot_variable_3d``
+* Stick plots : ``plot_stick_plot``
 
 
 9. DRIFTERS
 -----------
 
-Fonctionnalité 9 : comparaison aux flotteurs dérivants:
+Comparison to drifter measurements.
 
 Available outputs :
 
-* Carte des courants :
-* Cartes de trajectoires :
-* Courbes d’écart en distance :
-* Courbes d’écart en direction :
+* Current maps along trajectory : ``map_current_trajectroy``
+* Trajectory maps : ``map_trajectroy``
+* Direction / distance difference plot : ``plot_diff_traj_dist``
