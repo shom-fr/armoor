@@ -123,11 +123,12 @@ class Report:
                                          functionality=functionality
                                          )
 
-                base_name = os.path.join(tmp_directory, f'metazone{index_metazone}functionality{index_functionality}')
+                base_name = os.path.join(tmp_directory,
+                                         f'metazone{index_metazone}functionality{index_functionality}.pdf')
 
                 html = HTML(string=render, base_url=self.output_folder_path)
-                html.write_pdf(target=f'{base_name}.pdf')
-                generated_pdfs.append(f'{base_name}.pdf')
+                html.write_pdf(target=base_name)
+                generated_pdfs.append(base_name)
 
         # Merge the generated pdfs
         merger = PdfMerger()
