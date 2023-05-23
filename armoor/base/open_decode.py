@@ -131,7 +131,11 @@ def open_decode_woa18(path_files):
     elif 't_mn' in woa18:
         woa18 = woa18.rename({'t_mn': 'temp'})
 
-    woa18 = woa18.xoa.decode()
+    try:
+        woa18 = woa18.xoa.decode()
+    except:
+        pass
+
     return woa18
 
 

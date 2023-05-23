@@ -6,8 +6,9 @@ from tests.int.base import change_path
 from armoor.base.open_decode import open_decode
 import numpy as np
 
-folder_test = 'open_data'
+folder_test = 'meta_zone'
 out_path, logger = change_path(folder_test)
+
 path_ds_lon_lat = [f"../data/test_uni/meta_zone/model_lon_lat.nc"]
 ds_lon_lat_depth = open_decode(path_ds_lon_lat)
 
