@@ -1,6 +1,6 @@
 from tests.int.base import change_path_bull, copy_bull_test_files
 
-from armoor.bull.run_script import main
+from armoor.cli.bull import main
 
 test = 'multi'
 copy_bull_test_files(test)
