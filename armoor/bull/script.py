@@ -346,7 +346,7 @@ def get_output_files(dict_configuration: dict,
         files_paths = []
         for file in files:
             files_paths.append(f'{file}')
-        new_outputs.append({'plot': plot_name, 'files': files_paths, 'folder_name': plot_folder_name})
+        new_outputs.append({'plot': plot_name, 'files': sorted(files_paths), 'folder_name': plot_folder_name})
 
     dict_configuration['report'][meta_zone][functionality]["outputs"] = new_outputs
     return dict_configuration
