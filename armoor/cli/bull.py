@@ -9,7 +9,7 @@ import time
 from xoa import cfgm
 
 from armoor.cli.cli_tools import directory_type
-from armoor.bull.script import create_reports
+from armoor.bull.misc import create_reports
 from armoor.bull.report import Report
 
 import armoor.cli.logger_tools as log
