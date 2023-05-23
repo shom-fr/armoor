@@ -105,8 +105,6 @@ def create_minimaps(dict_configuration: dict, output_path_base: str) -> dict:
             axes = plt.axes(projection=ccrs.Mercator())
             axes.set_extent(external_bound,
                             crs=ccrs.PlateCarree())
-            axes.add_feature(cfeature.COASTLINE.with_scale('50m'),
-                             linewidth=0.25)
             axes.add_feature(cfeature.LAND,
                              zorder=1,
                              edgecolor='k')
