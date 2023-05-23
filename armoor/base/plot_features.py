@@ -1091,17 +1091,17 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
 
 def plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot, time_step, output_path):
     """
-
+    Plot the modelled and observed trajectories.
     Parameters
     ----------
     observation : xarray.dataset
         Trajectory from the observation dataset.
     models : list of xarray.dataset
-        Trajectoris from the models datasets.
+        Trajectories from the models datasets.
     traj_duration_plot : int
         duration of the simulated trajectory to plot.
     traj_freq_plot : int
-        frequency at which the trajectories are plotted (ex : one ine 3)
+        frequency at which the trajsectories are plotted (ex : one ine 3)
     output_path : str
         Path where to save the figure.
 
@@ -1149,7 +1149,7 @@ def plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot,
 
 def plot_map_current_trajectory(obs, mod, output_path=None):
     """
-    Plot the current along the trajectories.
+    Plot the current vectors along the trajectories.
     Parameters
     ----------
     obs : xarray.dataset
@@ -2745,7 +2745,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, obs, title_time, mod_name, obs_
 
 def plot_stick_plots(models, observation, output_path=None):
     """
-    Plt stick plots for current data.
+    Plot stick plots for current data.
     Parameters
     ----------
     models : list of dict of xarray.dataset
