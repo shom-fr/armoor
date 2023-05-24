@@ -1,22 +1,21 @@
-from armoor import cli
-from armoor import base
-import armoor.cli.logger_tools as log
 import logging
-import pprint
+from armoor.cli.command_line_interface import command_line_interface
+from armoor.base.calls_from_dict import dict2call
+import armoor.cli.logger_tools as log
 
-def main(argv=None):
+def main(functionality :str = None):
     log.setup_logging()
     logger = logging.getLogger(__name__)
 
     logger.info('Retrieving parameter')
-    parser = cli.command_line_interface()
+    parser = command_line_interface()
 
     if functionality:
         parser.update({"functionality" : functionality})
 
     print(f'{ parser = }')
     logger.info('Applying configuration to generate plots')
-    base.calls_from_dict.dict2call(parser)
+    dict2call(parser)
 
 
 def script_p_sst():
