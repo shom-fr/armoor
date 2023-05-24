@@ -66,6 +66,15 @@ setup(
     entry_points={
         'console_scripts': [
             'armoor = armoor.cli.run:main',
+            'armoor-sst = armoor.cli.run:script_p_sst',
+            'armoor-prof_hydro_vessel = armoor.cli.run:script_p_prof_hydro_vessel',
+            'armoor-prof_hydro_mooring = armoor.cli.run:script_p_prof_hydro_mooring',
+            'armoor-section_hydro = armoor.cli.run:script_p_section_hydro',
+            'armoor-clim_hydro = armoor.cli.run:script_p_clim_hydro',
+            'armoor-currents_hfr = armoor.cli.run:script_p_currents_hfr',
+            'armoor-currents_ADCP = armoor.cli.run:script_p_currents_ADCP',
+            'armoor-currents_VMADCP = armoor.cli.run:script_p_currents_VMADCP',
+            'armoor-drifters = armoor.cli.run:script_p_drifters',
             'armoor-tick-create = armoor.cli.tick:create',
             'armoor-tick-search = armoor.cli.tick:search',
             'armoor-tick-description = armoor.cli.tick:description',
