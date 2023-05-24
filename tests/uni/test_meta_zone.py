@@ -15,6 +15,8 @@ ds_lon_lat_depth = open_decode(path_ds_lon_lat)
 path_ds_xy = [f"../data/test_uni/meta_zone/model_x_y.nc"]
 ds_xy = open_decode(path_ds_xy)
 
+path_ds_QC = [f"../data/test_uni/meta_zone/GL_PR_GL_64556_sub.nc"]
+ds_QC = open_decode(path_ds_QC,type='CMEMS')
 
 class TestMetaZone:
 
@@ -127,3 +129,9 @@ class TestMetaZone:
 
         ds_meta = ds_lon_lat_depth.meta.vertical_selection_slice(slice=slice, var_slice='depth')
         assert len(ds_meta.slice) == 5
+
+    def test_sel_QC(self):
+        logger.info('test_sel_QC')
+        quality = ['TEMP_QC','0','1']
+        ds_meta = ds_QC.meta.quality_filter(quality)
+        assert len(ds_meta.time) < len(ds_QC.time)
