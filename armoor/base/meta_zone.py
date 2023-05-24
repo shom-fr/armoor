@@ -92,8 +92,13 @@ class MetazoneAccessor:
         """
         logger.info(f"Applying filter - quality_filter")
         var, min_q, max_q = quality
+        min_q, max_q = int(min_q), int(max_q)
 
-        if var not in self._obj:
+        if var in list(self._obj.keys()):
+            pass
+        elif "QC_" + var[:-3] in list(self._obj.keys()):
+            var = "QC_" + var[:-3]
+        else:
             var = "quality_level"
 
         if var in self._obj:
@@ -229,7 +234,7 @@ class MetazoneAccessor:
             list_ds_point = []
             for i_lon, lon in enumerate(lon_target):
                 list_ds_point.append(self._obj.meta.sel_closest(lon_target[i_lon], lat_target[i_lon]))
-            return xr.concat(list_ds_point,dim='x')
+            return xr.concat(list_ds_point, dim='x')
 
     def horizontal_selection_from_obs_radius(self, config_obj) -> xr.Dataset:
         """

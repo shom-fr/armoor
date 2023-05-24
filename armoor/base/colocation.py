@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag, temporal_colocation_flag,
-                 coloc_method='nearest', opt_grid=None, vertical_step=None, horizontal_step=None, coloc_method_z='nearest'):
+                 coloc_method='nearest', opt_grid=None, vertical_step=None, horizontal_step=None,
+                 coloc_method_z='nearest'):
     """
     Put the model and observation dataset on the same grid defined
     according to the selected method.
@@ -67,8 +68,6 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
     elif horizontal_colocation_flag:
         mod, obs = horizontal_colocation(mod, obs, ds_tgt, coloc_method)
 
-
-
     # Vertical colocation
 
     if vertical_step:
@@ -76,7 +75,6 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
 
     elif vertical_colocation_flag:
         mod, obs = vertical_colocation(mod, obs, ds_tgt, coloc_method_z)
-
 
     return obs, mod
 
@@ -230,7 +228,7 @@ def set_hor_step(mod, obs, hor_step):
     return mod, obs
 
 
-def set_vert_step(mod, obs, vert_step, coloc_method ='linear'):
+def set_vert_step(mod, obs, vert_step, coloc_method='linear'):
     """
     Colocate the model and obs on the chosen vertical grid.
     Parameters
