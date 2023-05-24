@@ -77,7 +77,7 @@ def main(argv=None):
     logger.info(f"Done in {time.time() - start_time} seconds ")
 
 
-def only_report(argv):
+def only_report(argv=None):
     """
     Calls the function with the arguments provided by the user
     to generate the weather report
