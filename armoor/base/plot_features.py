@@ -595,7 +595,7 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
 
 
 def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metric, cmap=cmocean.cm.thermal, vmin=None,
-                           vmax=None, output_path=None):
+                           vmax=None, output_path=None, dvmin=None, dvmax=None):
     """
     Plot the map of the profiles for functionality 2.
     Parameters
@@ -715,7 +715,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
                     file_name = f'time{index_time}_slice{index_slice}'
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter, title, vmin, vmax,
-                                                  metric, cmap, file_name, output_path)
+                                                  metric, cmap, file_name, output_path, dvmin=dvmin, dvmax=dvmax)
 
             elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
                 for index_depth, depth in enumerate(obs_coloc.depth):
@@ -728,7 +728,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
                     file_name = f'time{index_time}_depth{index_depth}'
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter, title, vmin, vmax,
-                                                  metric, cmap, file_name, output_path)
+                                                  metric, cmap, file_name, output_path, dvmin=dvmin, dvmax=dvmax)
 
             elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
                 for index_dens, dens in enumerate(obs_coloc.dens):
@@ -741,7 +741,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
                     file_name = f'time{index_time}_dens{index_dens}'
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter, title, vmin, vmax,
-                                                  metric, cmap, file_name, output_path)
+                                                  metric, cmap, file_name, output_path, dvmin=dvmin, dvmax=dvmax)
             else:
                 # Select the data to plot
                 obs_coloc_inter = obs_coloc.isel(interval=[index_time]).squeeze()
@@ -751,7 +751,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
                 file_name = f'time{index_time}'
                 plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter, title, vmin, vmax,
-                                              metric, cmap, file_name, output_path)
+                                              metric, cmap, file_name, output_path, dvmin=dvmin, dvmax=dvmax)
     else:
         if flag_slice:
             for index_slice, slice in enumerate(obs_coloc.slice):
@@ -763,7 +763,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
                 file_name = f'slice{index_slice}'
                 plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap,
-                                              file_name, output_path)
+                                              file_name, output_path, dvmin=dvmin, dvmax=dvmax)
 
         elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
             for index_depth, depth in enumerate(obs_coloc.depth):
@@ -775,7 +775,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
                 file_name = f'depth{index_depth}'
                 plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap,
-                                              file_name, output_path)
+                                              file_name, output_path, dvmin=dvmin, dvmax=dvmax)
 
         elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
             for index_dens, dens in enumerate(obs_coloc.dens):
@@ -787,17 +787,17 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
                 file_name = f'dens{index_dens}'
                 plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap,
-                                              file_name, output_path)
+                                              file_name, output_path, dvmin=dvmin, dvmax=dvmax)
         else:
             title = f'{var_title} : {metric.capitalize()} metric - {title_depth} - {title_time}'
             file_name = ''
 
             plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap, file_name,
-                                          output_path)
+                                          output_path, dvmin=dvmin, dvmax=dvmax)
 
 
 def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap, file_name,
-                                  output_path=None):
+                                  output_path=None, dvmin=None, dvmax=None):
     """
     Plot the map of the profiles for functionality 2. Display the figures.
     Parameters
@@ -830,7 +830,7 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
     """
     # Get min/max colobar values
     vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap = get_min_max_values(vmin, vmax, obs_coloc,
-                                                                                       comparison, metric)
+                                                                                       comparison, metric, dvmin, dvmax)
 
     # Plot the map
     f, axs = figure_3_maps(mod_coloc, 'classic')
@@ -852,7 +852,7 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
 
 
 def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_coloc, metric, cmap=cmocean.cm.thermal,
-                  vmin=None, vmax=None, output_path=None):
+                  vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None):
     """
     Plot the map of the model and observation and their comparison required in functionality 1,2,3,5.
 
@@ -880,6 +880,10 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
        max colour value of variable to plot.
     output_path :
         Path where to save the figures.
+    dvmin : float
+       min colour value of comparison to plot.
+    dvmax : float
+       max colour value of comparison to plot.
 
     """
 
@@ -967,7 +971,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
 
             # Plot, save and display
             f, axs = plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title,
-                                          metric)
+                                          metric, dvmin=dvmin, dvmax=dvmax)
 
             ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
 
@@ -984,13 +988,15 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                 if 'U' in str(time.data.dtype):  # Check if times are months names
                     f, axs = plot_map_metr_figure(obs_meta.isel(time=i_time), mod_meta.isel(time=i_time),
                                                   obs_coloc.isel(time=i_time), mod_coloc.isel(time=i_time),
-                                                  comparison.isel(time=i_time), vmin, vmax, cmap, title, metric)
+                                                  comparison.isel(time=i_time), vmin, vmax, cmap, title, metric,
+                                                  dvmin=dvmin, dvmax=dvmax)
 
                 else:
                     f, axs = plot_map_metr_figure(obs_meta.sel(time=time, method='nearest'),
                                                   mod_meta.sel(time=time, method='nearest'),
                                                   obs_coloc.isel(time=i_time), mod_coloc.isel(time=i_time),
-                                                  comparison.isel(time=i_time), vmin, vmax, cmap, title, metric)
+                                                  comparison.isel(time=i_time), vmin, vmax, cmap, title, metric,
+                                                  dvmin=dvmin, dvmax=dvmax)
 
                 ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
     # Other metric than difference
@@ -1004,7 +1010,8 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                 # Plot, save and display
                 f, axs = plot_map_metr_figure(obs_meta.isel(interval=i_inter), mod_meta.isel(interval=i_inter),
                                               obs_coloc.isel(interval=i_inter), mod_coloc.isel(interval=i_inter),
-                                              comparison.isel(interval=i_inter), vmin, vmax, cmap, title, metric)
+                                              comparison.isel(interval=i_inter), vmin, vmax, cmap, title, metric,
+                                              dvmin=dvmin, dvmax=dvmax)
 
                 ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
         # no interval
@@ -1024,12 +1031,13 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
             title = f'{var_title} : {metric.capitalize()} metric \n{title_time}'
             # Plot, save and display
             f, axs = plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title,
-                                          metric)
+                                          metric, dvmin=dvmin, dvmax=dvmax)
 
             ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
 
 
-def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title, metric):
+def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title, metric,
+                         dvmin=None, dvmax=None):
     """
     Plot the map figures with comparison metric.
     Parameters
@@ -1054,6 +1062,10 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
         Title of the figure.
     metric : str
         Comparison to plot.
+    dvmin : float
+       min colour value of comparison to plot.
+    dvmax : float
+       max colour value of comparison to plot.
 
     Returns
     -------
@@ -1063,7 +1075,7 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
     logger.info('map figures with comparison metric')
     # Get min/max colobar values
     vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap = get_min_max_values(vmin, vmax, obs_meta, comparison,
-                                                                                       metric)
+                                                                                       metric, dvmin, dvmax)
     # Plot
 
     f, axs = figure_5_maps(obs_coloc)
@@ -1541,7 +1553,7 @@ def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
 
 
 def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_coloc, metric,
-                          cmap=cmocean.cm.thermal, vmin=None, vmax=None, output_path=None):
+                          cmap=cmocean.cm.thermal, vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None):
     """
     Plot the maps of the current with the comparison metric.
     Parameters
@@ -1578,7 +1590,6 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
     list_dims_mean = []
     if 'idx_time' in mod_coloc.dims:
         list_dims_mean.append('idx_time')
-
     # Calculate the variables to plot
     if metric == "difference":
         if flag_interval is True:
@@ -1636,7 +1647,7 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
 
             # Plot, save and display
             f, axs = plot_map_metr_figure(obs_meta.norm, mod_meta.norm, obs_coloc.norm, mod_coloc.norm, vmin, vmax,
-                                          cmap, title, metric)
+                                          cmap, title, metric, dvmin=dvmin, dvmax=dvmax)
             axs = add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc)
 
             ft.manage_output(plt, f'{metric}_{title_time}', output_path)
@@ -1654,7 +1665,8 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                 f, axs = plot_map_metr_figure(obs_meta.norm.sel(time=time, method='nearest'),
                                               mod_meta.norm.sel(time=time, method='nearest'),
                                               obs_coloc.norm.isel(time=i_time), mod_coloc.norm.isel(time=i_time),
-                                              comparison.norm.isel(time=i_time), vmin, vmax, cmap, title, metric)
+                                              comparison.norm.isel(time=i_time), vmin, vmax, cmap, title, metric,
+                                              dvmin=dvmin, dvmax=dvmax)
                 axs = add_current_arrows(axs, obs_meta.sel(time=time, method='nearest'), obs_coloc.isel(time=i_time),
                                          mod_meta.sel(time=time, method='nearest'), mod_coloc.isel(time=i_time))
 
@@ -1674,7 +1686,8 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                                                   mod_meta.norm.isel(interval=i_inter_mod),
                                                   obs_coloc.norm.isel(interval=i_inter),
                                                   mod_coloc.norm.isel(interval=i_inter),
-                                                  comparison.isel(interval=i_inter), vmin, vmax, cmap, title, metric)
+                                                  comparison.isel(interval=i_inter), vmin, vmax, cmap, title, metric,
+                                                  dvmin=dvmin, dvmax=dvmax)
                 else:
                     i_inter_obs, i_inter_mod = get_index_interval(i_inter, obs_meta, mod_meta)
                     f, axs = plot_map_metr_figure(obs_meta.norm.isel(interval=i_inter_obs),
@@ -1682,7 +1695,7 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                                                   obs_coloc.norm.isel(interval=i_inter),
                                                   mod_coloc.norm.isel(interval=i_inter),
                                                   comparison.norm.isel(interval=i_inter), vmin, vmax, cmap, title,
-                                                  metric)
+                                                  metric, dvmin=dvmin, dvmax=dvmax)
                 if metric == 'bias':
                     i_inter_obs, i_inter_mod = get_index_interval(i_inter, obs_meta, mod_meta)
                     axs = add_current_arrows(axs, obs_meta.isel(interval=i_inter_obs), obs_coloc.isel(interval=i_inter),
@@ -1696,7 +1709,7 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
 
             # Plot
             f, axs = plot_map_metr_figure(obs_meta.norm, mod_meta.norm, obs_coloc.norm, mod_coloc.norm, comparison.norm,
-                                          vmin, vmax, cmap, title, metric)
+                                          vmin, vmax, cmap, title, metric, dvmin=dvmin, dvmax=dvmax)
             if metric == 'bias':
                 axs = add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc)
             # Save and display
@@ -2957,7 +2970,7 @@ def add_second_x_axis(f, ax, mod):
     ax2.set_xlabel('Lon, Lat')
 
 
-def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None):
+def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None, dvmax=None):
     """
     Give the appropriate values for the colorbar.
     Parameters
@@ -2972,6 +2985,10 @@ def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None):
         Comparison datarray to be displayed.
     metric : str
         Name of the metric.
+    dvmin : float
+        Minimum value of the comparison colorbar.
+    dvmax : float
+        Maximum value of the comparison colorbar.
 
     Returns
     -------
@@ -2990,18 +3007,23 @@ def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None):
         vmin = ds.min().values
         vmax = ds.max().values
 
-    if metric in ["difference", "bias"]:
-        comparison_vmin = -np.nanmax(comparison)
-        comparison_vmax = np.nanmax(comparison)
-        comparison_cmap = cmocean.cm.balance
-    elif metric in ['RMSEc', 'RMSEcentree']:
-        comparison_vmin = 0
-        comparison_vmax = np.nanmax(comparison)
-        comparison_cmap = cmocean.cm.amp
-    else:
-        comparison_vmin = None
-        comparison_vmax = None
+    if dvmin and dvmax:
+        comparison_vmin = dvmin
+        comparison_vmax = dvmax
         comparison_cmap = None
+    else:
+        if metric in ["difference", "bias"]:
+            comparison_vmin = -np.nanmax(comparison)
+            comparison_vmax = np.nanmax(comparison)
+            comparison_cmap = cmocean.cm.balance
+        elif metric in ['RMSEc', 'RMSEcentree']:
+            comparison_vmin = 0
+            comparison_vmax = np.nanmax(comparison)
+            comparison_cmap = cmocean.cm.amp
+        else:
+            comparison_vmin = None
+            comparison_vmax = None
+            comparison_cmap = None
     return vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap
 
 

@@ -50,20 +50,11 @@ def plot(config_obj):
             sub_func_output_folder = output_path
 
         # Get the figure parameters from config obj
-        if 'vmin' in output:
-            vmin = output["vmin"]
-        else:
-            vmin = None
-
-        if 'vmax' in output:
-            vmax = output["vmax"]
-        else:
-            vmax = None
-
-        if 'colormap' in output:
-            cmap = 'cmo.' + output["colormap"]
-        else:
-            cmap = None
+        vmin = output.get('vmin')
+        vmax = output.get('vmax')
+        dvmin = output.get('dvmin')
+        dvmax = output.get('dvmax')
+        cmap = output.get("colormap")
 
         if 'scale' in output:
             scale = output["scale"]

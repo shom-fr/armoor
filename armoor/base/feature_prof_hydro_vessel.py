@@ -77,6 +77,8 @@ def plot(config_obj):
         # get parameters from config obj
         vmin = output.get('vmin')
         vmax = output.get('vmax')
+        dvmin = output.get('dvmin')
+        dvmax = output.get('dvmax')
         cmap = output.get("colormap")
         cmap = cmap if cmap is None else f'cmo.{cmap}'
 
@@ -101,9 +103,8 @@ def plot(config_obj):
 
         ################################################################################################################
         # MAP METRIC
-        plot_map_metr = {"plot_map_metr_ecart": 'difference',
-                         "plot_map_metr_biais": 'bias', "plot_map_metr_RMSEc": 'RMSEc',
-                         "plot_map_metr_RMSEcentree": 'RMSEcentree'
+        plot_map_metr = {"plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
+                         "plot_map_metr_RMSEc": 'RMSEc', "plot_map_metr_RMSEcentree": 'RMSEcentree'
                          }
 
         if output["plot"] in plot_map_metr:
@@ -111,7 +112,7 @@ def plot(config_obj):
                 base.plot_features.plot_map_metr_profiles(flag_interval, flag_slice, mod["xarray_meta_coloc"],
                                                           observation["xarray_meta_coloc"][i],
                                                           plot_map_metr[output["plot"]], cmap, vmin, vmax,
-                                                          output_path=sub_func_output_folder)
+                                                          output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax)
 
         ################################################################################################################
         # DISP DIAG

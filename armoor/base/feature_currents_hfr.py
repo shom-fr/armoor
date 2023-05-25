@@ -58,6 +58,7 @@ def plot(config_obj):
             st.create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
+
         # Get the figure parameters from config obj
         if 'scale' in output:
             scale = output["scale"]
@@ -239,6 +240,8 @@ def plot(config_obj):
         if output["plot"] in plot_map_metr:
             vmin = output.get('vmin')
             vmax = output.get('vmax')
+            dvmin = output.get('dvmin')
+            dvmax = output.get('dvmax')
             cmap = output.get("colormap")
             cmap = cmap if cmap is None else f'cmo.{cmap}'
 
@@ -251,4 +254,4 @@ def plot(config_obj):
                                                          mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                          observation["xarray_meta_coloc"][i_mod],
                                                          plot_map_metr[output["plot"]], cmap, vmin, vmax,
-                                                         output_path=sub_func_output_folder)
+                                                         output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax)
