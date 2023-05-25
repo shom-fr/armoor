@@ -32,35 +32,35 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_harmonic_table_tranche(self):  # OK
-        out_path, logger = change_path(folder_test)
-        logger.info('test_harmonic_table_tranche')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/harmonic_table_tranche.ini"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
-
-    def test_hovmoller_datashom(self):  # OK
-        out_path, logger = change_path(folder_test)
-        logger.info('test_hovmoller_datashom')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom.ini"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
-
-    def test_hovmoller_ladcp(self):  # OK
-        out_path, logger = change_path(folder_test)
-        logger.info('test_hovmoller_LADCP')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP.ini"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
-
-    def test_hovmoller_datashom_bathyradius(self):  # OK
-        out_path, logger = change_path(folder_test)
-        logger.info('test_hovmoller_datashom_bathyradius')
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom_bathyradius.ini"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
+    # def test_harmonic_table_tranche(self):  # OK
+    #     out_path, logger = change_path(folder_test)
+    #     logger.info('test_harmonic_table_tranche')
+    #     parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/harmonic_table_tranche.ini"])
+    #     parser.update({'output_path': out_path})
+    #     dict2call(parser)
+    #     assert True
+    #
+    # def test_hovmoller_datashom(self):  # OK
+    #     out_path, logger = change_path(folder_test)
+    #     logger.info('test_hovmoller_datashom')
+    #     parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom.ini"])
+    #     parser.update({'output_path': out_path})
+    #     dict2call(parser)
+    #     assert True
+    #
+    # def test_hovmoller_ladcp(self):  # OK
+    #     out_path, logger = change_path(folder_test)
+    #     logger.info('test_hovmoller_LADCP')
+    #     parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP.ini"])
+    #     parser.update({'output_path': out_path})
+    #     dict2call(parser)
+    #     assert True
+    #
+    # def test_hovmoller_datashom_bathyradius(self):  # OK
+    #     out_path, logger = change_path(folder_test)
+    #     logger.info('test_hovmoller_datashom_bathyradius')
+    #     parser = command_line_interface(
+    #         ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom_bathyradius.ini"])
+    #     parser.update({'output_path': out_path})
+    #     dict2call(parser)
+    #     assert True

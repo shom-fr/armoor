@@ -64,6 +64,11 @@ def plot(config_obj):
         else:
             scale = 0.1
 
+        if "env_comodo" in output:
+            env_comodo = output["env_comodo"]
+        else:
+            env_comodo = ''
+
         # PLOTS
         ################################################################################################################
         # MAP TIDAL CURRENTS
@@ -106,12 +111,14 @@ def plot(config_obj):
 
             # Proceed harmonic analysis on obs
             ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
-                                                                path_results, path_tools, list_waves, 'obs')
+                                                                path_results, path_tools, list_waves, 'obs',
+                                                                env_comodo=env_comodo)
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on mod
                 path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc, path_results,
-                                                                    path_tools, list_waves, 'mod')
+                                                                    path_tools, list_waves, 'mod',
+                                                                    env_comodo=env_comodo)
                 obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, True, False, False, coloc_method='nearest',
                                                          opt_grid=coloc_product)
                 # Plot the maps
@@ -158,7 +165,8 @@ def plot(config_obj):
 
             # Proceed harmonic analysis on obs
             ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
-                                                                path_results, path_tools, list_waves, 'obs')
+                                                                path_results, path_tools, list_waves, 'obs',
+                                                                env_comodo=env_comodo)
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
             ds_models = []
@@ -166,7 +174,8 @@ def plot(config_obj):
                 # Proceed harmonic analysis on mod
                 path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc, path_results,
-                                                                    path_tools, list_waves, 'mod')
+                                                                    path_tools, list_waves, 'mod',
+                                                                    env_comodo=env_comodo)
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
                 ds_models.append(ds_mod)
             # Plot the maps

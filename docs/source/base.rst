@@ -144,14 +144,15 @@ For each output here is the list of possible options (with their associated desc
     * ``vmin`` : To fix minimum value scale
     * ``vmax`` : To fix maximum value scale
     * ``path_results_traj`` : Path to store temporary dataset files
-    * ``traj_duration_plot`` : duration of the simulated trajectory to plot
-    * ``traj_freq_plot`` : frequency at which the trajectories are plotted (ex : one ine 3)
+    * ``traj_duration_plot`` : Duration of the simulated trajectory to plot
+    * ``traj_freq_plot`` : Frequency at which the trajectories are plotted (ex : one ine 3)
     * ``scale`` : Scale to adapt the size of the ellipses/vectors
     * ``analysis_start`` : Date to start the harmonic analysis
     * ``analysis_end`` : Date to end the harmonic analysis
-    * ``tidal_waves`` : List of the tidal waves to compute
+    * ``tidal_waves`` : List of the tidal waves to compute. At least 1 tidal wave must be given, a good start is M2 S2 K1 O1 P1 Q1.
     * ``path_results`` : Path where to save the detided result files
     * ``path_comodo`` : Path of the comodo-detidor executable
+    * ``env_comodo`` : Commandline needed to load the comodo environment : "module load sirocco". For more information, read ~dallain/softs/LISEZMOI.rst
 
 
 
