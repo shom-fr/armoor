@@ -70,6 +70,11 @@ def plot(config_obj):
         else:
             scale = 0.1
 
+        if "env_comodo" in output:
+            env_comodo = output["env_comodo"]
+        else:
+            env_comodo = ''
+
         # PLOTS
         ################################################################################################################
         # HOVMOLLER CURRENTS
@@ -141,7 +146,8 @@ def plot(config_obj):
 
             # Calculate harmonic analysis
             ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
-                                                                path_results, path_tools, list_waves, 'obs')
+                                                                path_results, path_tools, list_waves, 'obs',
+                                                                env_comodo=env_comodo)
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
             # Re-add the depth / slice values
@@ -161,7 +167,8 @@ def plot(config_obj):
 
                 # Calculate harmonic analysis
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'], 'u v', path_nc,
-                                                                    path_results, path_tools, list_waves, 'mod')
+                                                                    path_results, path_tools, list_waves, 'mod',
+                                                                    env_comodo=env_comodo)
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
 
                 # Re-add the depth / slice values + colocate
@@ -226,7 +233,8 @@ def plot(config_obj):
 
             # Calculate harmonic analysis
             ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
-                                                                path_results, path_tools, list_waves, 'obs')
+                                                                path_results, path_tools, list_waves, 'obs',
+                                                                env_comodo=env_comodo)
 
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
@@ -247,7 +255,8 @@ def plot(config_obj):
 
                 # Calculate harmonic analysis
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'], 'u v', path_nc,
-                                                                    path_results, path_tools, list_waves, 'mod')
+                                                                    path_results, path_tools, list_waves, 'mod',
+                                                                    env_comodo=env_comodo)
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
 
                 # Re-add the depth / slice values + colocate
@@ -261,5 +270,3 @@ def plot(config_obj):
 
             # Plot the ellipses
             base.plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale, output_path=sub_func_output_folder)
-
-
