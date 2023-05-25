@@ -135,7 +135,7 @@ class SSTAccessor:
             Data array containing SST. If several depth temperature, the temperature of the min depth is taken.
         """
         if 'sst' in self._obj:
-            return self._obj.sst
+            return self._obj.sst.read_sst.convert_K_C()
         elif 'temp' in self._obj:
             logger.info('SST retrieved from temperature variable')
             if 'depth' in self._obj.dims:
@@ -290,6 +290,8 @@ class SSTAccessor:
         """
 
         if 'units' in self._obj.attrs and self._obj.attrs['units'] == 'kelvin':
+            return self._obj - 273.15
+        elif self._obj.max() > 200:
             return self._obj - 273.15
         else:
             return self._obj
