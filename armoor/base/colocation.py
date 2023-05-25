@@ -151,8 +151,9 @@ def vertical_colocation(mod, obs, ds_tgt, coloc_method):
         # Interpolation for HYCOM
         if 'level' in mod.dims and 'depth' not in mod.dims:
             if len(depth_values) > 50:
-                logger.info(f"too many unique depth values, the grid is resampled with only 50"
-                            f" values")
+                logger.warning(f"Too many unique depth values encountered in the HYCOM product :"
+                               f" please specify the vertical step you need with the option \'vertical_step\'."
+                               f"The grid will be resampled with only 50 values.")
                 depth_values = np.linspace(depth_values[0], depth_values[-1], 50)
 
             mod = mod.meta.vertical_selection_list(depth_values)
