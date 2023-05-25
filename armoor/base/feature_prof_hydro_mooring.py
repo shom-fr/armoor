@@ -45,20 +45,6 @@ def plot(config_obj):
             sub_func_output_folder = output_path
 
         # get parameters from config obj
-        if 'vmin' in output:
-            vmin = output["vmin"]
-        else:
-            vmin = None
-
-        if 'vmax' in output:
-            vmax = output["vmax"]
-        else:
-            vmax = None
-
-        if 'colormap' in output:
-            cmap = 'cmo.' + output["colormap"]
-        else:
-            cmap = None
         observation = copy.copy(config_obj["observation"])
         models = copy.copy(config_obj["models"])
 

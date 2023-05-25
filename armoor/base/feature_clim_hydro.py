@@ -43,20 +43,11 @@ def plot(config_obj):
             sub_func_output_folder = output_path
 
         # Get the figure parameters from config obj
-        if 'vmin' in output:
-            vmin = output["vmin"]
-        else:
-            vmin = None
-
-        if 'vmax' in output:
-            vmax = output["vmax"]
-        else:
-            vmax = None
-
-        if 'colormap' in output:
-            cmap = 'cmo.' + output["colormap"]
-        else:
-            cmap = None
+        vmin = output.get('vmin')
+        vmax = output.get('vmax')
+        dvmin = output.get('dvmin')
+        dvmax = output.get('dvmax')
+        cmap = output.get("colormap")
 
         # Select the variables in the model and in the observations
         if "attribute" in output:
@@ -98,13 +89,6 @@ def plot(config_obj):
                               "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
                               }
         if output["plot"] in plot_ts_metr_stats:
-            # for i, mod in enumerate(models):
-            #     base.plot_features.plot_ts_metr(mod["xarray_meta"],
-            #                                      mod["xarray_meta_coloc"],
-            #                                      observation["xarray_meta"],
-            #                                      observation["xarray_meta_coloc"][i],
-            #                                      plot_ts_metr[output["plot"]])
-
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
                                                   output_path=sub_func_output_folder)
 
@@ -117,7 +101,8 @@ def plot(config_obj):
                     base.plot_features.plot_map_metr(flag_interval, flag_slice, mod["xarray_meta"],
                                                      mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                      observation["xarray_meta_coloc"][i], plot_map_metr[output["plot"]],
-                                                     cmap, vmin, vmax, output_path=sub_func_output_folder)
+                                                     cmap, vmin, vmax, output_path=sub_func_output_folder, dvmin=dvmin,
+                                                     dvmax=dvmax)
                 else:
                     for depth in [float(mod["xarray_meta_coloc"].depth.values)]:
                         try:
@@ -142,4 +127,4 @@ def plot(config_obj):
                                                          mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                          observation["xarray_meta_coloc"][i],
                                                          plot_map_metr[output["plot"]], cmap, vmin, vmax,
-                                                         output_path=sub_func_output_folder)
+                                                         output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax)

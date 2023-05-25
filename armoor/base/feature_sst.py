@@ -58,9 +58,12 @@ def plot(config_obj):
 
         if 'attribute' in output and output['attribute'] != 'SST':
             logger.debug(f'{config_obj["functionality"]} should be used for SST only.')
+
         # get parameters from config obj
         vmin = output.get('vmin')
         vmax = output.get('vmax')
+        dvmin = output.get('dvmin')
+        dvmax = output.get('dvmax')
         cmap = output.get("colormap")
         cmap = cmap if cmap is None else f'cmo.{cmap}'
 
@@ -96,7 +99,8 @@ def plot(config_obj):
                 base.plot_features.plot_map_metr(flag_interval, flag_slice, mod["xarray_meta"],
                                                  mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                  observation["xarray_meta_coloc"][i], plot_map_metr[output["plot"]],
-                                                 cmap, vmin, vmax, output_path=sub_func_output_folder)
+                                                 cmap, vmin, vmax, output_path=sub_func_output_folder, dvmin=dvmin,
+                                                 dvmax=dvmax)
 
         ################################################################################################################
         # DISP DIAG
