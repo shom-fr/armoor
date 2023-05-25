@@ -143,6 +143,8 @@ For each output here is the list of possible options (with their associated desc
     * ``colormap`` : Name of the colormap, ex: *solar*, *thermal*
     * ``vmin`` : To fix minimum value scale
     * ``vmax`` : To fix maximum value scale
+    * ``dvmin`` : To fix minimum comparison figure value scale
+    * ``dvmax`` : To fix maximum comparison figure value scale
     * ``path_results_traj`` : Path to store temporary dataset files
     * ``traj_duration_plot`` : Duration of the simulated trajectory to plot
     * ``traj_freq_plot`` : Frequency at which the trajectories are plotted (ex : one ine 3)
