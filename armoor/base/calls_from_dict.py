@@ -88,7 +88,7 @@ def get_observation_models_meta(config_obj: dict):
         model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj, get_method(model), mod_obs='mod')
                       })
 
-        if 'depth' not in model["xarray_meta"] or model["xarray_meta"].depth.values.dtype == 'float32':
+        if 'depth' not in model["xarray_meta"] or model["xarray_meta"].depth.values.dtype in ['float32','float64']:
             vertical_colocation_flag = False
         elif 'depth' not in model["xarray_meta"]:
             vertical_colocation_flag = False
@@ -138,6 +138,7 @@ def get_observation_models_meta(config_obj: dict):
     logger.info(f"Collocating model(s) and observation")
     vertical_step = config_obj.get('vertical_step')
     horizontal_step = config_obj.get('horizontal_step')
+
     for index_model, model in enumerate(models):
         # Colocation per model
         obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"],

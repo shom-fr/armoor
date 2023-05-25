@@ -363,7 +363,7 @@ def open_decode_mouillages(path_file):
     # Get the line indexes of the start of each new measurement, set fill values
     first_column = np.array(lines)[:, 0]
     first_column[first_column == ''] = 9999999.
-    first_column = first_column.astype(np.float)
+    first_column = first_column.astype(float)
     index_mesures = np.where(first_column != 9999999.)[0]
     np.append(index_mesures, len(lines))
     nb_dates = len(index_mesures)
@@ -379,7 +379,7 @@ def open_decode_mouillages(path_file):
         bottom_depth = float(lines[i_line_deb][6])
 
         # Subset the numpy array selecting only the specific measurements
-        array_series = np.array(lines[index_mesures[i]:index_mesures[i + 1], 7:]).astype(np.float)
+        array_series = np.array(lines[index_mesures[i]:index_mesures[i + 1], 7:]).astype(float)
         # Convert the array into xr.dataset and add it to the list of measurements
         list_ds.append(array2ds(array_series, lon, lat, date, bottom_depth, 'mouillages'))
 
@@ -953,12 +953,12 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
         indexes = [10, 11, 0, 0, 6]  # indexes in array for U,V,mag,dir,depth
 
     # Create the u & v data arrays
-    depth = array_series[:, indexes[4]].astype(np.float)
+    depth = array_series[:, indexes[4]].astype(float)
 
-    da_u = xr.DataArray(data=array_series[:, indexes[0]].astype(np.float), dims=["depth"],
+    da_u = xr.DataArray(data=array_series[:, indexes[0]].astype(float), dims=["depth"],
                         coords=dict(depth=('depth', depth), time=date, bottom_depth=bot_depth),
                         attrs=dict(long_name=long_names[0], units="m/s", _FillValue=9999999.), )
-    da_v = xr.DataArray(data=array_series[:, indexes[1]].astype(np.float), dims=["depth"],
+    da_v = xr.DataArray(data=array_series[:, indexes[1]].astype(float), dims=["depth"],
                         coords=dict(depth=('depth', depth), time=date, bottom_depth=bot_depth),
                         attrs=dict(long_name="Corrected Flow 2D W-E", units="m/s", _FillValue=9999999.), )
 
@@ -971,11 +971,11 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
 
     # If current magnitude and direction are included in the data, add them to the dataset
     if type != 'LADCP':
-        da_mag = xr.DataArray(data=array_series[:, indexes[2]].astype(np.float), dims=["depth"],
+        da_mag = xr.DataArray(data=array_series[:, indexes[2]].astype(float), dims=["depth"],
                               coords=dict(depth=('depth', depth.data), time=date, bottom_depth=bot_depth),
                               attrs=dict(long_name="Corrected Flow 2D Amplitude", units="m/s", _FillValue=9999999.), )
 
-        da_dir = xr.DataArray(data=array_series[:, indexes[3]].astype(np.float), dims=["depth"],
+        da_dir = xr.DataArray(data=array_series[:, indexes[3]].astype(float), dims=["depth"],
                               coords=dict(depth=('depth', depth.data), time=date, bottom_depth=bot_depth),
                               attrs=dict(long_name="Corrected Flow 2D Direction", units="deg T",
                                          _FillValue=9999999., ), )
@@ -996,14 +996,14 @@ def array2ds_radiales(array_series, lon, lat, date, type):
         indexes = [6, 8, 9, 11]
         data_type = 'scanfish'
 
-    depth = array_series[:, indexes[3]].astype(np.float64)
-    da_temp = xr.DataArray(data=array_series[:, indexes[0]].astype(np.float64), dims=["depth"],
+    depth = array_series[:, indexes[3]].astype(float64)
+    da_temp = xr.DataArray(data=array_series[:, indexes[0]].astype(float64), dims=["depth"],
                            coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
                            attrs=dict(long_name=long_names[0], units="deg C", _FillValue=9999999.), )
-    da_sal = xr.DataArray(data=array_series[:, indexes[1]].astype(np.float64), dims=["depth"],
+    da_sal = xr.DataArray(data=array_series[:, indexes[1]].astype(float64), dims=["depth"],
                           coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
                           attrs=dict(long_name=long_names[1], units="PSU", _FillValue=9999999.), )
-    da_dens = xr.DataArray(data=array_series[:, indexes[2]].astype(np.float64), dims=["depth"],
+    da_dens = xr.DataArray(data=array_series[:, indexes[2]].astype(float64), dims=["depth"],
                            coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
                            attrs=dict(long_name=long_names[2], units="kg/m^3", _FillValue=9999999.), )
 

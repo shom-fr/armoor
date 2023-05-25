@@ -1525,9 +1525,9 @@ def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
         v_a, v_g = v_a[0], v_g[0]
 
     if np.size(ds.lon.values) > 1:
-        lon, lat = ds.lon.values[0], ds.lat.values[0]
+        lon, lat = float(ds.lon.values[0]), float(ds.lat.values[0])
     else:
-        lon, lat = ds.lon.values, ds.lat.values
+        lon, lat = float(ds.lon.values), float(ds.lat.values)
 
     # Get the constants for the calculations
     T = freq
