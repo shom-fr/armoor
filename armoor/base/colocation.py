@@ -62,11 +62,11 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
         mod, obs = temporal_colocation(mod, obs, ds_tgt, coloc_method)
 
     # Horizontal colocation
+    if horizontal_colocation_flag:
+        mod, obs = horizontal_colocation(mod, obs, ds_tgt, coloc_method)
+
     if horizontal_step:
         mod, obs = set_hor_step(mod, obs, horizontal_step, coloc_method)
-
-    elif horizontal_colocation_flag:
-        mod, obs = horizontal_colocation(mod, obs, ds_tgt, coloc_method)
 
     # Vertical colocation
 
@@ -147,12 +147,11 @@ def vertical_colocation(mod, obs, ds_tgt, coloc_method):
 
     if len(depth_values) != 1:
         logger.info(f"Vertical model colocation.")
-
-        # Interpolation for HYCOM
+        # Interpolation for HYCOM/Croco
         if 'level' in mod.dims and 'depth' not in mod.dims:
             if len(depth_values) > 50:
-                logger.warning(f"Too many unique depth values encountered in the HYCOM product :"
-                               f" please specify the vertical step you need with the option \'vertical_step\'."
+                logger.warning(f"Too many unique depth values encountered in the target product :"
+                               f" please specify the vertical step you need with the option \'vertical_step\'. "
                                f"The grid will be resampled with only 50 values.")
                 depth_values = np.linspace(depth_values[0], depth_values[-1], 50)
 
@@ -189,7 +188,7 @@ def vertical_colocation(mod, obs, ds_tgt, coloc_method):
     return mod, obs
 
 
-def set_hor_step(mod, obs, hor_step):
+def set_hor_step(mod, obs, hor_step, coloc_method='linear'):
     """
     Colocate the model and obs on the chosen horizontal grid.
     Parameters
@@ -213,6 +212,7 @@ def set_hor_step(mod, obs, hor_step):
     # Calculate the time step and distance step in the data
     pos0, pos1 = mod.isel(time=0), mod.isel(time=1)
     time_step_data = pos1.time.data - pos0.time.data
+
     dist_step = np.sqrt((pos1.lon - pos0.lon) ** 2 + (pos1.lat - pos0.lat) ** 2)
     time_step = time_step_data * hor_step / dist_step
     time_step = time_step.data.astype('timedelta64[s]')
@@ -224,8 +224,8 @@ def set_hor_step(mod, obs, hor_step):
     tgt_time = pd.date_range(time_min, time_max, freq=time_step)
 
     # Interpolate the model and obs on the targeted times
-    mod = mod.interp(time=tgt_time, method='linear')
-    obs = obs.interp(time=tgt_time, method='linear')
+    mod = mod.interp(time=tgt_time, method=coloc_method)
+    obs = obs.interp(time=tgt_time, method=coloc_method)
     return mod, obs
 
 
