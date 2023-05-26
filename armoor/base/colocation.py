@@ -69,12 +69,11 @@ def colocate_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
         mod, obs = set_hor_step(mod, obs, horizontal_step, coloc_method)
 
     # Vertical colocation
+    if vertical_colocation_flag:
+        mod, obs = vertical_colocation(mod, obs, ds_tgt, coloc_method_z)
 
     if vertical_step:
         mod, obs = set_vert_step(mod, obs, vertical_step, coloc_method_z)
-
-    elif vertical_colocation_flag:
-        mod, obs = vertical_colocation(mod, obs, ds_tgt, coloc_method_z)
 
     return obs, mod
 

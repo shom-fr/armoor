@@ -186,3 +186,33 @@ Example of configuration file for a *global scatter plots* and a *statistical ti
 
 
 
+
+Run test
+--------
+
+Unit tests verify the correct opening and decoding of observation and model products, as well as the meta zones and some internally calculated variables.
+To run the unit tests, use the following command:
+
+    * pytest your_path_to/tests/uni/test_open_data.py
+    * pytest your_path_to/tests/uni/test_meta_zone.py
+    * pytest your_path_to/tests/uni/test_read_var.py
+
+Integration tests verify the accurate running of the required features. To run the integration tests use the following command :
+
+    * pytest your_path_to/tests/int/base/test_f1.py
+    * pytest your_path_to/tests/int/base/test_f2.py
+    * pytest your_path_to/tests/int/base/test_f3.py
+    * pytest your_path_to/tests/int/base/test_f4.py
+    * pytest your_path_to/tests/int/base/test_f5.py
+    * pytest your_path_to/tests/int/base/test_f6.py
+    * pytest your_path_to/tests/int/base/test_f7.py
+    * pytest your_path_to/tests/int/base/test_f8.py
+    * pytest your_path_to/tests/int/base/test_f9.py
+    * pytest your_path_to/tests/int/base/test_VA.py
+
+In both cases, you will need to have a ``/path/to/output/tests/P1/`` with the files from the delivered data archive.
+In the folder where you will run ``pytest`` please create a file named **tests.cfg**
+and add the following line by replacing ``/path/to/output/tests/P1/`` with your information::
+
+    path_p1 = '/path/to/output/tests/P1/'
+

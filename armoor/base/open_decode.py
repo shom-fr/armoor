@@ -446,6 +446,7 @@ def open_decode_scanfish(path_file):
         list_ds.append(ds_time)
 
     scanfish = xr.concat(list_ds, dim='time')
+    scanfish = scanfish.xoa.decode()
     return scanfish
 
 
@@ -996,20 +997,20 @@ def array2ds_radiales(array_series, lon, lat, date, type):
         indexes = [6, 8, 9, 11]
         data_type = 'scanfish'
 
-    depth = array_series[:, indexes[3]].astype(float64)
-    da_temp = xr.DataArray(data=array_series[:, indexes[0]].astype(float64), dims=["depth"],
+    depth = array_series[:, indexes[3]].astype(float)
+    da_temp = xr.DataArray(data=array_series[:, indexes[0]].astype(float), dims=["depth"],
                            coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
                            attrs=dict(long_name=long_names[0], units="deg C", _FillValue=9999999.), )
-    da_sal = xr.DataArray(data=array_series[:, indexes[1]].astype(float64), dims=["depth"],
+    da_sal = xr.DataArray(data=array_series[:, indexes[1]].astype(float), dims=["depth"],
                           coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
                           attrs=dict(long_name=long_names[1], units="PSU", _FillValue=9999999.), )
-    da_dens = xr.DataArray(data=array_series[:, indexes[2]].astype(float64), dims=["depth"],
+    da_dens = xr.DataArray(data=array_series[:, indexes[2]].astype(float), dims=["depth"],
                            coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
                            attrs=dict(long_name=long_names[2], units="kg/m^3", _FillValue=9999999.), )
 
     # Create the dataset and add the data arrays
     ds = xr.Dataset(attrs=dict(DATA_TYPE=data_type))
-    ds["Temperature"], ds["Salinity"], ds["Density"] = da_temp, da_sal, da_dens
+    ds["temperature"], ds["salinity"], ds["density"] = da_temp, da_sal, da_dens
     return ds
 
 
