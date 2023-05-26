@@ -446,6 +446,7 @@ def open_decode_scanfish(path_file):
         list_ds.append(ds_time)
 
     scanfish = xr.concat(list_ds, dim='time')
+    scanfish = scanfish.xoa.decode()
     return scanfish
 
 
@@ -1009,7 +1010,7 @@ def array2ds_radiales(array_series, lon, lat, date, type):
 
     # Create the dataset and add the data arrays
     ds = xr.Dataset(attrs=dict(DATA_TYPE=data_type))
-    ds["Temperature"], ds["Salinity"], ds["Density"] = da_temp, da_sal, da_dens
+    ds["temperature"], ds["salinity"], ds["density"] = da_temp, da_sal, da_dens
     return ds
 
 
