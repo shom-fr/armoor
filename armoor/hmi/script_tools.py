@@ -11,6 +11,53 @@ import xoa
 import logging
 logger = logging.getLogger(__name__)
 
+def decumulate_data(data, cut_list):
+    """
+
+    Parameters
+    ----------
+    data : cumulated data
+    cut_list : list of chunks
+
+    Returns
+    -------
+    decumulated data
+    """
+    end_i = 0
+    tmp_list = list()
+
+    for i in cut_list:
+        start_i = end_i
+        end_i = start_i + i
+
+        aux = data[start_i:end_i, :, :]
+        diff = np.diff(aux, axis=0)
+        conc = np.concatenate((data[start_i:start_i + 1], diff))
+
+        tmp_list.append(conc)
+
+    result = np.concatenate(tmp_list)
+
+    return result
+
+
+def from_3h_to_1h(data, split_index):
+    """
+
+    Parameters
+    ----------
+    data : data to process
+    split_index : index where data change from 1h accumulation to 3h
+
+    Returns
+    -------
+    decumulated data 1h step
+    """
+    start = data[:split_index, :, :]
+    end = data[split_index:, :, :]
+    end /= 3.0
+
+    return np.concatenate((start,end))
 
 def convert_K_C(data: xr.Dataset) -> xr.Dataset:
     """

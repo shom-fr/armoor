@@ -18,6 +18,7 @@ import xarray as xr
 from armoor.hmi.configuration import  get_forcing_model, get_model, get_obs
 from armoor.hmi.configuration import  get_time_spacial_extent, apply_custom_metazone
 from armoor.hmi.script_tools import format_times, create_folder, compute_mixed_layer, convert_K_C
+from armoor.hmi.script_tools import decumulate_data, from_3h_to_1h
 from armoor.hmi.script_plot import hmi_image
 from armoor.base.colocation import colocate_all
 
@@ -426,36 +427,21 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
     cbar_range : min, max values for the color bar
     data2plot_all_times: all tata to be plot
     """
-    if func in ["visu_temp", "visu_sal", 'visu_solarflux']:
+    if func in ["visu_temp", "visu_sal"]:
         data2plot_all_times = model2plot_xr.xoa[var_m].squeeze()
         cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
 
-    elif func in ["visu_precip"]:
-        print('======================  >> decumul')
+    elif func in ["visu_precip", 'visu_solarflux']:
+        logger.info('Decumulate data')
         data2plot_all_times = model2plot_xr.xoa[var_m].squeeze()
         list_cut = [6, 6, 6, 6, 42]
+        split_1h_3h_index = 36
 
-        print(f"{data2plot_all_times.shape =}")
-        print(f'{data2plot_all_times[:, 0, 0] =}')
-        cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
-        print(f'INIT {cbar_range =}')
+        result = decumulate_data(data2plot_all_times, list_cut)
+        result = from_3h_to_1h(result, split_1h_3h_index)
 
-        print("=" * 100)
-        result = uncumul_data(data2plot_all_times, list_cut)
-        print("=" * 100)
-
-        print(f"{result.shape =}")
-        print(f'{result[:, 0, 0] =}')
-        cbar_range = np.nanmin(result), np.nanmax(result)
-        print(f'RESULT 1 {cbar_range =}')
-        result = from_3h_to_1h(result, 36)
         data2plot_all_times[:, :, :] = result[:, :, :]
-        data2plot_all_times.to_netcdf("/mnt/d/1144/P3/NEW/saved_on_disk_result_1h.nc")
         cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
-        print(f'RESULT {cbar_range =}')
-
-        print("#" * 100)
-
 
     elif func in ["visu_current", "visu_windforcing"]:
         model_da_u = model2plot_xr['u']
@@ -493,53 +479,3 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
     logger.info('Retrieving colorbar for all times...')
     return cbar_range, data2plot_all_times
 
-def uncumul_data(data, cut_list):
-
-    end_i = 0
-    tmp_list = list()
-
-    for i in cut_list:
-        #index
-        start_i = end_i
-        end_i = start_i + i
-        print(f'{start_i = }')
-        print(f'{end_i = }')
-
-        #init slice
-        print('init slice --------------------------------')
-        aux = data[start_i:end_i, :, :]
-        print(f"{aux.shape =}")
-        print(f'{aux[:, 0, 0] =}')
-        cbar_range = np.nanmin(aux), np.nanmax(aux)
-        print(f'{start_i} {cbar_range =}')
-
-        # uncumul
-        print('uncumul    --------------------------------')
-        diff = np.diff(aux, axis=0)
-        print(f"{diff.shape =}")
-        print(f'{diff[:, 0, 0] =}')
-        cbar_range = np.nanmin(diff), np.nanmax(diff)
-        print(f'{start_i} {cbar_range =}')
-
-        # add first value
-        print('added first value  --------------------------')
-        conc = np.concatenate((data[start_i:start_i + 1], diff))
-        print(f"{conc.shape =}")
-        print(f'{conc[:, 0, 0] =}')
-        cbar_range = np.nanmin(conc), np.nanmax(conc)
-        print(f'{start_i} {cbar_range =}')
-        print(f'{conc =}')
-        tmp_list.append(conc)
-        print("# " * 50)
-
-    result = np.concatenate(tmp_list)
-    return result
-
-
-def from_3h_to_1h(data, split_index):
-    start = data[:split_index, :, :]
-
-    end = data[split_index:, :, :]
-    end /= 3.0
-
-    return np.concatenate((start,end))
