@@ -114,4 +114,4 @@ and add the following line by replacing ``/path/to/output/tests/P1/`` with your 
 
     path_p1 = '/path/to/output/tests/P1/'
 
-In the ``path_p1`` folder, you must have the ``data`` folder provided with the netCDF files.
+In the ``path_p1`` folder, you must have the ``data`` folder from the delivered archive ``archive_data_for_tests.tar.gz``.
