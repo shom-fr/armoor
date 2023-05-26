@@ -191,27 +191,27 @@ Run test
 --------
 
 Unit tests verify the correct opening and decoding of observation and model products, as well as the meta zones and some internally calculated variables.
-To run the unit tests, use the following command:
+To run the unit tests, use the following command::
 
-    * pytest your_path_to/tests/uni/test_open_data.py
-    * pytest your_path_to/tests/uni/test_meta_zone.py
-    * pytest your_path_to/tests/uni/test_read_var.py
+    pytest your_path_to/tests/uni/test_open_data.py
+    pytest your_path_to/tests/uni/test_meta_zone.py
+    pytest your_path_to/tests/uni/test_read_var.py
 
-Integration tests verify the accurate running of the required features. To run the integration tests use the following command :
+Integration tests verify the accurate running of the required features. To run the integration tests use the following command::
 
-    * pytest your_path_to/tests/int/base/test_f1.py
-    * pytest your_path_to/tests/int/base/test_f2.py
-    * pytest your_path_to/tests/int/base/test_f3.py
-    * pytest your_path_to/tests/int/base/test_f4.py
-    * pytest your_path_to/tests/int/base/test_f5.py
-    * pytest your_path_to/tests/int/base/test_f6.py
-    * pytest your_path_to/tests/int/base/test_f7.py
-    * pytest your_path_to/tests/int/base/test_f8.py
-    * pytest your_path_to/tests/int/base/test_f9.py
-    * pytest your_path_to/tests/int/base/test_VA.py
+    pytest your_path_to/tests/int/base/test_f1.py
+    pytest your_path_to/tests/int/base/test_f2.py
+    pytest your_path_to/tests/int/base/test_f3.py
+    pytest your_path_to/tests/int/base/test_f4.py
+    pytest your_path_to/tests/int/base/test_f5.py
+    pytest your_path_to/tests/int/base/test_f6.py
+    pytest your_path_to/tests/int/base/test_f7.py
+    pytest your_path_to/tests/int/base/test_f8.py
+    pytest your_path_to/tests/int/base/test_f9.py
+    pytest your_path_to/tests/int/base/test_VA.py
 
-Note that for ``test_6`` and ``test_7`` you will need to specify the parameters : path_results, path_comodo and
-env_comodo.
+Note that for ``test_6`` and ``test_7`` you will need to specify the parameters : ``path_results``, ``path_comodo`` and
+``env_comodo``.
 
 
 In both cases, you will need to have a ``/path/to/output/tests/P1/`` with the files from the delivered data archive.
