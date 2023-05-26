@@ -210,6 +210,10 @@ Integration tests verify the accurate running of the required features. To run t
     * pytest your_path_to/tests/int/base/test_f9.py
     * pytest your_path_to/tests/int/base/test_VA.py
 
+Note that for ``test_6`` and ``test_7`` you will need to specify the parameters : path_results, path_comodo and
+env_comodo.
+
+
 In both cases, you will need to have a ``/path/to/output/tests/P1/`` with the files from the delivered data archive.
 In the folder where you will run ``pytest`` please create a file named **tests.cfg**
 and add the following line by replacing ``/path/to/output/tests/P1/`` with your information::
