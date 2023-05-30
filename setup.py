@@ -24,8 +24,7 @@ setup(
                  'bin': 'bin',
                  'config': 'config'
                  },
-    package_data={'armoor': ['cli/code_text.json',
-                             'bull/templates/index.html.jinja',
+    package_data={'armoor': ['bull/templates/index.html.jinja',
                              'bull/templates/index-metazones.html.jinja',
                              'bull/templates/functionality.html.jinja',
                              'bull/templates/metazone.html.jinja',
@@ -67,23 +66,23 @@ setup(
     entry_points={
         'console_scripts': [
             'armoor = armoor.cli.run:main',
-            'armoor2 = armoor.cli.run:main_2',
-            'armoor-tick-create = armoor.tick.run:create',
-            'armoor-tick-search = armoor.tick.run:search',
-            'armoor-tick-description = armoor.tick.run:description',
-            'armoor-tick-authentication-info = armoor.tick.run:authentication_info',
-            'armoor-tick-authentication = armoor.tick.run:authentication_update',
-            'armoor-script = armoor.hmi.run_script:main',
-            'armoor-bull = armoor.bull.run_script:main',
-            'armoor-bull-report = armoor.bull.run_script:only_report'
+            'armoor-sst = armoor.cli.run:script_p_sst',
+            'armoor-prof_hydro_vessel = armoor.cli.run:script_p_prof_hydro_vessel',
+            'armoor-prof_hydro_mooring = armoor.cli.run:script_p_prof_hydro_mooring',
+            'armoor-section_hydro = armoor.cli.run:script_p_section_hydro',
+            'armoor-clim_hydro = armoor.cli.run:script_p_clim_hydro',
+            'armoor-currents_hfr = armoor.cli.run:script_p_currents_hfr',
+            'armoor-currents_ADCP = armoor.cli.run:script_p_currents_ADCP',
+            'armoor-currents_VMADCP = armoor.cli.run:script_p_currents_VMADCP',
+            'armoor-drifters = armoor.cli.run:script_p_drifters',
+            'armoor-tick-create = armoor.cli.tick:create',
+            'armoor-tick-search = armoor.cli.tick:search',
+            'armoor-tick-description = armoor.cli.tick:description',
+            'armoor-tick-authentication-info = armoor.cli.tick:authentication_info',
+            'armoor-tick-authentication = armoor.cli.tick:authentication_update',
+            'armoor-script = armoor.cli.hmi:main',
+            'armoor-bull = armoor.cli.bull:main',
+            'armoor-bull-report = armoor.cli.bull:only_report'
         ]
     },
 )
-
-# Running tests :
-# Run python setup.py pytest
-
-# Deploying lib from whl file located in \armoor\dist directory
-# Run python -m build on root where setup.py is.
-# install armoor lib with pip install armoor-version-py3-none-any.whl on a new env
-# Then you can run : armoor --file example.ini

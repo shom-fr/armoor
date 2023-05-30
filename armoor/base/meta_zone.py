@@ -10,7 +10,9 @@ import matplotlib.path as path
 import math
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 @xr.register_dataarray_accessor("meta")
 @xr.register_dataset_accessor("meta")
@@ -70,7 +72,7 @@ class MetazoneAccessor:
         # remove the other variables
         for var in self._obj.variables:
             if var not in list_names:
-                self._obj = self._obj.drop(var)
+                self._obj = self._obj.drop_vars(var)
 
         return self._obj
 
@@ -90,8 +92,13 @@ class MetazoneAccessor:
         """
         logger.info(f"Applying filter - quality_filter")
         var, min_q, max_q = quality
+        min_q, max_q = int(min_q), int(max_q)
 
-        if var not in self._obj:
+        if var in list(self._obj.keys()):
+            pass
+        elif "QC_" + var[:-3] in list(self._obj.keys()):
+            var = "QC_" + var[:-3]
+        else:
             var = "quality_level"
 
         if var in self._obj:
@@ -151,6 +158,7 @@ class MetazoneAccessor:
             mask_poly = np.reshape(flags, [len(self._obj.y.data), len(self._obj.x.data)])
             mask_poly = xr.DataArray(data=mask_poly, dims=['y', 'x'],
                                      coords=dict(x=(['x'], self._obj.x.data), y=(['y'], self._obj.y.data)), )
+
         # Check if the polygon matches the coordinates of the data
         if True not in mask_poly:
             raise Exception('The polygon you have defined is not included in the data grid. '
@@ -223,7 +231,43 @@ class MetazoneAccessor:
             else:
                 return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
         elif 'x' in self._obj.dims:  # Curvilinear grid
-            return self._obj.meta.sel_closest(lon_target, lat_target)
+            list_ds_point = []
+            for i_lon, lon in enumerate(lon_target):
+                list_ds_point.append(self._obj.meta.sel_closest(lon_target[i_lon], lat_target[i_lon]))
+            return xr.concat(list_ds_point, dim='x')
+
+    def horizontal_selection_from_obs_radius(self, config_obj) -> xr.Dataset:
+        """
+        Subset dataset selecting the closest elements to the observations point located within the specified radius.
+
+        Parameters
+        ----------
+        config_obj : dict
+            Models, observation and meta-zone zone parameters from the parser.
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset with elements included inside the cloud/area.
+        """
+
+        radius = config_obj["meta_zones"]["radius"]
+
+        obs = config_obj['observation']["xarray_meta"]
+        obs_lon, obs_lat = obs.lon.values, obs.lat.values
+        if obs_lon.size > 1:
+            obs_lon, obs_lat = obs_lon[0], obs_lat[0]
+
+        self._obj = self._obj.sel(lon=obs_lon, lat=obs_lat, method='nearest')
+        distance = np.sqrt((self._obj.lon.values - obs_lon) ** 2 + (self._obj.lat.values - obs_lat) ** 2)
+        radius_km = self._obj.meta.km_to_deg(radius)
+
+        if distance > radius_km:
+            logger.info(f'Oops, le modèle ne contient pas de point qui respecte le critère '
+                        f'de rayon. Le point le plus proche est utilisé, à la position {xarray_obj.lat.data}N '
+                        f'{xarray_obj.lon.data}E .')
+
+        return self._obj
 
     def sel_closest(self, lon_target, lat_target):
         """
@@ -241,10 +285,9 @@ class MetazoneAccessor:
         mindist = 100000
         i = 0
         j = 0
-        for it in self._obj.x.values:
-            for jt in self._obj.y.values:
-                ds = self._obj.isel(x=it, y=jt)
-
+        for i_x, x in enumerate(self._obj.x.values):
+            for i_y, y in enumerate(self._obj.y.values):
+                ds = self._obj.isel(x=i_x, y=i_y)
                 lon0, lat0, lon1, lat1 = ds.lon.values, ds.lat.values, lon_target, lat_target
                 deg2rad = math.pi / 180.0
                 dist = math.sin(deg2rad * (lat0 - lat1) * 0.5) ** 2
@@ -253,14 +296,13 @@ class MetazoneAccessor:
                 dist = 2.0 * math.asin(math.sqrt(dist))
 
                 if dist <= mindist:
-                    i = it
-                    j = jt
+                    i_x_min = i_x
+                    i_y_min = i_y
                     mindist = dist
 
-        ds = self._obj.isel(x=i, y=j)
+        ds = self._obj.isel(x=i_x_min, y=i_y_min)
 
         return ds
-
 
     def horizontal_selection_cloud_dots(self, cloud: [(float, float)], radius_km: float = 0.,
                                         method: str = None) -> xr.Dataset:
@@ -419,23 +461,23 @@ class MetazoneAccessor:
         ds = self._obj
         if var_vert == 'depth':
             if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # check if NEMO or TOPAZ
-                return ds.sel(depth=depth, method='nearest').squeeze()
+                return ds.sel(depth=depth, method='nearest')
             elif 'z' in ds.dims or 'level' in ds.dims or (
                     depth in ds.dims and len(ds.depth.dims) == 2):  # check if CROCO or HYCOM or profile
                 tgt_depth = xr.DataArray([depth], dims="depth", name="depth")
                 tgt_ds = ds
                 for var in self._obj.variables:
                     if var == 'depth' or 'DEPH' in var:
-                        tgt_ds = tgt_ds.drop(var)
+                        tgt_ds = tgt_ds.drop_vars(var)
                     else:
                         for var_depth in ['level', 'z', 'DEPTH', 'sig']:
                             if var_depth in ds[var].dims and len(ds[var][var_depth]) > 1:
                                 da = self._obj[var]
                                 da_tgt = regrid1d(da, tgt_depth)
                                 tgt_ds = tgt_ds.assign({var: da_tgt})
-                return tgt_ds.squeeze()
+                return tgt_ds
             else:
-                return ds.squeeze()
+                return ds
         elif var_vert == 'dens':
             return ds.sel(dens=depth, method='nearest')
 
@@ -466,11 +508,10 @@ class MetazoneAccessor:
         # Select all depth between min and max
         if len(depth) == 2:
             selection = ((self._obj[var_vert] >= min) & (self._obj[var_vert] <= max))
-            # return self._obj.where(selection, drop=True)
-            return self._obj.where(self._obj.depth < 130, drop=True)
+            return self._obj.where(selection, drop=True)
 
         # Select between min and max with a specific number of depths between
-        elif len(depth) > 2:
+        elif len(depth) == 3:
             step = depth[2]
             depths = np.linspace(min, max, int(step))
             return self.vertical_selection_list(depths)
@@ -502,7 +543,7 @@ class MetazoneAccessor:
             tgt_ds = self._obj
             for var in self._obj.variables:
                 if var == 'depth':
-                    tgt_ds = tgt_ds.drop(var)
+                    tgt_ds = tgt_ds.drop_vars(var)
                 elif 'level' in self._obj[var].dims or 'z' in self._obj[var].dims:
                     da = self._obj[var]
                     da_tgt = regrid1d(da, tgt_depth)
@@ -523,6 +564,15 @@ class MetazoneAccessor:
             same Dataset averaged over the time interval
         """
         logger.info(f"Applying filter - vertical_selection_slice")
+
+        if 'depth' not in self._obj.dims:
+            depth_values = np.unique(self._obj.depth.data)
+
+            if len(depth_values) > len(self._obj.z.data):
+                logger.info(f"too many unique depth values, the grid is resampled with only {len(self._obj.z.data)}"
+                            f" values")
+                depth_values = np.linspace(depth_values[0], depth_values[-1], len(self._obj.z.data))
+            self._obj = self._obj.meta.vertical_selection_list(depth_values)
 
         start = self._obj.isel(depth=[0])[var_slice].data[0]
         end = self._obj.isel(depth=[-1])[var_slice].data[0]
@@ -547,34 +597,6 @@ class MetazoneAccessor:
         ds = ds.rename({var_slice + '_value': var_slice})
         ds['slice'] = ds['slice_label']
         return ds
-
-    def vertical_selection_density(self, density: float = None, minimum: float = None,
-                                   maximum: float = None, ) -> xr.Dataset:
-
-        """
-        Subset dataset selecting elements whom density values are included in the specified density range.
-
-        Parameters
-        ----------
-        density : float
-            Only density value kept (i.e. maximum = minimum).
-        minimum : float
-            Minimum density value kept.
-        maximum : float
-            Maximum density value kept.
-
-        Returns
-        -------
-        xarray.Dataset
-             Dataset with density values meeting the condition(s).
-
-        See Also
-        --------
-        cli.base.meta_zone.MetazoneAccessor.data_selection
-        """
-        logger.info(f"Applying filter - vertical_selection_density")
-
-        return self.data_selection(dim='density', value=density, minimum=minimum, maximum=maximum)
 
     def time_selection_start(self, start=None) -> xr.Dataset:
         """
@@ -671,54 +693,6 @@ class MetazoneAccessor:
         if end is not None:
             end = now + pandas.offsets.Day(end + 1)
         return self._obj.sel(time=slice(start, end))
-
-    def depth_selection(self, depth):
-        """
-
-        Parameters
-        ----------
-        depth
-
-        Returns
-        -------
-
-        """
-        logger.info(f"Applying filter - depth_selection")
-        if 'depth' in self._obj.dims:
-            return self._obj.sel(depth=depth)
-        elif 'depth' in self._obj.variables:
-            da_depth = xr.DataArray([depth], name="depth", dims="depth")
-            for var in self._obj.variables:
-                if 'z' in self._obj[var].dims and var != 'depth':
-                    da_var = regrid1d(self._obj[var], da_depth)
-                    self._obj.assign({var: da_var})
-
-            return regrid1d(self._obj, depth)
-
-    def time_selection(self, *args, method: str = None):
-        """
-        Manage overload for :
-            - param times: values kept are those in this list
-            def time_selection(self, times: list) -> xr.Dataset:
-        and
-            - param freq: frequency between values, can be hours, days or months.
-            - param start: values kept from "start" (this is the reference for the frequency).
-            def time_selection(self, freq: str = None, start: str = None) -> xr.Dataset:
-
-        See Also
-        --------
-        cli.base.meta_zone.MetazoneAccessor.time_selection_list
-        cli.base.meta_zone.MetazoneAccessor.time_selection_freq
-        """
-        logger.info(f"Applying filter - time_selection")
-
-        if len(args) == 1 and isinstance(args[0], list):
-            return self.time_selection_list(args[0], method)
-        elif len(args) == 1 and isinstance(args[0], str):
-            return self.time_selection_freq(args[0], method)
-        elif len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], str):
-            return self.time_selection_freq(args[0], args[1], method)
-        return None
 
     # Overload time_selection
     def time_selection_list(self, times: list, method: str = 'nearest') -> xr.Dataset:
@@ -820,9 +794,14 @@ class MetazoneAccessor:
             same Dataset averaged over the time interval
         """
         logger.info(f"Applying filter - time_selection_interval")
+
         start = self._obj.isel(time=[0]).time.data[0]
         end = self._obj.isel(time=[-1]).time.data[0]
+
+        start, end, interval = self._obj.meta.format_interval(start, end, interval)
+
         time_interval = pandas.date_range(start=start, end=end, freq=interval)
+
         ds_group = self._obj.groupby_bins('time', time_interval)
         liste_ds = []
 
@@ -842,8 +821,32 @@ class MetazoneAccessor:
         ds = ds.rename({'time': 'idx_time'})
         ds = ds.rename({'date_time': 'time'})
         ds['interval'] = ds['interval_label']
-        ds = ds.drop('interval_label')
+        ds = ds.drop_vars('interval_label')
         return ds
+
+    def format_interval(self, start, end, interval):
+        """
+        Retrieve the right inteval for monthly, yearly interval.
+        Parameters
+        ----------
+        start : np.datime64
+            Date of start
+        end : np.datime64
+            Date of end
+        interval : str
+            Required interval
+
+        Returns
+        -------
+
+        """
+        if interval in ["1M", "M"]:
+            interval = "MS"
+            start = np.datetime_as_string(start)[:7]
+            day = np.datetime_as_string(end, unit='D').split('-')[2]
+            if int(day) > 2:
+                end = end + np.timedelta64(int(1 * 2.628e+15), 'ns')
+        return start, end, interval
 
     # Overload emulation
     def time_selection_climatological(self, *args):

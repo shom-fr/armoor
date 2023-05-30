@@ -1,10 +1,13 @@
 """Create figures for feature 3:prof_hydro_mooring"""
+import os
 import copy
 from armoor import base
 import armoor.hmi.script_tools as st
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def plot(config_obj):
     """
@@ -36,26 +39,12 @@ def plot(config_obj):
 
     for output in outputs:
         if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
+            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
 
         # get parameters from config obj
-        if 'vmin' in output:
-            vmin = output["vmin"]
-        else:
-            vmin = None
-
-        if 'vmax' in output:
-            vmax = output["vmax"]
-        else:
-            vmax = None
-
-        if 'colormap' in output:
-            cmap = 'cmo.' + output["colormap"]
-        else:
-            cmap = None
         observation = copy.copy(config_obj["observation"])
         models = copy.copy(config_obj["models"])
 
@@ -68,7 +57,7 @@ def plot(config_obj):
         observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(var)
         for i_mod, mod in enumerate(models):
             mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(var)
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read.decode().read_sst.sel(var)
+            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(var)
             observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(var)
 
             # Remove missing values
@@ -78,25 +67,18 @@ def plot(config_obj):
 
         ################################################################################################################
         # TIME SERIES STATS
-        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
-                              "plot_ts_metr_bias_stats": 'bias_stats',
-                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats',
-                              "plot_ts_metr_stats": 'all_metrics'}
+        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats', "plot_ts_metr_bias_stats": 'bias_stats',
+                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
+                              }
         if output["plot"] in plot_ts_metr_stats:
             if 'depth' not in models[0]["xarray_meta_coloc"].dims:
                 models_depth, observation_depth = models, observation
-                base.plot_features.plot_ts_metr_stats(models_depth,
-                                                      observation_depth,
-                                                      flag_interval,
-                                                      flag_slice,
+                base.plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval, flag_slice,
                                                       output_path=sub_func_output_folder)
             else:
                 for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
                     models_depth, observation_depth = select_depth(models, observation, depth)
-                    base.plot_features.plot_ts_metr_stats(models_depth,
-                                                          observation_depth,
-                                                          flag_interval,
-                                                          flag_slice,
+                    base.plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval, flag_slice,
                                                           output_path=sub_func_output_folder)
 
 
@@ -111,7 +93,7 @@ def select_depth(models, observation, depth):
         models_depth[i_mod]["xarray_meta"] = mod["xarray_meta"].sel(depth=depth, method='nearest')
         models_depth[i_mod]['name'] = mod['name']
         models_depth[i_mod]["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel(depth=depth)
-        observation_depth["xarray_meta_coloc"].append(observation["xarray_meta_coloc"][i_mod].sel(depth=depth,
-                                                                                                  method='nearest'))
+        observation_depth["xarray_meta_coloc"].append(
+            observation["xarray_meta_coloc"][i_mod].sel(depth=depth, method='nearest'))
 
     return models_depth, observation_depth

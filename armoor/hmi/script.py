@@ -15,9 +15,11 @@ import time
 import numpy as np
 import xarray as xr
 
-from armoor import hmi
-from armoor import base
-import armoor.hmi.script_tools as st
+from armoor.hmi.configuration import  get_forcing_model, get_model, get_obs
+from armoor.hmi.configuration import  get_time_spacial_extent, apply_custom_metazone
+from armoor.hmi.script_tools import format_times, create_folder, compute_mixed_layer, convert_K_C
+from armoor.hmi.script_plot import hmi_image
+from armoor.base.colocation import colocate_all
 
 import logging
 logger = logging.getLogger(__name__)
@@ -46,11 +48,12 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
     production_day = datetime.now(timezone.utc).strftime("%Y%m%d")
     logger.info(f'Production day : {production_day}')
 
-    config_reg_t0, config_reg_times, config_reg_extent = \
-        hmi.get_time_spacial_extent(input_folder_path, config_reg, production_day)
+    config_reg_t0, config_reg_times, config_reg_extent = get_time_spacial_extent(input_folder_path,
+                                                                                 config_reg,
+                                                                                 production_day)
 
     model_json = {'parameters': [],
-                  'times': hmi.format_times(config_reg_times),
+                  'times': format_times(config_reg_times),
                   't0': config_reg_t0.replace(':', 'h'),
                   'production_day': production_day,
                   'config_reg': config_reg,
@@ -90,9 +93,11 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
                           production_day)
 
     # COMPRESSING to TGZ and delete source directory
-    make_tarfile(output_folder_path,
-                 config_reg,
-                 production_day)
+    # TODO uncomment make_tafile
+    logger.info(f'PLEASE UNCOMMENT in hmi/script.py line 97')
+    # make_tarfile(output_folder_path,
+    #              config_reg,
+    #              production_day)
 
     # DONE
     logger.info(f'PRODUCTION DAY {production_day} : OK')
@@ -209,7 +214,18 @@ def create_param_images(config_reg: str,
     multiprocess = param.get("multiprocess")
     rarification = param.get("rarification")
 
+    #TODO DELETE
+    max_steps = 5
+    index_step = 0
+    #TODO END DELETE
+
     for reg_time in config_reg_times:
+        # TODO DELETE
+        if index_step  == 5:
+            logger.info(f'MAX STEPS REACHED FOR TEST, PLEASE DELETE TODO in hmi/script.py line 224')
+            break
+        index_step += 1
+        # TODO END DELETE
         path2save = get_path2save(reg_time, parameter_mane, output_folder_path, sub_param)
 
         if func in ["visu_temp",
@@ -243,12 +259,12 @@ def create_param_images(config_reg: str,
                          rarification])
 
         else:
-            hmi.hmi_image(data2plot,
-                          func,
-                          param_title,
-                          path2save,
-                          cbar_range,
-                          rarification=rarification)
+            hmi_image(data2plot,
+                      func,
+                      param_title,
+                      path2save,
+                      cbar_range,
+                      rarification=rarification)
 
     if multiprocess:
         logger.info(f'Multiprocess')
@@ -280,12 +296,12 @@ def work_process(data: list):
     path2save = data[3]
     cbar_range = data[4]
     rarification = data[5]
-    hmi.hmi_image(data2plot,
-                  func,
-                  param_title,
-                  path2save,
-                  cbar_range,
-                  rarification=rarification)
+    hmi_image(data2plot,
+              func,
+              param_title,
+              path2save,
+              cbar_range,
+              rarification=rarification)
 
 
 def get_obs_xr(param: dict,
@@ -315,18 +331,18 @@ def get_obs_xr(param: dict,
     obs_name = param.get("obs")
     if obs_name:
         logger.info(f'Reading : {obs_name}')
-        obs2plot_xr = hmi.get_obs(input_folder_path,
-                                  config_reg,
-                                  production_day,
-                                  obs_name,
-                                  var_m)
+        obs2plot_xr = get_obs(input_folder_path,
+                              config_reg,
+                              production_day,
+                              obs_name,
+                              var_m)
         if obs_name == 'woa18':
             depth = 0
-        obs2plot_xr = hmi.apply_custom_metazone(obs2plot_xr,
-                                                depth,
-                                                extent,
-                                                var_m,
-                                                config_reg_extent)
+        obs2plot_xr = apply_custom_metazone(obs2plot_xr,
+                                            depth,
+                                            extent,
+                                            var_m,
+                                            config_reg_extent)
         return obs2plot_xr
     return None
 
@@ -358,27 +374,27 @@ def get_model_xr(param: dict,
     forcing_model_name = param.get("forcing_model")
     if forcing_model_name:
         logger.info(f'Reading : {forcing_model_name}')
-        model2plot_xr = hmi.get_forcing_model(input_folder_path,
-                                              config_reg,
-                                              production_day,
-                                              forcing_model_name,
-                                              var_m)
+        model2plot_xr = get_forcing_model(input_folder_path,
+                                          config_reg,
+                                          production_day,
+                                          forcing_model_name,
+                                          var_m)
         if forcing_model_name not in ['rivers']:
-            model2plot_xr = hmi.apply_custom_metazone(model2plot_xr,
-                                                      depth,
-                                                      extent,
-                                                      var_m,
-                                                      config_reg_extent)
-    else:
-        logger.info('Reading model (regional configuration)')
-        model_xr = hmi.get_model(input_folder_path,
-                                 config_reg,
-                                 production_day,
-                                 var_m)
-        model2plot_xr = hmi.apply_custom_metazone(model_xr,
+            model2plot_xr = apply_custom_metazone(model2plot_xr,
                                                   depth,
                                                   extent,
-                                                  var_m)
+                                                  var_m,
+                                                  config_reg_extent)
+    else:
+        logger.info('Reading model (regional configuration)')
+        model_xr = get_model(input_folder_path,
+                             config_reg,
+                             production_day,
+                             var_m)
+        model2plot_xr = apply_custom_metazone(model_xr,
+                                              depth,
+                                              extent,
+                                              var_m)
     return model2plot_xr
 
 
@@ -401,7 +417,7 @@ def get_path2save(reg_time: str,
     """
     reg_time = reg_time.replace(':', 'h')
     path = os.path.join(output_folder_path, reg_time, parameter_mane)
-    hmi.create_folder(path)
+    create_folder(path)
     path2save = os.path.join(path, sub_param)
     return path2save
 
@@ -438,7 +454,7 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
 
     elif func in ["visu_mixedlayer", 'visu_mixedlayer_clim']:
         logger.info('Computing mixed layer.')
-        data2plot_all_times = hmi.compute_mixed_layer(model2plot_xr.xoa[var_m].squeeze())
+        data2plot_all_times = compute_mixed_layer(model2plot_xr.xoa[var_m].squeeze())
         cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
 
     elif func in ["visu_runoff"]:
@@ -450,14 +466,14 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
         model_da = model2plot_xr.xoa[var_m].squeeze()
 
         obs_da = obs2plot_xr[var_m].squeeze()
-        obs_da = st.convert_K_C(obs_da)
+        obs_da = convert_K_C(obs_da)
 
-        da_obs_coloc, da_model_coloc = base.colocate_all(obs_da,
-                                                         model_da,
-                                                         True,
-                                                         False,
-                                                         False,
-                                                         opt_grid="model")
+        da_obs_coloc, da_model_coloc = colocate_all(obs_da,
+                                                    model_da,
+                                                    True,
+                                                    False,
+                                                    False,
+                                                    opt_grid="model")
         difference = da_model_coloc - da_obs_coloc
         cbar_range = np.nanmin(difference), np.nanmax(difference)
         data2plot_all_times = difference

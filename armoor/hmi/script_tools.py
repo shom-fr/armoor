@@ -8,8 +8,6 @@ import xarray as xr
 
 import xoa
 
-from armoor import hmi
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -28,20 +26,6 @@ def convert_K_C(data: xr.Dataset) -> xr.Dataset:
         return data - 273.15
     else:
         return data
-
-def return_dict(path: str, spec_config_file: str) -> dict:
-    """
-    Read configObj for bull and hmi
-    Parameters
-    ----------
-    path : path to the configObj
-    spec_config_file : specification to validate and format the configObj
-
-    Returns
-    -------
-    Dictionary with configObj information
-    """
-    return hmi.read_configuration.read_config_obj(path, spec_config_file)
 
 
 def create_folder(path: str):

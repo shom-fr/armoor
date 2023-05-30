@@ -8,8 +8,11 @@ from xoa.regrid import grid2loc, regrid1d
 import xoa
 import xoa.cf as xcf
 import logging
+import gsw
+from armoor.hmi.script_tools import compute_mixed_layer
 
 logger = logging.getLogger(__name__)
+
 
 @xr.register_dataarray_accessor("read_sst")
 @xr.register_dataset_accessor("read_sst")
@@ -59,13 +62,20 @@ class SSTAccessor:
                 ds = self._obj.read_sst.sel_pdens()
             elif var == 'current':
                 ds = self._obj.read_sst.sel_current()
+            elif var == 'mld':
+                ds = self._obj.read_sst.sel_mixed_layer_depth()
+            elif var == 'sound_speed':
+                ds = self._obj.read_sst.sel_sound_speed()
+            elif var == 'geostrophic_current':
+                ds = self._obj.read_sst.sel_geo_current()
 
             liste_ds.append(ds)
+
         if len(liste_ds) == 1:
             ds_all = xr.concat(liste_ds, 'mean_time', combine_attrs="drop")
         elif len(liste_ds) > 1:
             ds_all = xr.merge(liste_ds)  # xr.concat(liste_ds, 'mean_time', combine_attrs="drop")
-        return ds_all.squeeze()
+        return ds_all
 
     def convert_current(self):
         """
@@ -76,7 +86,6 @@ class SSTAccessor:
         """
         speed = self._obj.HCSP
         direction = self._obj.HCDT
-
         u = speed / np.sin(direction)
         v = speed / np.cos(direction)
         self._obj['u'] = u
@@ -88,17 +97,33 @@ class SSTAccessor:
         Select the u/v current from dataset
         Returns
         -------
+        xarray.DataArray
+            Data array containing current.
 
         """
         if 'u' in self._obj.variables:
-            self._obj = self._obj[['u', 'v']]
+            current = self._obj[['u', 'v']]
+            current = current.assign_coords(self._obj.coords)
         else:
-            self._obj = self._obj.read_sst.convert_current()
+            current = self._obj.read_sst.convert_current()
         if 'HCSP' in self._obj.variables:
-            self._obj['norm'] = self._obj['HCSP']
+            current['norm'] = self._obj['HCSP']
         else:
-            self._obj['norm'] = (self._obj.u ** 2 + self._obj.v ** 2) ** 0.5
-        return self._obj
+            current['norm'] = (current.u ** 2 + current.v ** 2) ** 0.5
+        return current
+
+    def sel_geo_current(self):
+        """
+        Select the u/v current from dataset
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing geostrophic current.
+
+        """
+        current = self._obj[["ugbt", "vgbt"]]
+
+        return current
 
     def sel_sst(self, depth=0):
         """
@@ -109,22 +134,30 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing SST. If several depth temperature, the temperature of the min depth is taken.
         """
-        if 'depth' in self._obj.coords:
-            try:
-                return self._obj.xoa.temp.sel(depth=depth, method='nearest').read_sst.convert_K_C()
-            except:  # CROCO
-                try:
-                    return self._obj.xoa.temp.sel(z=depth).read_sst.convert_K_C()  # method='nearest'
-                except:
-                    return self._obj.xoa.temp.read_sst.convert_K_C()
-        elif 'depth' in self._obj.variables:
-            depth = xr.DataArray([0], name="depth", dims="depth")
-            return regrid1d(self._obj.xoa.temp, depth).read_sst.convert_K_C()
-        else:  # if no depth (obs sst for example)
-            try:
-                return self._obj.xoa.temp.read_sst.convert_K_C()
-            except:
-                return self._obj.sst.read_sst.convert_K_C()
+        if 'sst' in self._obj:
+            return self._obj.sst.read_sst.convert_K_C()
+        elif 'temp' in self._obj:
+            logger.info('SST retrieved from temperature variable')
+            if 'depth' in self._obj.dims:
+                return self._obj.temp.sel(depth=depth, method='nearest').read_sst.convert_K_C()
+            elif 'z' in self._obj.dims:
+                return self._obj.temp.sel(z=depth).read_sst.convert_K_C()
+            elif 'depth' in self._obj.variables:
+                depth = xr.DataArray([0], name="depth", dims="depth")
+                return regrid1d(self._obj.temp, depth).read_sst.convert_K_C()
+            else:  # if no depth (obs sst for example)
+                return self._obj.temp.read_sst.convert_K_C()
+        elif 'ptemp' in self._obj:
+            logger.info('SST retrieved from potential temperature variable')
+            if 'depth' in self._obj.dims:
+                return self._obj.ptemp.sel(depth=depth, method='nearest').read_sst.convert_K_C()
+            elif 'z' in self._obj.dims:
+                return self._obj.ptemp.sel(z=depth).read_sst.convert_K_C()
+            elif 'depth' in self._obj.variables:
+                depth = xr.DataArray([0], name="depth", dims="depth")
+                return regrid1d(self._obj.ptemp, depth).read_sst.convert_K_C()
+            else:  # if no depth (obs sst for example)
+                return self._obj.ptemp.read_sst.convert_K_C()
 
     def sel_sal(self):
         """
@@ -164,7 +197,54 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing temperature.
         """
-        return self._obj['ptemp'].read_sst.convert_K_C()
+        if 'ptemp' in self._obj:
+            return self._obj['ptemp'].read_sst.convert_K_C()
+        elif 'temp' in self._obj:
+            # verify salinity and pressure are also included
+            if 'sal' in self._obj and 'pres' in self._obj:
+                ptemp = gsw.conversions.pt0_from_t(self._obj.sal, self._obj.temp, self._obj.pres)
+                ptemp.attrs['standard_name'] = "sea_water_potential_temperature"
+                ptemp.attrs['units'] = "degrees_celsius"
+                ptemp.attrs['long_name'] = "Potential temperature"
+                self._obj['ptemp'] = ptemp
+                return self._obj
+
+    def sel_sound_speed(self):
+        """
+        Compute the sound speed.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing the sound speed.
+        """
+        # Verify all the required variables are included in the dataset
+        sal = self._obj.read_sst.sel_sal()
+
+        ptemp = self._obj.read_sst.sel_ptemp()
+        cons_temp = gsw.CT_from_pt(sal, ptemp)
+
+        depth = self._obj.depth
+        lat = self._obj.lat
+        pres = gsw.p_from_z(depth, lat, geo_strf_dyn_height=0, sea_surface_geopotential=0)
+
+        if sal is not None and cons_temp is not None and pres is not None:
+            return gsw.sound_speed(sal, cons_temp, pres)
+        else:
+            logger.warning("To compute sound speed you need to have salinity, potential temperature and depth in your"
+                           "dataset.")
+            return self._obj
+
+    def sel_mixed_layer_depth(self):
+        """
+        Compute the mixed layer depth
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing the mixed layer depth.
+        """
+        return compute_mixed_layer(self._obj['temp'])
 
     def sel_density(self):
         """
@@ -210,6 +290,8 @@ class SSTAccessor:
         """
 
         if 'units' in self._obj.attrs and self._obj.attrs['units'] == 'kelvin':
+            return self._obj - 273.15
+        elif self._obj.max() > 200:
             return self._obj - 273.15
         else:
             return self._obj

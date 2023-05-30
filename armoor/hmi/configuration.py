@@ -7,8 +7,9 @@ import xarray as xr
 
 import xoa
 
-from armoor import hmi
-from armoor import base
+from armoor.hmi.path_tools import get_config_reg_path, get_obs_path, get_forcing_model_path
+from armoor.hmi.script_tools import get_t0
+from armoor.base.open_decode import open_decode
 
 import logging
 logger = logging.getLogger(__name__)
@@ -28,9 +29,9 @@ def get_model(input_folder_path, config_reg, production_day, var):
     dataset
     """
     logger.info('Retrieving model')
-    config_reg_path = hmi.path_tools.get_config_reg_path(input_folder_path,
-                                                         f"{config_reg}_{production_day}",
-                                                         var)
+    config_reg_path = get_config_reg_path(input_folder_path,
+                                          f"{config_reg}_{production_day}",
+                                          var)
     var_type = {"sst": None,
                 "temp": "HYCOM_3D",
                 "sss": None,
@@ -40,7 +41,7 @@ def get_model(input_folder_path, config_reg, production_day, var):
                 "mld": "HYCOM_3D"
                 }
 
-    return hmi.read_netcdfs(config_reg_path, data_type=var_type[var])
+    return read_netcdfs(config_reg_path, data_type=var_type[var])
 
 
 def get_obs(input_folder_path, config_reg, production_day, obs_name, var):
@@ -58,11 +59,12 @@ def get_obs(input_folder_path, config_reg, production_day, obs_name, var):
     -------
 
     """
-    config_reg_path = hmi.path_tools.get_obs_path(input_folder_path,
-                                                  f"{config_reg}_{production_day}",
-                                                  obs_name,
-                                                  var)
-    return hmi.read_netcdfs(config_reg_path, data_type=obs_name)
+    logger.info('Retrieving obs')
+    config_reg_path = get_obs_path(input_folder_path,
+                                   f"{config_reg}_{production_day}",
+                                   obs_name,
+                                   var)
+    return read_netcdfs(config_reg_path, data_type=obs_name)
 
 
 def get_forcing_model(input_folder_path, config_reg, production_day, forcing_model, var):
@@ -80,11 +82,12 @@ def get_forcing_model(input_folder_path, config_reg, production_day, forcing_mod
     -------
 
     """
-    forcing_model_path = hmi.path_tools.get_forcing_model_path(input_folder_path,
-                                                               f"{config_reg}_{production_day}",
-                                                               forcing_model,
-                                                               var)
-    return hmi.read_netcdfs(forcing_model_path, data_type=forcing_model)
+    logger.info('Retrieving forcing model')
+    forcing_model_path = get_forcing_model_path(input_folder_path,
+                                                f"{config_reg}_{production_day}",
+                                                forcing_model,
+                                                var)
+    return read_netcdfs(forcing_model_path, data_type=forcing_model)
 
 
 def get_time_spacial_extent(input_folder_path, config_reg, production_day):
@@ -113,7 +116,7 @@ def get_time_spacial_extent(input_folder_path, config_reg, production_day):
                   'lon_max': geo_extent[1],
                   'lat_min': geo_extent[2],
                   'lat_max': geo_extent[3]}
-    t0_fwi = hmi.get_t0(times, production_day)
+    t0_fwi = get_t0(times, production_day)
     if t0_fwi == "":
         t0_fwi = np.datetime_as_string(config_reg_xr.sel(time=pandas.to_datetime(production_day),
                                                          method="nearest")["time"].data, unit='m')
@@ -189,7 +192,7 @@ def select_var(param_xr: xr.Dataset, variable: str) -> xr.Dataset:
             blacklist.append(var)
     if blacklist:
         for blackvar in blacklist:
-            param_xr = param_xr.drop(blackvar)
+            param_xr = param_xr.drop_vars(blackvar)
     return param_xr
 
 
@@ -268,10 +271,8 @@ def read_netcdfs(paths: list, data_type: str = None) -> xr.Dataset:
         xarray.Dataset
              Dataset with decoded parameters
     """
-    if len(paths) == 1 and data_type not in ['rivers']:
-        paths = paths[0]
     logger.info('Opening file(s)')
-    xarray_obj = base.open_file(paths, func='forecaster', type=data_type)
+    xarray_obj = open_decode(paths, func='forecaster', type=data_type)
 
     if data_type not in ['rivers']:
         logger.info('Decoding xarray')

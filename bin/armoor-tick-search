@@ -11,7 +11,7 @@ THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(THIS_DIR)
 
 sys.path.insert(0, ROOT_DIR)
-from armoor.tick.run import search as main
+from armoor.cli.tick import search as main
 
 
 if __name__ == '__main__':

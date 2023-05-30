@@ -32,18 +32,7 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
         logger.info(f"forecaster")
         return open_forecaster(path_files, type)
 
-    elif isinstance(path_files, list) and type is None:
-        if func == "clim_hydro":
-            logger.info(f"clim_hydro")
-            return xr.open_mfdataset(path_files, decode_times=False)
-
-        else:
-            logger.info(f"You are trying to open multiple files. If they corresponds to an "
-                        f"HYCOM model, you should specify type='HYCOM_3D' or type='HYCOM_currents'"
-                        f"in the configuration file.")
-            return xr.open_mfdataset(path_files)
-
-    elif isinstance(path_files, list) and type == 'CMEMS':
+    elif type == 'CMEMS' and len(path_files) > 1:
         return open_several_obs(path_files)
 
     elif type == 'HYCOM_currents':
@@ -61,28 +50,41 @@ def open_file(path_files, func=None, type=None) -> xr.Dataset:
         croco_current = decode_croco_currents(path_files)
         return croco_current
 
-    elif os.path.splitext(path_files)[1] in (".nc", ".netcdf"):
-        logger.info(f"Single file dataset")
-        return xr.open_dataset(path_files)
+    elif type == "mouillage":
+        logger.info(f"mouillage")
+        return open_mouillages(path_files)
 
-    elif type:
-        if type == "mouillage":
-            logger.info(f"mouillage")
-            return open_mouillages(path_files)
-        elif type == "LADCP":
-            logger.info(f"LADCP")
-            return open_L_ADCP(path_files)
-        elif type == "VMADCP":
-            logger.info(f"VMADCP")
-            return open_VMADCP(path_files)
-        elif type == "seasoar":
-            logger.info(f"seasoar")
-            return open_seasoar(path_files)
-        elif type == "scanfish":
-            logger.info(f"scanfish")
-            return open_scanfish(path_files)
-        else:
-            raise Exception("Oops, le type de fichier que vous essayez d'ouvrir n'est pas reconnu...")
+    elif type == "LADCP":
+        logger.info(f"LADCP")
+        return open_L_ADCP(path_files)
+
+    elif type == "VMADCP":
+        logger.info(f"VMADCP")
+        return open_VMADCP(path_files)
+
+    elif type == "seasoar":
+        logger.info(f"seasoar")
+        return open_seasoar(path_files)
+
+    elif type == "scanfish":
+        logger.info(f"scanfish")
+        return open_scanfish(path_files)
+
+    elif func == "clim_hydro" and type is None:
+        logger.info(f"clim_hydro")
+        return xr.open_mfdataset(path_files, decode_times=False)
+
+    elif len(path_files) > 1:
+        logger.info(f"Multi file dataset")
+        logger.info(f"You are trying to open multiple files. If they corresponds to an "
+                    f"HYCOM model, you should specify type='HYCOM_3D' or type='HYCOM_currents'"
+                    f"in the configuration file.")
+        return xr.open_mfdataset(path_files)
+
+    elif len(path_files) == 1 and os.path.splitext(path_files[0])[1] in (".nc", ".netcdf"):
+        logger.info(f"Single file dataset")
+        return xr.open_dataset(path_files[0])
+
     else:
         raise Exception("Oops, le fichier que vous essayez d'ouvrir n'est pas reconnu...")
 
@@ -257,6 +259,13 @@ def decode_hycom_3d(path_files):
                 var_name = var
 
         hycom[var_name] = ds_var[var_name]
+
+    if list(hycom.depth.dims) == ['level']:
+        depths = hycom.depth
+        hycom = hycom.drop('depth')
+        hycom = hycom.rename({'level': 'depth'})
+        hycom['depth'] = depths.data
+
     return hycom
 
 
@@ -559,6 +568,7 @@ def open_seasoar(path_files):
 
     return ds
 
+
 def open_scanfish(path_files):
     """
     Open txt file form scanfish observation and store it in dataset.
@@ -615,6 +625,7 @@ def open_scanfish(path_files):
 
     ds = xr.concat(list_ds, dim='time')
     return ds
+
 
 def array2ds(array_series, lon, lat, date, bot_depth, type):
     """
