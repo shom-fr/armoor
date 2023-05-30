@@ -18,6 +18,7 @@ import xarray as xr
 from armoor.hmi.configuration import  get_forcing_model, get_model, get_obs
 from armoor.hmi.configuration import  get_time_spacial_extent, apply_custom_metazone
 from armoor.hmi.script_tools import format_times, create_folder, compute_mixed_layer, convert_K_C
+from armoor.hmi.script_tools import decumulate_data, from_3h_to_1h
 from armoor.hmi.script_plot import hmi_image
 from armoor.base.colocation import colocate_all
 
@@ -214,18 +215,7 @@ def create_param_images(config_reg: str,
     multiprocess = param.get("multiprocess")
     rarification = param.get("rarification")
 
-    #TODO DELETE
-    max_steps = 5
-    index_step = 0
-    #TODO END DELETE
-
     for reg_time in config_reg_times:
-        # TODO DELETE
-        if index_step  == 5:
-            logger.info(f'MAX STEPS REACHED FOR TEST, PLEASE DELETE TODO in hmi/script.py line 224')
-            break
-        index_step += 1
-        # TODO END DELETE
         path2save = get_path2save(reg_time, parameter_mane, output_folder_path, sub_param)
 
         if func in ["visu_temp",
@@ -437,12 +427,20 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
     cbar_range : min, max values for the color bar
     data2plot_all_times: all tata to be plot
     """
-    if func in ["visu_temp", "visu_sal", 'visu_solarflux']:
+    if func in ["visu_temp", "visu_sal"]:
         data2plot_all_times = model2plot_xr.xoa[var_m].squeeze()
         cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
 
-    elif func in ["visu_precip"]:
+    elif func in ["visu_precip", 'visu_solarflux']:
+        logger.info('Decumulate data')
         data2plot_all_times = model2plot_xr.xoa[var_m].squeeze()
+        list_cut = [6, 6, 6, 6, 42]
+        split_1h_3h_index = 36
+
+        result = decumulate_data(data2plot_all_times, list_cut)
+        result = from_3h_to_1h(result, split_1h_3h_index)
+
+        data2plot_all_times[:, :, :] = result[:, :, :]
         cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
 
     elif func in ["visu_current", "visu_windforcing"]:
@@ -480,3 +478,4 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
 
     logger.info('Retrieving colorbar for all times...')
     return cbar_range, data2plot_all_times
+
