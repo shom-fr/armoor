@@ -45,8 +45,8 @@ def plot(config_obj):
         # Get the figure parameters from config obj
         vmin = output.get('vmin')
         vmax = output.get('vmax')
-        dvmin = output.get('dvmin')
-        dvmax = output.get('dvmax')
+        _ = output.get('dvmin')
+        _ = output.get('dvmax')
         cmap = output.get("colormap")
 
         ################################################################################################################

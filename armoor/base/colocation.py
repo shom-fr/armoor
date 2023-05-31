@@ -145,7 +145,7 @@ def vertical_colocation(mod, obs, ds_tgt, coloc_method):
         depth_values = np.unique(ds_tgt.depth.fillna(0).values)
 
     if len(depth_values) != 1:
-        logger.info(f"Vertical model colocation.")
+        logger.info("Vertical model colocation.")
         # Interpolation for HYCOM/Croco
         if 'level' in mod.dims and 'depth' not in mod.dims:
             if len(depth_values) > 50:

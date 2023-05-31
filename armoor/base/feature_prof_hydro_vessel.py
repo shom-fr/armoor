@@ -91,7 +91,7 @@ def plot(config_obj):
                               }
         if output["plot"] in plot_ts_metr_point:
             base.plot_features.plot_ts_metr_point(models, observation, plot_ts_metr_point[output["plot"]],
-                                                  flag_interval, output_path=sub_func_output_folder)
+                                                  flag_interval, flag_slice, output_path=sub_func_output_folder)
 
         ################################################################################################################
         # TIME SERIES STATS

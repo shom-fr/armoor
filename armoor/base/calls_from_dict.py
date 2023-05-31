@@ -58,16 +58,16 @@ def get_observation_models_meta(config_obj: dict):
 
     logger.info(f"Using functionality : {config_obj['functionality']}")
 
-    logger.info(f"Reading observation files")
+    logger.info("Reading observation files")
 
     # Open observation dataset from path then decode dataset and apply meta-zone
-    logger.info(f"Opening observation from file(s)")
+    logger.info("Opening observation from file(s)")
     obs_type = config_obj['observation'].get('type')
     observation.update({"xarray": base.open_decode(observation.pop("path"), config_obj['functionality'], obs_type)})
-    logger.info(f"Applying : decode and meta zone on observation")
+    logger.info("Applying : decode and meta zone on observation")
     observation.update({"xarray_meta": apply_metas2dataset(observation["xarray"], config_obj, get_method(observation))
                         })
-    logger.info(f"File(s) read for observation")
+    logger.info("File(s) read for observation")
     # Set initial colocation flags
     temporal_colocation_flag = True
     vertical_colocation_flag = True
@@ -81,10 +81,10 @@ def get_observation_models_meta(config_obj: dict):
         # Get type of model (in case HYCOM)
         mod_type = model.get('type')
 
-        logger.info(f"Opening model from file(s)")
+        logger.info("Opening model from file(s)")
         model.update({"xarray": base.open_decode(model.pop("path"), config_obj['functionality'], mod_type)})
 
-        logger.info(f"Applying : decode and meta zone on model")
+        logger.info("Applying : decode and meta zone on model")
         model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj, get_method(model), mod_obs='mod')
                       })
 
@@ -135,7 +135,7 @@ def get_observation_models_meta(config_obj: dict):
         vertical_colocation_flag = False
         horizontal_colocation_flag = True
 
-    logger.info(f"Collocating model(s) and observation")
+    logger.info("Collocating model(s) and observation")
     vertical_step = config_obj.get('vertical_step')
     horizontal_step = config_obj.get('horizontal_step')
 
@@ -256,7 +256,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str, m
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
             radius = config_obj["meta_zones"]["radius"] if "radius" in config_obj["meta_zones"] else None
-            logger.info(f"Applying : cloud")
+            logger.info("Applying : cloud")
             points = config_obj["meta_zones"]["cloud"]
             xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
 
@@ -265,7 +265,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str, m
             xarray_obj = xarray_obj.rename({'h': 'bathy'})
 
         if 'bathy_min' in config_obj["meta_zones"] or 'bathy_max' in config_obj["meta_zones"]:
-            logger.info(f"Applying : bathymetry threshold")
+            logger.info("Applying : bathymetry threshold")
             if 'bathy' in xarray_obj:
                 min_bath = config_obj["meta_zones"]["bathy_min"] if "bathy_min" in config_obj["meta_zones"] else None
                 max_bath = config_obj["meta_zones"]["bathy_max"] if "bathy_max" in config_obj["meta_zones"] else None

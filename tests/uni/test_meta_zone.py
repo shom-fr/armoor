@@ -9,13 +9,13 @@ import numpy as np
 folder_test = 'meta_zone'
 out_path, logger = change_path(folder_test)
 
-path_ds_lon_lat = [f"../data/test_uni/meta_zone/model_lon_lat.nc"]
+path_ds_lon_lat = ["../data/test_uni/meta_zone/model_lon_lat.nc"]
 ds_lon_lat_depth = open_decode(path_ds_lon_lat)
 
-path_ds_xy = [f"../data/test_uni/meta_zone/model_x_y.nc"]
+path_ds_xy = ["../data/test_uni/meta_zone/model_x_y.nc"]
 ds_xy = open_decode(path_ds_xy)
 
-path_ds_QC = [f"../data/test_uni/meta_zone/GL_PR_GL_64556_sub.nc"]
+path_ds_QC = ["../data/test_uni/meta_zone/GL_PR_GL_64556_sub.nc"]
 ds_QC = open_decode(path_ds_QC,type='CMEMS')
 
 class TestMetaZone:
@@ -130,7 +130,7 @@ class TestMetaZone:
         ds_meta = ds_lon_lat_depth.meta.vertical_selection_slice(slice=slice, var_slice='depth')
         assert len(ds_meta.slice) == 5
 
-    def test_sel_QC(self):
+    def test_sel_qc(self):
         logger.info('test_sel_QC')
         quality = ['TEMP_QC','0','1']
         ds_meta = ds_QC.meta.quality_filter(quality)

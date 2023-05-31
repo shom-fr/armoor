@@ -529,7 +529,7 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
         Path where to save the figures.
 
     """
-    logger.info(f'Dispersion diagram')
+    logger.info('Dispersion diagram')
     f, axes = plt.subplots()
     f.suptitle(title, fontsize=15, fontweight='bold')
     plt.xlabel(f"{obs_name} Observations")
@@ -619,7 +619,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
     output_path :
         Path where to save the figures.
     """
-    logger.info(f'Map of profiles')
+    logger.info('Map of profiles')
     # Set the titles
     if 'name' in obs_coloc.attrs:
         obs_name = obs_coloc.name
@@ -887,7 +887,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
 
     """
 
-    logger.info(f'Map of the model and observation and their comparison')
+    logger.info('Map of the model and observation and their comparison')
 
     # Get the titles
     if 'name' in obs_coloc.attrs:
@@ -2173,7 +2173,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         list_dims_mean.append('dens')
         label_title += ' Vertical -'
 
-    logger.info(f'The statistics are calculated on the following dimensions:')
+    logger.info('The statistics are calculated on the following dimensions:')
     logger.info(f'{list_dims_mean}')
 
     # Case vertical slices
