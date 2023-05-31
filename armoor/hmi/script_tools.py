@@ -173,7 +173,7 @@ def get_cumul_info(path_files):
 
     return list_cut, cumul_time_in_h
 
-def convert_K_C(data: xr.Dataset) -> xr.Dataset:
+def convert_k_c(data: xr.Dataset) -> xr.Dataset:
     """
     Convert temperature units into Celcius degrees.
 

@@ -36,10 +36,10 @@ def script_p_clim_hydro():
 def script_p_currents_hfr():
     main('currents_hfr')
 
-def script_p_currents_ADCP():
+def script_p_currents_adcp():
     main('currents_ADCP')
 
-def script_p_currents_VMADCP():
+def script_p_currents_vmadcp():
     main('currents_VMADCP')
 
 def script_p_drifters():

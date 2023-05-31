@@ -1,7 +1,6 @@
 from .meta_zone import *
 from .read import *
 from .read_sst import *
-from .open_data import *
 from .calls_from_dict import *
 from .feature_tools import *
 from .feature_sst import *
