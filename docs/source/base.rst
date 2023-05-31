@@ -220,3 +220,7 @@ and add the following line by replacing ``/path/to/output/tests/P1/`` with your 
 
     path_p1 = '/path/to/output/tests/P1/'
 
+
+.. NOTE::
+
+    The ``data`` folder from the archive must be in the ``path_p1`` folder.
