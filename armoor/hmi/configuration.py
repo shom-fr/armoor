@@ -87,7 +87,7 @@ def get_forcing_model(input_folder_path, config_reg, production_day, forcing_mod
                                                 f"{config_reg}_{production_day}",
                                                 forcing_model,
                                                 var)
-    return read_netcdfs(forcing_model_path, data_type=forcing_model)
+    return read_netcdfs(forcing_model_path, data_type=forcing_model), forcing_model_path
 
 
 def get_time_spacial_extent(input_folder_path, config_reg, production_day):

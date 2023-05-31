@@ -18,7 +18,7 @@ import xarray as xr
 from armoor.hmi.configuration import  get_forcing_model, get_model, get_obs
 from armoor.hmi.configuration import  get_time_spacial_extent, apply_custom_metazone
 from armoor.hmi.script_tools import format_times, create_folder, compute_mixed_layer, convert_K_C
-from armoor.hmi.script_tools import decumulate_data, from_3h_to_1h
+from armoor.hmi.script_tools import decumulate_data, from_nh_to_1h, get_cumul_info
 from armoor.hmi.script_plot import hmi_image
 from armoor.base.colocation import colocate_all
 
@@ -190,12 +190,12 @@ def create_param_images(config_reg: str,
     extent = config_obj["parameters"][parameter_mane].get("extent")
 
     # Model or forcing model used to generate the images for a given parameter
-    model2plot_xr = get_model_xr(param,
-                                 extent,
-                                 input_folder_path,
-                                 config_reg,
-                                 config_reg_extent,
-                                 production_day)
+    model2plot_xr, paths = get_model_xr(param,
+                                        extent,
+                                        input_folder_path,
+                                        config_reg,
+                                        config_reg_extent,
+                                        production_day)
     # Observation used to generate the images for a given parameter
     obs2plot_xr = get_obs_xr(param,
                              extent,
@@ -207,7 +207,8 @@ def create_param_images(config_reg: str,
     cbar_range, data2plot_all_times = get_data2plot(func,
                                                     param["var"],
                                                     model2plot_xr,
-                                                    obs2plot_xr)
+                                                    obs2plot_xr,
+                                                    paths)
     logger.info(f'Creating images for all steps : {len(config_reg_times)}')
     # Loop on times to create all images
     param_title = param["name"]
@@ -362,13 +363,14 @@ def get_model_xr(param: dict,
     depth = param.get("depth")
     var_m = param["var"]
     forcing_model_name = param.get("forcing_model")
+    paths = None
     if forcing_model_name:
         logger.info(f'Reading : {forcing_model_name}')
-        model2plot_xr = get_forcing_model(input_folder_path,
-                                          config_reg,
-                                          production_day,
-                                          forcing_model_name,
-                                          var_m)
+        model2plot_xr, paths = get_forcing_model(input_folder_path,
+                                                 config_reg,
+                                                 production_day,
+                                                 forcing_model_name,
+                                                 var_m)
         if forcing_model_name not in ['rivers']:
             model2plot_xr = apply_custom_metazone(model2plot_xr,
                                                   depth,
@@ -385,7 +387,7 @@ def get_model_xr(param: dict,
                                               depth,
                                               extent,
                                               var_m)
-    return model2plot_xr
+    return model2plot_xr, paths
 
 
 def get_path2save(reg_time: str,
@@ -412,11 +414,12 @@ def get_path2save(reg_time: str,
     return path2save
 
 
-def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
+def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names):
     """
     Retrieve data to plot and colorbar min and max
     Parameters
     ----------
+    file_names: file names to decumulate data
     func : visualisation function
     var_m : valiable to plot
     model2plot_xr : model data
@@ -434,11 +437,10 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr):
     elif func in ["visu_precip", 'visu_solarflux']:
         logger.info('Decumulate data')
         data2plot_all_times = model2plot_xr.xoa[var_m].squeeze()
-        list_cut = [6, 6, 6, 6, 42]
-        split_1h_3h_index = 36
+        list_cut, cumul_time_in_h = get_cumul_info(file_names)
 
         result = decumulate_data(data2plot_all_times, list_cut)
-        result = from_3h_to_1h(result, split_1h_3h_index)
+        result = from_nh_to_1h(result, cumul_time_in_h)
 
         data2plot_all_times[:, :, :] = result[:, :, :]
         cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
