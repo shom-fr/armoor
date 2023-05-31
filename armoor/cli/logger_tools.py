@@ -25,5 +25,5 @@ def setup_logging():
     logging.config.fileConfig(
         log_config_path,
         disable_existing_loggers=False,
-        defaults={"log filename": os.path.join(log_dir,f'{timestamp}.log')},
+        defaults={"logfilename": os.path.join(log_dir,f'{timestamp}.log')},
     )
