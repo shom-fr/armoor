@@ -22,7 +22,7 @@ def format_opendrift(mod, path_model):
         Path where to save the netcdf file to be used for OpenDrift.
 
     """
-    logger.info(f"Formatting dataset")
+    logger.info("Formatting dataset")
 
     mod = mod['xarray_meta'].rename({'u': 'x_sea_water_velocity', 'v': 'y_sea_water_velocity'})
     mod['x_sea_water_velocity'].attrs = {'standard_name': "eastward_sea_water_velocity",
@@ -109,7 +109,7 @@ def calculate_trajectory(path_model, lons, lats, times, time_step, nb_step, outp
     trajectory : xarray.Dataset
         Trajectories of the drifting particules.
     """
-    logger.info(f"Computing trajectory")
+    logger.info("Computing trajectory")
 
     # Initialise the OpenDrift model
     o = OceanDrift(loglevel=20)

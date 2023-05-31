@@ -55,7 +55,7 @@ class ReadAccessor:
         xarray.Dataset
             Decoded dataset.
         """
-        logger.info(f"Decoding data")
+        logger.info("Decoding data")
         # Remove QC from variables to prevent random behaviours
         vars_to_remove = ['TEMP_QC', 'TEMP_ADJUSTED', 'PSAL_ADJUSTED', 'PSAL_QC', 'TIME_QC', 'POSITION_QC', 'DIRECTION']
         for var in vars_to_remove:

@@ -158,7 +158,8 @@ async def get_validation_status(config_reg: str, production_time: str):
     Get validation status
     Parameters
     ----------
-    status_info : information needed to get the status of the desire production
+    production_time : time of production
+    config_reg : the regional configuration
 
     Returns
     -------

@@ -17,7 +17,7 @@ import xarray as xr
 
 from armoor.hmi.configuration import  get_forcing_model, get_model, get_obs
 from armoor.hmi.configuration import  get_time_spacial_extent, apply_custom_metazone
-from armoor.hmi.script_tools import format_times, create_folder, compute_mixed_layer, convert_K_C
+from armoor.hmi.script_tools import format_times, create_folder, compute_mixed_layer, convert_k_c
 from armoor.hmi.script_tools import decumulate_data, from_nh_to_1h, get_cumul_info
 from armoor.hmi.script_plot import hmi_image
 from armoor.base.colocation import colocate_all
@@ -466,7 +466,7 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names):
         model_da = model2plot_xr.xoa[var_m].squeeze()
 
         obs_da = obs2plot_xr[var_m].squeeze()
-        obs_da = convert_K_C(obs_da)
+        obs_da = convert_k_c(obs_da)
 
         da_obs_coloc, da_model_coloc = colocate_all(obs_da,
                                                     model_da,

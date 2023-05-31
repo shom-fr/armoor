@@ -42,7 +42,7 @@ class MetazoneAccessor:
         xarray.Dataset
             Dataset with the selected parameters
         """
-        logger.info(f"Applying filter - var_selection")
+        logger.info("Applying filter - var_selection")
         # create list of variables to keep
         list_names = ['lon', 'lat', 'time', 'depth', 'bathy']
         if 'temp' in vars:
@@ -90,7 +90,7 @@ class MetazoneAccessor:
         xarray.Dataset
             Dataset filtered with quality levels input restrictions.
         """
-        logger.info(f"Applying filter - quality_filter")
+        logger.info("Applying filter - quality_filter")
         var, min_q, max_q = quality
         min_q, max_q = int(min_q), int(max_q)
 
@@ -138,7 +138,7 @@ class MetazoneAccessor:
         --------
         https://matplotlib.org/stable/api/path_api.html
         """
-        logger.info(f"Applying filter - horizontal_selection_polygon")
+        logger.info("Applying filter - horizontal_selection_polygon")
         # Create the polygon where to subset
         p = path.Path(coords)
 
@@ -188,7 +188,7 @@ class MetazoneAccessor:
         xarray.Dataset
              Dataset with elements values meeting the condition(s).
         """
-        logger.info(f"Applying filter - data_selection")
+        logger.info("Applying filter - data_selection")
 
         if value is not None:
             selection = self._obj[dim] == value
@@ -220,7 +220,7 @@ class MetazoneAccessor:
         xarray.Dataset
             Dataset with elements included inside the cloud/area.
         """
-        logger.info(f"Applying filter - horizontal_selection_coords")
+        logger.info("Applying filter - horizontal_selection_coords")
 
         lon_target = [lon for lon, lat in coordinates]
         lat_target = [lat for lon, lat in coordinates]
@@ -281,7 +281,7 @@ class MetazoneAccessor:
         -------
         x, y coordinates
         """
-        logger.info(f"Applying filter - sel_closest")
+        logger.info("Applying filter - sel_closest")
         mindist = 100000
         i = 0
         j = 0
@@ -321,7 +321,7 @@ class MetazoneAccessor:
         xarray.Dataset
             Dataset with elements included inside the cloud/area.
         """
-        logger.info(f"Applying filter - horizontal_selection_cloud_dots")
+        logger.info("Applying filter - horizontal_selection_cloud_dots")
         if radius_km == 0. or radius_km is None:
             return self._obj.meta.horizontal_selection_coords(cloud, method)
         else:
@@ -397,7 +397,7 @@ class MetazoneAccessor:
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
 
-        logger.info(f"Applying filter - horizontal_selection_bathymetry")
+        logger.info("Applying filter - horizontal_selection_bathymetry")
         return self.data_selection(dim='bathy', minimum=minimum, maximum=maximum)
 
     def vertical_selection_depth(self, depth: list = None) -> xr.Dataset:
@@ -411,7 +411,7 @@ class MetazoneAccessor:
         -------
 
         """
-        logger.info(f"Applying filter - vertical_selection_depth")
+        logger.info("Applying filter - vertical_selection_depth")
         if depth and len(depth) == 1:
             return self.vertical_selection_ponct(depth[0], 'depth')
         elif depth:  # if output=profiles, only this option should apply
@@ -430,7 +430,7 @@ class MetazoneAccessor:
         -------
 
         """
-        logger.info(f"Applying filter - vertical_selection_dens")
+        logger.info("Applying filter - vertical_selection_dens")
         if depth and len(depth) == 1:
             return self.vertical_selection_ponct(depth[0], 'dens')
         elif depth:  # if output=profiles, only this option should apply
@@ -457,7 +457,7 @@ class MetazoneAccessor:
         --------
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
-        logger.info(f"Applying filter - vertical_selection_ponct")
+        logger.info("Applying filter - vertical_selection_ponct")
         ds = self._obj
         if var_vert == 'depth':
             if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # check if NEMO or TOPAZ
@@ -501,7 +501,7 @@ class MetazoneAccessor:
         --------
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
-        logger.info(f"Applying filter - vertical_selection_range")
+        logger.info("Applying filter - vertical_selection_range")
         # Get min and max values
         min = depth[0]
         max = depth[1]
@@ -534,7 +534,7 @@ class MetazoneAccessor:
         --------
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
-        logger.info(f"Applying filter - vertical_selection_list")
+        logger.info("Applying filter - vertical_selection_list")
         if 'depth' in self._obj.dims:  # Selection for NEMO or TOPAZ
             return self._obj.sel(depth=depths, method='nearest')
 
@@ -563,7 +563,7 @@ class MetazoneAccessor:
         xarray.Dataset
             same Dataset averaged over the time interval
         """
-        logger.info(f"Applying filter - vertical_selection_slice")
+        logger.info("Applying filter - vertical_selection_slice")
 
         if 'depth' not in self._obj.dims:
             depth_values = np.unique(self._obj.depth.data)
@@ -611,7 +611,7 @@ class MetazoneAccessor:
         xarray.Dataset
              Dataset with density values meeting the condition(s).
         """
-        logger.info(f"Applying filter - time_selection_start")
+        logger.info("Applying filter - time_selection_start")
         if isinstance(start, int):
             return self.time_selection_relative(start, None)
         else:
@@ -630,7 +630,7 @@ class MetazoneAccessor:
         xarray.Dataset
              Dataset with density values meeting the condition(s).
         """
-        logger.info(f"Applying filter - time_selection_end")
+        logger.info("Applying filter - time_selection_end")
         if isinstance(end, int):
             return self.time_selection_relative(None, end)
         else:
@@ -657,7 +657,7 @@ class MetazoneAccessor:
         https://docs.python.org/fr/3/library/datetime.html
         https://docs.python.org/3/library/datetime.html
         """
-        logger.info(f"Applying filter - time_selection_absolute")
+        logger.info("Applying filter - time_selection_absolute")
         if start == end:
             return self._obj.sel(time=start, method='nearest')
 
@@ -686,7 +686,7 @@ class MetazoneAccessor:
         https://docs.python.org/3/library/datetime.html
         """
 
-        logger.info(f"Applying filter - time_selection_relative")
+        logger.info("Applying filter - time_selection_relative")
         now = pandas.to_datetime(datetime.today().strftime("%Y-%m-%d"))
         if start is not None:
             start = now + pandas.offsets.Day(start)
@@ -714,7 +714,7 @@ class MetazoneAccessor:
         xarray.Dataset
              Dataset with elements referring to the specified listed dates.
         """
-        logger.info(f"Applying filter - time_selection_list")
+        logger.info("Applying filter - time_selection_list")
         if method in ["linear"]:
             return self._obj.interp(time=pandas.to_datetime(times), method=method)
         else:
@@ -754,7 +754,7 @@ class MetazoneAccessor:
         ds.meta.time_selection('day', '2020-07-01T12:00:00')
 
         """
-        logger.info(f"Applying filter - time_selection_freq")
+        logger.info("Applying filter - time_selection_freq")
         intervals = {'hour': 'H', 'hours': 'H', 'day': 'D', 'days': 'D', 'month': 'MS', 'months': 'MS'}
         args = freq.split(" ")
         if len(args) == 1:
@@ -793,7 +793,7 @@ class MetazoneAccessor:
         xarray.Dataset
             same Dataset averaged over the time interval
         """
-        logger.info(f"Applying filter - time_selection_interval")
+        logger.info("Applying filter - time_selection_interval")
 
         start = self._obj.isel(time=[0]).time.data[0]
         end = self._obj.isel(time=[-1]).time.data[0]
@@ -860,7 +860,7 @@ class MetazoneAccessor:
         -------
 
         """
-        logger.info(f"Applying filter - time_selection_climatological")
+        logger.info("Applying filter - time_selection_climatological")
         if len(args) == 1 and isinstance(args[0], str):
             return self.time_selection_climatological_interval(args[0])
         elif len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], str):
@@ -884,7 +884,7 @@ class MetazoneAccessor:
         xarray.Dataset
              Dataset with elements referring to the specified seasons.
         """
-        logger.info(f"Applying filter - time_selection_climatological_custom_interval")
+        logger.info("Applying filter - time_selection_climatological_custom_interval")
 
         start = pandas.to_datetime(self._obj.time.data.min())
         end = pandas.to_datetime(self._obj.time.data.max())
@@ -936,7 +936,7 @@ class MetazoneAccessor:
         xarray.Dataset
              Dataset with elements referring to the specified period.
         """
-        logger.info(f"Applying filter - time_selection_climatological_interval")
+        logger.info("Applying filter - time_selection_climatological_interval")
         interval = interval.lower()
 
         climatological_interval = "jfmamjjasondjfmamjjasond"
@@ -979,7 +979,7 @@ class MetazoneAccessor:
             If "start" is later then "end" : we take values from "start" until "end" trough midnight
             (i.e. day d at "start" to day d+1 at "end")
         """
-        logger.info(f"Applying filter - time_restriction")
+        logger.info("Applying filter - time_restriction")
         start, end = restriction
         index = []
         for obj_time in self._obj.time.data:

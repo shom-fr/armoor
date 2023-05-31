@@ -11,8 +11,8 @@ THIS_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.dirname(THIS_DIR)
 
 sys.path.insert(0, ROOT_DIR)
-from armoor.cli.run import script_p_currents_VMADCP
+from armoor.cli.run import script_p_currents_vmadcp
 
 
 if __name__ == '__main__':
-    script_p_currents_VMADCP()
+    script_p_currents_vmadcp()

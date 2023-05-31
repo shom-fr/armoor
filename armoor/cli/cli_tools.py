@@ -98,7 +98,7 @@ def try_str2float(value) -> float:
     return None
 
 
-def depth_configObj(depths) -> list:
+def depth_config_obj(depths) -> list:
     """ @4
     if depths length is 1 : it's for the selection of a layer
     if depths length is 2 : it's for the selection of all the layers between the 2 values.
@@ -137,7 +137,7 @@ def depth_configObj(depths) -> list:
 
 
 # function to check if the coordinates provided are well formatted
-def coords_configObj(coordinates) -> list:
+def coords_config_obj(coordinates) -> list:
     """
     Used when coordinates are provided
     check "coordinates" type, check if coordinates are even and perform cleanup.
@@ -174,7 +174,7 @@ def coords_configObj(coordinates) -> list:
         raise VdtTypeError(coordinates)
 
 
-def format_cofigObj2Dict(config: dict) -> dict:
+def format_cofig_obj2dict(config: dict) -> dict:
     """
     function to format configObj input to useful dictionary
 

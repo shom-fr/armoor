@@ -51,48 +51,48 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
 
     # Open file
     if func == 'forecaster':
-        logger.info(f"forecaster")
+        logger.info("forecaster")
         return open_forecaster(path_files, type)
 
     else:
         if type == "WOA18":
-            logger.info(f"Opening WOA18")
+            logger.info("Opening WOA18")
             return open_decode_woa18(path_files)
         elif type == "CMEMS":
-            logger.info(f"Opening CMEMS")
+            logger.info("Opening CMEMS")
             return open_decode_cmems(path_files)
         elif type == "scanfish":
-            logger.info(f"Opening Scanfish")
+            logger.info("Opening Scanfish")
             return open_decode_scanfish(path_files[0])
         elif type == "seasoar":
-            logger.info(f"Opening Seasoar")
+            logger.info("Opening Seasoar")
             return open_decode_seasoar(path_files[0])
         elif type == "LADCP":
-            logger.info(f"Opening L-ADCP")
+            logger.info("Opening L-ADCP")
             return open_decode_l_adcp(path_files[0])
         elif type == "mouillage":
-            logger.info(f"Opening Mooring")
+            logger.info("Opening Mooring")
             return open_decode_mouillages(path_files[0])
         elif type == "VMADCP":
-            logger.info(f"Opening VMADCP")
+            logger.info("Opening VMADCP")
             return open_decode_vmadcp(path_files[0])
         elif type == 'CROCO':
-            logger.info(f"Opening CROCO")
+            logger.info("Opening CROCO")
             return open_decode_croco(path_files[0])
         elif type == 'CROCO_currents':
-            logger.info(f"Opening CROCO currents")
+            logger.info("Opening CROCO currents")
             return open_decode_croco_currents(path_files[0])
         elif type == 'HYCOM_currents':
-            logger.info(f"Opening HYCOM currents")
+            logger.info("Opening HYCOM currents")
             return open_decode_hycom_currents(path_files)
         elif type == 'HYCOM_3D':
-            logger.info(f"Opening HYCOM 3D currents")
+            logger.info("Opening HYCOM 3D currents")
             return open_decode_hycom_3d(path_files)
         elif type == 'CORA':
-            logger.info(f"Opening CORA")
+            logger.info("Opening CORA")
             return open_decode_cora(path_files[0])
         else:
-            logger.info(f"Opening non specific file type")
+            logger.info("Opening non specific file type")
             return open_decode_basic(path_files)
 
 
@@ -586,7 +586,7 @@ def open_decode_croco_currents(path_files):
     hycom : xarray.Dataset
          Model dataset decoded.
     """
-    logger.info(f"Decode CROCO currents")
+    logger.info("Decode CROCO currents")
     ds = xr.open_dataset(path_files).decode_sigma()
     ds = xoa.grid.to_rect(ds)
 
@@ -657,13 +657,13 @@ def open_decode_hycom_currents(path_files):
     hycom : xarray.Dataset
          Model dataset decoded.
     """
-    logger.info(f"Decoding HYCOM currents")
+    logger.info("Decoding HYCOM currents")
     if len(path_files) == 2:  # Test if 2D
-        logger.info(f"HYCOM 2D")
+        logger.info("HYCOM 2D")
         path_u, path_v = path_files[0], path_files[1]
         hycom = xr.Dataset()
     elif len(path_files) == 3:  # Test if 3D
-        logger.info(f"HYCOM 3D")
+        logger.info("HYCOM 3D")
         path_h, path_u, path_v = path_files[0], path_files[1], path_files[2]
         hycom = xr.open_dataset(path_h).xoa.decode().squeeze(drop=True)
         if 'level' not in hycom.variables:
@@ -706,7 +706,7 @@ def open_decode_hycom_3d(path_files):
          Model dataset decoded.
 
     """
-    logger.info(f"Decoding HYCOM 3D")
+    logger.info("Decoding HYCOM 3D")
     # Open the file with depth values
     path_h = path_files[0]
     hycom = xr.open_dataset(path_h).xoa.decode().squeeze(drop=True)
