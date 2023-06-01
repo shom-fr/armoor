@@ -252,7 +252,7 @@ def get_t0(times: list, today: str) -> str:
     """
     t0_forecaster_web_interface = ""
     for time in times:
-        if today in time:
+        if today in time.replace('-',''):
             t0_forecaster_web_interface = time
             break
     return t0_forecaster_web_interface
