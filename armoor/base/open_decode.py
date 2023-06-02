@@ -907,13 +907,9 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         ds_insta = ds_insta.sortby('time')
         return ds_insta
 
-    elif len(path_files) > 1:
-        logger.info("multiple files from list")
-        return xr.open_mfdataset(path_files)
-
     else:
-        logger.info("single file")
-        return xr.open_dataset(path_files[0])
+        logger.info("Basic type")
+        return open_forecaster_basic(path_files)
 
 
 ####################### Tools #######################
@@ -1101,4 +1097,35 @@ def depth_from_press(ds):
     ds = ds.rename({'depth': 'z'})
     adepth = adepth.rename({'depth': 'z'})
     ds = ds.assign_coords(depth=adepth)
+    return ds
+
+def open_forecaster_basic(path_files):
+    """
+     Open netcdf file(s) and store it into a ready-to-use dataset.
+     Parameters
+     ----------
+     path_files : str, list of str
+         Path to the netcdf files.
+     Returns
+     -------
+     xarray.Dataset
+         dataset.
+     """
+    # Open
+    if len(path_files) > 1:
+        logger.info("multiple files from list")
+        ds = xr.open_mfdataset(path_files)
+    else:
+        logger.info("single file")
+        ds = xr.open_dataset(path_files[0])
+
+    # Regrid if necessary
+    ds = xoa.grid.to_rect(ds)
+
+    # Convert depths
+    ds = convert_depths(ds)
+
+    # Convert lons
+    ds = convert_lons(ds)
+
     return ds
