@@ -347,6 +347,7 @@ Run tests
 To run Forecaster unit tests, use the following commands::
 
     pytest your_path_to/tests/uni/hmi/test_path_tools.py
+    pytest your_path_to/tests/uni/hmi/test_script_tools.py
     pytest your_path_to/tests/uni/test_approval.py
 
 
