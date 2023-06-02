@@ -94,13 +94,10 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
                           production_day)
 
     # COMPRESSING to TGZ and delete source directory
-    # TODO uncomment make_tafile
-    logger.info(f'PLEASE UNCOMMENT in hmi/script.py line 97')
-    # make_tarfile(output_folder_path,
-    #              config_reg,
-    #              production_day)
+    make_tarfile(output_folder_path,
+                 config_reg,
+                 production_day)
 
-    # DONE
     logger.info(f'PRODUCTION DAY {production_day} : OK')
 
 
