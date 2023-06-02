@@ -48,7 +48,6 @@ and add the following line by replacing ``/path/to/output/tests/P2/`` with your 
     path_p2 = '/path/to/output/tests/P2/'
 
 .. NOTE::
-
     For ``test_ticket``, in the folder ``path_p2`` you just defined add a file named **auth.cfg** as describe in section above **How to setup**.
 
 
