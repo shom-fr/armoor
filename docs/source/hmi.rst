@@ -366,3 +366,33 @@ In the ``path_p3`` folder, you must have the ``data`` folder containing ``hycom3
 
 .. NOTE::
     To run tests on a specific parameter, add ``::TestForecasterScripts::test_med_*`` after ``test_forecaster_script.py`` and replace ``*`` with the desired parameter number from the following list: 1, 2, 3, 4, 5, 10, 11, and 12.
+
+
+Run on Datarmor
+---------------
+
+To run a job on datarmor you can use this command: ``qsub my_job.qsub``.
+
+Where ``my_job.qsub`` could resemble the following example::
+
+    #!/bin/bash
+    #PBS -q omp
+    #PBS -l ncpus=16
+    #PBS -l mem=64gb
+    #PBS -l walltime=2:00:00
+
+    export PATH=/home6/datahome/your_user_name/.conda/envs/your_environment_name/bin:$PATH
+    export ESMFMKFILE=/home6/datahome/your_user_name/.conda/envs/your_environment_name/lib/esmf.mk
+
+    armoor-script -o your_output_folder -i your_data -c your_configuration_file.cfg
+
+For more information on the first part of this example you can refer to this `link <https://domicile.ifremer.fr/intraric/Mon-informatique/Calcul-et-donnees-scientifiques/Datarmor-Calcul-et-Donnees/Datarmor-calcul-et-programmes/,DanaInfo=w3z.ifremer.fr,SSL+Commencer-lancer-un-calcul>`_
+
+Please modify the two ``export`` lines to match your information.
+
+.. NOTE::
+
+    To avoid running out of memory for ``hycom3d_indien``, you should double the memory allocation for ``mem``.
+
+.. NOTE::
+    You can use this example to execute a job and transpose it for :doc:`base` or :doc:`bull`.
