@@ -347,22 +347,52 @@ Run tests
 To run Forecaster unit tests, use the following commands::
 
     pytest your_path_to/tests/uni/hmi/test_path_tools.py
-    pytest your_path_to/tests/uni/test_approval.py
-
+    pytest your_path_to/tests/uni/hmi/test_script_tools.py
 
 In the folder where you will run ``pytest`` please create a file named **tests.cfg**
-and add the following lines by replacing ``/path/to/output/tests/P2/`` and ``/path/to/output/tests/P3/`` with your information::
+and add the following line by replacing ``/path/to/output/tests/P3/`` with your information::
 
-    path_p2 = '/path/to/output/tests/P2/'
     path_p3 = '/path/to/output/tests/P3/'
-
-The ``path_p2`` folder is for ``test_approval.py``, and the ``path_p3`` folder is for ``test_path_tools.py``.
 
 To run tests for all the different parameters, use the following command::
 
-    pytest /mnt/c/Users/Pastor/Downloads/WSL_WORKSPACE/Gitlab_SHOM/tests/int/hmi/test_forecaster_script.py
+    pytest your_path_to/tests/uni/hmi/test_forecaster_script.py
 
 In the ``path_p3`` folder, you must have the ``data`` folder containing ``hycom3d_med_20220310``, ``hycom3d_indien_20220310`` and
 ``hycom3d_manga_20220310`` from ``/home/shom_simurep/public_no_ftp/Noveltis_19AC22/Developpement/InterfacePrevisionnistes``.
 
-In the ``data`` folder from ``path_p3``, please rename the folders ``*_20220310`` with the current day following this naming convention: ``*_YYYYMMDD``.
+.. IMPORTANT::
+    In the ``data`` folder from ``path_p3``, please rename the folders ``*_20220310`` with the current day following this naming convention: ``*_YYYYMMDD``.
+
+.. NOTE::
+    To run tests on a specific parameter, add ``::TestForecasterScripts::test_med_*`` after ``test_forecaster_script.py`` and replace ``*`` with the desired parameter number from the following list: 1, 2, 3, 4, 5, 10, 11, and 12.
+
+
+Run on Datarmor
+---------------
+
+To run a job on datarmor you can use this command: ``qsub my_job.qsub``.
+
+Where ``my_job.qsub`` could resemble the following example::
+
+    #!/bin/bash
+    #PBS -q omp
+    #PBS -l ncpus=16
+    #PBS -l mem=64gb
+    #PBS -l walltime=2:00:00
+
+    export PATH=/home6/datahome/your_user_name/.conda/envs/your_environment_name/bin:$PATH
+    export ESMFMKFILE=/home6/datahome/your_user_name/.conda/envs/your_environment_name/lib/esmf.mk
+
+    armoor-script -o your_output_folder -i your_data -c your_configuration_file.cfg
+
+For more information on the first part of this example you can refer to this `link <https://domicile.ifremer.fr/intraric/Mon-informatique/Calcul-et-donnees-scientifiques/Datarmor-Calcul-et-Donnees/Datarmor-calcul-et-programmes/,DanaInfo=w3z.ifremer.fr,SSL+Commencer-lancer-un-calcul>`_
+
+Please modify the two ``export`` lines to match your information.
+
+.. NOTE::
+
+    To avoid running out of memory for ``hycom3d_indien``, you should double the memory allocation for ``mem``.
+
+.. NOTE::
+    You can use this example to execute a job and transpose it for :doc:`base` or :doc:`bull`.

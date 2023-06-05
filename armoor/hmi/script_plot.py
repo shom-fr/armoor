@@ -2,10 +2,12 @@
 """
 Functions to create the plots
 """
+import os
 from datetime import datetime
 
 import xarray as xr
 import xoa
+from xoa import cfgm
 import numpy as np
 
 from matplotlib import colors
@@ -47,72 +49,15 @@ def hmi_image(data: xr.Dataset,
     -------
 
     """
-    legend = {"visu_temp": {"title": title,
-                            "var_name": "Temperature",
-                            "var_unit": "(°C)",
-                            "cmap": cmocean.cm.thermal,
-                            "cbar_range": cbar_range
-                            },
-              "visu_sal": {"title": title,
-                           "var_name": "Salinity",
-                           "var_unit": "(g/kg)",
-                           "cmap": cmocean.cm.haline,
-                           "cbar_range": cbar_range
-                           },
-              "visu_current": {"title": title,
-                               "var_name": "Current",
-                               "var_unit": "(m/s)",
-                               "cmap": cmocean.cm.speed,
-                               "cbar_range": cbar_range
-                               },
-              "visu_windforcing": {"title": title,
-                                   "var_name": "Wind 10m",
-                                   "var_unit": "(m/s)",
-                                   "cmap": cmocean.cm.matter,
-                                   "cbar_range": cbar_range
-                                   },
-              "visu_diff_sss": {"title": title,
-                                "var_name": "SSS difference (model - climatology)",
-                                "var_unit": "(g/kg)",
-                                "cmap": 'PiYG',
-                                "cbar_range": cbar_range
-                                },
-              "visu_diff_sst": {"title": title,
-                                "var_name": "SST difference (model - satellite)",
-                                "var_unit": "(°C)",
-                                "cmap": 'RdBu_r',
-                                "cbar_range": cbar_range
-                                },
-              "visu_solarflux": {"title": title,
-                                 "var_name": "Solar sensible heat flux",
-                                 "var_unit": "(J/m²)",
-                                 "cmap": 'cmo.solar',
-                                 "cbar_range": cbar_range
-                                 },
-              "visu_precip": {"title": title,
-                              "var_name": "Total precipitation",
-                              "var_unit": "(mm)",
-                              "cmap": cmocean.cm.rain,
-                              "cbar_range": cbar_range
-                              },
-              "visu_mixedlayer_clim":
-                  {"title": title,
-                   "var_name": "Mixed layer thickness at standard depth levels",
-                   "var_unit": "(m)",
-                   "cmap": cmocean.cm.deep,
-                   "cbar_range": cbar_range
-                   },
-              "visu_mixedlayer": {"title": title,
-                                  "var_name": "Mixed layer thickness at 10 m",
-                                  "var_unit": "(m)",
-                                  "cmap": cmocean.cm.deep,
-                                  "cbar_range": cbar_range
-                                  },
-              "visu_runoff": {"title": title,
-                              "var_name": "River runoff",
-                              "var_unit": "($m^3$/s)",
-                              }
-              }
+    rootdir = os.path.abspath(os.path.dirname(__file__))
+    with open(os.path.join(rootdir, "hmi_plot.ini"), "r", encoding="utf-8") as hmi_plot_spec:
+        cfgm_plots = cfgm.ConfigManager(hmi_plot_spec)
+    with open(os.path.join(rootdir, '..', '..', 'config', 'hmi_plot.cfg'), "r", encoding="utf-8") as hmi_plot_config:
+        cfgm_plots_dict = cfgm_plots.load(hmi_plot_config)
+
+    legend = cfgm_plots_dict.get('legend').get(func)
+    legend.update({"title": title})
+    legend.update({"cbar_range": cbar_range})
 
     rarification = int(rarification) if rarification else 1
 
@@ -120,24 +65,24 @@ def hmi_image(data: xr.Dataset,
                 "visu_diff_sss", "visu_solarflux", 'visu_precip',
                 'visu_mixedlayer_clim', "visu_mixedlayer"]:
         base_map(data,
-                 legend[func],
+                 legend,
                  path2save)
 
     elif func in ["visu_current"]:
         stream(data,
-               legend[func],
+               legend,
                path2save,
                rarification)
 
     elif func in ["visu_windforcing"]:
         stream_wind(data,
-                    legend[func],
+                    legend,
                     path2save,
                     rarification)
 
     elif func == "visu_runoff":
         runoff(data,
-               legend[func],
+               legend,
                cbar_range,
                path2save)
 

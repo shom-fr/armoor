@@ -136,6 +136,9 @@ def open_decode_woa18(path_files):
     except:
         pass
 
+    # Convert lons
+    woa18 = convert_lons(woa18)
+
     return woa18
 
 
@@ -198,6 +201,9 @@ def open_decode_cmems(path_files):
 
     # Convert depth
     cmems = convert_depths(cmems)
+
+    # Convert lons
+    cmems = convert_lons(cmems)
 
     return cmems
 
@@ -273,6 +279,9 @@ def open_decode_l_adcp(path_file):
         ladcp = ladcp.drop_vars(['lon', 'lat'])
         ladcp = ladcp.assign_coords({'lon': lon_values, 'lat': lat_values})
 
+    # Convert lons
+    ladcp = convert_lons(ladcp)
+
     return ladcp
 
 
@@ -334,6 +343,9 @@ def open_decode_vmadcp(path_file) -> xr.Dataset:
     # Decode
     vmadcp = vmadcp.xoa.decode()
 
+    # Convert lons
+    vmadcp = convert_lons(vmadcp)
+
     return vmadcp
 
 
@@ -388,6 +400,10 @@ def open_decode_mouillages(path_file):
 
     # Decode
     mouillage = mouillage.xoa.decode()
+
+    # Convert lons
+    mouillage = convert_lons(mouillage)
+
     return mouillage
 
 
@@ -447,6 +463,10 @@ def open_decode_scanfish(path_file):
 
     scanfish = xr.concat(list_ds, dim='time')
     scanfish = scanfish.xoa.decode()
+
+    # Convert lons
+    scanfish = convert_lons(scanfish)
+
     return scanfish
 
 
@@ -507,6 +527,10 @@ def open_decode_seasoar(path_file):
 
     seasoar = xr.concat(list_ds, dim='time')
     seasoar = seasoar.xoa.decode()
+
+    # Convert lons
+    seasoar = convert_lons(seasoar)
+
     return seasoar
 
 
@@ -641,6 +665,9 @@ def open_decode_croco_currents(path_files):
     # Regrid if necessary
     croco = xoa.grid.to_rect(croco)
 
+    # Convert lons
+    croco = convert_lons(croco)
+
     return croco
 
 
@@ -689,6 +716,9 @@ def open_decode_hycom_currents(path_files):
     # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)
 
+    # Convert lons
+    hycom = convert_lons(hycom)
+
     return hycom
 
 
@@ -735,6 +765,9 @@ def open_decode_hycom_3d(path_files):
 
     hycom = xoa.grid.to_rect(hycom)
 
+    # Convert lons
+    hycom = convert_lons(hycom)
+
     return hycom
 
 
@@ -776,6 +809,9 @@ def open_decode_cora(path_files):
     cora = cora.rename({'N_levels': 'depth'})
     cora = depth_from_press(cora)
 
+    # Convert lons
+    cora = convert_lons(cora)
+
     return cora
 
 
@@ -807,6 +843,9 @@ def open_decode_basic(path_files):
 
     # Convert depths
     ds = convert_depths(ds)
+
+    # Convert lons
+    ds = convert_lons(ds)
 
     return ds
 
@@ -868,13 +907,9 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         ds_insta = ds_insta.sortby('time')
         return ds_insta
 
-    elif len(path_files) > 1:
-        logger.info("multiple files from list")
-        return xr.open_mfdataset(path_files)
-
     else:
-        logger.info("single file")
-        return xr.open_dataset(path_files[0])
+        logger.info("Basic type")
+        return open_forecaster_basic(path_files)
 
 
 ####################### Tools #######################
@@ -1023,7 +1058,7 @@ def convert_lons(ds):
         Dataset with homogeneous longitudes
     """
     if np.nanmax(ds.lon.where(ds.lon < 1e+30).data) > 180:
-        ds.assign_coords({"lon": (((ds.lon + 180) % 360) - 180)})
+        ds = ds.assign_coords({"lon": (((ds.lon + 180) % 360) - 180)})
     return ds
 
 
@@ -1062,4 +1097,35 @@ def depth_from_press(ds):
     ds = ds.rename({'depth': 'z'})
     adepth = adepth.rename({'depth': 'z'})
     ds = ds.assign_coords(depth=adepth)
+    return ds
+
+def open_forecaster_basic(path_files):
+    """
+     Open netcdf file(s) and store it into a ready-to-use dataset.
+     Parameters
+     ----------
+     path_files : str, list of str
+         Path to the netcdf files.
+     Returns
+     -------
+     xarray.Dataset
+         dataset.
+     """
+    # Open
+    if len(path_files) > 1:
+        logger.info("multiple files from list")
+        ds = xr.open_mfdataset(path_files)
+    else:
+        logger.info("single file")
+        ds = xr.open_dataset(path_files[0])
+
+    # Regrid if necessary
+    ds = xoa.grid.to_rect(ds)
+
+    # Convert depths
+    ds = convert_depths(ds)
+
+    # Convert lons
+    ds = convert_lons(ds)
+
     return ds
