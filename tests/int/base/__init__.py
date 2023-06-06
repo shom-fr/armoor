@@ -60,4 +60,5 @@ def update_comodo(parser:dict) -> dict:
         output.update({'path_comodo' : paths["path_comodo"]})
         new_outputs.append(output)
 
-    return parser.update({'outputs' : new_outputs})
+    parser.update({'outputs': new_outputs})
+    return parser
