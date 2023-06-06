@@ -180,6 +180,8 @@ def open_decode_cmems(path_files):
                 cmems = cmems.drop_vars(f"{var}_ADJUSTED")
             if f"{var}_ADJUSTED_ERROR" in cmems:
                 cmems = cmems.drop_vars(f"{var}_ADJUSTED_ERROR")
+            if f"{var}_CNDC" in cmems:
+                cmems = cmems.drop_vars(f"{var}_CNDC")
 
     # Decode
     cmems = cmems.xoa.decode()
