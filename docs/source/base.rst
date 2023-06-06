@@ -216,11 +216,11 @@ Note that for ``test_6`` and ``test_7`` you will need to specify the parameters 
 
 In both cases, you will need to have a ``/path/to/output/tests/P1/`` with the files from the delivered data archive.
 In the folder where you will run ``pytest`` please create a file named **tests.cfg**
-and add the following lines by replacing ``/path/to/output/tests/P1/``, ``/path/to/comodo/`` and ``/path/to/env/comodo/`` with your information::
+and add the following lines by replacing ``/path/to/output/tests/P1/``, ``/path/to/comodo/`` and ``your commandline`` with your information::
 
     path_p1 = '/path/to/output/tests/P1/'
     path_comodo = '/path/to/comodo/'
-    env_comodo = '/path/to/env/comodo/'
+    env_comodo = 'your commandline'
 
 .. NOTE::
 
