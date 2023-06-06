@@ -22,7 +22,6 @@ class TestBulletins:
         logger.info('test_map_trajectory')
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory.ini"])
         parser.update({'output_path': out_path})
-        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
@@ -31,7 +30,6 @@ class TestBulletins:
         logger.info('test_plot_diff_traj_distance')
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/plot_diff_traj_distance.ini"])
         parser.update({'output_path': out_path})
-        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
@@ -40,6 +38,5 @@ class TestBulletins:
         logger.info('test_map_trajectory_TOPAZ')
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory_TOPAZ.ini"])
         parser.update({'output_path': out_path})
-        create_folder(f'tmp')
         dict2call(parser)
         assert True
