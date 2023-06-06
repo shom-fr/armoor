@@ -787,7 +787,7 @@ def open_decode_cora(path_files):
      """
     # Open
     cora = xr.open_dataset(path_files)
-
+    cora = cora.drop_dims(['N_HISTORY', 'N_CALIB', 'N_PARAM'])
     # Variables to drop/rename to prevent random behaviours
     for var in list(cora.keys()):
         if "POSITION" in var:
@@ -799,6 +799,11 @@ def open_decode_cora(path_files):
                 cora = cora.drop_vars(f"{var}_ADJUSTED")
             if f"{var}_ADJUSTED_ERROR" in cora:
                 cora = cora.drop_vars(f"{var}_ADJUSTED_ERROR")
+
+    for var in list(cora.keys()):
+        if 'N_PROF' not in list(cora[var].dims) and 'N_LEVELS' not in list(cora[var].dims):
+            cora = cora.drop_vars(var)
+
     # Decode
     cora = cora.xoa.decode()
 
