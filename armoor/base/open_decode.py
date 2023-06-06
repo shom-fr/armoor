@@ -810,6 +810,7 @@ def open_decode_cora(path_files):
     # Convert depths
     cora = cora.rename({'N_levels': 'depth'})
     cora = depth_from_press(cora)
+    cora = convert_depths(cora)
 
     # Convert lons
     cora = convert_lons(cora)
@@ -1100,6 +1101,7 @@ def depth_from_press(ds):
     adepth = adepth.rename({'depth': 'z'})
     ds = ds.assign_coords(depth=adepth)
     return ds
+
 
 def open_forecaster_basic(path_files):
     """
