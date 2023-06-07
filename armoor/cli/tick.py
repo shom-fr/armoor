@@ -83,7 +83,7 @@ def search(argv=None):
     config = formated_ticket.get('config')
     state = formated_ticket.get('state')
 
-    show_tickets(ticket.search_tickets(request, config, state))
+    show_tickets(ticket.search_tickets(config, request, state))
 
 
 def description():
