@@ -127,7 +127,7 @@ def plot(config_obj):
                 obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, True, False, False, coloc_method='nearest',
                                                          opt_grid=coloc_product)
                 # Plot the maps
-                base.plot_features.plot_map_harm(mod_coloc, obs_coloc, models_name[i], obs_name,
+                base.plot_features.plot_map_harm(mod_coloc, obs_coloc, models_name[i_mod], obs_name,
                                                  output_path=sub_func_output_folder)
 
         ################################################################################################################
