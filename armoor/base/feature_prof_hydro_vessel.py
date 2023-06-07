@@ -67,6 +67,10 @@ def plot(config_obj):
         # Remove missing values
         models, observation = base.remove_missing_values_ds(models, observation, i_mod, var_mod, vars)
 
+    # Get names
+    models_name = [m['name'] for m in models]
+    obs_name = observation['name']
+
     # PLOT THE OUTPUTS
     for index_output, output in enumerate(outputs):
         if output_path:
@@ -112,49 +116,48 @@ def plot(config_obj):
                 base.plot_features.plot_map_metr_profiles(flag_interval, flag_slice, mod["xarray_meta_coloc"],
                                                           observation["xarray_meta_coloc"][i],
                                                           plot_map_metr[output["plot"]], cmap, vmin, vmax,
+                                                          mod_name=models_name[i], obs_name=obs_name,
                                                           output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax)
 
-        ################################################################################################################
-        # DISP DIAG
-        if "diag_disp" in output["plot"]:
-            models_name = [m['name'] for m in models]
-            obs_name = observation['name']
-            for i, mod in enumerate(models):
-                base.plot_features.diag_disp(flag_interval, flag_slice, obs_name, models_name[i], output["plot"],
-                                             mod["xarray_meta_coloc"], observation["xarray_meta_coloc"][i],
-                                             output_path=sub_func_output_folder)
+            ################################################################################################################
+            # DISP DIAG
+            if "diag_disp" in output["plot"]:
+                for i, mod in enumerate(models):
+                    base.plot_features.diag_disp(flag_interval, flag_slice, obs_name, models_name[i], output["plot"],
+                                                 mod["xarray_meta_coloc"], observation["xarray_meta_coloc"][i],
+                                                 output_path=sub_func_output_folder)
 
-        ################################################################################################################
-        # COURBE PROFIL UNIQUE
-        plot_profile_u = {"plot_profile_u": 'profile_u'}
-        if output["plot"] in plot_profile_u:
-            base.plot_features.plot_profile_unique(models, observation["xarray_meta"],
-                                                   config_obj["meta_zones"]["radius"],
-                                                   output_path=sub_func_output_folder)
+            ################################################################################################################
+            # COURBE PROFIL UNIQUE
+            plot_profile_u = {"plot_profile_u": 'profile_u'}
+            if output["plot"] in plot_profile_u:
+                base.plot_features.plot_profile_unique(models, observation["xarray_meta"],
+                                                       config_obj["meta_zones"]["radius"],
+                                                       output_path=sub_func_output_folder)
 
-        ################################################################################################################
-        # COURBE MULTI PROFILS
-        plot_profile_multi = {"plot_profile_multi": 'profile_multi'}
-        if output["plot"] in plot_profile_multi:
-            base.plot_features.plot_profile_multi(models, observation["xarray_meta"],
-                                                  config_obj["meta_zones"]["radius"],
-                                                  output_path=sub_func_output_folder)
-
-        ################################################################################################################
-        # DIAG TS PROFIL UNIQUE
-        plot_profile_u = {"diag_ts_unique": 'diag_ts_unique'}
-        if output["plot"] in plot_profile_u:
-            base.plot_features.plot_diag_ts_unique(models, observation["xarray_meta"],
-                                                   output_path=sub_func_output_folder)
-
-        ################################################################################################################
-        # DIAG_TS_MULTI
-        diag_ts_multi = {"diag_ts_multi": 'diag_ts_multi'}
-
-        if output["plot"] in diag_ts_multi:
-            if "radius" not in config_obj["meta_zones"]:
-                logger.warning("Caution ! To plot Theta-S diagrams you need to specify a radius in the meta-zone")
-            else:
-                base.plot_features.plot_diag_ts_multi(models, observation["xarray_meta"],
+            ################################################################################################################
+            # COURBE MULTI PROFILS
+            plot_profile_multi = {"plot_profile_multi": 'profile_multi'}
+            if output["plot"] in plot_profile_multi:
+                base.plot_features.plot_profile_multi(models, observation["xarray_meta"],
                                                       config_obj["meta_zones"]["radius"],
                                                       output_path=sub_func_output_folder)
+
+            ################################################################################################################
+            # DIAG TS PROFIL UNIQUE
+            plot_profile_u = {"diag_ts_unique": 'diag_ts_unique'}
+            if output["plot"] in plot_profile_u:
+                base.plot_features.plot_diag_ts_unique(models, observation["xarray_meta"],
+                                                       output_path=sub_func_output_folder)
+
+            ################################################################################################################
+            # DIAG_TS_MULTI
+            diag_ts_multi = {"diag_ts_multi": 'diag_ts_multi'}
+
+            if output["plot"] in diag_ts_multi:
+                if "radius" not in config_obj["meta_zones"]:
+                    logger.warning("Caution ! To plot Theta-S diagrams you need to specify a radius in the meta-zone")
+                else:
+                    base.plot_features.plot_diag_ts_multi(models, observation["xarray_meta"],
+                                                          config_obj["meta_zones"]["radius"],
+                                                          output_path=sub_func_output_folder)
