@@ -4,7 +4,7 @@ import copy
 from armoor import base
 import pandas
 import numpy as np
-import armoor.hmi.script_tools as st
+from armoor.hmi.script_tools import create_folder
 
 import logging
 
@@ -44,7 +44,7 @@ def plot(config_obj):
     for index_output, output in enumerate(outputs):
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
-            st.create_folder(sub_func_output_folder)
+            create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
 
@@ -63,6 +63,7 @@ def plot(config_obj):
             # Define path where to save the trajectories
             if 'path_results_traj' in output:
                 path_results = output["path_results_traj"]
+                create_folder(path_results)
             else:
                 raise Exception("Oops, pour calculer les trajectoires vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")
@@ -122,6 +123,7 @@ def plot(config_obj):
             # Define path where to save the trajectories
             if 'path_results_traj' in output:
                 path_results = output["path_results_traj"]
+                create_folder(path_results)
             else:
                 raise Exception("Oops, pour calculer les trajectoires vous devriez spécifier"
                                 " le chemin où sauvegarder les fichiers résultats...")

@@ -67,3 +67,10 @@ Configuration Apache :
 -	Faire pointer toutes les requêtes /* vers le fichier index.html (sur le serveur Front End)
 -	Faire pointer toutes les requêtes /api vers l’API (serveur Back End)
 
+
+Hébergement de l'API et du site web
+-----------------------------------
+
+Tous les tests ont été effectués avec 8 Go de RAM et 6 vCPU. 
+Il faut prévoir au moins 90 Go d'espace disque pour 10 jours d'historique et 
+3 configurations régionales (3 Go x 10 j x 3 conf).

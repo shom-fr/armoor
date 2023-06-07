@@ -180,6 +180,8 @@ def open_decode_cmems(path_files):
                 cmems = cmems.drop_vars(f"{var}_ADJUSTED")
             if f"{var}_ADJUSTED_ERROR" in cmems:
                 cmems = cmems.drop_vars(f"{var}_ADJUSTED_ERROR")
+            if f"{var}_CNDC" in cmems:
+                cmems = cmems.drop_vars(f"{var}_CNDC")
 
     # Decode
     cmems = cmems.xoa.decode()
@@ -785,7 +787,7 @@ def open_decode_cora(path_files):
      """
     # Open
     cora = xr.open_dataset(path_files)
-
+    cora = cora.drop_dims(['N_HISTORY', 'N_CALIB', 'N_PARAM'])
     # Variables to drop/rename to prevent random behaviours
     for var in list(cora.keys()):
         if "POSITION" in var:
@@ -797,6 +799,11 @@ def open_decode_cora(path_files):
                 cora = cora.drop_vars(f"{var}_ADJUSTED")
             if f"{var}_ADJUSTED_ERROR" in cora:
                 cora = cora.drop_vars(f"{var}_ADJUSTED_ERROR")
+
+    for var in list(cora.keys()):
+        if 'N_PROF' not in list(cora[var].dims) and 'N_LEVELS' not in list(cora[var].dims):
+            cora = cora.drop_vars(var)
+
     # Decode
     cora = cora.xoa.decode()
 
@@ -808,6 +815,7 @@ def open_decode_cora(path_files):
     # Convert depths
     cora = cora.rename({'N_levels': 'depth'})
     cora = depth_from_press(cora)
+    cora = convert_depths(cora)
 
     # Convert lons
     cora = convert_lons(cora)
@@ -1098,6 +1106,7 @@ def depth_from_press(ds):
     adepth = adepth.rename({'depth': 'z'})
     ds = ds.assign_coords(depth=adepth)
     return ds
+
 
 def open_forecaster_basic(path_files):
     """
