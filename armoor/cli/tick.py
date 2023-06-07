@@ -79,8 +79,8 @@ def search(argv=None):
     ticket = Ticket()
     formated_ticket = ticket.format_ticket_from_cli(cfg_ticket_lines)
 
-    request = formated_ticket.get('request')
-    config = formated_ticket.get('config')
+    request = formated_ticket.get('request', '')
+    config = formated_ticket.get('config', '')
     state = formated_ticket.get('state')
 
     show_tickets(ticket.search_tickets(config, request, state))
