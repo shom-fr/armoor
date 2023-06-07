@@ -11,6 +11,7 @@ Welcome to [SHOM] Validation and reports tools's documentation!
    functionalities
    bull
    tick
+   hmi_install
    hmi
 
 
@@ -31,5 +32,6 @@ Indices and tables
 * :doc:`functionalities`: Description of the different comparison functions of the tool.
 * :doc:`bull`: Description of the generation of a comparison report based on the 9 functionalities described above
 * :doc:`tick`: Presentation of the tool to create, search and read issues from Gitlab.
+* :doc:`hmi_install` : Installation process for the forecaster interface.
 * :doc:`hmi` : Presentation of the script to generate images for the forecaster interface.
 
