@@ -77,7 +77,8 @@ def remove_missing_values(model, obs):
         model_nan = model_nan.assign_coords(model.coords)
         if obs_nan.dims != obs.dims:
             obs_nan = obs_nan.squeeze()
-        obs_nan = obs_nan.assign_coords(obs.coords)
+        if len(list(obs_nan.coords)) <= len(list(obs.coords)):
+            obs_nan = obs_nan.assign_coords(obs.coords)
         return model_nan, obs_nan
     else:
         return model, obs
