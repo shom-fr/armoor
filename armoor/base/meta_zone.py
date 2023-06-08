@@ -827,27 +827,6 @@ class MetazoneAccessor:
         ds = ds.drop_vars('interval_label')
         return ds
 
-    def format_interval(self, start, end, interval):
-        """
-        Retrieve the right inteval for monthly, yearly interval.
-        Parameters
-        ----------
-        start : np.datime64
-            Date of start
-        end : np.datime64
-            Date of end
-        interval : str
-            Required interval
-
-        Returns
-        -------
-
-        """
-        if interval in ["1M", "M"]:
-            interval = "MS"
-        end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
-        return start, end, interval
-
     # Overload emulation
     def time_selection_climatological(self, *args):
         """
