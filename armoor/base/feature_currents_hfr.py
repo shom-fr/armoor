@@ -70,6 +70,10 @@ def plot(config_obj):
         else:
             env_comodo = ''
 
+        # Get names
+        models_name = [m['name'] for m in models]
+        obs_name = observation['name']
+
         # PLOTS
         ################################################################################################################
         # MAP TIDAL CURRENTS
@@ -123,7 +127,8 @@ def plot(config_obj):
                 obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, True, False, False, coloc_method='nearest',
                                                          opt_grid=coloc_product)
                 # Plot the maps
-                base.plot_features.plot_map_harm(mod_coloc, obs_coloc, output_path=sub_func_output_folder)
+                base.plot_features.plot_map_harm(mod_coloc, obs_coloc, models_name[i_mod], obs_name,
+                                                 output_path=sub_func_output_folder)
 
         ################################################################################################################
         # ELLIPSES TIDAL CURRENTS
@@ -168,7 +173,6 @@ def plot(config_obj):
             ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
                                                                 path_results, path_tools, list_waves, 'obs',
                                                                 env_comodo=env_comodo)
-            ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
             ds_models = []
             for i_mod, mod in enumerate(models):
@@ -177,7 +181,6 @@ def plot(config_obj):
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc, path_results,
                                                                     path_tools, list_waves, 'mod',
                                                                     env_comodo=env_comodo)
-                ds_mod = ds_mod.assign_attrs({'name': mod['name']})
                 ds_models.append(ds_mod)
             # Plot the maps
             base.plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale, output_path=sub_func_output_folder)
@@ -253,5 +256,5 @@ def plot(config_obj):
                 base.plot_features.plot_map_metr_current(flag_interval, flag_slice, mod["xarray_meta"],
                                                          mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                          observation["xarray_meta_coloc"][i_mod],
-                                                         plot_map_metr[output["plot"]], cmap, vmin, vmax,
-                                                         output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax)
+                                                         plot_map_metr[output["plot"]], cmap, vmin, vmax, dvmin=dvmin,
+                                                         dvmax=dvmax, output_path=sub_func_output_folder, )

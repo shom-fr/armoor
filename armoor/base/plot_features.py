@@ -591,11 +591,11 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
     cbar.set_label('Number Of Points', rotation=270, fontsize=15, labelpad=15)
     plt.legend(loc='upper left')
 
-    ft.manage_output(plt, f'diag_disp_g_{var_title}_{model_name}_{obs_name}', output_path)
+    ft.manage_output(plt, f'diag_disp_g_{var_title}_{obs_name}_{model_name}', output_path)
 
 
 def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metric, cmap=cmocean.cm.thermal, vmin=None,
-                           vmax=None, output_path=None, dvmin=None, dvmax=None):
+                           vmax=None, mod_name=None, obs_name=None, output_path=None, dvmin=None, dvmax=None):
     """
     Plot the map of the profiles for functionality 2.
     Parameters
@@ -613,24 +613,24 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
     cmap : str
        cmocean colour map.
     vmin : float
-       min colour value of SST to plot.
+       min colour value of profile to plot.
     vmax : float
-       max colour value of SST to plot.
+       max colour value of profile to plot.
+    dvmin : float
+       min colour value of comparison to plot.
+    dvmax : float
+       max colour value of comparison to plot.
+    mod_name : str
+        Name of the model.
+    obs_name : str
+        Name of the observation.
     output_path :
         Path where to save the figures.
     """
     logger.info('Map of profiles')
-    # Set the titles
-    if 'name' in obs_coloc.attrs:
-        obs_name = obs_coloc.name
-    else:
-        obs_name = 'Observation'
-    if 'name' in mod_coloc.attrs:
-        mod_name = mod_coloc.name
-    else:
-        mod_name = 'Model'
+
     if output_path:
-        output_path = os.path.join(output_path, f'{obs_name}_{mod_name}')
+        output_path = os.path.join(output_path, f'{mod_name}_{obs_name}')
         st.create_folder(output_path)
 
     var_title = find_var_title(obs_name, obs_coloc)
@@ -654,8 +654,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
     # calculate the variables required by the metric to plot
     if metric == "difference":
-        obs_coloc = obs_coloc.squeeze()
-        mod_coloc = mod_coloc.squeeze()
+        obs_coloc = obs_coloc
+        mod_coloc = mod_coloc
         comparison = mod_coloc - obs_coloc
 
     elif metric == "bias":
@@ -668,8 +668,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                 var_slice = 'idx_depth'
             elif 'idx_dens' in obs_coloc.dims:
                 var_slice = 'idx_dens'
-            obs_coloc = obs_coloc.squeeze().mean(var_slice)
-            mod_coloc = mod_coloc.squeeze().mean(var_slice)
+            obs_coloc = obs_coloc.mean(var_slice)
+            mod_coloc = mod_coloc.mean(var_slice)
             comparison = mod_coloc - obs_coloc
 
     elif metric == "RMSEc":
@@ -684,8 +684,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
             elif 'idx_dens' in obs_coloc.dims:
                 var_slice = 'idx_dens'
             comparison = calculation.rmse_generic(obs_coloc, mod_coloc, [var_slice])
-            obs_coloc = obs_coloc.std(var_slice).squeeze()
-            mod_coloc = mod_coloc.std(var_slice).squeeze()
+            obs_coloc = obs_coloc.std(var_slice)
+            mod_coloc = mod_coloc.std(var_slice)
 
     elif metric == "RMSEcentree":
         if flag_slice is False:
@@ -698,8 +698,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
             elif 'idx_dens' in obs_coloc.dims:
                 var_slice = 'idx_dens'
             comparison = calculation.rmse_center_generic(obs_coloc, mod_coloc, [var_slice])
-            obs_coloc = obs_coloc.std(var_slice).squeeze()
-            mod_coloc = mod_coloc.std(var_slice).squeeze()
+            obs_coloc = obs_coloc.std(var_slice)
+            mod_coloc = mod_coloc.std(var_slice)
 
     # Plot the figures
     if flag_interval:
@@ -707,97 +707,101 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
             if flag_slice:
                 for index_slice, slice in enumerate(obs_coloc.slice):
                     # Select the data to plot
-                    obs_coloc_inter = obs_coloc.isel(interval=[index_time], slice=[index_slice]).squeeze()
-                    mod_coloc_inter = mod_coloc.isel(interval=[index_time], slice=[index_slice]).squeeze()
-                    comparison_inter = comparison.isel(interval=[index_time], slice=[index_slice]).squeeze()
+                    obs_coloc_inter = obs_coloc.isel(interval=[index_time], slice=[index_slice])
+                    mod_coloc_inter = mod_coloc.isel(interval=[index_time], slice=[index_slice])
+                    comparison_inter = comparison.isel(interval=[index_time], slice=[index_slice])
                     title = f'{var_title} : {metric.capitalize()} metric - {title_depth[index_slice]} - ' \
                             f'{title_time[index_time]} '
 
                     file_name = f'time{index_time}_slice{index_slice}'
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter, title, vmin, vmax,
-                                                  metric, cmap, file_name, output_path, dvmin=dvmin, dvmax=dvmax)
+                                                  metric, cmap, file_name, output_path, mod_name, obs_name, dvmin=dvmin,
+                                                  dvmax=dvmax)
 
             elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
                 for index_depth, depth in enumerate(obs_coloc.depth):
                     # Select the data to plot
-                    obs_coloc_inter = obs_coloc.isel(interval=[index_time], depth=[index_depth]).squeeze()
-                    mod_coloc_inter = mod_coloc.isel(interval=[index_time], depth=[index_depth]).squeeze()
-                    comparison_inter = comparison.isel(interval=[index_time], depth=[index_depth]).squeeze()
+                    obs_coloc_inter = obs_coloc.isel(interval=[index_time], depth=[index_depth])
+                    mod_coloc_inter = mod_coloc.isel(interval=[index_time], depth=[index_depth])
+                    comparison_inter = comparison.isel(interval=[index_time], depth=[index_depth])
                     title = f'{var_title} : {metric.capitalize()} metric - {title_depth[index_depth]} -' \
                             f' {title_time[index_time]}'
 
                     file_name = f'time{index_time}_depth{index_depth}'
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter, title, vmin, vmax,
-                                                  metric, cmap, file_name, output_path, dvmin=dvmin, dvmax=dvmax)
+                                                  metric, cmap, file_name, output_path, mod_name, obs_name, dvmin=dvmin,
+                                                  dvmax=dvmax)
 
             elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
                 for index_dens, dens in enumerate(obs_coloc.dens):
                     # Select the data to plot
-                    obs_coloc_inter = obs_coloc.isel(interval=[index_time], dens=[index_dens]).squeeze()
-                    mod_coloc_inter = mod_coloc.isel(interval=[index_time], dens=[index_dens]).squeeze()
-                    comparison_inter = comparison.isel(interval=[index_time], dedenspth=[index_dens]).squeeze()
+                    obs_coloc_inter = obs_coloc.isel(interval=[index_time], dens=[index_dens])
+                    mod_coloc_inter = mod_coloc.isel(interval=[index_time], dens=[index_dens])
+                    comparison_inter = comparison.isel(interval=[index_time], dedenspth=[index_dens])
                     title = f'{var_title} : {metric.capitalize()} metric - {title_depth[index_dens]} -' \
                             f' {title_time[index_time]}'
 
                     file_name = f'time{index_time}_dens{index_dens}'
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter, title, vmin, vmax,
-                                                  metric, cmap, file_name, output_path, dvmin=dvmin, dvmax=dvmax)
+                                                  metric, cmap, file_name, output_path, mod_name, obs_name, dvmin=dvmin,
+                                                  dvmax=dvmax)
             else:
                 # Select the data to plot
-                obs_coloc_inter = obs_coloc.isel(interval=[index_time]).squeeze()
-                mod_coloc_inter = mod_coloc.isel(interval=[index_time]).squeeze()
-                comparison_inter = comparison.isel(interval=[index_time]).squeeze()
+                obs_coloc_inter = obs_coloc.isel(interval=[index_time])
+                mod_coloc_inter = mod_coloc.isel(interval=[index_time])
+                comparison_inter = comparison.isel(interval=[index_time])
                 title = f'{var_title} : {metric.capitalize()} metric - {title_depth} - {title_time[index_time]}'
 
                 file_name = f'time{index_time}'
                 plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter, title, vmin, vmax,
-                                              metric, cmap, file_name, output_path, dvmin=dvmin, dvmax=dvmax)
+                                              metric, cmap, file_name, output_path, mod_name, obs_name, dvmin=dvmin,
+                                              dvmax=dvmax)
     else:
         if flag_slice:
             for index_slice, slice in enumerate(obs_coloc.slice):
                 # Select the data to plot
-                obs_coloc = obs_coloc.isel(slice=[index_slice]).squeeze()
-                mod_coloc = mod_coloc.isel(slice=[index_slice]).squeeze()
-                comparison = comparison.isel(slice=[index_slice]).squeeze()
+                obs_coloc = obs_coloc.isel(slice=[index_slice])
+                mod_coloc = mod_coloc.isel(slice=[index_slice])
+                comparison = comparison.isel(slice=[index_slice])
                 title = f'{var_title} : {metric.capitalize()} metric - {title_depth[index_slice]} - {title_time}'
 
                 file_name = f'slice{index_slice}'
                 plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap,
-                                              file_name, output_path, dvmin=dvmin, dvmax=dvmax)
+                                              file_name, output_path, mod_name, obs_name, dvmin=dvmin, dvmax=dvmax)
 
         elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
             for index_depth, depth in enumerate(obs_coloc.depth):
                 # Select the data to plot
-                obs_coloc = obs_coloc.isel(depth=[index_depth]).squeeze()
-                mod_coloc = mod_coloc.isel(depth=[index_depth]).squeeze()
-                comparison = comparison.isel(depth=[index_depth]).squeeze()
+                obs_coloc = obs_coloc.isel(depth=[index_depth])
+                mod_coloc = mod_coloc.isel(depth=[index_depth])
+                comparison = comparison.isel(depth=[index_depth])
                 title = f'{var_title} : {metric.capitalize()} metric - {title_depth[index_depth]} - {title_time}'
 
                 file_name = f'depth{index_depth}'
                 plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap,
-                                              file_name, output_path, dvmin=dvmin, dvmax=dvmax)
+                                              file_name, output_path, mod_name, obs_name, dvmin=dvmin, dvmax=dvmax)
 
         elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
             for index_dens, dens in enumerate(obs_coloc.dens):
                 # Select the data to plot
-                obs_coloc = obs_coloc.isel(dens=[index_dens]).squeeze()
-                mod_coloc = mod_coloc.isel(dens=[index_dens]).squeeze()
-                comparison = comparison.isel(dens=[index_dens]).squeeze()
+                obs_coloc = obs_coloc.isel(dens=[index_dens])
+                mod_coloc = mod_coloc.isel(dens=[index_dens])
+                comparison = comparison.isel(dens=[index_dens])
                 title = f'{var_title} : {metric.capitalize()} metric - {title_depth[index_dens]} - {title_time}'
 
                 file_name = f'dens{index_dens}'
                 plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap,
-                                              file_name, output_path, dvmin=dvmin, dvmax=dvmax)
+                                              file_name, output_path, mod_name, obs_name, dvmin=dvmin, dvmax=dvmax)
         else:
             title = f'{var_title} : {metric.capitalize()} metric - {title_depth} - {title_time}'
             file_name = ''
 
             plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap, file_name,
-                                          output_path, dvmin=dvmin, dvmax=dvmax)
+                                          output_path, mod_name, obs_name, dvmin=dvmin, dvmax=dvmax)
 
 
 def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap, file_name,
-                                  output_path=None, dvmin=None, dvmax=None):
+                                  output_path=None, mod_name=None, obs_name=None, dvmin=None, dvmax=None):
     """
     Plot the map of the profiles for functionality 2. Display the figures.
     Parameters
@@ -826,11 +830,19 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
         Name of the figure file to save.
     output_path :
         Path where to save the figures.
+    mod_name : str
+        Name of the model.
+    obs_name : str
+        Name of the observation.
 
     """
     # Get min/max colobar values
     vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap = get_min_max_values(vmin, vmax, obs_coloc,
                                                                                        comparison, metric, dvmin, dvmax)
+
+    # Squeeze
+    mod_coloc, obs_coloc = mod_coloc.squeeze(), obs_coloc.squeeze()
+    comparison = comparison.squeeze()
 
     # Plot the map
     f, axs = figure_3_maps(mod_coloc, 'classic')
@@ -848,11 +860,11 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
     f.suptitle(title, fontsize=17, fontweight='bold')
 
     # Save figure
-    ft.manage_output(plt, f'map_metric_{file_name}', output_path)
+    ft.manage_output(plt, f'map_metric_{obs_name}_{mod_name}_{file_name}', output_path)
 
 
 def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_coloc, metric, cmap=cmocean.cm.thermal,
-                  vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None):
+                  vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None, obs_name=None, mod_name=None):
     """
     Plot the map of the model and observation and their comparison required in functionality 1,2,3,5.
 
@@ -884,22 +896,15 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
        min colour value of comparison to plot.
     dvmax : float
        max colour value of comparison to plot.
-
+    mod_name : str
+        Name of the model.
+    obs_name : str
+        Name of the observation.
     """
 
     logger.info('Map of the model and observation and their comparison')
 
-    # Get the titles
-    if 'name' in obs_coloc.attrs:
-        obs_name = obs_coloc.name
-    else:
-        obs_name = 'observation'
-    if 'name' in mod_coloc.attrs:
-        mod_name = mod_coloc.name
-    else:
-        mod_name = 'model'
-
-    var_title = find_var_title(mod_coloc.name, mod_coloc)
+    var_title = find_var_title(mod_name, mod_coloc)
 
     # Get the dimensions on which the stats are calculated
     list_dims_mean = []
@@ -913,10 +918,6 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                 "Oops, pour utiliser cette carte de métrique, vous ne devriez pas fournir une spécification "
                 "d'intervalles successifs dans votre meta-zone")
 
-        obs_coloc = obs_coloc.squeeze()
-        obs_meta = obs_meta.squeeze()
-        mod_coloc = mod_coloc.squeeze()
-        mod_meta = mod_meta.squeeze()
         comparison = mod_coloc - obs_coloc
 
     elif metric == "bias":
@@ -926,10 +927,10 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                 "temporels "
                 "ou de tranches verticales dans votre meta-zone")
 
-        obs_coloc = obs_coloc.mean(list_dims_mean).squeeze()
-        obs_meta = obs_meta.mean(list_dims_mean).squeeze()
-        mod_coloc = mod_coloc.mean(list_dims_mean).squeeze()
-        mod_meta = mod_meta.mean(list_dims_mean).squeeze()
+        obs_coloc = obs_coloc.mean(list_dims_mean)
+        obs_meta = obs_meta.mean(list_dims_mean)
+        mod_coloc = mod_coloc.mean(list_dims_mean)
+        mod_meta = mod_meta.mean(list_dims_mean)
         comparison = mod_coloc - obs_coloc
 
     elif metric == "RMSEc":
@@ -939,10 +940,10 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                 "temporels "
                 "ou de tranches verticales dans votre meta-zone")
         comparison = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean)
-        obs_coloc = obs_coloc.std(list_dims_mean).squeeze()
-        obs_meta = obs_meta.std(list_dims_mean).squeeze()
-        mod_coloc = mod_coloc.std(list_dims_mean).squeeze()
-        mod_meta = mod_meta.std(list_dims_mean).squeeze()
+        obs_coloc = obs_coloc.std(list_dims_mean)
+        obs_meta = obs_meta.std(list_dims_mean)
+        mod_coloc = mod_coloc.std(list_dims_mean)
+        mod_meta = mod_meta.std(list_dims_mean)
 
     elif metric == "RMSEcentree":
         if flag_interval is False and flag_slice is False:
@@ -951,10 +952,10 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                 "temporels "
                 "ou de tranches verticales dans votre meta-zone")
         comparison = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean)
-        obs_coloc = obs_coloc.std(list_dims_mean).squeeze()
-        obs_meta = obs_meta.std(list_dims_mean).squeeze()
-        mod_coloc = mod_coloc.std(list_dims_mean).squeeze()
-        mod_meta = mod_meta.std(list_dims_mean).squeeze()
+        obs_coloc = obs_coloc.std(list_dims_mean)
+        obs_meta = obs_meta.std(list_dims_mean)
+        mod_coloc = mod_coloc.std(list_dims_mean)
+        mod_meta = mod_meta.std(list_dims_mean)
 
     # Plot the values
     if metric == "difference":
@@ -1076,8 +1077,13 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
     # Get min/max colobar values
     vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap = get_min_max_values(vmin, vmax, obs_meta, comparison,
                                                                                        metric, dvmin, dvmax)
-    # Plot
 
+    # Squeeze
+    obs_meta, obs_coloc = obs_meta.squeeze(), obs_coloc.squeeze()
+    mod_meta, mod_coloc = mod_meta.squeeze(), mod_coloc.squeeze()
+    comparison = comparison.squeeze()
+
+    # Plot
     f, axs = figure_5_maps(obs_coloc)
     im0 = axs[0].pcolormesh(obs_meta.lon.data, obs_meta.lat.data, obs_meta.data, vmin=vmin, vmax=vmax, cmap=cmap,
                             transform=ccrs.PlateCarree())
@@ -1089,7 +1095,7 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
 
     im3 = axs[3].pcolormesh(mod_coloc.lon, mod_coloc.lat, mod_coloc, vmin=vmin, vmax=vmax, cmap=cmap,
                             transform=ccrs.PlateCarree())
-    im4 = axs[4].pcolormesh(obs_coloc.lon.data, obs_coloc.lat.data, comparison.squeeze().data, vmin=comparison_vmin,
+    im4 = axs[4].pcolormesh(obs_coloc.lon.data, obs_coloc.lat.data, comparison.data, vmin=comparison_vmin,
                             vmax=comparison_vmax, cmap=cmocean.cm.balance, transform=ccrs.PlateCarree())
 
     cbar1 = f.colorbar(im3, ax=[axs[1], axs[3]])
@@ -1262,10 +1268,10 @@ def plot_difference_trajectory(obs, mod, obs_name, mod_name, var, output_path=No
     ax_mini_map = add_mini_map(f, obs)
     ax_mini_map.plot(obs.lon.values, obs.lat.values, transform=ccrs.PlateCarree())
 
-    ft.manage_output(plt, f'2Dgraph_{var}', output_path)
+    ft.manage_output(plt, f'2Dgraph_{obs_name}_{mod_name}_{var}', output_path)
 
 
-def plot_map_harm(models, observations, output_path=None):
+def plot_map_harm(models, observations, mod_name, obs_name, output_path=None):
     """
     Plot the map of amplitude, phase and norm of each tidal harmonic.
     Parameters
@@ -1274,11 +1280,16 @@ def plot_map_harm(models, observations, output_path=None):
         Model harmonic datasets.
     observations : xarray.dataset
         Observation harmonic dataset.
+    mod_name : str
+        Model name.
+    obs_name : str
+        Observation name.
     output_path : str
         Path where to save the figures.
 
     """
     logger.info('Map of amplitude, phase and norm of each tidal harmonic.')
+
     for i_wave, wave in enumerate(observations.wave):
         # Get the variables of interest
         wave_name = str(observations.waveNames[i_wave].values).split('\'')[1]
@@ -1330,7 +1341,7 @@ def plot_map_harm(models, observations, output_path=None):
             colorbar_go = f.colorbar(G_obs, ax=axs[3], orientation='horizontal', fraction=0.046, pad=0.1)
             colorbar_gd = f.colorbar(G_diff, ax=axs[5], orientation='horizontal', fraction=0.046, pad=0.1)
 
-            ft.manage_output(plt, f'{wave_name}_tide_current_{var}_map', output_path)
+            ft.manage_output(plt, f'{wave_name}_tide_current_{var}_map_{obs_name}_{mod_name}', output_path)
 
         for var in ['Norm']:
             ampl = 'norm'
@@ -1361,7 +1372,7 @@ def plot_map_harm(models, observations, output_path=None):
             colorbar_ao = f.colorbar(a_obs, ax=axs[1], orientation='horizontal', fraction=0.046, pad=0.1)
             colorbar_ad = f.colorbar(a_diff, ax=axs[2], orientation='horizontal', fraction=0.046, pad=0.05)
 
-            ft.manage_output(plt, f'{wave_name}_tide_current_{var}_map', output_path)
+            ft.manage_output(plt, f'{wave_name}_tide_current_{var}_map_{obs_name}_{mod_name}', output_path)
 
 
 def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None):
@@ -1410,7 +1421,8 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
                     f.suptitle(title, fontsize=15, fontweight='bold')
                     f.subplots_adjust(top=0.85)
 
-                    ft.manage_output(plt, f'{wave_name}_tide_current_ellipses_depth{i_depth}', output_path)
+                    ft.manage_output(plt, f'{wave_name}_tide_current_ellipses_{obs.name}_{mod.name}_depth{i_depth}',
+                                     output_path)
 
             # If vertical immersions : on plot per immersion (density)
             elif 'dens' in observations.dims:
@@ -1436,7 +1448,8 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
                             f'{title_depth}'
                     f.suptitle(title, fontsize=15, fontweight='bold')
                     f.subplots_adjust(top=0.85)
-                    ft.manage_output(plt, f'{wave_name}_tide_current_ellipses_dens{i_dens}', output_path)
+                    ft.manage_output(plt, f'{wave_name}_tide_current_ellipses_{obs.name}_{mod.name}_dens{i_dens}',
+                                     output_path)
             # If vertical slices : one plot per slice
             elif 'slice' in observations.dims:
                 for i_slice, slice in enumerate(observations.slice):
@@ -1461,7 +1474,8 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
                             f'{title_depth}'
                     f.suptitle(title, fontsize=15, fontweight='bold')
                     f.subplots_adjust(top=0.85)
-                    ft.manage_output(plt, f'{wave_name}_tide_current_ellipses_slice{i_slice}_{wave_name}', output_path)
+                    ft.manage_output(plt, f'{wave_name}_tide_current_ellipses_{obs.name}_{mod.name}_slice{i_slice}',
+                                     output_path)
 
             else:
                 # Get the variables of interest
@@ -1489,7 +1503,7 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
                 # Add the scale
                 ax = add_scale(ax, scale)
 
-                ft.manage_output(plt, f'tide_current_ellipses_{wave_name}', output_path)
+                ft.manage_output(plt, f'{wave_name}_tide_current_ellipses_{obs.name}_{mod.name}', output_path)
 
 
 def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
@@ -1553,7 +1567,8 @@ def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
 
 
 def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_coloc, metric,
-                          cmap=cmocean.cm.thermal, vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None):
+                          cmap=cmocean.cm.thermal, vmin=None, vmax=None, dvmin=None, dvmax=None, obs_name=None,
+                          mod_name=None, output_path=None):
     """
     Plot the maps of the current with the comparison metric.
     Parameters
@@ -1578,6 +1593,14 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
        min colour value of variable to plot.
     vmax : float
        max colour value of variable to plot.
+    dvmin : float
+       min comparison value of variable to plot.
+    dvmax : float
+       max comparison value of variable to plot.
+    mod_name : str
+        Name of the model.
+    obs_name : str
+        Name of the observation.
     output_path :
         Path where to save the figures.
     """
@@ -1597,10 +1620,6 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                 "Oops, pour utiliser cette carte de métrique, vous ne devriez pas fournir une spécification "
                 "d'intervalles successifs dans votre meta-zone")
 
-        obs_coloc = obs_coloc.squeeze()
-        obs_meta = obs_meta.squeeze()
-        mod_coloc = mod_coloc.squeeze()
-        mod_meta = mod_meta.squeeze()
         comparison = mod_coloc - obs_coloc
 
     elif metric == "bias":
@@ -1610,10 +1629,10 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                 "temporels "
                 "ou de tranches verticales dans votre meta-zone")
 
-        obs_coloc = obs_coloc.mean(list_dims_mean).squeeze()
-        obs_meta = obs_meta.mean(list_dims_mean).squeeze()
-        mod_coloc = mod_coloc.mean(list_dims_mean).squeeze()
-        mod_meta = mod_meta.mean(list_dims_mean).squeeze()
+        obs_coloc = obs_coloc.mean(list_dims_mean)
+        obs_meta = obs_meta.mean(list_dims_mean)
+        mod_coloc = mod_coloc.mean(list_dims_mean)
+        mod_meta = mod_meta.mean(list_dims_mean)
         comparison = mod_coloc - obs_coloc
 
     elif metric == "RMSEc":
@@ -1622,10 +1641,10 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                 "Oops, pour utiliser cette carte de métrique, vous devriez fournir une spécification d'intervalles "
                 "temporels ou de tranches verticales dans votre meta-zone")
         comparison = calculation.rmse_generic(obs_coloc.norm, mod_coloc.norm, list_dims_mean)
-        obs_coloc = obs_coloc.std(list_dims_mean).squeeze()
-        obs_meta = obs_meta.std(list_dims_mean).squeeze()
-        mod_coloc = mod_coloc.std(list_dims_mean).squeeze()
-        mod_meta = mod_meta.std(list_dims_mean).squeeze()
+        obs_coloc = obs_coloc.std(list_dims_mean)
+        obs_meta = obs_meta.std(list_dims_mean)
+        mod_coloc = mod_coloc.std(list_dims_mean)
+        mod_meta = mod_meta.std(list_dims_mean)
 
     elif metric == "RMSEcentree":
         if flag_interval is False and flag_slice is False:
@@ -1633,10 +1652,10 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                 "Oops, pour utiliser cette carte de métrique, vous devriez fournir une spécification d'intervalles "
                 "temporels ou de tranches verticales dans votre meta-zone")
         comparison = calculation.rmse_center_generic(obs_coloc.norm, mod_coloc.norm, list_dims_mean)
-        obs_coloc = obs_coloc.std(list_dims_mean).squeeze()
-        obs_meta = obs_meta.std(list_dims_mean).squeeze()
-        mod_coloc = mod_coloc.std(list_dims_mean).squeeze()
-        mod_meta = mod_meta.std(list_dims_mean).squeeze()
+        obs_coloc = obs_coloc.std(list_dims_mean)
+        obs_meta = obs_meta.std(list_dims_mean)
+        mod_coloc = mod_coloc.std(list_dims_mean)
+        mod_meta = mod_meta.std(list_dims_mean)
 
     # Plot the values
     if metric == "difference":
@@ -1646,11 +1665,11 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
             title = f'{var_title} : {metric.capitalize()} metric - {title_time}'
 
             # Plot, save and display
-            f, axs = plot_map_metr_figure(obs_meta.norm, mod_meta.norm, obs_coloc.norm, mod_coloc.norm, vmin, vmax,
-                                          cmap, title, metric, dvmin=dvmin, dvmax=dvmax)
+            f, axs = plot_map_metr_figure(obs_meta.norm, mod_meta.norm, obs_coloc.norm, mod_coloc.norm, comparison.norm,
+                                          vmin, vmax, cmap, title, metric, dvmin=dvmin, dvmax=dvmax)
             axs = add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc)
 
-            ft.manage_output(plt, f'{metric}_{title_time}', output_path)
+            ft.manage_output(plt, f'current_map_{metric}_{obs_name}_{mod_name}_{title_time}', output_path)
 
         else:
             for i_time, time in enumerate(mod_coloc.time):
@@ -1670,7 +1689,7 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                 axs = add_current_arrows(axs, obs_meta.sel(time=time, method='nearest'), obs_coloc.isel(time=i_time),
                                          mod_meta.sel(time=time, method='nearest'), mod_coloc.isel(time=i_time))
 
-                ft.manage_output(plt, f'{metric}_{title_time}', output_path)
+                ft.manage_output(plt, f'current_map_{metric}_{obs_name}_{mod_name}_{title_time}', output_path)
 
     else:
         if flag_interval:
@@ -1701,7 +1720,7 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
                     axs = add_current_arrows(axs, obs_meta.isel(interval=i_inter_obs), obs_coloc.isel(interval=i_inter),
                                              mod_meta.isel(interval=i_inter_mod), mod_coloc.isel(interval=i_inter))
 
-                ft.manage_output(plt, f'{metric}_{title_time}', output_path)
+                ft.manage_output(plt, f'current_map_{metric}_{obs_name}_{mod_name}_{title_time}', output_path)
         # no interval
         else:
             title_time = np.datetime_as_string(mod_coloc.time.values, unit='s')
@@ -1713,7 +1732,7 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
             if metric == 'bias':
                 axs = add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc)
             # Save and display
-            ft.manage_output(plt, f'{metric}_{title_time}', output_path)
+            ft.manage_output(plt, f'current_map_{metric}_{obs_name}_{mod_name}_{title_time}', output_path)
 
 
 def add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, nb_vect=50):
@@ -1739,6 +1758,11 @@ def add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, nb_vect=50
 
     """
     logger.info('Current vectors')
+
+    # Squeeze
+    obs_meta, obs_coloc = obs_meta.squeeze(), obs_coloc.squeeze()
+    mod_meta, mod_coloc = mod_meta.squeeze(), mod_coloc.squeeze()
+
     for i_ds, ds in enumerate([obs_meta, obs_coloc, mod_meta, mod_coloc]):
         dens = int(len(ds.lon.values) / nb_vect)
         if dens < 1:
@@ -1890,7 +1914,7 @@ def plot_ts_metr_point(models, observation, metric, flag_interval, flag_slice, o
 
         lon_name = str(longitude.data)[0:8]
         lat_name = str(latitude.data)[0:8]
-        ft.manage_output(plt, f'ts_lon{lon_name}_lat{lat_name}_{metric}', output_path)
+        ft.manage_output(plt, f'ts_lon{lon_name}_lat{lat_name}_{mod.name}_{observation.name}_{metric}', output_path)
 
 
 def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vmax=None, output_path=None):
@@ -1914,21 +1938,23 @@ def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vm
     logger.info('3D variable section difference between observation and model.')
     if type(observation["xarray_meta_coloc"][0]) == xr.DataArray:
         for i_mod, mod in enumerate(models):
-            obs_meta_coloc = observation["xarray_meta_coloc"][i_mod].squeeze()
-            mod_meta_coloc = mod["xarray_meta_coloc"].squeeze()
+            obs_meta_coloc = observation["xarray_meta_coloc"][i_mod]
+            mod_meta_coloc = mod["xarray_meta_coloc"]
             var = obs_meta_coloc.name
-            plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin, vmax, cmap, output_path)
+            plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin, vmax, cmap, observation.name, mod.name,
+                                    output_path)
     else:
         for var in list(observation["xarray_meta"].keys()):
             var_mod = var
             for i_mod, mod in enumerate(models):
-                obs_meta_coloc = observation["xarray_meta_coloc"][i_mod][var].squeeze()
-                mod_meta_coloc = mod["xarray_meta_coloc"][var_mod].squeeze()
-                plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin, vmax, cmap, output_path)
+                obs_meta_coloc = observation["xarray_meta_coloc"][i_mod][var]
+                mod_meta_coloc = mod["xarray_meta_coloc"][var_mod]
+                plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin, vmax, cmap, observation.name,
+                                        mod.name, output_path)
 
 
 def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin=None, vmax=None, cmap=cmocean.cm.thermal,
-                            output_path=None):
+                            obs_name=None, mod_name=None, output_path=None):
     """
     Plot the figure of 3D variable section difference between observation and model.
     Parameters
@@ -1945,12 +1971,19 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin=None, vmax
        min colour value of variable to plot.
     vmax : float
        max colour value of variable to plot.
+    mod_name : str
+        Name of the model.
+    obs_name : str
+        Name of the observation.
     output_path :
         Path where to save the figures.
 
     """
     logger.info('Figure of 3D variable section difference between observation and model.')
     f, axs = figure_3lin_ts()
+
+    # Squeeze
+    mod_meta_coloc, obs_meta_coloc = mod_meta_coloc.squeeze(), obs_meta_coloc.squeeze()
 
     # Select the variables to plot
     diff = mod_meta_coloc.transpose().values - obs_meta_coloc.transpose().values
@@ -1994,7 +2027,7 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin=None, vmax
     if len(np.unique(obs_meta_coloc.lon.values)) > 1:
         add_second_x_axis(f, axs[2], mod_meta_coloc)
 
-    ft.manage_output(plt, f'2Dgraph_{var}', output_path)
+    ft.manage_output(plt, f'2Dgraph_{var}_{obs_name}_{mod_name}', output_path)
 
 
 def plot_variable_2d(models, observation, output_path=None):
@@ -2014,10 +2047,10 @@ def plot_variable_2d(models, observation, output_path=None):
     logger.info('2D variable section difference between observation and model.')
     if type(observation["xarray_meta_coloc"][0]) == xr.DataArray:
         for i_mod, mod in enumerate(models):
-            obs_meta_coloc = observation["xarray_meta_coloc"][i_mod].squeeze()
-            mod_meta_coloc = mod["xarray_meta_coloc"].squeeze()
+            obs_meta_coloc = observation["xarray_meta_coloc"][i_mod]
+            mod_meta_coloc = mod["xarray_meta_coloc"]
             var = obs_meta_coloc.name
-            plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, output_path)
+            plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, observation.name, mod.name, output_path)
 
     else:
         for var in list(observation["xarray_meta"].keys()):
@@ -2025,12 +2058,12 @@ def plot_variable_2d(models, observation, output_path=None):
             if var == 'temp':
                 var_mod = 'ptemp'
             for i_mod, mod in enumerate(models):
-                obs_meta_coloc = observation["xarray_meta_coloc"][i_mod][var].squeeze()
-                mod_meta_coloc = mod["xarray_meta_coloc"][var_mod].squeeze()
-                plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, output_path)
+                obs_meta_coloc = observation["xarray_meta_coloc"][i_mod][var]
+                mod_meta_coloc = mod["xarray_meta_coloc"][var_mod]
+                plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, observation.name, mod.name, output_path)
 
 
-def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, output_path=None):
+def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, obs_name=None, mod_name=None, output_path=None):
     """
     Plot 2d figure, Hovmoller diagram.
     Parameters
@@ -2041,11 +2074,19 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, output_path=Non
         Observation dataset.
     var : str
         variable to plot.
+    mod_name : str
+        Name of the model.
+    obs_name : str
+        Name of the observation.
     output_path : str
         Path where to save the figures.
 
     """
     logger.info('2D figure, Hovmoller diagram.')
+
+    # Squeeze
+    mod_meta_coloc, obs_meta_coloc = mod_meta_coloc.squeeze(), obs_meta_coloc.squeeze()
+
     # Create the plot
     f, axs = figure_2lin_ts()
     diff = mod_meta_coloc.transpose().values - obs_meta_coloc.transpose().values
@@ -2074,7 +2115,7 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, output_path=Non
     if len(np.unique(obs_meta_coloc.lon.values)) > 1:
         add_second_x_axis(f, axs[1], mod_meta_coloc)
 
-    ft.manage_output(plt, f'1Dgraph_{var}', output_path)
+    ft.manage_output(plt, f'1Dgraph_{var}_{obs_name}_{mod_name}', output_path)
 
 
 def create_harmonic_table(models, observations, output_path):
@@ -2205,7 +2246,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             title = f'{var_title} : Time series metrics - {label_title} Statistics \nSlice : {slice.values}m'
             f.suptitle(title, fontsize=17, fontweight='bold')
 
-            ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_slice{idx_slice}', output_path)
+            ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}_slice{idx_slice}', output_path)
     # Case no vertical slices
     else:
         obs_mean_0 = observation["xarray_meta_coloc"][0].mean(list_dims_mean).squeeze()
@@ -2249,7 +2290,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
 
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
-        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}', output_path)
+        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}', output_path)
 
 
 def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title):
@@ -2381,7 +2422,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
         ax_mini_map = add_mini_map(f, obs)
         ax_mini_map.scatter(obs.lon, obs.lat, 30, 'navy', transform=ccrs.PlateCarree())
 
-        ft.manage_output(plt, f'profile_unique_{mod_name}_{obs_name}_{time.values}', output_path)
+        ft.manage_output(plt, f'profile_unique_{obs_name}_{mod_name}_{time.values}', output_path)
 
 
 def plot_profile_multi(models, observation, radius, output_path=None):
@@ -2499,7 +2540,7 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
     ax_mini_map = add_mini_map(f, observation)
     ax_mini_map.scatter(observation.lon, observation.lat, 30, c='navy', transform=ccrs.PlateCarree())
 
-    ft.manage_output(plt, f'multi_profile-{title_time}', output_path)
+    ft.manage_output(plt, f'multi_profile_{obs_name}_{mod_name}_{title_time}', output_path)
 
 
 def add_std_profile(ax, data, depth, color, name):
@@ -2671,7 +2712,7 @@ def plot_diag_ts_unique(models, observation, output_path=None):
     """
     logger.info('Theta - S diagram with unique profiles')
     for i_time, time in enumerate(observation.time):
-        obs = observation.sel(time=time)
+        obs = observation.sel(time=time).squeeze()
         for i_mod, mod in enumerate(models):
             # Get the names
             if "name" in mod:
@@ -2690,7 +2731,8 @@ def plot_diag_ts_unique(models, observation, output_path=None):
             f, ax = figure_1_profile()
             im_obs = ax.scatter(obs.sal, obs.temp, 30, obs.depth, marker="^", edgecolors="black", linewidth=0.1,
                                 label=f'{obs_name}', cmap='autumn', vmin=vmin, vmax=vmax)
-            mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, depth=obs.depth, time=time, method='nearest')
+            mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, depth=obs.depth, time=time,
+                                                 method='nearest').squeeze()
             im_mod = ax.scatter(mod_nearest.sal, mod_nearest.ptemp, 30, mod_nearest.depth, edgecolors="black",
                                 linewidth=0.1, label=f'{mod_name}', cmap='summer', vmin=vmin, vmax=vmax)
 
@@ -2753,7 +2795,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, obs, title_time, mod_name, obs_
     ax_mini_map = add_mini_map(f, obs)
     ax_mini_map.scatter(obs.lon, obs.lat, 30, c='navy', transform=ccrs.PlateCarree())
 
-    ft.manage_output(plt, f'diag_ts_{type}-{title_time}_{mod_name}', output_path)
+    ft.manage_output(plt, f'diag_ts_{type}-{title_time}_{obs_name}_{mod_name}', output_path)
 
 
 def plot_stick_plots(models, observation, output_path=None):
@@ -2883,7 +2925,7 @@ def find_var_title(obs_name, da):
     if "units" in da.attrs:
         title_unit = da.attrs['units']
     else:
-        title_unit = "N/A"  # if obs_name in ['temp', 'ptemp', 'theta', 'TEMP', 'temperature', 'sst']:  #     title_unit = "°C"  # elif obs_name in ['sal', 'sss', 'density', 'dens']:  #     title_unit = "g/kg"  # elif obs_name in ['u', 'v', 'current', 'norm']:  #     title_unit = "m/s"  # else:  #     title_unit = 'unit'
+        title_unit = "N/A"
 
     title = f"{title_name} - [{title_unit}]"
     return title

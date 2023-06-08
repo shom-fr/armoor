@@ -1,5 +1,6 @@
 from tests.uni import copy_p2_forecaster_cfg_file, init_status, change_path_p2, get_auth_spec
 from armoor.tick.ticket import Ticket
+from armoor.cli.tick import search
 import pytest
 import time
 
@@ -147,18 +148,52 @@ class TestTicket:
         logger = change_path_p2()
         logger.info('test_search_tickets')
 
-        time.sleep(60)
+        timeout = 10*60
+        start_time = time.time()
+        success = False
 
-        ticket = Ticket()
+        while not success and (time.time() - start_time) < timeout:
+            ticket = Ticket()
 
-        config = 'hycom3d_med'
-        request = 'Test unitaire : gestion des anomalies'
-        out_search = ticket.search_tickets(config, request)
+            config = 'hycom3d_med'
+            request = 'Test unitaire'
+            out_search = ticket.search_tickets(config, request)
+
+            success = out_search.get(pytest.ticket_issue_id, False)
+            if not success:
+                time.sleep(10)
 
         logger.info(f'output with config : {config} and request : {request} :: {out_search}')
         logger.info(f'out_search only issue {pytest.ticket_issue_id} :: {out_search[pytest.ticket_issue_id]}')
-
         assert out_search[pytest.ticket_issue_id]['title'] == 'hycom3d_med - 25/04/2023 - Test unitaire : gestion des anomalies'
+
+    def test_search_tickets_cli(self):
+        logger = change_path_p2()
+        logger.info('test_search_tickets_cli')
+
+        search(['--request', 'Test unitaire', '--config', 'hycom3d_med'])
+        assert True
+
+    def test_search_tickets_cli_closed(self):
+        logger = change_path_p2()
+        logger.info('test_search_tickets_cli')
+
+        search(['--request', 'Test unitaire', '--config', 'hycom3d_med', '--state', 'closed'])
+        assert True
+
+    def test_search_tickets_cli_config_only(self):
+        logger = change_path_p2()
+        logger.info('test_search_tickets_config_only')
+
+        search(['--config', 'hycom3d_med'])
+        assert True
+
+    def test_search_tickets_cli_request_only(self):
+        logger = change_path_p2()
+        logger.info('test_search_tickets_request_only')
+
+        search(['--request', 'Test unitaire'])
+        assert True
 
     def test_get_description(self):
         logger = change_path_p2()

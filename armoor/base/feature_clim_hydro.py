@@ -35,6 +35,10 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
+    # Get names
+    models_name = [m['name'] for m in models]
+    obs_name = observation['name']
+
     for index_output, output in enumerate(outputs):
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
@@ -102,7 +106,7 @@ def plot(config_obj):
                                                      mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                      observation["xarray_meta_coloc"][i], plot_map_metr[output["plot"]],
                                                      cmap, vmin, vmax, output_path=sub_func_output_folder, dvmin=dvmin,
-                                                     dvmax=dvmax)
+                                                     dvmax=dvmax, obs_name=obs_name, mod_name=models_name[i])
                 else:
                     for depth in [float(mod["xarray_meta_coloc"].depth.values)]:
                         try:
@@ -127,4 +131,5 @@ def plot(config_obj):
                                                          mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                          observation["xarray_meta_coloc"][i],
                                                          plot_map_metr[output["plot"]], cmap, vmin, vmax,
-                                                         output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax)
+                                                         output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax,
+                                                         obs_name=obs_name, mod_name=models_name[i])

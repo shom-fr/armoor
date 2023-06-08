@@ -46,6 +46,10 @@ def plot(config_obj):
         # Remove missing values
         models, observation = base.remove_missing_values_ds(models, observation, i_mod, ["sst"], ["sst"])
 
+    # Get names
+    models_name = [m['name'] for m in models]
+    obs_name = observation['name']
+
     # PLOT THE OUTPUTS
     for index_output, output in enumerate(outputs):
         logger.info(f'Generating plot :: {output["plot"]}')
@@ -59,7 +63,7 @@ def plot(config_obj):
         if 'attribute' in output and output['attribute'] != 'SST':
             logger.debug(f'{config_obj["functionality"]} should be used for SST only.')
 
-        # get parameters from config obj
+        # Get parameters from config obj
         vmin = output.get('vmin')
         vmax = output.get('vmax')
         dvmin = output.get('dvmin')
@@ -100,13 +104,11 @@ def plot(config_obj):
                                                  mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                  observation["xarray_meta_coloc"][i], plot_map_metr[output["plot"]],
                                                  cmap, vmin, vmax, output_path=sub_func_output_folder, dvmin=dvmin,
-                                                 dvmax=dvmax)
+                                                 dvmax=dvmax, mod_name=models_name[i], obs_name=obs_name)
 
         ################################################################################################################
         # DISP DIAG
         if "diag_disp" in output["plot"]:
-            models_name = [m['name'] for m in models]
-            obs_name = observation['name']
             for i, mod in enumerate(models):
                 base.plot_features.diag_disp(flag_interval, flag_slice, obs_name, models_name[i], output["plot"],
                                              mod["xarray_meta_coloc"], observation["xarray_meta_coloc"][i],
