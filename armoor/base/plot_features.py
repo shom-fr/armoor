@@ -1863,20 +1863,23 @@ def plot_ts_metr_point(models, observation, metric, flag_interval, flag_slice, o
                             label=f'Mean Centered RMSE : {observation["name"]}  {mod["name"]} ')
                 axs[4].legend(loc=5)
 
-                # Set labels and titles
-                for ax in axs:
-                    ax.set_ylabel(f'{var_title}')
+            # Set labels and titles
+            for ax in axs:
+                ax.set_ylabel(f'{var_title}')
 
-                if 'lon' in mod_coloc.coords:
-                    title = f'{var_title} : Bias and RMSE statistics \nLongitude : {mod_coloc.lon.data:.2f},' \
-                            f' - Latitude : {mod_coloc.lat.data:.2f}'
-                else:
-                    title = f'{var_title} : Bias and RMSE statistics'
-                f.suptitle(title, fontsize=17, fontweight='bold')
+            if 'lon' in mod_coloc.coords:
+                title = f'{var_title} : Bias and RMSE statistics \nLongitude : {mod_coloc.lon.data:.2f},' \
+                        f' - Latitude : {mod_coloc.lat.data:.2f}'
+            else:
+                title = f'{var_title} : Bias and RMSE statistics'
+            f.suptitle(title, fontsize=17, fontweight='bold')
 
-                # Rotate x labels
-                for label in ax.get_xticklabels():
-                    label.set_rotation(25)
+            # Rotate x labels
+            for label in ax.get_xticklabels():
+                label.set_rotation(25)
+
+            # Change x interval labels
+            modify_interval_label(axs[4])
 
         else:  # No flag interval : difference only
 
@@ -2232,7 +2235,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             axs[0].plot(time_coloc, obs_mean_0, 'k-o', label=f'Mean {observation["name"]} ')
             f.autofmt_xdate(rotation=5)
             axs[2].plot(time_coloc, obs_std_0, 'k-o', label=f'St_d {observation["name"]} ')
-
+                        
             for i, mod in enumerate(models):
                 mod_name = mod["name"]
                 obs_name = observation["name"]
@@ -2241,6 +2244,9 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
 
                 plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name,
                                           var_title)
+            # Change x interval labels
+            if flag_interval:
+                modify_interval_label(axs[4])
 
             # Set title and save
             title = f'{var_title} : Time series metrics - {label_title} Statistics \nSlice : {slice.values}m'
@@ -2261,6 +2267,8 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         axs[0].plot(time_coloc, obs_mean_0, 'k-o', label=f'Mean {observation["name"]} ')
         f.autofmt_xdate(rotation=5)
         axs[2].plot(time_coloc, obs_std_0, 'k-o', label=f'St_d {observation["name"]} ')
+
+
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"]
@@ -2287,6 +2295,10 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         else:
             depth = 0
             title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDepth : {depth} m'
+
+        # Change x interval labels
+        if flag_interval:
+            modify_interval_label(axs[4])
 
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
@@ -3092,3 +3104,16 @@ def get_index_interval(i_inter, obs_meta, mod_meta):
         i_inter_mod = i_inter
 
     return i_inter_obs, i_inter_mod
+
+def modify_interval_label(ax):
+    labels_ini = [label.get_text() for label in ax.get_xticklabels()]
+    labels_modif = []
+    for i_lab, lab in enumerate(labels_ini):
+        date_first, date_last = lab.replace(' ','T').split('TtoT')[0], lab.replace(' ','T').split('TtoT')[1][:-1]
+        date_first, date_last = np.datetime64(date_first), np.datetime64(date_last)
+        date_center = (date_first + (date_last - date_first) / 2 )
+        labels_modif.append(np.datetime_as_string(date_center))
+    print(labels_modif)
+    ax = ax.set_xticklabels(labels_modif)
+    return ax
+
