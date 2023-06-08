@@ -8,6 +8,7 @@ import numpy as np
 from xoa.regrid import regrid1d
 import matplotlib.path as path
 import math
+from pandas.tseries.offsets import MonthEnd
 
 import logging
 
@@ -561,7 +562,7 @@ class MetazoneAccessor:
         Returns
         -------
         xarray.Dataset
-            same Dataset averaged over the time interval
+            same Dataset averaged over the vertical slice
         """
         logger.info("Applying filter - vertical_selection_slice")
 
@@ -795,14 +796,16 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - time_selection_interval")
 
+        if interval in ["1M", "M"]:
+            interval = "MS"
+
         start = self._obj.isel(time=[0]).time.data[0]
         end = self._obj.isel(time=[-1]).time.data[0]
-
-        start, end, interval = self._obj.meta.format_interval(start, end, interval)
+        end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
 
         time_interval = pandas.date_range(start=start, end=end, freq=interval)
 
-        ds_group = self._obj.groupby_bins('time', time_interval)
+        ds_group = self._obj.groupby_bins('time', time_interval, right=False)
         liste_ds = []
 
         for label, ds in ds_group:
@@ -842,10 +845,7 @@ class MetazoneAccessor:
         """
         if interval in ["1M", "M"]:
             interval = "MS"
-            start = np.datetime_as_string(start)[:7]
-            day = np.datetime_as_string(end, unit='D').split('-')[2]
-            if int(day) > 2:
-                end = end + np.timedelta64(int(1 * 2.628e+15), 'ns')
+        end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
         return start, end, interval
 
     # Overload emulation

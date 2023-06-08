@@ -3113,7 +3113,6 @@ def modify_interval_label(ax):
         date_first, date_last = np.datetime64(date_first), np.datetime64(date_last)
         date_center = (date_first + (date_last - date_first) / 2 )
         labels_modif.append(np.datetime_as_string(date_center))
-    print(labels_modif)
     ax = ax.set_xticklabels(labels_modif)
     return ax
 
