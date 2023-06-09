@@ -2057,12 +2057,9 @@ def plot_variable_2d(models, observation, output_path=None):
 
     else:
         for var in list(observation["xarray_meta"].keys()):
-            var_mod = var
-            if var == 'temp':
-                var_mod = 'ptemp'
             for i_mod, mod in enumerate(models):
                 obs_meta_coloc = observation["xarray_meta_coloc"][i_mod][var]
-                mod_meta_coloc = mod["xarray_meta_coloc"][var_mod]
+                mod_meta_coloc = mod["xarray_meta_coloc"][var]
                 plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, observation.name, mod.name, output_path)
 
 
