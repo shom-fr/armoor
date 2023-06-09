@@ -476,6 +476,9 @@ class MetazoneAccessor:
                                 da = self._obj[var]
                                 da_tgt = regrid1d(da, tgt_depth)
                                 tgt_ds = tgt_ds.assign({var: da_tgt})
+
+                if "depth" not in list(tgt_ds.coords):
+                    tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
                 return tgt_ds
             else:
                 return ds
