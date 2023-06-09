@@ -89,6 +89,7 @@ def temporal_colocation(mod, obs, ds_tgt, coloc_method):
         mod = pick_time(mod, time_values)
 
     logger.info("Temporal observation colocation")
+    obs = obs.drop_duplicates('time')
     if obs.dims["time"] > 1:
         obs = obs.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
     else:
