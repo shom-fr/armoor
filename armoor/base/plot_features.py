@@ -454,23 +454,23 @@ def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, o
     # Set the titles
     var_title = find_var_title(obs_name, obs)
     if flag_slice:
-        title_depth = ["Slice : " + str(obs.slice.values[i]) + 'm' for i in range(len(obs.slice.values))]
+        title_depth = [f"Slice: {obs.slice.values[i]:.4f}m" for i in range(len(obs.slice.values))]
     elif diag_type == "diag_disp_g" and 'depth' in obs.dims and len(obs.depth) > 0:
-        title_depth = "Depth : " + str(min(obs.depth.values)) + 'm to ' + str(max(obs.depth.values)) + 'm'
+        title_depth = f"Depth: {min(obs.depth.values):.4f}m to {max(obs.depth.values):.4f}m"
     elif diag_type == "diag_disp_g" and 'dens' in obs.dims and len(obs.dens) > 0:
-        title_depth = "Density : " + str(min(obs.dens.values)) + 'm to ' + str(max(obs.dens.values)) + 'm'
+        title_depth = f"Density: {min(obs.dens.values):.4f} to {max(obs.dens.values):.4f}"
     elif 'depth' in obs.dims and len(obs.depth) > 0:
-        title_depth = ["Depth : " + str(obs.depth.values[i]) + 'm' for i in range(len(obs.depth.values))]
+        title_depth = [f"Depth: {obs.depth.values[i]:.4f}m" for i in range(len(obs.slice.values))]
     elif 'depth' in obs.dims:
-        title_depth = "Depth : " + str(obs.depth.values) + 'm'
+        title_depth = f"Depth: {obs.depth.values:.4f}m"
     elif 'dens' in obs.dims and len(obs.dens) > 0:
-        title_depth = ["Density : " + str(obs.dens.values[i]) + 'm' for i in range(len(obs.dens.values))]
+        title_depth = [f"Density: {obs.dens.values[i]:.4f}" for i in range(len(obs.dens.values))]
     elif 'depth' in obs.dims:
-        title_depth = "Density : " + str(obs.dens.values) + 'm'
+        title_depth = f"Density: {obs.dens.values:.4f}m"
     else:
         title_depth = "Depth : 0 m"
     if flag_interval:
-        title_time = ["\nInterval : " + str(obs.interval.values[i]) for i in range(len(obs.interval.values))]
+        title_time = [f"\nInterval : {obs.interval.values[i]}" for i in range(len(obs.interval.values))]
     else:
         time_min = np.datetime_as_string(obs.time.min(skipna=True).values, unit='s')
         time_max = np.datetime_as_string(obs.time.max(skipna=True).values, unit='s')
@@ -634,16 +634,15 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
     var_title = find_var_title(obs_name, obs_coloc)
     if flag_slice:
-        title_depth = ["Slice : " + str(obs_coloc.slice.values[i]) + 'm' for i in range(len(obs_coloc.slice.values))]
+        title_depth = [f"Slice : {obs_coloc.slice.values[i]}" for i in range(len(obs_coloc.slice.values))]
     elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
-        title_depth = ["Depth : " + str(obs_coloc.depth.values[i]) + 'm' for i in range(len(obs_coloc.depth.values))]
+        title_depth = [f"Depth : {obs_coloc.depth.values[i]:.4f}m" for i in range(len(obs_coloc.slice.values))]
     elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
-        title_depth = ["Density : " + str(obs_coloc.dens.values[i]) + 'm' for i in range(len(obs_coloc.dens.values))]
+        title_depth = [f"Density : {obs_coloc.dens.values[i]:.4f}" for i in range(len(obs_coloc.dens.values))]
     else:
-        title_depth = "Depth : " + str(obs_coloc.depth.values) + 'm'
+        title_depth = f"Depth : {obs_coloc.depth.values:.4f}m"
     if flag_interval:
-        title_time = ["\nInterval : " + str(obs_coloc.interval.values[i]) for i in
-                      range(len(obs_coloc.interval.values))]
+        title_time = [f"\nInterval : {obs_coloc.interval.values[i]}" for i in range(len(obs_coloc.interval.values))]
     elif obs_coloc.time.size > 1:
         time_min = np.datetime_as_string(obs_coloc.time.min(skipna=True).values, unit='s')
         time_max = np.datetime_as_string(obs_coloc.time.max(skipna=True).values, unit='s')
@@ -979,7 +978,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
             for i_time, time in enumerate(mod_coloc.time):
                 # Get the title
                 if mod_coloc.time[i_time].values.dtype == '<U9':
-                    title_time = "Climatology " + str(mod_coloc.time[i_time].values)
+                    title_time = f"Climatology {mod_coloc.time[i_time].values}"
                 else:
                     title_time = np.datetime_as_string(mod_coloc.time[i_time], unit='s')
                 title = f'{var_title} : {metric.capitalize()} metric \n {title_time}'
@@ -1674,7 +1673,7 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
             for i_time, time in enumerate(mod_coloc.time):
                 # Get the title
                 if mod_coloc.time[i_time].values.dtype == '<U9':
-                    title_time = "Climatology " + str(mod_coloc.time[i_time].values)
+                    title_time = f"Climatology {mod_coloc.time[i_time].values}"
                 else:
                     title_time = np.datetime_as_string(mod_coloc.time[i_time], unit='s')
                 title = f'{var_title} : {metric.capitalize()} metric - {title_time}'
@@ -2395,7 +2394,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
             if "name" in mod:
                 mod_name = mod["name"]
             else:
-                mod_name = "Model n." + str(i_mod)
+                mod_name = f"Model n.{i_mod}"
 
             # Plot the model profiles
             mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, time=time, method='nearest').squeeze()
@@ -2495,7 +2494,7 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
                 if "name" in mod:
                     mod_name = mod["name"]
                 else:
-                    mod_name = "Model n." + str(i_mod)
+                    mod_name = f"Model n.{i_mod}"
 
                 dict_mod[str(i_mod)] = []
 
@@ -2520,7 +2519,7 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
         if "name" in mod:
             mod_name = mod["name"]
         else:
-            mod_name = "Model n." + str(i_mod)
+            mod_name = f"Model n.{i_mod}"
 
         # Add the mean profile and its std
         depth = np.array(dict_mod[str(i_mod) + 'depth'])
@@ -2598,7 +2597,7 @@ def plot_diag_ts_multi(models, observation, radius, output_path=None):
         if "name" in mod:
             mod_name = mod["name"]
         else:
-            mod_name = "Model n." + str(i_mod)
+            mod_name = f"Model n.{i_mod}"
         if "name" in observation.attrs:
             obs_name = observation["name"]
         else:
@@ -2724,7 +2723,7 @@ def plot_diag_ts_unique(models, observation, output_path=None):
             if "name" in mod:
                 mod_name = mod["name"]
             else:
-                mod_name = "Model n." + str(i_mod)
+                mod_name = f"Model n.{i_mod}"
             if "name" in observation.attrs:
                 obs_name = observation["name"]
             else:
