@@ -72,9 +72,9 @@ class SSTAccessor:
             liste_ds.append(ds)
 
         if len(liste_ds) == 1:
-            ds_all = xr.concat(liste_ds, 'mean_time', combine_attrs="drop")
+            ds_all = liste_ds[0]
         elif len(liste_ds) > 1:
-            ds_all = xr.merge(liste_ds)  # xr.concat(liste_ds, 'mean_time', combine_attrs="drop")
+            ds_all = xr.merge(liste_ds)
         return ds_all
 
     def convert_current(self):

@@ -503,7 +503,6 @@ def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, o
                     title = f'{var_title} :  {title_depth[index_slice]} - {title_time}'
                     diag_disp_figure(mod_inter, obs_inter, var_title, title, obs_name, model_name, output_path)
             else:
-
                 title = f'{var_title} : {title_depth} - {title_time}'
                 diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_path)
 
@@ -2232,7 +2231,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             axs[0].plot(time_coloc, obs_mean_0, 'k-o', label=f'Mean {observation["name"]} ')
             f.autofmt_xdate(rotation=5)
             axs[2].plot(time_coloc, obs_std_0, 'k-o', label=f'St_d {observation["name"]} ')
-                        
+
             for i, mod in enumerate(models):
                 mod_name = mod["name"]
                 obs_name = observation["name"]
@@ -2264,8 +2263,6 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         axs[0].plot(time_coloc, obs_mean_0, 'k-o', label=f'Mean {observation["name"]} ')
         f.autofmt_xdate(rotation=5)
         axs[2].plot(time_coloc, obs_std_0, 'k-o', label=f'St_d {observation["name"]} ')
-
-
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"]
@@ -3102,14 +3099,14 @@ def get_index_interval(i_inter, obs_meta, mod_meta):
 
     return i_inter_obs, i_inter_mod
 
+
 def modify_interval_label(ax):
     labels_ini = [label.get_text() for label in ax.get_xticklabels()]
     labels_modif = []
     for i_lab, lab in enumerate(labels_ini):
-        date_first, date_last = lab.replace(' ','T').split('TtoT')[0], lab.replace(' ','T').split('TtoT')[1][:-1]
+        date_first, date_last = lab.replace(' ', 'T').split('TtoT')[0], lab.replace(' ', 'T').split('TtoT')[1][:-1]
         date_first, date_last = np.datetime64(date_first), np.datetime64(date_last)
-        date_center = (date_first + (date_last - date_first) / 2 )
+        date_center = (date_first + (date_last - date_first) / 2)
         labels_modif.append(np.datetime_as_string(date_center))
     ax = ax.set_xticklabels(labels_modif)
     return ax
-
