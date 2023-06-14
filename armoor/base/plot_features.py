@@ -454,23 +454,23 @@ def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, o
     # Set the titles
     var_title = find_var_title(obs_name, obs)
     if flag_slice:
-        title_depth = ["Slice : " + str(obs.slice.values[i]) + 'm' for i in range(len(obs.slice.values))]
+        title_depth = [f"Slice: {obs.slice.values[i]:.4f}m" for i in range(len(obs.slice.values))]
     elif diag_type == "diag_disp_g" and 'depth' in obs.dims and len(obs.depth) > 0:
-        title_depth = "Depth : " + str(min(obs.depth.values)) + 'm to ' + str(max(obs.depth.values)) + 'm'
+        title_depth = f"Depth: {min(obs.depth.values):.4f}m to {max(obs.depth.values):.4f}m"
     elif diag_type == "diag_disp_g" and 'dens' in obs.dims and len(obs.dens) > 0:
-        title_depth = "Density : " + str(min(obs.dens.values)) + 'm to ' + str(max(obs.dens.values)) + 'm'
+        title_depth = f"Density: {min(obs.dens.values):.4f} to {max(obs.dens.values):.4f}"
     elif 'depth' in obs.dims and len(obs.depth) > 0:
-        title_depth = ["Depth : " + str(obs.depth.values[i]) + 'm' for i in range(len(obs.depth.values))]
+        title_depth = [f"Depth: {obs.depth.values[i]:.4f}m" for i in range(len(obs.slice.values))]
     elif 'depth' in obs.dims:
-        title_depth = "Depth : " + str(obs.depth.values) + 'm'
+        title_depth = f"Depth: {obs.depth.values:.4f}m"
     elif 'dens' in obs.dims and len(obs.dens) > 0:
-        title_depth = ["Density : " + str(obs.dens.values[i]) + 'm' for i in range(len(obs.dens.values))]
+        title_depth = [f"Density: {obs.dens.values[i]:.4f}" for i in range(len(obs.dens.values))]
     elif 'depth' in obs.dims:
-        title_depth = "Density : " + str(obs.dens.values) + 'm'
+        title_depth = f"Density: {obs.dens.values:.4f}m"
     else:
         title_depth = "Depth : 0 m"
     if flag_interval:
-        title_time = ["\nInterval : " + str(obs.interval.values[i]) for i in range(len(obs.interval.values))]
+        title_time = [f"\nInterval : {obs.interval.values[i]}" for i in range(len(obs.interval.values))]
     else:
         time_min = np.datetime_as_string(obs.time.min(skipna=True).values, unit='s')
         time_max = np.datetime_as_string(obs.time.max(skipna=True).values, unit='s')
@@ -503,7 +503,6 @@ def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, o
                     title = f'{var_title} :  {title_depth[index_slice]} - {title_time}'
                     diag_disp_figure(mod_inter, obs_inter, var_title, title, obs_name, model_name, output_path)
             else:
-
                 title = f'{var_title} : {title_depth} - {title_time}'
                 diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_path)
 
@@ -635,16 +634,15 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
 
     var_title = find_var_title(obs_name, obs_coloc)
     if flag_slice:
-        title_depth = ["Slice : " + str(obs_coloc.slice.values[i]) + 'm' for i in range(len(obs_coloc.slice.values))]
+        title_depth = [f"Slice : {obs_coloc.slice.values[i]}" for i in range(len(obs_coloc.slice.values))]
     elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
-        title_depth = ["Depth : " + str(obs_coloc.depth.values[i]) + 'm' for i in range(len(obs_coloc.depth.values))]
+        title_depth = [f"Depth : {obs_coloc.depth.values[i]:.4f}m" for i in range(len(obs_coloc.slice.values))]
     elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
-        title_depth = ["Density : " + str(obs_coloc.dens.values[i]) + 'm' for i in range(len(obs_coloc.dens.values))]
+        title_depth = [f"Density : {obs_coloc.dens.values[i]:.4f}" for i in range(len(obs_coloc.dens.values))]
     else:
-        title_depth = "Depth : " + str(obs_coloc.depth.values) + 'm'
+        title_depth = f"Depth : {obs_coloc.depth.values:.4f}m"
     if flag_interval:
-        title_time = ["\nInterval : " + str(obs_coloc.interval.values[i]) for i in
-                      range(len(obs_coloc.interval.values))]
+        title_time = [f"\nInterval : {obs_coloc.interval.values[i]}" for i in range(len(obs_coloc.interval.values))]
     elif obs_coloc.time.size > 1:
         time_min = np.datetime_as_string(obs_coloc.time.min(skipna=True).values, unit='s')
         time_max = np.datetime_as_string(obs_coloc.time.max(skipna=True).values, unit='s')
@@ -980,7 +978,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
             for i_time, time in enumerate(mod_coloc.time):
                 # Get the title
                 if mod_coloc.time[i_time].values.dtype == '<U9':
-                    title_time = "Climatology " + str(mod_coloc.time[i_time].values)
+                    title_time = f"Climatology {mod_coloc.time[i_time].values}"
                 else:
                     title_time = np.datetime_as_string(mod_coloc.time[i_time], unit='s')
                 title = f'{var_title} : {metric.capitalize()} metric \n {title_time}'
@@ -1675,7 +1673,7 @@ def plot_map_metr_current(flag_interval, flag_slice, mod_meta, mod_coloc, obs_me
             for i_time, time in enumerate(mod_coloc.time):
                 # Get the title
                 if mod_coloc.time[i_time].values.dtype == '<U9':
-                    title_time = "Climatology " + str(mod_coloc.time[i_time].values)
+                    title_time = f"Climatology {mod_coloc.time[i_time].values}"
                 else:
                     title_time = np.datetime_as_string(mod_coloc.time[i_time], unit='s')
                 title = f'{var_title} : {metric.capitalize()} metric - {title_time}'
@@ -1863,20 +1861,23 @@ def plot_ts_metr_point(models, observation, metric, flag_interval, flag_slice, o
                             label=f'Mean Centered RMSE : {observation["name"]}  {mod["name"]} ')
                 axs[4].legend(loc=5)
 
-                # Set labels and titles
-                for ax in axs:
-                    ax.set_ylabel(f'{var_title}')
+            # Set labels and titles
+            for ax in axs:
+                ax.set_ylabel(f'{var_title}')
 
-                if 'lon' in mod_coloc.coords:
-                    title = f'{var_title} : Bias and RMSE statistics \nLongitude : {mod_coloc.lon.data:.2f},' \
-                            f' - Latitude : {mod_coloc.lat.data:.2f}'
-                else:
-                    title = f'{var_title} : Bias and RMSE statistics'
-                f.suptitle(title, fontsize=17, fontweight='bold')
+            if 'lon' in mod_coloc.coords:
+                title = f'{var_title} : Bias and RMSE statistics \nLongitude : {mod_coloc.lon.data:.2f},' \
+                        f' - Latitude : {mod_coloc.lat.data:.2f}'
+            else:
+                title = f'{var_title} : Bias and RMSE statistics'
+            f.suptitle(title, fontsize=17, fontweight='bold')
 
-                # Rotate x labels
-                for label in ax.get_xticklabels():
-                    label.set_rotation(25)
+            # Rotate x labels
+            for label in ax.get_xticklabels():
+                label.set_rotation(25)
+
+            # Change x interval labels
+            modify_interval_label(axs[4])
 
         else:  # No flag interval : difference only
 
@@ -2054,12 +2055,9 @@ def plot_variable_2d(models, observation, output_path=None):
 
     else:
         for var in list(observation["xarray_meta"].keys()):
-            var_mod = var
-            if var == 'temp':
-                var_mod = 'ptemp'
             for i_mod, mod in enumerate(models):
                 obs_meta_coloc = observation["xarray_meta_coloc"][i_mod][var]
-                mod_meta_coloc = mod["xarray_meta_coloc"][var_mod]
+                mod_meta_coloc = mod["xarray_meta_coloc"][var]
                 plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, observation.name, mod.name, output_path)
 
 
@@ -2171,7 +2169,7 @@ def create_harmonic_table(models, observations, output_path):
                         f'{model[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
 
 
-def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None):
+def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, fig_title=''):
     """
     Plot statistical time series of model and observation.
 
@@ -2241,6 +2239,9 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
 
                 plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name,
                                           var_title)
+            # Change x interval labels
+            if flag_interval:
+                modify_interval_label(axs[4])
 
             # Set title and save
             title = f'{var_title} : Time series metrics - {label_title} Statistics \nSlice : {slice.values}m'
@@ -2288,9 +2289,13 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             depth = 0
             title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDepth : {depth} m'
 
+        # Change x interval labels
+        if flag_interval:
+            modify_interval_label(axs[4])
+
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
-        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}', output_path)
+        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}{fig_title}', output_path)
 
 
 def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title):
@@ -2389,7 +2394,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
             if "name" in mod:
                 mod_name = mod["name"]
             else:
-                mod_name = "Model n." + str(i_mod)
+                mod_name = f"Model n.{i_mod}"
 
             # Plot the model profiles
             mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, time=time, method='nearest').squeeze()
@@ -2489,7 +2494,7 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
                 if "name" in mod:
                     mod_name = mod["name"]
                 else:
-                    mod_name = "Model n." + str(i_mod)
+                    mod_name = f"Model n.{i_mod}"
 
                 dict_mod[str(i_mod)] = []
 
@@ -2514,7 +2519,7 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
         if "name" in mod:
             mod_name = mod["name"]
         else:
-            mod_name = "Model n." + str(i_mod)
+            mod_name = f"Model n.{i_mod}"
 
         # Add the mean profile and its std
         depth = np.array(dict_mod[str(i_mod) + 'depth'])
@@ -2592,7 +2597,7 @@ def plot_diag_ts_multi(models, observation, radius, output_path=None):
         if "name" in mod:
             mod_name = mod["name"]
         else:
-            mod_name = "Model n." + str(i_mod)
+            mod_name = f"Model n.{i_mod}"
         if "name" in observation.attrs:
             obs_name = observation["name"]
         else:
@@ -2718,7 +2723,7 @@ def plot_diag_ts_unique(models, observation, output_path=None):
             if "name" in mod:
                 mod_name = mod["name"]
             else:
-                mod_name = "Model n." + str(i_mod)
+                mod_name = f"Model n.{i_mod}"
             if "name" in observation.attrs:
                 obs_name = observation["name"]
             else:
@@ -3092,3 +3097,15 @@ def get_index_interval(i_inter, obs_meta, mod_meta):
         i_inter_mod = i_inter
 
     return i_inter_obs, i_inter_mod
+
+
+def modify_interval_label(ax):
+    labels_ini = [label.get_text() for label in ax.get_xticklabels()]
+    labels_modif = []
+    for i_lab, lab in enumerate(labels_ini):
+        date_first, date_last = lab.replace(' ', 'T').split('TtoT')[0], lab.replace(' ', 'T').split('TtoT')[1][:-1]
+        date_first, date_last = np.datetime64(date_first), np.datetime64(date_last)
+        date_center = (date_first + (date_last - date_first) / 2)
+        labels_modif.append(np.datetime_as_string(date_center))
+    ax = ax.set_xticklabels(labels_modif)
+    return ax

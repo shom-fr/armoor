@@ -43,7 +43,7 @@ To specify the observation, 5 attributes can be provided after ``[observation]``
     * ``path`` : Path to the observation file(s).
     * ``type`` : Observation type, to be used if there is a specific method to open the dataset : *WOA18*, *CMEMS*, *scanfish*, *seasoar*, *mouillage*, *LADCP* and *VMADCP*. Any other type of observation will be automatically decoded.
     * ``method`` : Horizontal colocation method.
-    * ``method-z`` : Vertical colocation method if different from ``method``.
+    * ``method_z`` : Vertical colocation method if different from ``method``.
 
 If several paths are given, the files will be merged along the time dimension.
 

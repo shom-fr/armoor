@@ -72,14 +72,22 @@ def remove_missing_values(model, obs):
         Observation dataset with the same missing values as the model.
 
     """
+
     if np.size(np.unique(model.lon.data)) == np.size(model.lon.data):  # Verify no duplicates in coords
         model_nan = model.where(~np.isnan(obs))
         obs_nan = obs.where(~np.isnan(model))
+
+        if model_nan.dims != model.dims:
+            model_nan = model_nan.squeeze()
         model_nan = model_nan.assign_coords(model.coords)
+
         if obs_nan.dims != obs.dims:
             obs_nan = obs_nan.squeeze()
         if len(list(obs_nan.coords)) <= len(list(obs.coords)):
-            obs_nan = obs_nan.assign_coords(obs.coords)
+            try:
+                obs_nan = obs_nan.assign_coords(obs.coords)
+            except:
+                obs_nan = obs_nan.assign_coords(obs.squeeze().coords)
         return model_nan, obs_nan
     else:
         return model, obs

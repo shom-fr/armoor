@@ -89,6 +89,7 @@ def temporal_colocation(mod, obs, ds_tgt, coloc_method):
         mod = pick_time(mod, time_values)
 
     logger.info("Temporal observation colocation")
+    obs = obs.drop_duplicates('time')
     if obs.dims["time"] > 1:
         obs = obs.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
     else:
@@ -99,7 +100,7 @@ def temporal_colocation(mod, obs, ds_tgt, coloc_method):
 
 def horizontal_colocation(mod, obs, ds_tgt, coloc_method):
     # Colocation for observations whose positions depend on time (profilers etc.)
-    if 'time' in ds_tgt.lon.dims:
+    if 'time' in ds_tgt.lon.dims and len(ds_tgt.time) > 1:
         logger.info("Target grid positions are depending on time")
         try:
             logger.info("Observation positions colocation")
@@ -110,7 +111,6 @@ def horizontal_colocation(mod, obs, ds_tgt, coloc_method):
 
         logger.info("Model positions colocation")
         mod = colocate_lon_lat_time_mod(mod, ds_tgt, coloc_method)
-
     else:
         lon_values = np.unique(ds_tgt.lon.values)
         lat_values = np.unique(ds_tgt.lat.values)
@@ -134,7 +134,6 @@ def horizontal_colocation(mod, obs, ds_tgt, coloc_method):
             obs = obs.interp(lon=lon_values, lat=lat_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
         except:
             logger.warning("Horizontal observation colocation : Failed.")
-
     return mod, obs
 
 
@@ -366,7 +365,6 @@ def colocate_lon_lat_time_mod(ds, tgt, method):
     for i, time in enumerate(tgt.time.values):
         # Colocation time
         ds_interp = ds.interp(time=time, method=method, kwargs={"fill_value": "extrapolate"}).squeeze()
-
         # Colocation depth
         if 'depth' in tgt.squeeze().dims:
             if 'DEPH' in tgt.variables:

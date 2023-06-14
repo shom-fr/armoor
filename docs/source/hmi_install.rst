@@ -6,7 +6,7 @@ Armoor API
 
 Here are the instructions to launch the Armoor API used by the forecasters interface.
 
-Follow the installation instructions in the README.md file at the root of the project.
+First follow the instructions from :doc:`install` section.
 
 Place the configuration files forecaster.cfg and auth.cfg in the current execution directory of the API (e.g., ~/api_directory).
 

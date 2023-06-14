@@ -88,7 +88,7 @@ def get_observation_models_meta(config_obj: dict):
         model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj, get_method(model), mod_obs='mod')
                       })
 
-        if 'depth' not in model["xarray_meta"] or model["xarray_meta"].depth.values.dtype in ['float32','float64']:
+        if 'depth' not in model["xarray_meta"] or model["xarray_meta"].depth.values.dtype in ['float32', 'float64']:
             vertical_colocation_flag = False
         elif 'depth' not in model["xarray_meta"]:
             vertical_colocation_flag = False
@@ -145,7 +145,8 @@ def get_observation_models_meta(config_obj: dict):
                                                  horizontal_colocation_flag, vertical_colocation_flag,
                                                  temporal_colocation_flag, coloc_method=get_method(model),
                                                  opt_grid=config_obj["colocate"], vertical_step=vertical_step,
-                                                 horizontal_step=horizontal_step, coloc_method_z=get_method(model, z=True))
+                                                 horizontal_step=horizontal_step,
+                                                 coloc_method_z=get_method(model, z=True))
 
         observation["xarray_meta_coloc"].append(obs_coloc)
         model.update({"xarray_meta_coloc": mod_coloc})
@@ -207,7 +208,7 @@ def get_method(data, z=False) -> str:
         Method to use.
     """
     if z:
-        method = data.get('method-z')
+        method = data.get('method_z')
         if method is None:
             method = data.get('method')
     else:

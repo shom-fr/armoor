@@ -8,6 +8,7 @@ import numpy as np
 from xoa.regrid import regrid1d
 import matplotlib.path as path
 import math
+from pandas.tseries.offsets import MonthEnd
 
 import logging
 
@@ -475,6 +476,9 @@ class MetazoneAccessor:
                                 da = self._obj[var]
                                 da_tgt = regrid1d(da, tgt_depth)
                                 tgt_ds = tgt_ds.assign({var: da_tgt})
+
+                if "depth" not in list(tgt_ds.coords):
+                    tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
                 return tgt_ds
             else:
                 return ds
@@ -561,7 +565,7 @@ class MetazoneAccessor:
         Returns
         -------
         xarray.Dataset
-            same Dataset averaged over the time interval
+            same Dataset averaged over the vertical slice
         """
         logger.info("Applying filter - vertical_selection_slice")
 
@@ -795,14 +799,16 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - time_selection_interval")
 
+        if interval in ["1M", "M"]:
+            interval = "MS"
+
         start = self._obj.isel(time=[0]).time.data[0]
         end = self._obj.isel(time=[-1]).time.data[0]
-
-        start, end, interval = self._obj.meta.format_interval(start, end, interval)
+        end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
 
         time_interval = pandas.date_range(start=start, end=end, freq=interval)
 
-        ds_group = self._obj.groupby_bins('time', time_interval)
+        ds_group = self._obj.groupby_bins('time', time_interval, right=False)
         liste_ds = []
 
         for label, ds in ds_group:
@@ -824,47 +830,49 @@ class MetazoneAccessor:
         ds = ds.drop_vars('interval_label')
         return ds
 
-    def format_interval(self, start, end, interval):
-        """
-        Retrieve the right inteval for monthly, yearly interval.
-        Parameters
-        ----------
-        start : np.datime64
-            Date of start
-        end : np.datime64
-            Date of end
-        interval : str
-            Required interval
-
-        Returns
-        -------
-
-        """
-        if interval in ["1M", "M"]:
-            interval = "MS"
-            start = np.datetime_as_string(start)[:7]
-            day = np.datetime_as_string(end, unit='D').split('-')[2]
-            if int(day) > 2:
-                end = end + np.timedelta64(int(1 * 2.628e+15), 'ns')
-        return start, end, interval
-
     # Overload emulation
-    def time_selection_climatological(self, *args):
+    def time_selection_climatological(self, cycle: str):
         """
+                Subset dataset filtering elements along time dimension, selecting dates within the specified period.
 
-        Parameters
-        ----------
-        args
+                Parameters
+                ----------
+                interval : str
+                    Period kept, can be one of the following : january, february, march,
+                    april, may, june, july, august, september, october, november, december,
+                    spring, summer, autumn, winter or
+                    from 2 to 12 consecutive letters in JFMAMJJASOND
 
-        Returns
-        -------
-
-        """
+                Returns
+                -------
+                xarray.Dataset
+                     Dataset with elements referring to the specified period.
+                """
         logger.info("Applying filter - time_selection_climatological")
-        if len(args) == 1 and isinstance(args[0], str):
-            return self.time_selection_climatological_interval(args[0])
-        elif len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], str):
-            return self.time_selection_climatological_custom_interval(args[0], args[1])
+
+        climatological_interval = "jfmamjjasondjfmamjjasond"
+
+        climatological_month = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6, 'july': 7,
+                                'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
+                                }
+        climatological_season = {'winter': 'DJF', 'spring': 'MAM', 'summer': 'JJA', 'autumn': "SON"
+                                 }
+
+        cycle = cycle[0]
+        if cycle in climatological_interval and 1 < len(cycle) <= 12:
+            i_start = climatological_interval.find(interval) + 1
+            i_end = len(interval) - 1 + i_start
+            month_selection = [i % 12 if i != 12 else 12 for i in range(i_start, i_end + 1)]
+            return self._obj.sel(time=self._obj.time.dt.month.isin(month_selection))
+
+        elif cycle in climatological_month:
+            return self._obj.sel(time=self._obj['time.month'] == climatological_month[interval])
+
+        elif cycle in climatological_season:
+            ds_season_group = self._obj.groupby('time.season')
+            for label_season, ds_season in ds_season_group:
+                if label_season == climatological_season[cycle]:
+                    return ds_season
         return None
 
     def time_selection_climatological_custom_interval(self, season_start: str = None,
@@ -918,50 +926,6 @@ class MetazoneAccessor:
                 elif season_end < obj_time:
                     break
         return self._obj.sel(time=index)
-
-    def time_selection_climatological_interval(self, interval: str = None, ) -> xr.Dataset:
-        """
-        Subset dataset filtering elements along time dimension, selecting dates within the specified period.
-
-        Parameters
-        ----------
-        interval : str
-            Period kept, can be one of the following : january, february, march,
-            april, may, june, july, august, september, october, november, december,
-            spring, summer, autumn, winter or
-            from 2 to 12 consecutive letters in JFMAMJJASOND
-
-        Returns
-        -------
-        xarray.Dataset
-             Dataset with elements referring to the specified period.
-        """
-        logger.info("Applying filter - time_selection_climatological_interval")
-        interval = interval.lower()
-
-        climatological_interval = "jfmamjjasondjfmamjjasond"
-
-        climatological_interval_month = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
-                                         'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11,
-                                         'december': 12
-                                         }
-        climatological_interval_season = {'spring': ("21/03", "21/06"), 'summer': ("21/06", "23/09"),
-                                          'autumn': ("23/09", "21/12"), 'winter': ("21/12", "21/03")
-                                          }
-
-        if interval in climatological_interval and 1 < len(interval) <= 12:
-            i_start = climatological_interval.find(interval) + 1
-            i_end = len(interval) - 1 + i_start
-            month_selection = [i % 12 if i != 12 else 12 for i in range(i_start, i_end + 1)]
-            return self._obj.sel(time=self._obj.time.dt.month.isin(month_selection))
-
-        elif interval in climatological_interval_month:
-            return self._obj.sel(time=self._obj.time.dt.month.isin(climatological_interval_month[interval]))
-
-        elif interval in climatological_interval_season:
-            season_start, season_end = climatological_interval_season[interval]
-            return self.time_selection_climatological_custom_interval(season_start, season_end)
-        return None
 
     def time_restriction(self, restriction: (int, int) = (None, None)) -> xr.Dataset:
         """
