@@ -372,11 +372,11 @@ def open_decode_mouillages(path_file):
     for i in range(n_line):
         lines[i] = lines[i].split('\t')
         lines[i][-1] = lines[i][-1].rstrip('\n')  # Remove header
-    lines = np.array(lines[1:])
+    lines = lines[1:]
 
     # Get the line indexes of the start of each new measurement, set fill values
-    first_column = np.array(lines)[:, 0]
-    first_column[first_column == ''] = 9999999.
+    first_column = np.array([line[0] for line in lines], dtype=object)
+    first_column[first_column == ''] = '9999999'
     first_column = first_column.astype(float)
     index_mesures = np.where(first_column != 9999999.)[0]
     np.append(index_mesures, len(lines))
@@ -387,13 +387,22 @@ def open_decode_mouillages(path_file):
     for i in range(nb_dates - 1):
         # Get measurements coordinates
         i_line_deb = index_mesures[i]
-        date = np.datetime64(lines[i_line_deb][3])
+        date = np.datetime64(lines[i_line_deb][3], "ns")
         lon = float(lines[i_line_deb][4])
         lat = float(lines[i_line_deb][5])
         bottom_depth = float(lines[i_line_deb][6])
 
         # Subset the numpy array selecting only the specific measurements
-        array_series = np.array(lines[index_mesures[i]:index_mesures[i + 1], 7:]).astype(float)
+        array_series_0 = lines[index_mesures[i]:index_mesures[i + 1]]
+        array_series_1 = []
+        for line in array_series_0[1:]:
+            line_edit = line[:-1] if line[-1] == "" else line
+            line_edit = np.array(line_edit[7:], dtype=object)
+            line_edit[line_edit == ''] = '999999.'
+            line_edit = line_edit.astype(float)
+            array_series_1.append(line_edit)
+        array_series = np.array(array_series_1)
+
         # Convert the array into xr.dataset and add it to the list of measurements
         list_ds.append(array2ds(array_series, lon, lat, date, bottom_depth, 'mouillages'))
 
@@ -405,7 +414,6 @@ def open_decode_mouillages(path_file):
 
     # Convert lons
     mouillage = convert_lons(mouillage)
-
     return mouillage
 
 
