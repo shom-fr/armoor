@@ -19,7 +19,7 @@ We can distinguish 5 sections in the configuration file:
     #. Header : common part of the execution
     #. Observation : part relative to the observation
     #. Models : part relative to the models
-    #. Meta-zones : filters applied to the datasets
+    #. Meta-zone : filters applied to the datasets
     #. Outputs : in this section we specify what we want to plot with the remaining datasets.
 
 1. Header
@@ -57,10 +57,10 @@ The model's section is very similar to the observation's one, the main differenc
 
 The only other difference concerns the ``type`` values, that are specific regarding the models : *CROCO*, *CROCO_currents*, *HYCOM_currents*, *HYCOM_3D* and *CORA*. Any other type of model will be automatically decoded.
 
-4. Meta-zones
+4. Meta-zone
 -------------
 
-The *meta-zone* allows you to select a subset of the original dataset. Here is the list of possible options (with their associated description) that can be provided after ``[[meta-zones]]``:
+The *meta-zone* allows you to select a subset of the original dataset. Here is the list of possible options (with their associated description) that can be provided after ``[[meta_zone]]``:
 
     * ``name`` : *meta-zone* name appearing in the title plots.
 
