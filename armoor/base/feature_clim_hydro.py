@@ -108,7 +108,7 @@ def plot(config_obj):
                                                      cmap, vmin, vmax, output_path=sub_func_output_folder, dvmin=dvmin,
                                                      dvmax=dvmax, obs_name=obs_name, mod_name=models_name[i])
                 else:
-                    for depth in [float(mod["xarray_meta_coloc"].depth.values)]:
+                    for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
                         try:
                             mod["xarray_meta"] = mod["xarray_meta"].sel(depth=depth, method='nearest')
                         except:
@@ -126,10 +126,10 @@ def plot(config_obj):
                                                                                                           method='nearest')
                         except:
                             logger.warning("obs-meta-coloc depth selection : Failed")
-
+                        figname = f"depth{i_depth}"
                         base.plot_features.plot_map_metr(flag_interval, flag_slice, mod["xarray_meta"],
                                                          mod["xarray_meta_coloc"], observation["xarray_meta"],
                                                          observation["xarray_meta_coloc"][i],
                                                          plot_map_metr[output["plot"]], cmap, vmin, vmax,
                                                          output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax,
-                                                         obs_name=obs_name, mod_name=models_name[i])
+                                                         obs_name=obs_name, mod_name=models_name[i],figname=figname)

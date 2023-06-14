@@ -862,7 +862,8 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
 
 
 def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_coloc, metric, cmap=cmocean.cm.thermal,
-                  vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None, obs_name=None, mod_name=None):
+                  vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None, obs_name=None, mod_name=None,
+                  figname=''):
     """
     Plot the map of the model and observation and their comparison required in functionality 1,2,3,5.
 
@@ -898,6 +899,8 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
         Name of the model.
     obs_name : str
         Name of the observation.
+    figname : str
+        Figure name to add.
     """
 
     logger.info('Map of the model and observation and their comparison')
@@ -997,7 +1000,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                                                   comparison.isel(time=i_time), vmin, vmax, cmap, title, metric,
                                                   dvmin=dvmin, dvmax=dvmax)
 
-                ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
+                ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}{figname}', output_path)
     # Other metric than difference
     else:
         if flag_interval:
@@ -1032,7 +1035,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
             f, axs = plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title,
                                           metric, dvmin=dvmin, dvmax=dvmax)
 
-            ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
+            ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}{figname}', output_path)
 
 
 def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title, metric,
@@ -2169,7 +2172,7 @@ def create_harmonic_table(models, observations, output_path):
                         f'{model[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
 
 
-def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, fig_title=''):
+def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, figname=''):
     """
     Plot statistical time series of model and observation.
 
@@ -2295,7 +2298,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
 
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
-        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}{fig_title}', output_path)
+        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}{figname}', output_path)
 
 
 def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title):
