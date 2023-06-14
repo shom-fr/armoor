@@ -221,8 +221,8 @@ def format_cofig_obj2dict(config: dict) -> dict:
         raise VdtTypeError(f'no outputs provided')
 
     # clean meta-zones from None values
-    if "meta-zones" in config:
-        meta_zones = remove_keys_with_none_value(config.pop("meta-zones"))
+    if "meta_zone" in config:
+        meta_zones = remove_keys_with_none_value(config.pop("meta_zone"))
         if meta_zones:
             config.update({"meta_zones": meta_zones})
 
