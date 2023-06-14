@@ -454,7 +454,7 @@ def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, o
     # Set the titles
     var_title = find_var_title(obs_name, obs)
     if flag_slice:
-        title_depth = [f"Slice: {obs.slice.values[i]:.4f}m" for i in range(len(obs.slice.values))]
+        title_depth = [f"Slice: {obs.slice.values[i]}" for i in range(len(obs.slice.values))]
     elif diag_type == "diag_disp_g" and 'depth' in obs.dims and len(obs.depth) > 0:
         title_depth = f"Depth: {min(obs.depth.values):.4f}m to {max(obs.depth.values):.4f}m"
     elif diag_type == "diag_disp_g" and 'dens' in obs.dims and len(obs.dens) > 0:
@@ -862,7 +862,8 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
 
 
 def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_coloc, metric, cmap=cmocean.cm.thermal,
-                  vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None, obs_name=None, mod_name=None):
+                  vmin=None, vmax=None, output_path=None, dvmin=None, dvmax=None, obs_name=None, mod_name=None,
+                  figname=''):
     """
     Plot the map of the model and observation and their comparison required in functionality 1,2,3,5.
 
@@ -898,6 +899,8 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
         Name of the model.
     obs_name : str
         Name of the observation.
+    figname : str
+        Figure name to add.
     """
 
     logger.info('Map of the model and observation and their comparison')
@@ -997,7 +1000,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                                                   comparison.isel(time=i_time), vmin, vmax, cmap, title, metric,
                                                   dvmin=dvmin, dvmax=dvmax)
 
-                ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
+                ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}{figname}', output_path)
     # Other metric than difference
     else:
         if flag_interval:
@@ -1032,7 +1035,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
             f, axs = plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title,
                                           metric, dvmin=dvmin, dvmax=dvmax)
 
-            ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}', output_path)
+            ft.manage_output(plt, f'map_{obs_name}_{mod_name}_{metric}_{title_time}{figname}', output_path)
 
 
 def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap, title, metric,
@@ -2081,7 +2084,6 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, obs_name=None, 
 
     """
     logger.info('2D figure, Hovmoller diagram.')
-
     # Squeeze
     mod_meta_coloc, obs_meta_coloc = mod_meta_coloc.squeeze(), obs_meta_coloc.squeeze()
 
@@ -2104,7 +2106,7 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, obs_name=None, 
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs_meta_coloc)
-    ax_mini_map.scatter(obs_meta_coloc.lon.values, obs_meta_coloc.lat.values, 30, transform=ccrs.PlateCarree())
+    ax_mini_map.scatter(obs_meta_coloc.lon, obs_meta_coloc.lat, 30, transform=ccrs.PlateCarree())
 
     # Add legend
     axs[0].legend(loc=5)
@@ -2169,7 +2171,7 @@ def create_harmonic_table(models, observations, output_path):
                         f'{model[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
 
 
-def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, fig_title=''):
+def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, figname=''):
     """
     Plot statistical time series of model and observation.
 
@@ -2295,7 +2297,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
 
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
-        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}{fig_title}', output_path)
+        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}{figname}', output_path)
 
 
 def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title):

@@ -54,7 +54,7 @@ For each **meta-zone**, you must provide a meta-zone name in double brackets ``[
 
     * ``name`` : *meta-zone* name appearing in the title plots.
     * ``description`` : *description* text appearing in the report.
-    * **filters to apply** : use the same attributes names as described in section **4. Meta-zones** of the :doc:`base` chapter.
+    * **filters to apply** : use the same attributes names as described in section **4. Meta-zone** of the :doc:`base` chapter.
 
 .. IMPORTANT::
     Each **meta-zone** name ``[[meta_zone_name]]`` must be unique.
