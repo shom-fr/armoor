@@ -208,7 +208,7 @@ def get_method(data, z=False) -> str:
         Method to use.
     """
     if z:
-        method = data.get('method-z')
+        method = data.get('method_z')
         if method is None:
             method = data.get('method')
     else:
