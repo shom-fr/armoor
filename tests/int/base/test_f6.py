@@ -9,24 +9,24 @@ copy_test_files(folder_test)
 
 class TestBulletins:
 
-    # def test_ellipse_courant_et_periode(self):  # OK
-    #     out_path, logger = change_path(folder_test)
-    #     logger.info('test_ellipse_courant_et_periode')
-    #     parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_et_periode.ini"])
-    #     parser.update({'output_path': out_path})
-    #     create_folder(f'results_comodo')
-    #     parser = update_comodo(parser)
-    #     dict2call(parser)
-    #     assert True
-    #
-    # def test_map_current(self):  # OK
-    #     out_path, logger = change_path(folder_test)
-    #     logger.info('test_map_current')
-    #     parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_current.ini"])
-    #     parser.update({'output_path': out_path})
-    #     dict2call(parser)
-    #     assert True
-    #
+    def test_ellipse_courant_et_periode(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_ellipse_courant_et_periode')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_et_periode.ini"])
+        parser.update({'output_path': out_path})
+        create_folder(f'results_comodo')
+        parser = update_comodo(parser)
+        dict2call(parser)
+        assert True
+
+    def test_map_current(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_map_current')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_current.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_map_current_biais(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_current_biais')
