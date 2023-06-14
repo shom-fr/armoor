@@ -454,7 +454,7 @@ def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, o
     # Set the titles
     var_title = find_var_title(obs_name, obs)
     if flag_slice:
-        title_depth = [f"Slice: {obs.slice.values[i]:.4f}m" for i in range(len(obs.slice.values))]
+        title_depth = [f"Slice: {obs.slice.values[i]}" for i in range(len(obs.slice.values))]
     elif diag_type == "diag_disp_g" and 'depth' in obs.dims and len(obs.depth) > 0:
         title_depth = f"Depth: {min(obs.depth.values):.4f}m to {max(obs.depth.values):.4f}m"
     elif diag_type == "diag_disp_g" and 'dens' in obs.dims and len(obs.dens) > 0:
