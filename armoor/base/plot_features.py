@@ -2169,7 +2169,7 @@ def create_harmonic_table(models, observations, output_path):
                         f'{model[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
 
 
-def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None):
+def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, fig_title=''):
     """
     Plot statistical time series of model and observation.
 
@@ -2295,7 +2295,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
 
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
-        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}', output_path)
+        ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}{fig_title}', output_path)
 
 
 def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title):
