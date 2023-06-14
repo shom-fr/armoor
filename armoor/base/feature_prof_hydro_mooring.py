@@ -77,10 +77,10 @@ def plot(config_obj):
                                                       output_path=sub_func_output_folder)
             else:
                 for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
-                    fig_title = f"_depth{i_depth}"
+                    figname = f"_depth{i_depth}"
                     models_depth, observation_depth = select_depth(models, observation, depth)
                     base.plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval, flag_slice,
-                                                          output_path=sub_func_output_folder,fig_title=fig_title)
+                                                          output_path=sub_func_output_folder, figname=figname)
 
 
 def select_depth(models, observation, depth):
