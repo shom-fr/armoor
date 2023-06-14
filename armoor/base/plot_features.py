@@ -2084,7 +2084,6 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, obs_name=None, 
 
     """
     logger.info('2D figure, Hovmoller diagram.')
-
     # Squeeze
     mod_meta_coloc, obs_meta_coloc = mod_meta_coloc.squeeze(), obs_meta_coloc.squeeze()
 
@@ -2107,7 +2106,7 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, obs_name=None, 
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs_meta_coloc)
-    ax_mini_map.scatter(obs_meta_coloc.lon.values, obs_meta_coloc.lat.values, 30, transform=ccrs.PlateCarree())
+    ax_mini_map.scatter(obs_meta_coloc.lon, obs_meta_coloc.lat, 30, transform=ccrs.PlateCarree())
 
     # Add legend
     axs[0].legend(loc=5)
