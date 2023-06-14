@@ -185,7 +185,7 @@ def open_decode_cmems(path_files):
 
     # Decode
     cmems = cmems.xoa.decode()
-
+    
     # Manage profiler depths
     if 'DEPH' in cmems.variables:
         cmems = decode_profiler(cmems)
@@ -206,6 +206,9 @@ def open_decode_cmems(path_files):
 
     # Convert lons
     cmems = convert_lons(cmems)
+
+    # Remove duplicate time values
+    cmems = cmems.drop_duplicates('time')
 
     return cmems
 
