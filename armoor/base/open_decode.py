@@ -991,7 +991,6 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
     ds : xarray.dataset
         observation dataset.
     """
-    logger.info("ADCP")
     # Define the columns to read and variable names for each type of observation
     if type == 'mouillages':
         long_names = ["Corrected Flow 2D S-N", "Corrected Flow 2D W-E", "Corrected Flow 2D Amplitude",
