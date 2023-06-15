@@ -371,6 +371,10 @@ def colocate_lon_lat_time_mod(ds, tgt, method):
                 depth = np.unique(tgt.DEPH.fillna(0).values)
             else:
                 depth = np.unique(tgt.depth.values)
+            if 'depth' not in ds_interp:
+                logger.warning(
+                    'Caution : the product you are using does not contain a depth dimension - probably a 2D file.'
+                    ' The vertical colocation will fail.')
             ds_interp = ds_interp.interp(depth=depth, method=method, kwargs={"fill_value": "extrapolate"}).squeeze()
 
         # Colocation lon/lat
