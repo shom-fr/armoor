@@ -3,6 +3,7 @@ import os
 import logging
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import numpy as np
 from scipy.stats import gaussian_kde
 from scipy import stats
@@ -394,36 +395,46 @@ def add_mini_map(f, extent=None):
     return ax_mini_map
 
 
-def add_plg_minimap(ax_mini_map, ds):
+def add_plg_minimap(ax_mini_map, ds, plg):
     """
     Add the mini map ax to the figure
     Parameters
     ----------
     ax_mini_map
         ax of the minimap
-    ds : DataArray
-        DataArray whose lon/lat to plot.
+    ds: DataArray
+        DataArray whose lon / lat to plot.
+    plg : list
+        Polygon coordinates list.
     """
-    lons = []
-    lats = []
-    if 'time' in ds.dims:
-        ds = ds.isel(time=0)
-    if 'depth' in ds.dims:
-        ds = ds.isel(depth=0)
-    if 'interval' in ds.dims:
-        ds = ds.isel(interval=0, idx_time=0)
-    if 'slice' in ds.dims:
-        ds = ds.isel(slice=0)
-    if 'idx_depth' in ds.dims:
-        ds = ds.isel(idx_depth=0)
-    if 'idx_dens' in ds.dims:
-        ds = ds.isel(idx_dens=0)
-    for i_lon, lon in enumerate(ds.lon.data):
-        for i_lat, lat in enumerate(ds.lat.data):
-            if not np.isnan(ds.isel(lon=i_lon, lat=i_lat)):
-                lons.append(lon)
-                lats.append(lat)
-    ax_mini_map.scatter(lons, lats, transform=ccrs.PlateCarree())
+    if plg:
+        lons = [point[0] for point in plg]
+        lats = [point[1] for point in plg]
+        polygon = mpatches.Polygon(list(zip(lons, lats)), closed=True, facecolor='blue', alpha=0.5,
+                                   transform=ccrs.PlateCarree())
+        ax_mini_map.add_patch(polygon)
+        ax_mini_map.set_extent([min(lons), max(lons), min(lats), max(lats)])
+    else:
+        lons = []
+        lats = []
+        if 'time' in ds.dims:
+            ds = ds.isel(time=0)
+        if 'depth' in ds.dims:
+            ds = ds.isel(depth=0)
+        if 'interval' in ds.dims:
+            ds = ds.isel(interval=0, idx_time=0)
+        if 'slice' in ds.dims:
+            ds = ds.isel(slice=0)
+        if 'idx_depth' in ds.dims:
+            ds = ds.isel(idx_depth=0)
+        if 'idx_dens' in ds.dims:
+            ds = ds.isel(idx_dens=0)
+        for i_lon, lon in enumerate(ds.lon.data):
+            for i_lat, lat in enumerate(ds.lat.data):
+                if not np.isnan(ds.isel(lon=i_lon, lat=i_lat)):
+                    lons.append(lon)
+                    lats.append(lat)
+        ax_mini_map.scatter(lons, lats, transform=ccrs.PlateCarree())
 
 
 def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, obs, output_path=None):
@@ -2170,7 +2181,7 @@ def create_harmonic_table(models, observations, output_path):
                         f'{model[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
 
 
-def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, figname=''):
+def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, figname='', plg=None):
     """
     Plot statistical time series of model and observation.
 
@@ -2239,7 +2250,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 obs_coloc = observation["xarray_meta_coloc"][i].isel(slice=[idx_slice])
 
                 plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name,
-                                          var_title)
+                                          var_title, plg)
             # Change x interval labels
             if flag_interval:
                 modify_interval_label(axs[4])
@@ -2270,7 +2281,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             mod_name = mod["name"]
             obs_name = observation["name"]
             plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name,
-                                      var_title)
+                                      var_title, plg)
 
         if 'depth' in mod['xarray_meta_coloc'].coords:
             if mod['xarray_meta_coloc'].depth.values.dtype in ['float64', 'float32']:
@@ -2299,7 +2310,8 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}{figname}', output_path)
 
 
-def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title):
+def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title,
+                              plg):
     """
     Plot the statistical time series figure.
     Parameters
@@ -2355,7 +2367,7 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     # add minimap
     ax_mini_map = add_mini_map(f, obs_coloc)
     if 'lon' in list_dims_mean:
-        add_plg_minimap(ax_mini_map, obs_coloc)
+        add_plg_minimap(ax_mini_map, obs_coloc, plg)
     else:
         ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30, transform=ccrs.PlateCarree())
 

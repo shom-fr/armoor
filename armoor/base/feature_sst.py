@@ -89,8 +89,9 @@ def plot(config_obj):
                               "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
                               }
         if output["plot"] in plot_ts_metr_stats:
+            plg = config_obj["meta_zones"].get("polygon")
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
-                                                  output_path=sub_func_output_folder)
+                                                  output_path=sub_func_output_folder, plg=plg)
 
         ################################################################################################################
         # MAP METRIC

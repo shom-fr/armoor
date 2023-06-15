@@ -62,7 +62,6 @@ def plot(config_obj):
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(var_mod)
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(vars)
 
-
         # Remove missing values
         models, observation = base.remove_missing_values_ds(models, observation, i_mod, var_mod, vars)
 
@@ -101,8 +100,9 @@ def plot(config_obj):
         plot_ts_metr_stats = {"plot_ts_metr_stats": 'all_metrics'
                               }
         if output["plot"] in plot_ts_metr_stats:
+            plg = config_obj["meta_zones"].get("polygon")
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
-                                                  output_path=sub_func_output_folder)
+                                                  output_path=sub_func_output_folder, plg=plg)
 
         ################################################################################################################
         # MAP METRIC
@@ -123,7 +123,6 @@ def plot(config_obj):
         diag_disp = {"diag_disp": 'diag_disp', "diag_disp_g": 'diag_disp_g'}
         if output["plot"] in diag_disp:
             for i, mod in enumerate(models):
-
                 base.plot_features.diag_disp(flag_interval, flag_slice, obs_name, models_name[i], output["plot"],
                                              mod["xarray_meta_coloc"], observation["xarray_meta_coloc"][i],
                                              output_path=sub_func_output_folder)

@@ -71,16 +71,17 @@ def plot(config_obj):
                               "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
                               }
         if output["plot"] in plot_ts_metr_stats:
+            plg = config_obj["meta_zones"].get("polygon")
             if 'depth' not in models[0]["xarray_meta_coloc"].dims:
                 models_depth, observation_depth = models, observation
                 base.plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval, flag_slice,
-                                                      output_path=sub_func_output_folder)
+                                                      output_path=sub_func_output_folder, plg=plg)
             else:
                 for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
                     figname = f"_depth{i_depth}"
                     models_depth, observation_depth = select_depth(models, observation, depth)
                     base.plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval, flag_slice,
-                                                          output_path=sub_func_output_folder, figname=figname)
+                                                          output_path=sub_func_output_folder, figname=figname, plg=plg)
 
 
 def select_depth(models, observation, depth):
