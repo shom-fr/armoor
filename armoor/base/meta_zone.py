@@ -225,7 +225,6 @@ class MetazoneAccessor:
 
         lon_target = [lon for lon, lat in coordinates]
         lat_target = [lat for lon, lat in coordinates]
-
         if 'lon' in self._obj.dims:  # Regular grid
             if method in ["linear"]:
                 return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
