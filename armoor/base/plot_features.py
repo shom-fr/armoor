@@ -1800,7 +1800,6 @@ def plot_ts_metr_point(models, observation, metric, flag_interval, flag_slice, o
     longitudes, latitudes = obs_coloc_base.lon, obs_coloc_base.lat
     obs_name = observation["xarray_meta"].name
     var_title = find_var_title(obs_name, obs_meta)
-
     list_dims_mean = []
     label_title = ''
     if flag_interval:
