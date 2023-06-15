@@ -221,6 +221,8 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
+            plg = config_obj["meta_zones"].get("polygon")
+
             observation['xarray_meta'] = observation['xarray_meta'][attribute]
             for i_mod, mod in enumerate(models):
                 mod['xarray_meta'] = mod['xarray_meta'][attribute]
@@ -232,7 +234,7 @@ def plot(config_obj):
                                                                     [attribute])
 
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
-                                                  output_path=sub_func_output_folder)
+                                                  output_path=sub_func_output_folder, plg=plg)
 
         ################################################################################################################
         # CURRENT MAP

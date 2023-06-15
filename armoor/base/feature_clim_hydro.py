@@ -93,8 +93,9 @@ def plot(config_obj):
                               "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
                               }
         if output["plot"] in plot_ts_metr_stats:
+            plg = config_obj["meta_zones"].get("polygon")
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
-                                                  output_path=sub_func_output_folder)
+                                                  output_path=sub_func_output_folder, plg=plg)
 
         ################################################################################################################
         # MAP METRIC
@@ -132,4 +133,4 @@ def plot(config_obj):
                                                          observation["xarray_meta_coloc"][i],
                                                          plot_map_metr[output["plot"]], cmap, vmin, vmax,
                                                          output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax,
-                                                         obs_name=obs_name, mod_name=models_name[i],figname=figname)
+                                                         obs_name=obs_name, mod_name=models_name[i], figname=figname)
