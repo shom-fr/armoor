@@ -551,6 +551,7 @@ class MetazoneAccessor:
                     da = self._obj[var]
                     da_tgt = regrid1d(da, tgt_depth)
                     tgt_ds = tgt_ds.assign({var: da_tgt})
+            tgt_ds = tgt_ds.assign_coords({'depth':depths})
             return tgt_ds
 
     def vertical_selection_slice(self, slice: str = None, var_slice: str = None) -> xr.Dataset:
