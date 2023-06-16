@@ -208,6 +208,9 @@ class SSTAccessor:
                 ptemp.attrs['long_name'] = "Potential temperature"
                 self._obj['ptemp'] = ptemp
                 return self._obj
+            else:
+                logging.warning('The potential temperature could not be calculated, sea temperature will be used')
+                return self._obj.temp
 
     def sel_sound_speed(self):
         """
