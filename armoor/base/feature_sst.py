@@ -34,16 +34,12 @@ def plot(config_obj):
     flag_slice = 'slice' in config_obj["meta_zones"].keys()
 
     # SELECT THE VARIABLES
+    config_obj = base.sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel_sst()
+    # Remove missing values
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel_sst()
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel_sst()
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel_sst()
-
-        # Remove missing values
         models, observation = base.remove_missing_values_ds(models, observation, i_mod, ["sst"], ["sst"])
 
     # Get names

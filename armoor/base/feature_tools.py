@@ -94,3 +94,51 @@ def remove_missing_values(model, obs):
         return model_nan, obs_nan
     else:
         return model, obs
+
+
+def sel_default_vars(config_obj):
+    """
+    Select the default and optional parameters in the model and observation datasets from the config_obj
+    Parameters
+    ----------
+    config_obj : dict
+        Meta-zone, models and observation from the parser.
+
+    Returns
+    -------
+    config_obj : dict
+        Meta-zone, models and observation from the parser with the selected variables.
+    """
+    feature = config_obj["functionality"]
+
+    additional_vars = config_obj['meta_zones']['vars'] if 'vars' in config_obj['meta_zones'] else []
+
+    if feature == "sst":  # F1
+        default_vars = ['SST']
+    elif feature == "prof_hydro_vessel":  # F2
+        default_vars = ['ptemp', 'sal', 'pdens']
+    elif feature == "prof_hydro_mooring":  # F3
+        default_vars = ['ptemp', 'sal', 'pdens']
+    elif feature == "section_hydro":  # F4
+        default_vars = ['ptemp', 'sal']
+    elif feature == "clim_hydro":  # F5
+        default_vars = ['ptemp', 'sal']
+    elif feature == "currents_hfr":  # F6
+        default_vars = ['current']
+    elif feature == "currents_ADCP":  # F7
+        default_vars = ['current']
+    elif feature == "currents_VMADCP":  # F8
+        default_vars = ['current']
+    elif feature == "drifters":  # F9
+        default_vars = ['current']
+
+    vars = default_vars + additional_vars
+
+    config_obj['observation']["xarray_meta"] = config_obj['observation']["xarray_meta"].sel_var.selection(vars)
+    for i_mod, mod in enumerate(config_obj['models']):
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars)
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars)
+        config_obj['observation']["xarray_meta_coloc"][i_mod] = config_obj['observation']["xarray_meta_coloc"][
+            i_mod].sel_var.selection(vars)
+
+    return config_obj
