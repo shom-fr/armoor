@@ -195,9 +195,10 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing temperature.
         """
-        ds_temp = self._obj.xoa.temp.sel_var.convert_K_C()
-        ds_temp = ds_temp.rename('temp')
-        return ds_temp
+        if self._obj.xoa.temp is not None:
+            ds_temp = self._obj.xoa.temp.sel_var.convert_K_C()
+            ds_temp = ds_temp.rename('temp')
+            return ds_temp
 
     def sel_ptemp(self):
         """
