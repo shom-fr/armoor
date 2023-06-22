@@ -27,13 +27,13 @@ def plot(config_obj):
 
     """
     outputs = config_obj["outputs"]
-
     output_path = config_obj.get("output_path")
-    # SET THE FLAGS
+
+    # Set the flags
     flag_interval = 'interval' in config_obj["meta_zones"].keys()
     flag_slice = 'slice' in config_obj["meta_zones"].keys()
 
-    # SELECT THE VARIABLES
+    # Select the variables
     config_obj = base.sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
@@ -46,7 +46,7 @@ def plot(config_obj):
     models_name = [m['name'] for m in models]
     obs_name = observation['name']
 
-    # PLOT THE OUTPUTS
+    # Plot the outputs
     for index_output, output in enumerate(outputs):
         logger.info(f'Generating plot :: {output["plot"]}')
         if output_path:
