@@ -217,6 +217,11 @@ def open_decode_cmems(path_files):
     # Remove duplicate time values
     cmems = cmems.drop_duplicates('time')
 
+    # Remove useless variables
+    list_to_remove = ['DC_REFERENCE', 'DEPH', 'QC_DEPH']
+    for var in list(cmems.keys()):
+        if var in list_to_remove:
+            cmems = cmems.drop(var)
     return cmems
 
 
