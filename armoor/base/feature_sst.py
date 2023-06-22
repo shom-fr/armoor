@@ -39,8 +39,12 @@ def plot(config_obj):
     models = copy.copy(config_obj["models"])
 
     # Remove missing values
+    vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
+    vars_mod = copy.copy(vars)
+    if 'temp' in vars_mod:
+        vars_mod[vars_mod.index('temp')] = 'ptemp'
     for i_mod, mod in enumerate(models):
-        models, observation = base.remove_missing_values_ds(models, observation, i_mod, ["sst"], ["sst"])
+        models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars_mod, vars)
 
     # Get names
     models_name = [m['name'] for m in models]
@@ -68,8 +72,7 @@ def plot(config_obj):
         cmap = cmap if cmap is None else f'cmo.{cmap}'
 
         # PLOTS
-        list_vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
-        for var in list_vars:
+        for var in vars:
             observation_var, models_var = base.sel_one_var(observation, models, var)
             ################################################################################################################
             # TIME SERIES POINT

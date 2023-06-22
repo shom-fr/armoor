@@ -48,11 +48,12 @@ class SSTAccessor:
         for var in vars:
             if var == 'SST':
                 ds = self._obj.sel_var.sel_sst(depth)
-                ds = ds.rename('sst')
+                ds = ds.rename('sst') if ds is not None else ds
             elif var == 'temp':
                 ds = self._obj.sel_var.sel_temp()
             elif var == 'ptemp':
                 ds = self._obj.sel_var.sel_ptemp()
+                ds = ds.rename('ptemp') if ds is not None else ds
             elif var == 'ssh':
                 ds = self._obj.sel_var.sel_ssh()
             elif var == 'sal':
