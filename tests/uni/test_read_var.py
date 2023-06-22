@@ -1,6 +1,6 @@
 import xarray as xr
 
-from armoor.base import read_sst
+from armoor.base import sel_var
 from armoor.base.open_decode import open_decode
 from armoor.hmi.script_tools import create_folder
 from tests.int.base import change_path
