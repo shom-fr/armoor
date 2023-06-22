@@ -167,8 +167,8 @@ def sel_default_vars(config_obj):
     if feature == "clim_hydro":  # Calculate climatologies
         config_obj['observation']["xarray_meta"] = config_obj['observation']["xarray_meta"].sel_var.selection(vars_obs)
         for i_mod, mod in enumerate(config_obj['models']):
-            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby("time.month").mean("time").rename(
-                {'month': 'time'})
+            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby("time.month").mean(
+                "time").rename({'month': 'time'})
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod).groupby("time.month").mean(
                 "time").rename({'month': 'time'}).assign_coords({'time': calendar.month_name[1:13]})
             config_obj['observation']["xarray_meta_coloc"][i_mod] = config_obj['observation']["xarray_meta_coloc"][
