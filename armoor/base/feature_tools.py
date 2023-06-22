@@ -114,9 +114,15 @@ def sel_default_vars(config_obj):
     additional_vars = config_obj['meta_zones']['vars'] if 'vars' in config_obj['meta_zones'] else []
 
     if feature == "sst":  # F1
-        default_vars = ['SST']
+        default_vars_mod = ['SST']
+        default_vars_obs = ['SST']
     elif feature == "prof_hydro_vessel":  # F2
-        default_vars = ['ptemp', 'sal', 'pdens']
+        default_vars_mod = ['ptemp', 'sal', 'pdens']
+        default_vars_obs = ['temp', 'sal', 'dens']
+        if 'temp' in additional_vars:
+            additional_vars = additional_vars.remove('temp')
+        if 'ptemp' in additional_vars:
+            additional_vars = additional_vars.remove('ptemp')
     elif feature == "prof_hydro_mooring":  # F3
         default_vars = ['ptemp', 'sal', 'pdens']
     elif feature == "section_hydro":  # F4
@@ -132,13 +138,32 @@ def sel_default_vars(config_obj):
     elif feature == "drifters":  # F9
         default_vars = ['current']
 
-    vars = default_vars + additional_vars
+    vars_mod = default_vars_mod + additional_vars
+    vars_obs = default_vars_obs + additional_vars
 
-    config_obj['observation']["xarray_meta"] = config_obj['observation']["xarray_meta"].sel_var.selection(vars)
+    config_obj['observation']["xarray_meta"] = config_obj['observation']["xarray_meta"].sel_var.selection(vars_obs)
     for i_mod, mod in enumerate(config_obj['models']):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars)
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars)
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod)
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod)
         config_obj['observation']["xarray_meta_coloc"][i_mod] = config_obj['observation']["xarray_meta_coloc"][
-            i_mod].sel_var.selection(vars)
+            i_mod].sel_var.selection(vars_obs)
 
     return config_obj
+
+
+def sel_one_var(observation, models, var):
+
+    # Adjust potential / insitu variables for models and obs
+    if var in ['temp', 'ptemp']:
+        var_mod = 'ptemp'
+        var_obs = 'temp'
+    elif var in ['dens', 'pdens']:
+        var_mod = 'pdens'
+        var_obs = 'dens'
+
+    observation['xarray_meta'] = observation['xarray_meta'][var]
+    for i_mod, mod in enumerate(models):
+        mod["xarray_meta"] = mod["xarray_meta"][var]
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var]
+        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod][var]
+    return observation, models
