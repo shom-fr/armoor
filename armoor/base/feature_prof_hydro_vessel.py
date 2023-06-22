@@ -34,13 +34,16 @@ def plot(config_obj):
 
     # Select the variables
     config_obj = base.sel_default_vars(config_obj)
-
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
     # Remove missing values
+    var = list(observation['xarray_meta'].keys())
+    var_mod = copy.copy(var)
+    if 'temp' in var_mod:
+        var_mod[var_mod.index('temp')] = 'ptemp'
     for i_mod, mod in enumerate(models):
-        models, observation = base.remove_missing_values_ds(models, observation, i_mod, var_mod, vars)
+        models, observation = base.remove_missing_values_ds(models, observation, i_mod, var_mod, var)
 
     # Get names
     models_name = [m['name'] for m in models]
@@ -84,63 +87,66 @@ def plot(config_obj):
                                                           output_path=sub_func_output_folder)
 
         else:
-            for var in list(observation["xarray_meta"].keys()):
-                observation, models = sel_one_var(observation, models, var)
-                ################################################################################################################
+            list_vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
+            for var in list_vars:
+                observation_var, models_var = base.sel_one_var(observation, models, var)
+                ########################################################################################################
                 # TIME SERIES POINT
                 plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point',
                                       "plot_ts_metr_bias_point": 'bias_point', "plot_ts_metr_RMSE_point": 'RMSEc_point',
                                       "plot_ts_metr_point": 'all_metrics'
                                       }
                 if output["plot"] in plot_ts_metr_point:
-                    base.plot_features.plot_ts_metr_point(models, observation, plot_ts_metr_point[output["plot"]],
-                                                          flag_interval, flag_slice, output_path=sub_func_output_folder)
+                    base.plot_features.plot_ts_metr_point(models_var, observation_var,
+                                                          plot_ts_metr_point[output["plot"]], flag_interval, flag_slice,
+                                                          output_path=sub_func_output_folder)
 
-                ################################################################################################################
+                ########################################################################################################
                 # TIME SERIES STATS
                 plot_ts_metr_stats = {"plot_ts_metr_stats": 'all_metrics'
                                       }
                 if output["plot"] in plot_ts_metr_stats:
                     plg = config_obj["meta_zones"].get("polygon")
-                    base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
+                    base.plot_features.plot_ts_metr_stats(models_var, observation_var, flag_interval, flag_slice,
                                                           output_path=sub_func_output_folder, plg=plg)
 
-                ################################################################################################################
+                ########################################################################################################
                 # MAP METRIC
                 plot_map_metr = {"plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
                                  "plot_map_metr_RMSEc": 'RMSEc', "plot_map_metr_RMSEcentree": 'RMSEcentree'
                                  }
 
                 if output["plot"] in plot_map_metr:
-                    for i, mod in enumerate(models):
+                    for i, mod in enumerate(models_var):
                         base.plot_features.plot_map_metr_profiles(flag_interval, flag_slice, mod["xarray_meta_coloc"],
-                                                                  observation["xarray_meta_coloc"][i],
+                                                                  observation_var["xarray_meta_coloc"][i],
                                                                   plot_map_metr[output["plot"]], cmap, vmin, vmax,
                                                                   mod_name=models_name[i], obs_name=obs_name,
                                                                   output_path=sub_func_output_folder, dvmin=dvmin,
                                                                   dvmax=dvmax)
 
-                ################################################################################################################
+                ########################################################################################################
                 # DISP DIAG
                 diag_disp = {"diag_disp": 'diag_disp', "diag_disp_g": 'diag_disp_g'}
                 if output["plot"] in diag_disp:
-                    for i, mod in enumerate(models):
-                        base.plot_features.diag_disp(flag_interval, flag_slice, obs_name, models_name[i], output["plot"],
-                                                     mod["xarray_meta_coloc"], observation["xarray_meta_coloc"][i],
+                    for i, mod in enumerate(models_var):
+                        base.plot_features.diag_disp(flag_interval, flag_slice, obs_name, models_name[i],
+                                                     output["plot"], mod["xarray_meta_coloc"],
+                                                     observation_var["xarray_meta_coloc"][i],
                                                      output_path=sub_func_output_folder)
 
-                ################################################################################################################
+                ########################################################################################################
                 # COURBE PROFIL UNIQUE
                 plot_profile_u = {"plot_profile_u": 'profile_u'}
                 if output["plot"] in plot_profile_u:
-                    base.plot_features.plot_profile_unique(models, observation["xarray_meta"],
+                    base.plot_features.plot_profile_unique(models_var, observation_var["xarray_meta"],
                                                            config_obj["meta_zones"]["radius"],
                                                            output_path=sub_func_output_folder)
 
-                ################################################################################################################
+                ########################################################################################################
                 # COURBE MULTI PROFILS
                 plot_profile_multi = {"plot_profile_multi": 'profile_multi'}
                 if output["plot"] in plot_profile_multi:
-                    base.plot_features.plot_profile_multi(models, observation["xarray_meta"],
+                    base.plot_features.plot_profile_multi(models_var, observation_var["xarray_meta"],
                                                           config_obj["meta_zones"]["radius"],
                                                           output_path=sub_func_output_folder)

@@ -1,7 +1,7 @@
 """Common tools for all features"""
 import os
 import logging
-
+import copy
 import numpy as np
 import pandas as pd
 import logging
@@ -112,7 +112,6 @@ def sel_default_vars(config_obj):
     feature = config_obj["functionality"]
 
     additional_vars = config_obj['meta_zones']['vars'] if 'vars' in config_obj['meta_zones'] else []
-
     if feature == "sst":  # F1
         default_vars_mod = ['SST']
         default_vars_obs = ['SST']
@@ -120,23 +119,30 @@ def sel_default_vars(config_obj):
         default_vars_mod = ['ptemp', 'sal', 'pdens']
         default_vars_obs = ['temp', 'sal', 'dens']
         if 'temp' in additional_vars:
-            additional_vars = additional_vars.remove('temp')
+            additional_vars.remove('temp')
         if 'ptemp' in additional_vars:
-            additional_vars = additional_vars.remove('ptemp')
+            additional_vars.remove('ptemp')
     elif feature == "prof_hydro_mooring":  # F3
-        default_vars = ['ptemp', 'sal', 'pdens']
+        default_vars_mod = ['ptemp', 'sal', 'pdens']
+        default_vars_obs = ['temp', 'sal', 'dens']
     elif feature == "section_hydro":  # F4
-        default_vars = ['ptemp', 'sal']
+        default_vars_mod = ['ptemp', 'sal']
+        default_vars_obs = ['temp', 'sal']
     elif feature == "clim_hydro":  # F5
-        default_vars = ['ptemp', 'sal']
+        default_vars_mod = ['ptemp', 'sal']
+        default_vars_obs = ['temp', 'sal']
     elif feature == "currents_hfr":  # F6
-        default_vars = ['current']
+        default_vars_mod = ['current']
+        default_vars_obs = ['current']
     elif feature == "currents_ADCP":  # F7
-        default_vars = ['current']
+        default_vars_mod = ['current']
+        default_vars_obs = ['current']
     elif feature == "currents_VMADCP":  # F8
-        default_vars = ['current']
+        default_vars_mod = ['current']
+        default_vars_obs = ['current']
     elif feature == "drifters":  # F9
-        default_vars = ['current']
+        default_vars_mod = ['current']
+        default_vars_obs = ['current']
 
     vars_mod = default_vars_mod + additional_vars
     vars_obs = default_vars_obs + additional_vars
@@ -152,18 +158,39 @@ def sel_default_vars(config_obj):
 
 
 def sel_one_var(observation, models, var):
-
     # Adjust potential / insitu variables for models and obs
+    observation_var = copy.deepcopy(observation)
+    models_var = copy.deepcopy(models)
+
     if var in ['temp', 'ptemp']:
         var_mod = 'ptemp'
         var_obs = 'temp'
     elif var in ['dens', 'pdens']:
         var_mod = 'pdens'
         var_obs = 'dens'
+    else:
+        var_mod = var
+        var_obs = var
 
-    observation['xarray_meta'] = observation['xarray_meta'][var]
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"][var]
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var]
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod][var]
-    return observation, models
+    observation_var['xarray_meta'] = observation_var['xarray_meta'][var_obs]
+    for i_mod, mod in enumerate(models_var):
+        mod["xarray_meta"] = mod["xarray_meta"][var_mod]
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod]
+        observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][i_mod][var_obs]
+    return observation_var, models_var
+
+
+def check_same_variables(models, observation):
+    # Verify the same variables are in the model and observation
+    for i, mod in enumerate(models):
+        for var_mod in list(mod['xarray_meta'].keys()):
+            if var_mod not in observation:
+                logger.warning(f"{var_mod} is not included in the observation product ; "
+                               f"it is thus removed from model {imod}")
+                model = model.drop(var_mod)
+        for var_obs in list(observation['xarray_meta'].keys()):
+            if var_obs not in mod['xarray_meta']:
+                logger.warning(f"{var_obs} is not included in model {imod} ; "
+                               f"it is thus removed from observation")
+                observation['xarray_meta'] = observation['xarray_meta'].drop(var_obs)
+    return models, observation

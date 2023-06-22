@@ -48,6 +48,7 @@ class SSTAccessor:
         for var in vars:
             if var == 'SST':
                 ds = self._obj.sel_var.sel_sst(depth)
+                ds = ds.rename('sst')
             elif var == 'temp':
                 ds = self._obj.sel_var.sel_temp()
             elif var == 'ptemp':
@@ -57,9 +58,9 @@ class SSTAccessor:
             elif var == 'sal':
                 ds = self._obj.sel_var.sel_sal()
             elif var == 'dens':
-                ds = self._obj.sel_var.sel_dens()
+                ds = self._obj.sel_var.sel_density()
             elif var == 'pdens':
-                ds = self._obj.sel_var.sel_pdens()
+                ds = self._obj.sel_var.sel_pdensity()
             elif var == 'current':
                 ds = self._obj.sel_var.sel_current()
             elif var == 'mld':
@@ -71,10 +72,19 @@ class SSTAccessor:
 
             liste_ds.append(ds)
 
+        # Remove None datasets
+        liste_ds = [ds for ds in liste_ds if ds is not None]
+
+        # Merge
         if len(liste_ds) == 1:
             ds_all = liste_ds[0]
         elif len(liste_ds) > 1:
             ds_all = xr.merge(liste_ds)
+
+        # Convert to dataset for homogeneous processing
+        if not isinstance(ds_all, xr.Dataset):
+            ds_all = ds_all.to_dataset()
+
         return ds_all
 
     def convert_current(self):
