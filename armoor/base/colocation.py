@@ -111,8 +111,12 @@ def horizontal_colocation(mod, obs, ds_tgt, coloc_method):
         logger.info("Model positions colocation")
         mod = colocate_lon_lat_time_mod(mod, ds_tgt, coloc_method)
     else:
-        lon_values = ds_tgt.drop_duplicates('lon').lon.values
-        lat_values = ds_tgt.drop_duplicates('lat').lat.values
+        if 'lon' in ds_tgt.dims:
+            lon_values = ds_tgt.drop_duplicates('lon').lon.values
+            lat_values = ds_tgt.drop_duplicates('lat').lat.values
+        else:
+            lon_values = np.unique(ds_tgt.lon.values)
+            lat_values = np.unique(ds_tgt.lat.values)
 
         # If x/y coords remains after to_rect, we use xesmf to convert curv into rect grid
         if 'x' in mod.dims:
