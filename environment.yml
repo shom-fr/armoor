@@ -22,8 +22,9 @@ dependencies:
   - dask
   - geojson
   - configobj=5.0.6
-  - opendrift
+  - opendrift=1.10.5
   - cfgrib
+  - pip
   - pip:
     - pylint
     - xoa-999-py3-none-any.whl
