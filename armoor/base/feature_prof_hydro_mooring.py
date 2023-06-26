@@ -54,7 +54,9 @@ def plot(config_obj):
         models = copy.copy(config_obj["models"])
 
         # Remove missing values
-        vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
+        vars = [var for var in list(observation["xarray_meta"].keys()) if
+                var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
+
         vars_mod = copy.copy(vars)
         if 'temp' in vars_mod:
             vars_mod[vars_mod.index('temp')] = 'ptemp'

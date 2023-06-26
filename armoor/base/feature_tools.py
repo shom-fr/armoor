@@ -40,11 +40,11 @@ def manage_output(plot, figure_name, folder_path):
 def remove_missing_values_ds(models, observation, i, var_mod, vars):
     # Remove missing values
     if len(var_mod) == 1:
-        obs = observation["xarray_meta_coloc"][i]
-        mod = models[i]["xarray_meta_coloc"]
+        obs = observation["xarray_meta_coloc"][i][vars[0]]
+        mod = models[i]["xarray_meta_coloc"][var_mod[0]]
         mod, obs = remove_missing_values(mod, obs)
-        observation["xarray_meta_coloc"][i] = obs
-        models[i]["xarray_meta_coloc"] = mod
+        observation["xarray_meta_coloc"][i][vars[0]] = obs
+        models[i]["xarray_meta_coloc"][var_mod[0]] = mod
     else:
         for i_var, var in enumerate(var_mod):
             obs = observation["xarray_meta_coloc"][i][vars[i_var]]
@@ -76,7 +76,6 @@ def remove_missing_values(model, obs):
     if np.size(np.unique(model.lon.data)) == np.size(model.lon.data):  # Verify no duplicates in coords
         model_nan = model.where(~np.isnan(obs))
         obs_nan = obs.where(~np.isnan(model))
-
         if model_nan.dims != model.dims:
             model_nan = model_nan.squeeze()
         if len(list(obs_nan.coords)) <= len(list(obs.coords)):
@@ -84,7 +83,6 @@ def remove_missing_values(model, obs):
                 model_nan = model_nan.assign_coords(model.coords)
             except:
                 model_nan = model_nan.assign_coords(model.squeeze().coords)
-
         if obs_nan.dims != obs.dims:
             obs_nan = obs_nan.squeeze()
         if len(list(obs_nan.coords)) <= len(list(obs.coords)):
@@ -92,6 +90,7 @@ def remove_missing_values(model, obs):
                 obs_nan = obs_nan.assign_coords(obs.coords)
             except:
                 obs_nan = obs_nan.assign_coords(obs.squeeze().coords)
+
         return model_nan, obs_nan
     else:
         return model, obs
