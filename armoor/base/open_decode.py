@@ -397,6 +397,11 @@ def open_decode_mouillages(path_file):
     np.append(index_mesures, len(lines))
     nb_dates = len(index_mesures)
 
+    # Define standard
+    default_format = lines[1]
+    default_format = [element for element in default_format if element != '']
+    default_len = len(default_format)
+
     # Separate the measurements
     list_ds = []
     for i in range(nb_dates - 1):
@@ -413,7 +418,12 @@ def open_decode_mouillages(path_file):
         for line in array_series_0[1:]:
             line_edit = line[:-1] if line[-1] == "" else line
             line_edit = np.array(line_edit[7:], dtype=object)
+
+            # Fill missing values
             line_edit[line_edit == ''] = '999999.'
+            if len(line_edit) < default_len:
+                line_edit = np.concatenate((line_edit, (['999999.'] * (default_len - len(line_edit)))))
+
             line_edit = line_edit.astype(float)
             array_series_1.append(line_edit)
         array_series = np.array(array_series_1)
