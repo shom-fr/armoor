@@ -47,7 +47,7 @@ def plot(config_obj):
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
         else:
-            sub_func_output_folder = output_path
+            sub_func_output_folder = os.getcwd()
 
         # Get the figure parameters from config obj
         vmin = output.get('vmin')
@@ -76,14 +76,24 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
-            observation['xarray_meta'] = observation['xarray_meta'][attribute]
+            # Remove missing values
+            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute]
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute]
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute]
+                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][
+                    attribute].to_dataset()
+                models[i_mod] = mod
                 # Remove missing values
                 models, observation = base.remove_missing_values_ds(models, observation, i_mod, [attribute],
                                                                     [attribute])
+
+            # Select variables to plot
+            observation['xarray_meta'] = observation['xarray_meta'].to_array()
+            for i_mod, mod in enumerate(models):
+                mod['xarray_meta'] = mod['xarray_meta'].to_array()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod].to_array()
 
             base.plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax,
                                                 output_path=sub_func_output_folder)
@@ -165,8 +175,9 @@ def plot(config_obj):
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, False, True, False, coloc_method='nearest',
-                                                       opt_grid='observation')
+                    flags = False, True, False
+                    tgt_grid = 'observation'
+                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, flags, tgt_grid, coloc_method='nearest')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
 
@@ -253,8 +264,9 @@ def plot(config_obj):
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, False, True, False, coloc_method='nearest',
-                                                       opt_grid='observation')
+                    flags = False, True, False
+                    tgt_grid = 'observation'
+                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, flags, tgt_grid, coloc_method='nearest')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
                 ds_models.append(ds_mod)

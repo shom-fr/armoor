@@ -124,8 +124,10 @@ def plot(config_obj):
                 ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc, path_results,
                                                                     path_tools, list_waves, 'mod',
                                                                     env_comodo=env_comodo)
-                obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, True, False, False, coloc_method='nearest',
-                                                         opt_grid=coloc_product)
+                flags = False, True, False
+                tgt_grid = coloc_product
+                obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, flags, tgt_grid, coloc_method='nearest')
+
                 # Plot the maps
                 base.plot_features.plot_map_harm(mod_coloc, obs_coloc, models_name[i_mod], obs_name,
                                                  output_path=sub_func_output_folder)
@@ -197,15 +199,23 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
-            observation['xarray_meta'] = observation['xarray_meta'][attribute]
+            # Remove missing values
+            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute]
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute]
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute]
+                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute].to_dataset()
                 models[i_mod] = mod
                 # Remove missing values
                 models, observation = base.remove_missing_values_ds(models, observation, i_mod, [attribute],
                                                                     [attribute])
+
+            # Select variables to plot
+            observation['xarray_meta'] = observation['xarray_meta'].to_array()
+            for i_mod, mod in enumerate(models):
+                mod['xarray_meta'] = mod['xarray_meta'].to_array()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod].to_array()
 
             base.plot_features.plot_ts_metr_point(models, observation, plot_ts_metr_point[output["plot"]],
                                                   flag_interval, flag_slice, output_path=sub_func_output_folder)
@@ -223,15 +233,23 @@ def plot(config_obj):
 
             plg = config_obj["meta_zones"].get("polygon")
 
-            observation['xarray_meta'] = observation['xarray_meta'][attribute]
+            # Remove missing values
+            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute]
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute]
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute]
+                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute].to_dataset()
                 models[i_mod] = mod
                 # Remove missing values
                 models, observation = base.remove_missing_values_ds(models, observation, i_mod, [attribute],
                                                                     [attribute])
+
+            # Select variables to plot
+            observation['xarray_meta'] = observation['xarray_meta'].to_array()
+            for i_mod, mod in enumerate(models):
+                mod['xarray_meta'] = mod['xarray_meta'].to_array()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod].to_array()
 
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
                                                   output_path=sub_func_output_folder, plg=plg)

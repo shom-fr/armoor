@@ -5,7 +5,7 @@ import copy
 from armoor import base
 import armoor.base.feature_tools as ft
 import armoor.hmi.script_tools as st
-
+import matplotlib.pyplot as plt
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,12 +39,20 @@ def plot(config_obj):
     models = copy.copy(config_obj["models"])
 
     # Remove missing values
-    vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
-    vars_mod = copy.copy(vars)
-    if 'temp' in vars_mod:
-        vars_mod[vars_mod.index('temp')] = 'ptemp'
+    vars = ['sst']
+    vars_mod = ['sst']
     for i_mod, mod in enumerate(models):
         models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars_mod, vars)
+
+    obs = observation['xarray_meta_coloc'][0].sst
+    mod = models[0]['xarray_meta_coloc'].sst
+    # plt.pcolormesh(obs.lon, obs.lat, obs.isel(time=0))
+    # plt.savefig('obs.png')
+    # plt.close()
+    #
+    # plt.pcolormesh(mod.lon, mod.lat, mod.isel(time=0))
+    # plt.savefig('mod.png')
+    # plt.close()
 
     # Get names
     models_name = [m['name'] for m in models]
@@ -74,10 +82,12 @@ def plot(config_obj):
         # PLOTS
         for var in vars:
             observation_var, models_var = base.sel_one_var(observation, models, var)
+
             ################################################################################################################
             # TIME SERIES POINT
-            plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point', "plot_ts_metr_bias_point": 'bias_point',
-                                  "plot_ts_metr_RMSE_point": 'RMSEc_point', "plot_ts_metr_point": 'all_metrics'
+            plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point',
+                                  "plot_ts_metr_bias_point": 'bias_point', "plot_ts_metr_RMSE_point": 'RMSEc_point',
+                                  "plot_ts_metr_point": 'all_metrics'
                                   }
 
             if output["plot"] in plot_ts_metr_point:
@@ -86,8 +96,9 @@ def plot(config_obj):
 
             ################################################################################################################
             # TIME SERIES STATS
-            plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats', "plot_ts_metr_bias_stats": 'bias_stats',
-                                  "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
+            plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
+                                  "plot_ts_metr_bias_stats": 'bias_stats', "plot_ts_metr_RMSE_stats": 'RMSEc_stats',
+                                  "plot_ts_metr_stats": 'all_metrics'
                                   }
             if output["plot"] in plot_ts_metr_stats:
                 plg = config_obj["meta_zones"].get("polygon")
@@ -104,9 +115,10 @@ def plot(config_obj):
                 for i, mod in enumerate(models_var):
                     base.plot_features.plot_map_metr(flag_interval, flag_slice, mod["xarray_meta"],
                                                      mod["xarray_meta_coloc"], observation_var["xarray_meta"],
-                                                     observation_var["xarray_meta_coloc"][i], plot_map_metr[output["plot"]],
-                                                     cmap, vmin, vmax, output_path=sub_func_output_folder, dvmin=dvmin,
-                                                     dvmax=dvmax, mod_name=models_name[i], obs_name=obs_name)
+                                                     observation_var["xarray_meta_coloc"][i],
+                                                     plot_map_metr[output["plot"]], cmap, vmin, vmax,
+                                                     output_path=sub_func_output_folder, dvmin=dvmin, dvmax=dvmax,
+                                                     mod_name=models_name[i], obs_name=obs_name)
 
             ################################################################################################################
             # DISP DIAG

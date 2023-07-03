@@ -10,6 +10,7 @@ import gsw
 import logging
 import datetime
 from xoa.grid import dz2depth, shift
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -193,16 +194,16 @@ def open_decode_cmems(path_files):
     # Decode
     cmems = cmems.xoa.decode()
 
-    # Manage profiler depths
-    if 'DEPH' in cmems.variables:
-        cmems = decode_profiler(cmems)
-
     # Manage lon(time) and lat(time)
     len_lon = len(cmems.lon)
     len_lat = len(cmems.lat)
     len_time = len(cmems.time)
     if len_lat == len_time and len_lon == len_time:
         cmems = convert_trajectory(cmems)
+
+    # Manage profiler depths
+    if 'DEPH' in cmems.variables:
+        cmems = decode_profiler(cmems)
 
     # Calculate depth from pressure
     if 'depth' in cmems.dims and 'depth' not in cmems.coords and 'pres' in cmems:
@@ -214,14 +215,17 @@ def open_decode_cmems(path_files):
     # Convert lons
     cmems = convert_lons(cmems)
 
-    # Remove duplicate time values
+    # Remove duplicate time and depth values
     cmems = cmems.drop_duplicates('time')
+    if 'depth' in cmems.dims:
+        cmems = cmems.drop_duplicates('depth')
 
     # Remove useless variables
     list_to_remove = ['DC_REFERENCE', 'DEPH', 'QC_DEPH']
     for var in list(cmems.keys()):
         if var in list_to_remove:
             cmems = cmems.drop(var)
+
     return cmems
 
 
@@ -864,6 +868,11 @@ def open_decode_basic(path_files):
     else:
         ds = xr.open_dataset(path_files[0])
 
+    list_to_remove = ['sst_dtime']
+    for var in list(ds.keys()):
+        if var in list_to_remove:
+            ds = ds.drop(var)
+
     # Decode
     ds = ds.xoa.decode()
     if "lon_longitude" in ds:
@@ -878,6 +887,12 @@ def open_decode_basic(path_files):
     # Convert lons
     ds = convert_lons(ds)
 
+    # TODO
+    # Remove duplicate values
+    if 'lon' in ds.dims:
+        ds = ds.drop_duplicates(['lon'])
+    if 'lat' in ds.dims:
+        ds = ds.drop_duplicates(['lat'])
     return ds
 
 
@@ -962,8 +977,27 @@ def decode_profiler(profiler):
         depth_column = set(colonne_test)
         if len(depth_column) == 1:  # Tests if the depth values are all the same throughout time
             depth_values[i] = list(depth_column)[0]
+        else:  # if depth is truely depth(time,z)
+            return decode_depths_vmadcp(profiler)
     profiler = profiler.assign_coords({'depth': depth_values})
     profiler = convert_trajectory(profiler)
+    return profiler
+
+
+def decode_depths_vmadcp(profiler):
+    """
+    Decode profiler datasets
+    Returns
+    -------
+    xarray.dataset
+        Decoded dataset
+    """
+    profiler = profiler.drop_duplicates('time')
+    profiler = profiler.rename({'depth': 'z'})
+    profiler = profiler.rename({'DEPH': 'depth'})
+    profiler = profiler.assign_coords(depth=profiler.depth)
+    plt.pcolormesh(profiler.depth)
+    plt.savefig('depth.png')
     return profiler
 
 
