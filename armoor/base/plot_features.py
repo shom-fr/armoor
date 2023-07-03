@@ -500,25 +500,31 @@ def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, o
                         mod_inter = mod.isel(interval=[index_interval], slice=[index_slice])
                         obs_inter = obs.isel(interval=[index_interval], slice=[index_slice])
                         title = f'{var_title} :  {title_depth[index_slice]} - {title_time[index_interval]}'
-                        diag_disp_figure(mod_inter, obs_inter, var_title, title, obs_name, model_name, output_path)
+                        figname = f'interval{index_interval}_slice{index_slice}'
+                        diag_disp_figure(mod_inter, obs_inter, var_title, title, obs_name, model_name, output_path,
+                                         figname=figname)
                 else:
                     mod_inter = mod.isel(interval=[index_interval])
                     obs_inter = obs.isel(interval=[index_interval])
                     title = f'{var_title} :  {title_depth} - {title_time[index_interval]}'
-                    diag_disp_figure(mod_inter, obs_inter, var_title, title, obs_name, model_name, output_path)
+                    figname = f'interval{index_interval}'
+                    diag_disp_figure(mod_inter, obs_inter, var_title, title, obs_name, model_name, output_path,
+                                     figname=figname)
         else:
             if flag_slice:
                 for index_slice, slice in enumerate(mod['slice']):
                     mod_inter = mod.isel(slice=[index_slice])
                     obs_inter = obs.isel(slice=[index_slice])
                     title = f'{var_title} :  {title_depth[index_slice]} - {title_time}'
-                    diag_disp_figure(mod_inter, obs_inter, var_title, title, obs_name, model_name, output_path)
+                    figname = f'slice{index_slice}'
+                    diag_disp_figure(mod_inter, obs_inter, var_title, title, obs_name, model_name, output_path,
+                                     figname=figname)
             else:
                 title = f'{var_title} : {title_depth} - {title_time}'
                 diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_path)
 
 
-def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_path=None):
+def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_path=None, figname=''):
     """
     Creates the figures for the dispersion diagram
     Parameters
@@ -562,9 +568,10 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
     x = []
     y = []
 
-    # flatten dataarray because dask array doesn't work with flatten
+    # Flatten dataarray because dask array doesn't work with flatten
     obs = obs.values.ravel()
     mod = mod.values.ravel()
+
     for i in range(n):
         if not math.isnan(obs.item(i)) and not math.isnan(mod.item(i)):
             x.append(obs.item(i))
@@ -590,33 +597,21 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
     treshold = 1e-2
     if markersize < treshold:
         markersize = treshold
-    axes.scatter(x, y, c='slateblue', s=2*markersize)
-    plt.plot([vmin, vmax], [vmin, vmax],
-             color='gray', linestyle='dashed', markersize=5)
+    axes.scatter(x, y, c='slateblue', s=2 * markersize)
+    plt.plot([vmin, vmax], [vmin, vmax], color='gray', linestyle='dashed', markersize=5)
     plt.grid(color='gray', linestyle='--', linewidth=1, zorder=1)
-    plt.plot(x, mymodel,
-             color='red',
-             linestyle='solid',
-             markersize=5,
-             label=f'y = {slope:.3f}*x + {intercept:.3f} \n'
-                   f'Correlation Coef = {r:.3f}\n'
-                   f'Std Err = {std_err:.3f}\n'
-                   f'RMSE = {rmse:.3f}\n'
-                   f'Npts = {n}')
+    plt.plot(x, mymodel, color='red', linestyle='solid', markersize=5, label=f'y = {slope:.3f}*x + {intercept:.3f} \n'
+                                                                             f'Correlation Coef = {r:.3f}\n'
+                                                                             f'Std Err = {std_err:.3f}\n'
+                                                                             f'RMSE = {rmse:.3f}\n'
+                                                                             f'Npts = {n}')
     plt.legend(loc='upper left')
-    cs = axes.contour(
-            np.convolve(x_e, np.ones(2, dtype=int), 'valid') / 2.0,
-            np.convolve(y_e, np.ones(2, dtype=int), 'valid') / 2.0,
-            data.T/data.max(),
-            levels=np.arange(0.1, 1.2, 0.2),
-            cmap="Reds",
-            linewidths=1
-    )
+    cs = axes.contour(np.convolve(x_e, np.ones(2, dtype=int), 'valid') / 2.0,
+                      np.convolve(y_e, np.ones(2, dtype=int), 'valid') / 2.0, data.T / data.max(),
+                      levels=np.arange(0.1, 1.2, 0.2), cmap="Reds", linewidths=1)
     axes.clabel(cs, cs.levels, inline=True, fontsize=5, fmt="%1.1f")
 
-    ft.manage_output(plt,
-                     f'diag_disp_g_{var_title}_{model_name}_{obs_name}',
-                     output_path)
+    ft.manage_output(plt, f'diag_disp_g_{var_title}_{model_name}_{obs_name}_{figname}', output_path)
 
 
 def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metric, cmap=cmocean.cm.thermal, vmin=None,
@@ -3023,7 +3018,8 @@ def add_second_x_axis(f, ax, mod):
         lons = mod.lon.values
         lats = mod.lat.values
 
-        ticks = [i * int(len(lons) / nbticks) for i in range(nbticks + 1)]
+        ticks = [i * math.floor(len(lons) / nbticks) for i in range(nbticks + 1)]
+        ticks[-1] = len(lons)-1
         return [f'{lons[tick]:.3f}E,{lats[tick]:.3f}N' for tick in ticks]
 
     # Move twinned axis ticks and label from top to bottom

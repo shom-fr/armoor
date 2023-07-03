@@ -32,18 +32,18 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_variable_3d(self):  # OK
+    def test_variable_3d_hycom_steps(self):  # OK
         out_path, logger = change_path(folder_test)
-        logger.info('test_variable_3d')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d.ini"])
+        logger.info('test_variable_3d_hycom_steps')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_hycom_steps.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_variable_3d_hycom(self):  # OK
+    def test_variable_3d_croco_steps(self):  # OK
         out_path, logger = change_path(folder_test)
-        logger.info('test_variable_3d_hycom')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_hycom.ini"])
+        logger.info('test_variable_3d_croco_steps')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_croco_steps.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -52,6 +52,14 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_3d_steps')
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_steps.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_3d_scanfish_steps(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_3d_scanfish_steps')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_scanfish_steps.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

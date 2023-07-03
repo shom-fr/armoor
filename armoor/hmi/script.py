@@ -15,15 +15,17 @@ import time
 import numpy as np
 import xarray as xr
 
-from armoor.hmi.configuration import  get_forcing_model, get_model, get_obs
-from armoor.hmi.configuration import  get_time_spacial_extent, apply_custom_metazone
+from armoor.hmi.configuration import get_forcing_model, get_model, get_obs
+from armoor.hmi.configuration import get_time_spacial_extent, apply_custom_metazone
 from armoor.hmi.script_tools import format_times, create_folder, compute_mixed_layer, convert_k_c
 from armoor.hmi.script_tools import decumulate_data, from_nh_to_1h, get_cumul_info
 from armoor.hmi.script_plot import hmi_image
 from armoor.base.colocation import colocate_all
 
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def create_images(config_obj: dict, input_folder_path: str, output_folder_path: str):
     """
@@ -49,21 +51,12 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
     production_day = datetime.now(timezone.utc).strftime("%Y%m%d")
     logger.info(f'Production day : {production_day}')
 
-    config_reg_t0, config_reg_times, config_reg_extent = get_time_spacial_extent(input_folder_path,
-                                                                                 config_reg,
+    config_reg_t0, config_reg_times, config_reg_extent = get_time_spacial_extent(input_folder_path, config_reg,
                                                                                  production_day)
 
-    model_json = {'parameters': [],
-                  'times': format_times(config_reg_times),
-                  't0': config_reg_t0.replace(':', 'h'),
-                  'production_day': production_day,
-                  'config_reg': config_reg,
-                  'model': model_name,
-                  'config': config_name,
-                  'approval': {
-                      'status': "not_processed",
-                      'last_update': "",
-                      'reporter': ""}
+    model_json = {'parameters': [], 'times': format_times(config_reg_times), 't0': config_reg_t0.replace(':', 'h'),
+                  'production_day': production_day, 'config_reg': config_reg, 'model': model_name,
+                  'config': config_name, 'approval': {'status': "not_processed", 'last_update': "", 'reporter': ""}
                   }
     # CREATING ALL PARAMETERS OF THE REGIONAL CONFIGURATION
     gc.collect()
@@ -74,37 +67,23 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
         for sub_param in ['param_1', 'param_2', 'param_3', 'param_4']:
             start_time = time.time()
             logger.info(f'{config_reg} - {parameter} - {sub_param}')
-            create_param_images(config_reg,
-                                production_day,
-                                config_reg_times,
-                                config_reg_extent,
-                                config_obj,
-                                parameter,
-                                sub_param,
-                                input_folder_path,
+            create_param_images(config_reg, production_day, config_reg_times, config_reg_extent, config_obj, parameter,
+                                sub_param, input_folder_path,
                                 os.path.join(output_folder_path, f'{config_reg}_{production_day}'))
 
             logger.info(f'{config_reg} - {parameter} - {sub_param}  '
                         f'in {time.time() - start_time} seconds')
 
     # WRITING PRODUCTION INFO INTO JSON FILE
-    create_data_json_file(model_json,
-                          output_folder_path,
-                          config_reg,
-                          production_day)
+    create_data_json_file(model_json, output_folder_path, config_reg, production_day)
 
     # COMPRESSING to TGZ and delete source directory
-    make_tarfile(output_folder_path,
-                 config_reg,
-                 production_day)
+    make_tarfile(output_folder_path, config_reg, production_day)
 
     logger.info(f'PRODUCTION DAY {production_day} : OK')
 
 
-def create_data_json_file(model_json: dict,
-                          output_folder_path: str,
-                          config_reg: str,
-                          production_day: str):
+def create_data_json_file(model_json: dict, output_folder_path: str, config_reg: str, production_day: str):
     """
 
     Parameters
@@ -125,9 +104,7 @@ def create_data_json_file(model_json: dict,
         json.dump(model_json, json_file, indent=4, ensure_ascii=False)
 
 
-def make_tarfile(output_folder_path: str,
-                 config_reg: str,
-                 production_day: str):
+def make_tarfile(output_folder_path: str, config_reg: str, production_day: str):
     """
     Generates compress file and delete source directory
     Parameters
@@ -155,14 +132,8 @@ def make_tarfile(output_folder_path: str,
     shutil.rmtree(source_dir)
 
 
-def create_param_images(config_reg: str,
-                        production_day: str,
-                        config_reg_times: str,
-                        config_reg_extent: list,
-                        config_obj: dict,
-                        parameter_mane: str,
-                        sub_param: str,
-                        input_folder_path: str,
+def create_param_images(config_reg: str, production_day: str, config_reg_times: str, config_reg_extent: list,
+                        config_obj: dict, parameter_mane: str, sub_param: str, input_folder_path: str,
                         output_folder_path: str):
     """
 
@@ -187,25 +158,11 @@ def create_param_images(config_reg: str,
     extent = config_obj["parameters"][parameter_mane].get("extent")
 
     # Model or forcing model used to generate the images for a given parameter
-    model2plot_xr, paths = get_model_xr(param,
-                                        extent,
-                                        input_folder_path,
-                                        config_reg,
-                                        config_reg_extent,
-                                        production_day)
+    model2plot_xr, paths = get_model_xr(param, extent, input_folder_path, config_reg, config_reg_extent, production_day)
     # Observation used to generate the images for a given parameter
-    obs2plot_xr = get_obs_xr(param,
-                             extent,
-                             input_folder_path,
-                             config_reg,
-                             config_reg_extent,
-                             production_day)
+    obs2plot_xr = get_obs_xr(param, extent, input_folder_path, config_reg, config_reg_extent, production_day)
     func = param["func"]
-    cbar_range, data2plot_all_times = get_data2plot(func,
-                                                    param["var"],
-                                                    model2plot_xr,
-                                                    obs2plot_xr,
-                                                    paths)
+    cbar_range, data2plot_all_times = get_data2plot(func, param["var"], model2plot_xr, obs2plot_xr, paths)
     logger.info(f'Creating images for all steps : {len(config_reg_times)}')
     # Loop on times to create all images
     param_title = param["name"]
@@ -216,15 +173,8 @@ def create_param_images(config_reg: str,
     for reg_time in config_reg_times:
         path2save = get_path2save(reg_time, parameter_mane, output_folder_path, sub_param)
 
-        if func in ["visu_temp",
-                    "visu_sal",
-                    "visu_mixedlayer",
-                    "visu_solarflux",
-                    'visu_precip',
-                    "visu_current",
-                    "visu_windforcing",
-                    "visu_diff_sss",
-                    "visu_diff_sst"]:
+        if func in ["visu_temp", "visu_sal", "visu_mixedlayer", "visu_solarflux", 'visu_precip', "visu_current",
+                    "visu_windforcing", "visu_diff_sss", "visu_diff_sst"]:
             data2plot = data2plot_all_times.sel(time=reg_time, method="nearest")
             data2plot = data2plot.squeeze()
 
@@ -239,20 +189,10 @@ def create_param_images(config_reg: str,
             break
 
         if multiprocess:
-            data.append([data2plot,
-                         func,
-                         param_title,
-                         path2save,
-                         cbar_range,
-                         rarification])
+            data.append([data2plot, func, param_title, path2save, cbar_range, rarification])
 
         else:
-            hmi_image(data2plot,
-                      func,
-                      param_title,
-                      path2save,
-                      cbar_range,
-                      rarification=rarification)
+            hmi_image(data2plot, func, param_title, path2save, cbar_range, rarification=rarification)
 
     if multiprocess:
         logger.info(f'Multiprocess')
@@ -284,19 +224,10 @@ def work_process(data: list):
     path2save = data[3]
     cbar_range = data[4]
     rarification = data[5]
-    hmi_image(data2plot,
-              func,
-              param_title,
-              path2save,
-              cbar_range,
-              rarification=rarification)
+    hmi_image(data2plot, func, param_title, path2save, cbar_range, rarification=rarification)
 
 
-def get_obs_xr(param: dict,
-               extent: list,
-               input_folder_path: str,
-               config_reg: str,
-               config_reg_extent: list,
+def get_obs_xr(param: dict, extent: list, input_folder_path: str, config_reg: str, config_reg_extent: list,
                production_day: str) -> xr.Dataset:
     """
     Function to get data to be compered to the model
@@ -319,27 +250,15 @@ def get_obs_xr(param: dict,
     obs_name = param.get("obs")
     if obs_name:
         logger.info(f'Reading : {obs_name}')
-        obs2plot_xr = get_obs(input_folder_path,
-                              config_reg,
-                              production_day,
-                              obs_name,
-                              var_m)
+        obs2plot_xr = get_obs(input_folder_path, config_reg, production_day, obs_name, var_m)
         if obs_name == 'woa18':
             depth = 0
-        obs2plot_xr = apply_custom_metazone(obs2plot_xr,
-                                            depth,
-                                            extent,
-                                            var_m,
-                                            config_reg_extent)
+        obs2plot_xr = apply_custom_metazone(obs2plot_xr, depth, extent, var_m, config_reg_extent)
         return obs2plot_xr
     return None
 
 
-def get_model_xr(param: dict,
-                 extent: list,
-                 input_folder_path: str,
-                 config_reg: str,
-                 config_reg_extent: list,
+def get_model_xr(param: dict, extent: list, input_folder_path: str, config_reg: str, config_reg_extent: list,
                  production_day: str) -> xr.Dataset:
     """
     Function to get data from the model
@@ -363,34 +282,18 @@ def get_model_xr(param: dict,
     paths = None
     if forcing_model_name:
         logger.info(f'Reading : {forcing_model_name}')
-        model2plot_xr, paths = get_forcing_model(input_folder_path,
-                                                 config_reg,
-                                                 production_day,
-                                                 forcing_model_name,
+        model2plot_xr, paths = get_forcing_model(input_folder_path, config_reg, production_day, forcing_model_name,
                                                  var_m)
         if forcing_model_name not in ['rivers']:
-            model2plot_xr = apply_custom_metazone(model2plot_xr,
-                                                  depth,
-                                                  extent,
-                                                  var_m,
-                                                  config_reg_extent)
+            model2plot_xr = apply_custom_metazone(model2plot_xr, depth, extent, var_m, config_reg_extent)
     else:
         logger.info('Reading model (regional configuration)')
-        model_xr = get_model(input_folder_path,
-                             config_reg,
-                             production_day,
-                             var_m)
-        model2plot_xr = apply_custom_metazone(model_xr,
-                                              depth,
-                                              extent,
-                                              var_m)
+        model_xr = get_model(input_folder_path, config_reg, production_day, var_m)
+        model2plot_xr = apply_custom_metazone(model_xr, depth, extent, var_m)
     return model2plot_xr, paths
 
 
-def get_path2save(reg_time: str,
-                  parameter_mane: str,
-                  output_folder_path: str,
-                  sub_param: str):
+def get_path2save(reg_time: str, parameter_mane: str, output_folder_path: str, sub_param: str):
     """
     Get the path file name to save a sub parameter
     Parameters
@@ -465,16 +368,11 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names):
         obs_da = obs2plot_xr[var_m].squeeze()
         obs_da = convert_k_c(obs_da)
 
-        da_obs_coloc, da_model_coloc = colocate_all(obs_da,
-                                                    model_da,
-                                                    True,
-                                                    False,
-                                                    False,
-                                                    opt_grid="model")
+        flags = True, False, False
+        da_obs_coloc, da_model_coloc = colocate_all(obs, mod, flags, "model")
         difference = da_model_coloc - da_obs_coloc
         cbar_range = np.nanmin(difference), np.nanmax(difference)
         data2plot_all_times = difference
 
     logger.info('Retrieving colorbar for all times...')
     return cbar_range, data2plot_all_times
-
