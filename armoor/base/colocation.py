@@ -10,14 +10,31 @@ import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
+
 def colocate_all(obs, mod, flags, tgt_grid, vertical_step=None, horizontal_step=None, coloc_method='nearest',
-                     coloc_method_z='nearest'):
-    if tgt_grid == 'auto':
-        tgt_grid = 'observation'
+                 coloc_method_z='nearest'):
     # Read the colocation flags
     time_flag, hor_flag, ver_flag = flags
 
-    if vertical_step and horizontal_step:
+    # Colocate
+    if tgt_grid == 'auto':
+        logger.info(f'Auto colocation : the model and observation will be colocated '
+                    f'on the regular grid with the minimum step size of the products')
+        tgt = min_grid_all(obs, mod, hor_flag, ver_flag, time_flag)
+        obs_coloc = obs
+        mod_coloc = mod
+        if time_flag:
+            obs_coloc = temporal_colocation(obs_coloc, tgt, coloc_method)
+            mod_coloc = temporal_colocation(mod_coloc, tgt, coloc_method)
+        if hor_flag:
+            obs_coloc = horizontal_colocation(obs_coloc, tgt, coloc_method)
+            mod_coloc = horizontal_colocation(mod_coloc, tgt, coloc_method)
+        if ver_flag:
+            obs_coloc = vertical_colocation(obs_coloc, tgt, coloc_method)
+            mod_coloc = vertical_colocation(mod_coloc, tgt, coloc_method)
+
+    elif vertical_step and horizontal_step:
+        logger.info(f'Colocating on the vertical and horizontal step defined grid')
         # Vertical grid
         mod_coloc, obs_coloc = set_vert_step(mod, obs, tgt_grid, vertical_step, coloc_method_z)
 
@@ -27,10 +44,12 @@ def colocate_all(obs, mod, flags, tgt_grid, vertical_step=None, horizontal_step=
     else:
         # Colocate on the observation grid
         if tgt_grid == 'observation':
+            logger.info(f'Colocating the model on the observation grid')
             obs_coloc = obs
             mod_coloc = mod
             # If observation is profiler
             if 'time' in obs.lon.dims and len(obs.time) > 1:
+                logger.info(f'Profiler type colocation')
                 mod_coloc = colocate_lon_lat_time(mod, obs, coloc_method, coloc_method_z)
 
             else:
@@ -48,7 +67,7 @@ def colocate_all(obs, mod, flags, tgt_grid, vertical_step=None, horizontal_step=
 
         # Colocate on the model grid
         elif tgt_grid == 'model':
-
+            logger.info(f'Colocating the observation on the model grid')
             mod_coloc = mod
             obs_coloc = obs
 
@@ -64,12 +83,11 @@ def colocate_all(obs, mod, flags, tgt_grid, vertical_step=None, horizontal_step=
             if ver_flag:
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
 
-    # print('obs', obs_coloc)
-    # print('mod', mod_coloc)
     return obs_coloc, mod_coloc
 
 
 def temporal_colocation(ds, tgt, coloc_method):
+    logger.info('Time colocation')
     time_values = np.unique(tgt.time.values)
 
     if ds.dims["time"] > 1:
@@ -81,6 +99,7 @@ def temporal_colocation(ds, tgt, coloc_method):
 
 
 def horizontal_colocation(ds, tgt, coloc_method):
+    logger.info('Horizontal colocation')
     # Drop duplicates in lon/lat
     ds = ds.drop_duplicates('lon').drop_duplicates('lat')
 
@@ -94,7 +113,29 @@ def horizontal_colocation(ds, tgt, coloc_method):
 
     # If tgt lon/lat depend on x/y (ex if tgt from TOPAZ) : DOES NOT WORK
     if 'x' in tgt.dims:
-        ds_coloc = ds.interp_like(tgt)
+        ds_coloc_xy = []
+        for i_x, x in enumerate(tgt.x):
+            tgt_xy = tgt.isel(x=i_x)
+            ds_x = ds.interp(lon=tgt_xy.lon.values, lat=tgt_xy.lat.values, method=coloc_method)
+            ds_x = ds_x.stack(y=('lon', 'lat')).reset_index('y')
+            ds_x = ds_x.isel(y=slice(0, -1, len(tgt_xy.y)))
+            lons = xr.DataArray(ds_x.lon.values, dims='y', coords={'y': tgt_xy.y.values}, name='lon')
+            lats = xr.DataArray(ds_x.lat.values, dims='y', coords={'y': tgt_xy.y.values}, name='lat')
+            ds_x = ds_x.assign_coords({'lon': lons, 'lat': lats})
+            ds_coloc_xy.append(ds_x)
+
+        ds_coloc = xr.concat(ds_coloc_xy, 'x')
+        ds_coloc = ds_coloc.assign_coords(tgt.coords)
+
+
+        # Make sure x y are in the same order in both datasets
+        dims = list(tgt.dims.keys())
+        if len(dims) == 2:
+            ds_coloc = ds_coloc.transpose(dims[0], dims[1])
+        elif len(dims) == 3:
+            ds_coloc = ds_coloc.transpose(dims[0], dims[1], dims[2])
+        elif len(dims) == 4:
+            ds_coloc = ds_coloc.transpose(dims[0], dims[1], dims[2], dims[4])
 
     # Regrid ds if necessary
     elif 'x' in ds.dims:
@@ -107,6 +148,7 @@ def horizontal_colocation(ds, tgt, coloc_method):
 
 
 def vertical_colocation(ds, tgt, coloc_method):
+    logger.info('Vertical colocation')
     depth_ds = ds.depth
     depth_tgt = tgt.depth
 
