@@ -1117,7 +1117,7 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
 
     im3 = axs[3].pcolormesh(mod_coloc.lon, mod_coloc.lat, mod_coloc, vmin=vmin, vmax=vmax, cmap=cmap,
                             transform=ccrs.PlateCarree())
-    im4 = axs[4].pcolormesh(obs_coloc.lon.data, obs_coloc.lat.data, comparison.data, vmin=comparison_vmin,
+    im4 = axs[4].pcolormesh(obs_coloc.lon, obs_coloc.lat, comparison, vmin=comparison_vmin,
                             vmax=comparison_vmax, cmap=cmocean.cm.balance, transform=ccrs.PlateCarree())
 
     cbar1 = f.colorbar(im3, ax=[axs[1], axs[3]])
