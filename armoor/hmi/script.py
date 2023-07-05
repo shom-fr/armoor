@@ -74,15 +74,23 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
         for sub_param in ['param_1', 'param_2', 'param_3', 'param_4']:
             start_time = time.time()
             logger.info(f'{config_reg} - {parameter} - {sub_param}')
-            create_param_images(config_reg,
-                                production_day,
-                                config_reg_times,
-                                config_reg_extent,
-                                config_obj,
-                                parameter,
-                                sub_param,
-                                input_folder_path,
-                                os.path.join(output_folder_path, f'{config_reg}_{production_day}'))
+            try:
+                create_param_images(config_reg,
+                                    production_day,
+                                    config_reg_times,
+                                    config_reg_extent,
+                                    config_obj,
+                                    parameter,
+                                    sub_param,
+                                    input_folder_path,
+                                    os.path.join(output_folder_path, f'{config_reg}_{production_day}'))
+            except FileNotFoundError:
+                # Handle the error when files are not found
+                logger.error("Error: Files not found.")
+            except Exception as e:
+                # Handle other possible exceptions
+                logger.error("Error: An exception occurred :")
+                logger.error(f"{str(e)}")
 
             logger.info(f'{config_reg} - {parameter} - {sub_param}  '
                         f'in {time.time() - start_time} seconds')
