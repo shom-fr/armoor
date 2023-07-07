@@ -54,7 +54,7 @@ Forecasters Interface
 Here are the instructions to launch the front-end of the forecasters interface:
 
 * Unzip the shom-ui.zip file on an environment that has access to the API (it can be on the same server or not).
-* Prepare the shom-ui/assets/endpoints.json configuration file by specifying the API URL.
+* Prepare the ``shom-ui/assets/endpoints.json`` configuration file by specifying the API URL.
 
 **endpoints.json**::
 
@@ -77,3 +77,51 @@ Hosting the API and Website
 All tests have been conducted with 8 GB of RAM and 6 vCPUs.
 At least 90 GB of disk space is required for 10 days of history and
 3 regional configurations (3 GB x 10 days x 3 configurations).
+
+
+Update Website labels
+---------------------
+
+To add or update labels of a regional configuration and parameters,
+you will find two json files : ``config_reg.json`` and ``parameters.json`` in the folder ``shom-ui/assets/data``.
+
+
+*config_reg*
+~~~~~~~~~~~~
+
+To add a regional configuration, add a line to the ``config_reg.json`` file in the format of a Python dictionary::
+
+    {
+        "hycom3d_med": "HYCOM Mediterrannée",
+        "hycom3d_indien": "HYCOM Indien",
+        "hycom3d_manga": "HYCOM Manche/Gascone"
+    }
+
+In the above example, the key ``hycom3d_med`` follows the naming of ``model_config`` from :doc:`hmi` ``*config_reg* section`` and
+``HYCOM Mediterrannée`` is the label displayed in the website within the ``Configurations régionales`` component.
+
+
+*parameters*
+~~~~~~~~~~~~
+
+By default, the parameter labels are taken from the configuration file
+``[[parameter_name]]`` and are displayed as ``parameter_name`` (c.f. :doc:`hmi` ``Section *parameters*``)
+in the website within the ``Paramètres`` component.
+
+To customise a label, you can add a line to the ``parameters.json`` file with the default value of ``parameter_name``
+as the key and new label a hte corresponding value. Here's an example::
+
+    {
+        "SEA_SURFACE_TEMPERATURE": "1- température de surface",
+        "SEA_SURFACE_SALINITY": "2- salinité de surface",
+        "MIXED_LAYER": "3- couche de mélange - température",
+        "CURRENT": "4- courant",
+        "TEMPERATURE": "5- température",
+        "OUTFLOW_MED_TEMP": "6- outflow mediterranéen - température",
+        "OUTFLOW_MED_SAL": "7- outflow mediterranéen - salinité",
+        "OUTFLOW_PERS_TEMP": "8- outflow persique et mer Rouge - température",
+        "OUTFLOW_PERS_SAL": "9- outflow persique et mer Rouge - salinité",
+        "GIBRALTAR_TEMP": "10- Gibraltar - température",
+        "GIBRALTAR_SAL": "11- Gibraltar - salinité",
+        "GIBRALTAR_CURRENT": "12- Gibraltar - courant"
+    }
