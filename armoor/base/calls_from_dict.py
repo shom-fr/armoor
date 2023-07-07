@@ -98,9 +98,9 @@ def get_observation_models_meta(config_obj: dict):
     for index_model, model in enumerate(models):
         # Colocation per model
         obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"], flags,
-                                                     tgt_grid=config_obj["colocate"], vertical_step=vertical_step,
-                                                     horizontal_step=horizontal_step, coloc_method=get_method(model),
-                                                     coloc_method_z=get_method(model, z=True))
+                                                 tgt_grid=config_obj["colocate"], vertical_step=vertical_step,
+                                                 horizontal_step=horizontal_step, coloc_method=get_method(model),
+                                                 coloc_method_z=get_method(model, z=True))
 
         observation["xarray_meta_coloc"].append(obs_coloc)
         model.update({"xarray_meta_coloc": mod_coloc})
@@ -253,7 +253,8 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str, m
 
     # Add default meta-zone
     if config_obj['functionality'] == "sst":
-        config_obj["meta_zones"]["depth"] = [0]
+        if 'depth' not in config_obj["meta_zones"]:
+            config_obj["meta_zones"]["depth"] = [0]
 
     filters = {"quality": lambda obj: obj.meta.quality_filter, "depth": lambda obj: obj.meta.vertical_selection_depth,
                "dens": lambda obj: obj.meta.vertical_selection_dens,
