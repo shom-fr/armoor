@@ -1437,7 +1437,7 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
 
                     title_time = f'\nObservation : analysis {observations.analysis_period.replace(":00", "")}  ' \
                                  f'\nModel : analysis {models[0].analysis_period.replace(":00", "")}'
-                    title_depth = f'\nDepth : {depth.values}m'
+                    title_depth = f'\nDepth : {depth.values:.2f}m'
                     title = f'Tidal current ellipses - Constituent : {wave_name} - Scale : x {scale} {title_time} ' \
                             f'{title_depth}'
                     f.suptitle(title, fontsize=15, fontweight='bold')
@@ -1465,7 +1465,7 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
 
                     title_time = f'\nObservation : analysis {observations.analysis_period.replace(":00", "")}  ' \
                                  f'\nModel : analysis {models[0].analysis_period.replace(":00", "")}'
-                    title_depth = f'\nDensity : {dens.values}'
+                    title_depth = f'\nDensity : {dens.values:.2f}'
                     title = f'Tidal current ellipses - Constituent : {wave_name} - Scale : x {scale} {title_time} ' \
                             f'{title_depth}'
                     f.suptitle(title, fontsize=15, fontweight='bold')
@@ -2299,14 +2299,14 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             elif len(mod['xarray_meta_coloc'].depth.values) > 1:
                 depth = f"{mod['xarray_meta_coloc'].depth.min().values} to" \
                         f" {mod['xarray_meta_coloc'].depth.max().values}"
-            title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDepth : {depth} m'
+            title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDepth : {depth:.4f} m'
         elif 'dens' in mod['xarray_meta_coloc'].coords:
             if mod['xarray_meta_coloc'].dens.values.dtype in ['float64', 'float32']:
                 dens = mod['xarray_meta_coloc'].dens.values
             elif len(mod['xarray_meta_coloc'].dens.values) > 1:
                 dens = f"{mod['xarray_meta_coloc'].dens.min().values} to" \
                        f" {mod['xarray_meta_coloc'].dens.max().values}"
-            title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDensity : {dens}'
+            title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDensity : {dens:.4f}'
         else:
             depth = 0
             title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDepth : {depth} m'

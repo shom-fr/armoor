@@ -9,7 +9,6 @@ from xoa.regrid import regrid1d
 import matplotlib.path as path
 import math
 from pandas.tseries.offsets import MonthEnd
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -412,16 +411,22 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_ponct")
         ds = self._obj
+        ds.to_netcdf('croco_fin.nc')
         if var_vert == 'depth':
             if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # check if NEMO or TOPAZ
                 return ds.sel(depth=depth, method='nearest')
             elif 'z' in ds.dims or 'level' in ds.dims or (
                     depth in ds.dims and len(ds.depth.dims) == 2):  # check if CROCO or HYCOM or profile
-                tgt_depth = xr.DataArray([depth], dims="depth", name="depth")
+                # Regrid1D only seems to work with negative depths: the following lines adapt the deths values
+                # to correctly select the depth defined.
+                ds['depth'] = -ds['depth']
+                if depth == 0:
+                    depth = ds.depth.min().values
+                tgt_depth = xr.DataArray([-depth], dims="depth", name="depth")
                 tgt_ds = ds
                 for var in self._obj.variables:
                     if var == 'depth' or 'DEPH' in var:
-                        tgt_ds = tgt_ds.drop_vars(var)
+                        pass
                     else:
                         for var_depth in ['level', 'z', 'DEPTH', 'sig']:
                             if var_depth in ds[var].dims and len(ds[var][var_depth]) > 1:
@@ -431,6 +436,7 @@ class MetazoneAccessor:
 
                 if "depth" not in list(tgt_ds.coords):
                     tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
+                tgt_ds['depth'] = -tgt_ds['depth']
                 return tgt_ds
             else:
                 return ds
@@ -495,8 +501,11 @@ class MetazoneAccessor:
             return self._obj.sel(depth=depths, method='nearest')
 
         elif 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
-            tgt_depth = xr.DataArray(depths, name="depth", dims="depth")
+            # Regrid1D only seems to work with negative depths: the following lines adapt the deths values
+            # to correctly select the depth defined.
+            tgt_depth = -xr.DataArray(depths, name="depth", dims="depth")
             tgt_ds = self._obj
+            tgt_ds['depth'] = -tgt_ds['depth']
             for var in self._obj.variables:
                 if var == 'depth':
                     tgt_ds = tgt_ds.drop_vars(var)
@@ -505,6 +514,7 @@ class MetazoneAccessor:
                     da_tgt = regrid1d(da, tgt_depth)
                     tgt_ds = tgt_ds.assign({var: da_tgt})
             tgt_ds = tgt_ds.assign_coords({'depth': depths})
+            tgt_ds['depth'] = -tgt_ds['depth']
             return tgt_ds
 
     def vertical_selection_slice(self, slice: str = None, var_slice: str = None) -> xr.Dataset:
