@@ -10,6 +10,7 @@ import matplotlib.path as path
 import math
 from pandas.tseries.offsets import MonthEnd
 import logging
+import copy
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,8 @@ class MetazoneAccessor:
             flags = p.contains_points(ds_coords)
             mask_poly = np.reshape(flags, (len(self._obj.lon.data), len(self._obj.lat.data)))
             mask_poly = xr.DataArray(data=mask_poly, dims=['lon', 'lat'],
-                                     coords=dict(lon=('lon', self._obj.lon.data), lat=('lat', self._obj.lat.data)), )
+                                     coords=dict(lon=('lon', self._obj.lon.data),
+                                                 lat=('lat', self._obj.lat.data)), )
         elif 'x' in self._obj.dims:  # Check if curv coordinates
             lons, lats = self._obj.lon.data.flatten(), self._obj.lat.data.flatten()
             ds_coords = [(lons[i], lats[i]) for i in range(len(lons))]
@@ -110,7 +112,8 @@ class MetazoneAccessor:
 
             mask_poly = np.reshape(flags, [len(self._obj.y.data), len(self._obj.x.data)])
             mask_poly = xr.DataArray(data=mask_poly, dims=['y', 'x'],
-                                     coords=dict(x=(['x'], self._obj.x.data), y=(['y'], self._obj.y.data)), )
+                                     coords=dict(x=(['x'], self._obj.x.data),
+                                                 y=(['y'], self._obj.y.data)), )
 
         # Check if the polygon matches the coordinates of the data
         if True not in mask_poly:
@@ -121,7 +124,8 @@ class MetazoneAccessor:
         self._obj = self._obj.where(mask_poly, drop=True)
         return self._obj
 
-    def data_selection(self, dim: str, minimum: float = None, maximum: float = None, value: float = None) -> xr.Dataset:
+    def data_selection(self, dim: str, minimum: float = None, maximum: float = None,
+                       value: float = None) -> xr.Dataset:
         """
         Subset dataset filtering elements values along the specified dimension.
 
@@ -157,7 +161,8 @@ class MetazoneAccessor:
             return self._obj
         return self._obj.where(selection, drop=True)
 
-    def horizontal_selection_coords(self, coordinates: [(float, float)], method: str = None) -> xr.Dataset:
+    def horizontal_selection_coords(self, coordinates: [(float, float)],
+                                    method: str = None) -> xr.Dataset:
         """
         Subset dataset selecting elements located in cloud of specified dots plus those in a certain radius.
 
@@ -185,7 +190,8 @@ class MetazoneAccessor:
         elif 'x' in self._obj.dims:  # Curvilinear grid
             list_ds_point = []
             for i_lon, lon in enumerate(lon_target):
-                list_ds_point.append(self._obj.meta.sel_closest(lon_target[i_lon], lat_target[i_lon]))
+                list_ds_point.append(
+                    self._obj.meta.sel_closest(lon_target[i_lon], lat_target[i_lon]))
             return xr.concat(list_ds_point, dim='x')
 
     def horizontal_selection_from_obs_radius(self, config_obj) -> xr.Dataset:
@@ -211,7 +217,8 @@ class MetazoneAccessor:
             obs_lon, obs_lat = obs_lon[0], obs_lat[0]
 
         self._obj = self._obj.sel(lon=obs_lon, lat=obs_lat, method='nearest')
-        distance = np.sqrt((self._obj.lon.values - obs_lon) ** 2 + (self._obj.lat.values - obs_lat) ** 2)
+        distance = np.sqrt(
+            (self._obj.lon.values - obs_lon) ** 2 + (self._obj.lat.values - obs_lat) ** 2)
         radius_km = self._obj.meta.km_to_deg(radius)
 
         if distance > radius_km:
@@ -302,7 +309,8 @@ class MetazoneAccessor:
                 idx_centre += 1
 
             if len(liste_ds) > 1:
-                ds_all = xr.concat(liste_ds, 'idx_point', combine_attrs="drop")  # plusieurs point dans cloud
+                ds_all = xr.concat(liste_ds, 'idx_point',
+                                   combine_attrs="drop")  # plusieurs point dans cloud
             else:
                 ds_all = liste_ds[0]
             return ds_all
@@ -328,7 +336,8 @@ class MetazoneAccessor:
 
         return rad_lat_deg
 
-    def horizontal_selection_bathy(self, minimum: float = None, maximum: float = None, ) -> xr.Dataset:
+    def horizontal_selection_bathy(self, minimum: float = None,
+                                   maximum: float = None, ) -> xr.Dataset:
         """
         Subset dataset selecting elements whom bathymetry values are included in the specified bathymetry range.
 
@@ -410,38 +419,56 @@ class MetazoneAccessor:
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
         logger.info("Applying filter - vertical_selection_ponct")
-        ds = self._obj
-        ds.to_netcdf('croco_fin.nc')
+        ds = copy.copy(self._obj)
+        print('ds',ds)
         if var_vert == 'depth':
-            if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # check if NEMO or TOPAZ
+            if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # NEMO or TOPAZ
                 return ds.sel(depth=depth, method='nearest')
-            elif 'z' in ds.dims or 'level' in ds.dims or (
-                    depth in ds.dims and len(ds.depth.dims) == 2):  # check if CROCO or HYCOM or profile
-                # Regrid1D only seems to work with negative depths: the following lines adapt the deths values
-                # to correctly select the depth defined.
-                ds['depth'] = -ds['depth']
-                if depth == 0:
-                    depth = ds.depth.min().values
-                tgt_depth = xr.DataArray([-depth], dims="depth", name="depth")
-                tgt_ds = ds
-                for var in self._obj.variables:
-                    if var == 'depth' or 'DEPH' in var:
-                        pass
-                    else:
-                        for var_depth in ['level', 'z', 'DEPTH', 'sig']:
-                            if var_depth in ds[var].dims and len(ds[var][var_depth]) > 1:
-                                da = self._obj[var]
-                                da_tgt = regrid1d(da, tgt_depth)
-                                tgt_ds = tgt_ds.assign({var: da_tgt})
 
-                if "depth" not in list(tgt_ds.coords):
-                    tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
-                tgt_ds['depth'] = -tgt_ds['depth']
-                return tgt_ds
+            elif list(ds.dims.keys()) == ['time', 'z']:  # CMEMS profilers
+                return ds.meta.vertical_selection_ponct_cmems(depth)
+
+            elif 'z' in ds.dims or 'level' in ds.dims or (depth in ds.dims and len(
+                    ds.depth.dims) == 2):  # CROCO or HYCOM
+                return ds.meta.vertical_seletion_ponct_croco(depth)
+
             else:
                 return ds
         elif var_vert == 'dens':
             return ds.sel(dens=depth, method='nearest')
+
+    def vertical_selection_ponct_cmems(self, depth):
+        depth_diff = np.abs(self._obj['depth'] - depth)
+        nearest_depth_index = [np.argmin(depth_diff.isel(time=i_time).data) for i_time, time in
+                               enumerate(self._obj.time)]
+        ds_nearest_depth = [self._obj.isel(time=i_time, z=nearest_depth_index[i_time]) for
+                            i_time, time in enumerate(self._obj.time)]
+        tgt_ds = xr.concat(ds_nearest_depth, dim='time')
+        tgt_ds = tgt_ds.drop('depth').assign_coords(depth=depth)
+        return tgt_ds
+
+    def vertical_seletion_ponct_croco(self, depth):
+        # Regrid1D only seems to work with negative depths: the following lines adapt the depths values
+        # to correctly select the depth defined.
+        self._obj['depth'] = -self._obj['depth']
+        if depth == 0:
+            depth = ds.depth.max().values
+        tgt_depth = xr.DataArray([-depth], dims="depth", name="depth")
+        for var in self._obj.variables:
+            if var == 'depth' or 'DEPH' in var:
+                pass
+            else:
+                for var_depth in ['level', 'z', 'DEPTH', 'sig']:
+                    if var_depth in ds[var].dims and len(ds[var][var_depth]) > 1:
+                        da = self._obj[var]
+                        da_tgt = regrid1d(da, tgt_depth)
+                        self._obj = self._obj.assign({var: da_tgt})
+
+        if "depth" not in list(self._obj.coords):
+            self._obj = self._obj.assign_coords(depth=-tgt_depth)
+        self._obj['depth'] = - self._obj['depth']
+
+        return self._obj
 
     def vertical_selection_range(self, depth: list, var_vert: str = 'depth') -> xr.Dataset:
         """
@@ -496,6 +523,7 @@ class MetazoneAccessor:
         --------
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
+
         logger.info("Applying filter - vertical_selection_list")
         if 'depth' in self._obj.dims:  # Selection for NEMO or TOPAZ
             return self._obj.sel(depth=depths, method='nearest')
@@ -503,8 +531,9 @@ class MetazoneAccessor:
         elif 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
             # Regrid1D only seems to work with negative depths: the following lines adapt the deths values
             # to correctly select the depth defined.
+
             tgt_depth = -xr.DataArray(depths, name="depth", dims="depth")
-            tgt_ds = self._obj
+            tgt_ds = copy.copy(self._obj)
             tgt_ds['depth'] = -tgt_ds['depth']
             for var in self._obj.variables:
                 if var == 'depth':
@@ -536,8 +565,9 @@ class MetazoneAccessor:
             depth_values = np.unique(self._obj.depth.data)
 
             if len(depth_values) > len(self._obj.z.data):
-                logger.info(f"too many unique depth values, the grid is resampled with only {len(self._obj.z.data)}"
-                            f" values")
+                logger.info(
+                    f"too many unique depth values, the grid is resampled with only {len(self._obj.z.data)}"
+                    f" values")
                 depth_values = np.linspace(depth_values[0], depth_values[-1], len(self._obj.z.data))
             self._obj = self._obj.meta.vertical_selection_list(depth_values)
 
@@ -556,7 +586,8 @@ class MetazoneAccessor:
             ds = liste_ds[i]
             ds = ds.assign_coords(slice=i)  # ajoute une dimension de date moyenne sur l'intervalle
             ds[var_slice + "_value"] = ds[var_slice]
-            ds = ds.assign_coords(depth=np.arange(len(ds[var_slice])))  # change les dates en indices
+            ds = ds.assign_coords(
+                depth=np.arange(len(ds[var_slice])))  # change les dates en indices
             liste_ds[i] = ds
 
         ds = xr.concat(liste_ds, 'slice')
@@ -688,7 +719,8 @@ class MetazoneAccessor:
             return self._obj.sel(time=pandas.to_datetime(times), method=method)
 
     # Overload time_selection
-    def time_selection_freq(self, freq: str = None, start: str = None, method: str = None) -> xr.Dataset:
+    def time_selection_freq(self, freq: str = None, start: str = None,
+                            method: str = None) -> xr.Dataset:
         """
         Subset dataset filtering elements along time dimension, selecting dates from a "start" date with a specified
         frequency.
@@ -722,7 +754,9 @@ class MetazoneAccessor:
 
         """
         logger.info("Applying filter - time_selection_freq")
-        intervals = {'hour': 'H', 'hours': 'H', 'day': 'D', 'days': 'D', 'month': 'MS', 'months': 'MS'}
+        intervals = {'hour': 'H', 'hours': 'H', 'day': 'D', 'days': 'D', 'month': 'MS',
+                     'months': 'MS'
+                     }
         args = freq.split(" ")
         if len(args) == 1:
             freq = intervals[args[0]]
@@ -815,8 +849,9 @@ class MetazoneAccessor:
 
         climatological_interval = "jfmamjjasondjfmamjjasond"
 
-        climatological_month = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6, 'july': 7,
-                                'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
+        climatological_month = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5,
+                                'june': 6, 'july': 7, 'august': 8, 'september': 9, 'october': 10,
+                                'november': 11, 'december': 12
                                 }
         climatological_season = {'winter': 'DJF', 'spring': 'MAM', 'summer': 'JJA', 'autumn': "SON"
                                  }
@@ -913,7 +948,8 @@ class MetazoneAccessor:
             if start <= pandas.to_datetime(obj_time).hour <= end:
                 index.append(obj_time)
             elif end < start:
-                if start <= pandas.to_datetime(obj_time).hour <= 24 or 0 <= pandas.to_datetime(obj_time).hour <= end:
+                if start <= pandas.to_datetime(obj_time).hour <= 24 or 0 <= pandas.to_datetime(
+                        obj_time).hour <= end:
                     index.append(obj_time)
         if index:
             return self._obj.sel(time=index)

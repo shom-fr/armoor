@@ -211,7 +211,6 @@ def open_decode_cmems(path_files):
 
     # Convert depth
     cmems = convert_depths(cmems)
-
     # Convert lons
     cmems = convert_lons(cmems)
 

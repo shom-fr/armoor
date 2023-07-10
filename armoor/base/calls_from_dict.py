@@ -94,7 +94,6 @@ def get_observation_models_meta(config_obj: dict):
     logger.info("Collocating model(s) and observation")
     vertical_step = config_obj.get('vertical_step')
     horizontal_step = config_obj.get('horizontal_step')
-
     for index_model, model in enumerate(models):
         # Colocation per model
         obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"], flags,
