@@ -420,7 +420,6 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_ponct")
         ds = copy.copy(self._obj)
-        print('ds',ds)
         if var_vert == 'depth':
             if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # NEMO or TOPAZ
                 return ds.sel(depth=depth, method='nearest')
@@ -428,8 +427,8 @@ class MetazoneAccessor:
             elif list(ds.dims.keys()) == ['time', 'z']:  # CMEMS profilers
                 return ds.meta.vertical_selection_ponct_cmems(depth)
 
-            elif 'z' in ds.dims or 'level' in ds.dims or (depth in ds.dims and len(
-                    ds.depth.dims) == 2):  # CROCO or HYCOM
+            elif 'z' in ds.dims or 'level' in ds.dims or (
+                    depth in ds.dims and len(ds.depth.dims) == 2):  # CROCO or HYCOM
                 return ds.meta.vertical_seletion_ponct_croco(depth)
 
             else:
@@ -450,25 +449,26 @@ class MetazoneAccessor:
     def vertical_seletion_ponct_croco(self, depth):
         # Regrid1D only seems to work with negative depths: the following lines adapt the depths values
         # to correctly select the depth defined.
-        self._obj['depth'] = -self._obj['depth']
+        ds = copy.copy(self._obj)
+        ds['depth'] = -ds['depth']
         if depth == 0:
-            depth = ds.depth.max().values
+            depth = ds.depth.min().values
         tgt_depth = xr.DataArray([-depth], dims="depth", name="depth")
-        for var in self._obj.variables:
+        tgt_ds = ds
+        for var in ds.variables:
             if var == 'depth' or 'DEPH' in var:
                 pass
             else:
                 for var_depth in ['level', 'z', 'DEPTH', 'sig']:
                     if var_depth in ds[var].dims and len(ds[var][var_depth]) > 1:
-                        da = self._obj[var]
+                        da = ds[var]
                         da_tgt = regrid1d(da, tgt_depth)
-                        self._obj = self._obj.assign({var: da_tgt})
+                        tgt_ds = tgt_ds.assign({var: da_tgt})
 
-        if "depth" not in list(self._obj.coords):
-            self._obj = self._obj.assign_coords(depth=-tgt_depth)
-        self._obj['depth'] = - self._obj['depth']
-
-        return self._obj
+        if "depth" not in list(tgt_ds.coords):
+            tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
+        tgt_ds['depth'] = -tgt_ds['depth']
+        return tgt_ds
 
     def vertical_selection_range(self, depth: list, var_vert: str = 'depth') -> xr.Dataset:
         """
