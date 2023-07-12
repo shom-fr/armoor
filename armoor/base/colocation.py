@@ -11,8 +11,7 @@ import matplotlib.pyplot as plt
 logger = logging.getLogger(__name__)
 
 
-def colocate_all(obs, mod, flags, tgt_grid, vertical_step=None, horizontal_step=None, coloc_method='nearest',
-                 coloc_method_z='nearest'):
+def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method_z='nearest'):
     # Read the colocation flags
     time_flag, hor_flag, ver_flag = flags
 
@@ -32,14 +31,6 @@ def colocate_all(obs, mod, flags, tgt_grid, vertical_step=None, horizontal_step=
         if ver_flag:
             obs_coloc = vertical_colocation(obs_coloc, tgt, coloc_method)
             mod_coloc = vertical_colocation(mod_coloc, tgt, coloc_method)
-
-    elif vertical_step and horizontal_step:
-        logger.info(f'Colocating on the vertical and horizontal step defined grid')
-        # Vertical grid
-        mod_coloc, obs_coloc = set_vert_step(mod, obs, tgt_grid, vertical_step, coloc_method_z)
-
-        # Horizontal grid
-        mod_coloc, obs_coloc = set_hor_step(mod_coloc, obs_coloc, horizontal_step, coloc_method)
 
     else:
         # Colocate on the observation grid
@@ -119,14 +110,15 @@ def horizontal_colocation(ds, tgt, coloc_method):
             ds_x = ds.interp(lon=tgt_xy.lon.values, lat=tgt_xy.lat.values, method=coloc_method)
             ds_x = ds_x.stack(y=('lon', 'lat')).reset_index('y')
             ds_x = ds_x.isel(y=slice(0, -1, len(tgt_xy.y)))
-            lons = xr.DataArray(ds_x.lon.values, dims='y', coords={'y': tgt_xy.y.values}, name='lon')
-            lats = xr.DataArray(ds_x.lat.values, dims='y', coords={'y': tgt_xy.y.values}, name='lat')
+            lons = xr.DataArray(ds_x.lon.values, dims='y', coords={'y': tgt_xy.y.values},
+                                name='lon')
+            lats = xr.DataArray(ds_x.lat.values, dims='y', coords={'y': tgt_xy.y.values},
+                                name='lat')
             ds_x = ds_x.assign_coords({'lon': lons, 'lat': lats})
             ds_coloc_xy.append(ds_x)
 
         ds_coloc = xr.concat(ds_coloc_xy, 'x')
         ds_coloc = ds_coloc.assign_coords(tgt.coords)
-
 
         # Make sure x y are in the same order in both datasets
         dims = list(tgt.dims.keys())
@@ -142,7 +134,8 @@ def horizontal_colocation(ds, tgt, coloc_method):
         ds_coloc = convert_curv_rect(ds, lon_values, lat_values)
 
     else:
-        ds_coloc = ds.interp(lon=lon_values, lat=lat_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
+        ds_coloc = ds.interp(lon=lon_values, lat=lat_values, method=coloc_method,
+                             kwargs={"fill_value": "extrapolate"})
 
     return ds_coloc
 
@@ -165,87 +158,6 @@ def vertical_colocation(ds, tgt, coloc_method):
     return ds
 
 
-def set_hor_step(mod, obs, horizontal_step, coloc_method='linear'):
-    """
-    Colocate the model and obs on the chosen horizontal grid.
-    Parameters
-    ----------
-    obs : xarray.Dataset
-        Observation dataset.
-    mod : xarray.Dataset
-        Model dataset.
-    hor_step : float
-        Horizontal step of the grid on which to colocate.
-    Returns
-    -------
-    models : dict
-        Dictionnary with models with the updated projection grid.
-    observation : dict
-        Dictionnary with models with the updated projection grid.
-    """
-    horizontal_step = obs.meta.km_to_deg(horizontal_step)
-
-    obs_deb, obs_end = obs.isel(time=0), obs.isel(time=-1)
-    total_distance_obs = np.sqrt((obs_deb.lon - obs_end.lon) ** 2 + (obs_deb.lat - obs_end.lat) ** 2)
-    total_duration_obs = obs_end.time - obs_deb.time
-
-    time_step_grid = horizontal_step * total_duration_obs / total_distance_obs
-
-    time_step_grid = time_step_grid.data.astype('timedelta64[s]')
-    time_step_grid = str(time_step_grid).split()[0] + 'S'
-    time_min, time_max = obs_deb.time.values, obs_end.time.values
-    time_min, time_max = np.datetime64(time_min), np.datetime64(time_max)
-
-    # Create the new times array to select to retrieve the horizontal resolution
-    tgt_time = pd.date_range(time_min, time_max, freq=time_step_grid)
-
-    # Interpolate the observation on the targeted times
-    obs_coloc = obs.interp(time=tgt_time, method=coloc_method)
-
-    # Interpolate the model on the observation times and locations
-    mod_coloc = colocate_lon_lat_time(mod, obs_coloc, coloc_method, method_z=False)
-    return mod_coloc, obs_coloc
-
-
-def set_vert_step(mod, obs, tgt_grid, vertical_step, coloc_method_z):
-    """
-    Colocate the model and obs on the chosen vertical grid.
-    Parameters
-    ----------
-    obs : xarray.Dataset
-        Observation dataset.
-    mod : xarray.Dataset
-        Model dataset.
-    vertical_step : float
-        Vertical step of the grid on which to colocate.
-    Returns
-    -------
-    models : dict
-        Dictionnary with models with the updated projection grid.
-    observation : dict
-        Dictionnary with models with the updated projection grid.
-    """
-    # Define the target vertical grid
-    if tgt_grid == 'observation':
-        depths = np.arange(np.nanmin(obs.depth.values), np.nanmax(obs.depth.values), vertical_step)
-    elif tgt_grid == 'model':
-        depths = np.arange(np.nanmin(obs.depth.values), np.nanmax(obs.depth.values), vertical_step)
-
-    # Model
-    if 'level' in mod.depth.dims:  # Case croco
-        mod_coloc = mod.meta.vertical_selection_list(depths)
-    else:
-        mod_coloc = mod.interp(depth=depths, method=coloc_method_z)
-
-    # Observation
-    if 'z' in obs.depth.dims:  # Case CMEMS data : depth(z,time)
-        obs_coloc = obs.meta.vertical_selection_list(depths)
-    else:
-        obs_coloc = obs.interp(depth=depths, method=coloc_method_z)
-
-    return mod_coloc, obs_coloc
-
-
 def pick_time(ds, time_values):
     """Pick data in case of dims['time'] = 1.
     Parameters
@@ -266,7 +178,8 @@ def pick_time(ds, time_values):
     return ds
 
 
-def min_grid_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag, temporal_colocation_flag):
+def min_grid_all(obs, mod, horizontal_colocation_flag, vertical_colocation_flag,
+                 temporal_colocation_flag):
     """
     Gives the grid that has the minimum resolution along each dimension
     of the observation and model.
