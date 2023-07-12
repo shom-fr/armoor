@@ -105,8 +105,6 @@ def get_observation_models_meta(config_obj: dict):
         # Colocation per model
         obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"],
                                                  flags, tgt_grid=config_obj["colocate"],
-                                                 vertical_step=vertical_step,
-                                                 horizontal_step=horizontal_step,
                                                  coloc_method=get_method(model),
                                                  coloc_method_z=get_method(model, z=True))
 

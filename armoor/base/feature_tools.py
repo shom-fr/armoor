@@ -196,6 +196,7 @@ def sel_one_var(observation, models, var):
         mod["xarray_meta"] = mod["xarray_meta"][var_mod]
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod]
         observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][i_mod][var_obs]
+    observation_var['name'] = observation['name']
     return observation_var, models_var
 
 

@@ -528,6 +528,10 @@ class MetazoneAccessor:
         if 'depth' in self._obj.dims:  # Selection for NEMO or TOPAZ
             return self._obj.sel(depth=depths, method='nearest')
 
+        elif list(self._obj.dims.keys()) == ['time', 'z']:  # CMEMS profilers
+            list_ds_z = [self._obj.meta.vertical_selection_ponct_cmems(depth) for depth in depths]
+            return xr.concat(list_ds_z, dim='depth')
+
         elif 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
             # Regrid1D only seems to work with negative depths: the following lines adapt the deths values
             # to correctly select the depth defined.
