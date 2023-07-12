@@ -63,7 +63,7 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
             return open_decode_woa18(path_files)
         elif type == "CMEMS":
             logger.info("Opening CMEMS")
-            return open_decode_cmems(path_files)
+            return open_decode_cmems(path_files, steps=steps)
         elif type == "scanfish":
             logger.info("Opening Scanfish")
             return open_decode_scanfish(path_files[0], steps=steps)
@@ -152,7 +152,7 @@ def open_decode_woa18(path_files):
     return woa18
 
 
-def open_decode_cmems(path_files):
+def open_decode_cmems(path_files, steps):
     """
      Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
      Parameters
@@ -227,6 +227,10 @@ def open_decode_cmems(path_files):
     for var in list(cmems.keys()):
         if var in list_to_remove:
             cmems = cmems.drop(var)
+
+    if steps:
+        horizontal_step, vertical_step = steps
+        cmems = set_hor_vert_step(cmems, horizontal_step, vertical_step)
 
     return cmems
 
@@ -1177,24 +1181,8 @@ def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
     return obs_grid
 
 
-def set_hor_step(mod, obs, horizontal_step, coloc_method='linear'):
-    """
-    Colocate the model and obs on the chosen horizontal grid.
-    Parameters
-    ----------
-    obs : xarray.Dataset
-        Observation dataset.
-    mod : xarray.Dataset
-        Model dataset.
-    hor_step : float
-        Horizontal step of the grid on which to colocate.
-    Returns
-    -------
-    models : dict
-        Dictionnary with models with the updated projection grid.
-    observation : dict
-        Dictionnary with models with the updated projection grid.
-    """
+def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', method_z='linear'):
+    # Horizontal gridding
     horizontal_step = obs.meta.km_to_deg(horizontal_step)
 
     obs_deb, obs_end = obs.isel(time=0), obs.isel(time=-1)
@@ -1213,47 +1201,14 @@ def set_hor_step(mod, obs, horizontal_step, coloc_method='linear'):
     tgt_time = pd.date_range(time_min, time_max, freq=time_step_grid)
 
     # Interpolate the observation on the targeted times
-    obs_coloc = obs.interp(time=tgt_time, method=coloc_method)
+    obs_grid = obs.interp(time=tgt_time, method=method)
 
-    # Interpolate the model on the observation times and locations
-    mod_coloc = colocate_lon_lat_time(mod, obs_coloc, coloc_method, method_z=False)
-    return mod_coloc, obs_coloc
-
-
-def set_vert_step(mod, obs, tgt_grid, vertical_step, coloc_method_z):
-    """
-    Colocate the model and obs on the chosen vertical grid.
-    Parameters
-    ----------
-    obs : xarray.Dataset
-        Observation dataset.
-    mod : xarray.Dataset
-        Model dataset.
-    vertical_step : float
-        Vertical step of the grid on which to colocate.
-    Returns
-    -------
-    models : dict
-        Dictionnary with models with the updated projection grid.
-    observation : dict
-        Dictionnary with models with the updated projection grid.
-    """
+    # Vertical gridding
     # Define the target vertical grid
-    if tgt_grid == 'observation':
-        depths = np.arange(np.nanmin(obs.depth.values), np.nanmax(obs.depth.values), vertical_step)
-    elif tgt_grid == 'model':
-        depths = np.arange(np.nanmin(obs.depth.values), np.nanmax(obs.depth.values), vertical_step)
-
-    # Model
-    if 'level' in mod.depth.dims:  # Case croco
-        mod_coloc = mod.meta.vertical_selection_list(depths)
-    else:
-        mod_coloc = mod.interp(depth=depths, method=coloc_method_z)
-
-    # Observation
+    depths = np.arange(np.nanmin(obs.depth.values), np.nanmax(obs.depth.values), vertical_step)
     if 'z' in obs.depth.dims:  # Case CMEMS data : depth(z,time)
-        obs_coloc = obs.meta.vertical_selection_list(depths)
+        obs_grid = obs_grid.meta.vertical_selection_list(depths)
     else:
-        obs_coloc = obs.interp(depth=depths, method=coloc_method_z)
+        obs_grid = obs_grid.interp(depth=depths, method=method_z)
 
-    return mod_coloc, obs_coloc
+    return obs_grid
