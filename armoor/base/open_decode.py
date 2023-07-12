@@ -9,13 +9,15 @@ import xoa
 import gsw
 import logging
 import datetime
+import pandas as pd
 from xoa.grid import dz2depth, shift
 import matplotlib.pyplot as plt
+import xoa.geo as xgeo
 
 logger = logging.getLogger(__name__)
 
 
-def open_decode(path_files, func=None, type=None) -> xr.Dataset:
+def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
     """
      Open a netcdf/txt file and store it into a dataset
      Parameters
@@ -64,10 +66,10 @@ def open_decode(path_files, func=None, type=None) -> xr.Dataset:
             return open_decode_cmems(path_files)
         elif type == "scanfish":
             logger.info("Opening Scanfish")
-            return open_decode_scanfish(path_files[0])
+            return open_decode_scanfish(path_files[0], steps=steps)
         elif type == "seasoar":
             logger.info("Opening Seasoar")
-            return open_decode_seasoar(path_files[0])
+            return open_decode_seasoar(path_files[0], steps=steps)
         elif type == "LADCP":
             logger.info("Opening L-ADCP")
             return open_decode_l_adcp(path_files[0])
@@ -167,7 +169,8 @@ def open_decode_cmems(path_files):
         list_ds_cmems = []
         for path in path_files:
             ds = xr.open_dataset(path)
-            lon_ds = ds.LONGITUDE.assign_coords(LONGITUDE=ds.TIME.data).rename({'LONGITUDE': 'TIME'})
+            lon_ds = ds.LONGITUDE.assign_coords(LONGITUDE=ds.TIME.data).rename(
+                {'LONGITUDE': 'TIME'})
             lat_ds = ds.LATITUDE.assign_coords(LATITUDE=ds.TIME.data).rename({'LATITUDE': 'TIME'})
             ds = ds.drop_vars(['LONGITUDE', 'LATITUDE'])
             ds['LATITUDE'] = lat_ds
@@ -268,8 +271,8 @@ def open_decode_l_adcp(path_file):
     list_ds = []
     for i_mes, array_series in enumerate(list_measures):
         # Fill the small arrays with nan values
-        array_same_size = np.lib.pad(array_series, ((0, size_max - len(array_series)), (0, 0)), 'constant',
-                                     constant_values='NaN')
+        array_same_size = np.lib.pad(array_series, ((0, size_max - len(array_series)), (0, 0)),
+                                     'constant', constant_values='NaN')
         # Set the right depth values
         array_same_size[:, 6] = depth
 
@@ -435,7 +438,7 @@ def open_decode_mouillages(path_file):
     return mouillage
 
 
-def open_decode_scanfish(path_file):
+def open_decode_scanfish(path_file, steps):
     """
     Open txt file form scanfish observation and store it in dataset.
     Parameters
@@ -449,56 +452,32 @@ def open_decode_scanfish(path_file):
         scanfish observation dataset.
     """
     # Read the .txt file
-    file = open(path_file, 'r', encoding="ISO-8859-1")
-    lines = file.readlines()
-    n_line = len(lines)
-    for i in range(n_line):
-        lines[i] = lines[i].split('\t')
-        lines[i][-1] = lines[i][-1].rstrip('\n')  # Remove header
-    lines = np.array(lines[1:])
-    lines[lines == ''] = 9999999.
+    file = pd.read_csv(path_file, sep='\t')
+    lons, lats, depth = file["Longitude"], file["Latitude"], file['DepSM']
+    time = (file["TimeJ"] * 24 * 3600 * np.timedelta64(1, 's')) + np.datetime64('1970-01-01') + \
+           file["TimeY"] * np.timedelta64(1, 's')
 
-    list_measures = []
-    for i, i_station in enumerate(np.unique(lines[:, 0])):
-        list_measures.append(lines[lines[:, 0] == i_station])
+    # Create the dataset
+    file = file.assign(time=time, depth=depth, temp=file['T4990C'], sal=file['Sal00'])
+    file = file.set_index("time")
+    scanfish = file.to_xarray()
 
-    # Separate the measurements
-    list_ds = []
-    for i_mes, array_series in enumerate(list_measures):
-        # Get measurements coordinates
-        lon = float(array_series[0][4])
-        lat = float(array_series[0][3])
-        time_j = float(array_series[0][1])
-        time_y = array_series[0][2]
-        time_origine_y = np.datetime64('1970-01-01')
-        time = time_origine_y + np.timedelta64(time_y, 's') + np.timedelta64(int(time_j * 24 * 60 * 60), 's')
-        list_ds.append(array2ds_radiales(array_series, lon, lat, time, 'radiale'))
-
-    # Merge the datasets
-    scanfish = xr.concat(list_ds, dim='depth')
-
-    list_ds = []
-    times = np.unique(scanfish.time.data)
-    depths = np.unique(scanfish.depth.data)
-    for time in times:
-        ds_time = scanfish.where(scanfish.time == np.datetime64(time), drop=True)
-        ds_time = ds_time.assign_coords(time=xr.DataArray([time], dims='time'))
-        ds_time = ds_time.assign_coords(lon=xr.DataArray([ds_time.lon.data[0]], dims='time'))
-        ds_time = ds_time.assign_coords(lat=xr.DataArray([ds_time.lat.data[0]], dims='time'))
-        ds_time = ds_time.drop_duplicates(dim='depth')
-        ds_time = ds_time.interp(depth=depths, method='nearest')
-        list_ds.append(ds_time)
-
-    scanfish = xr.concat(list_ds, dim='time')
+    # Decode
     scanfish = scanfish.xoa.decode()
 
     # Convert lons
     scanfish = convert_lons(scanfish)
 
+    # Add attrs
+    scanfish = scanfish.assign_attrs({"type": 'scanfish'})
+
+    # Regrid
+    horizontal_step, vertical_step = steps
+    scanfish = set_hor_vert_step_radiales(scanfish, horizontal_step, vertical_step)
     return scanfish
 
 
-def open_decode_seasoar(path_file):
+def open_decode_seasoar(path_file, steps):
     """
     Open txt file form seasoar observation and store it in dataset.
     Parameters
@@ -512,53 +491,28 @@ def open_decode_seasoar(path_file):
         seasoar observation dataset.
     """
     # Read the .txt file
-    file = open(path_file, 'r', encoding="ISO-8859-1")
-    lines = file.readlines()
-    n_line = len(lines)
-    for i in range(n_line):
-        lines[i] = lines[i].split('\t')
-        lines[i][-1] = lines[i][-1].rstrip('\n')  # Remove header
-    lines = np.array(lines[1:])
-    lines[lines == ''] = 9999999.
+    file = pd.read_csv(path_file, sep='\t')
+    lons, lats, depth = file["Longitude"], file["Latitude"], file['DepSM']
+    time = (file["TimeJ"] * 24 * 3600 * np.timedelta64(1, 's')) + np.datetime64('2000-01-01') + \
+           file["TimeQ"] * np.timedelta64(1, 's')
 
-    list_measures = []
-    for i, i_station in enumerate(np.unique(lines[:, 0])):
-        list_measures.append(lines[lines[:, 0] == i_station])
+    # Create the dataset
+    file = file.assign(time=time, depth=depth, temp=file['T190C'], sal=file['Sal11'])
+    file = file.set_index("time")
+    seasoar = file.to_xarray()
 
-    # Separate the measurements
-    list_ds = []
-    for i_mes, array_series in enumerate(list_measures):
-        # Get measurements coordinates
-        lon = float(array_series[0][4])
-        lat = float(array_series[0][3])
-        time_j = float(array_series[0][1])
-        time_q = array_series[0][2]
-        time_origine_q = np.datetime64('2000-01-01')
-        time = time_origine_q + np.timedelta64(time_q, 's') + np.timedelta64(int(time_j * 24 * 60 * 60), 's')
-        list_ds.append(array2ds_radiales(array_series, lon, lat, time, 'GT1'))
-
-    # Merge the datasets
-    seasoar = xr.concat(list_ds, dim='depth')
-
-    # Put time and depth as dimensions
-    list_ds = []
-    times = np.unique(seasoar.time.data)
-    depths = np.unique(seasoar.depth.data)
-    for time in times:
-        ds_time = seasoar.where(seasoar.time == np.datetime64(time), drop=True)
-        ds_time = ds_time.assign_coords(time=xr.DataArray([time], dims='time'))
-        ds_time = ds_time.assign_coords(lon=xr.DataArray([ds_time.lon.data[0]], dims='time'))
-        ds_time = ds_time.assign_coords(lat=xr.DataArray([ds_time.lat.data[0]], dims='time'))
-        ds_time = ds_time.drop_duplicates(dim='depth')
-        ds_time = ds_time.interp(depth=depths, method='nearest')
-        list_ds.append(ds_time)
-
-    seasoar = xr.concat(list_ds, dim='time')
+    # Decode
     seasoar = seasoar.xoa.decode()
 
     # Convert lons
     seasoar = convert_lons(seasoar)
 
+    # Add attrs
+    seasoar = seasoar.assign_attrs({"type": 'seasoar'})
+
+    # Regrid
+    horizontal_step, vertical_step = steps
+    seasoar = set_hor_vert_step_radiales(seasoar, horizontal_step, vertical_step)
     return seasoar
 
 
@@ -644,7 +598,8 @@ def open_decode_croco_currents(path_files):
 
     # Verify Croco
     if 's_rho' not in ds.dims:
-        raise Exception('Attention, le fichier que vous essayez d\'ouvrir ne semble pas être du Croco....')
+        raise Exception(
+            'Attention, le fichier que vous essayez d\'ouvrir ne semble pas être du Croco....')
 
     # Retrieve grid
     ds = ds.rename_dims({'s_rho': 'z'})
@@ -922,7 +877,8 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         cumul_gribs = path_files
         dss_cumul = []
         for grib in cumul_gribs:
-            dss_cumul.append(xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": ""}))
+            dss_cumul.append(
+                xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": ""}))
 
         ds_cumul = xr.combine_nested(dss_cumul, concat_dim="valid_time", combine_attrs="override")
         ds_cumul = ds_cumul.drop_vars(["time", "surface"])
@@ -938,11 +894,13 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
             dss = []
             for level in [0, 2, 10]:
                 dss.append(xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": "",
-                                                                                  "filter_by_keys": {"edition": 2,
-                                                                                                     "level": level
-                                                                                                     },
+                                                                                  "filter_by_keys": {
+                                                                                      "edition": 2,
+                                                                                      "level": level
+                                                                                      },
                                                                                   },
-                                           drop_variables=["heightAboveGround", "meanSea", "surface", ], ))
+                                           drop_variables=["heightAboveGround", "meanSea",
+                                                           "surface", ], ))
 
             dss_insta.append(xr.merge(dss, combine_attrs="override"))
 
@@ -1041,8 +999,8 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
     """
     # Define the columns to read and variable names for each type of observation
     if type == 'mouillages':
-        long_names = ["Corrected Flow 2D S-N", "Corrected Flow 2D W-E", "Corrected Flow 2D Amplitude",
-                      "Corrected Flow 2D Direction"]
+        long_names = ["Corrected Flow 2D S-N", "Corrected Flow 2D W-E",
+                      "Corrected Flow 2D Amplitude", "Corrected Flow 2D Direction"]
         indexes = [2, 1, 3, 4, 0]  # indexes in array for U,V,mag,dir,depth
     elif type == 'VMADCP':
         long_names = ['V', 'U', 'Mag', "Dir"]
@@ -1059,7 +1017,8 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
                         attrs=dict(long_name=long_names[0], units="m/s", _FillValue=9999999.), )
     da_v = xr.DataArray(data=array_series[:, indexes[1]].astype(float), dims=["depth"],
                         coords=dict(depth=('depth', depth), time=date, bottom_depth=bot_depth),
-                        attrs=dict(long_name="Corrected Flow 2D W-E", units="m/s", _FillValue=9999999.), )
+                        attrs=dict(long_name="Corrected Flow 2D W-E", units="m/s",
+                                   _FillValue=9999999.), )
 
     depth = xr.DataArray(data=depth, dims=["depth"], coords=dict(depth=('depth', depth)),
                          attrs=dict(long_name="Instrument depth", units="m", _FillValue=9999999), )
@@ -1071,44 +1030,19 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
     # If current magnitude and direction are included in the data, add them to the dataset
     if type != 'LADCP':
         da_mag = xr.DataArray(data=array_series[:, indexes[2]].astype(float), dims=["depth"],
-                              coords=dict(depth=('depth', depth.data), time=date, bottom_depth=bot_depth),
-                              attrs=dict(long_name="Corrected Flow 2D Amplitude", units="m/s", _FillValue=9999999.), )
+                              coords=dict(depth=('depth', depth.data), time=date,
+                                          bottom_depth=bot_depth),
+                              attrs=dict(long_name="Corrected Flow 2D Amplitude", units="m/s",
+                                         _FillValue=9999999.), )
 
         da_dir = xr.DataArray(data=array_series[:, indexes[3]].astype(float), dims=["depth"],
-                              coords=dict(depth=('depth', depth.data), time=date, bottom_depth=bot_depth),
+                              coords=dict(depth=('depth', depth.data), time=date,
+                                          bottom_depth=bot_depth),
                               attrs=dict(long_name="Corrected Flow 2D Direction", units="deg T",
                                          _FillValue=9999999., ), )
 
         ds["Ampl"], ds["Dir"] = da_mag, da_dir
 
-    return ds
-
-
-def array2ds_radiales(array_series, lon, lat, date, type):
-    # Define the columns to read and variable names for each type of observation
-    if type == 'GT1':
-        long_names = ['Temperature', 'Salinity', 'Density', 'depth']
-        indexes = [6, 13, 14, 19]
-        data_type = 'seasoar'
-    elif type == 'radiale':
-        long_names = ['Temperature', 'Salinity', 'Density', 'depth']
-        indexes = [6, 8, 9, 11]
-        data_type = 'scanfish'
-
-    depth = array_series[:, indexes[3]].astype(float)
-    da_temp = xr.DataArray(data=array_series[:, indexes[0]].astype(float), dims=["depth"],
-                           coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
-                           attrs=dict(long_name=long_names[0], units="deg C", _FillValue=9999999.), )
-    da_sal = xr.DataArray(data=array_series[:, indexes[1]].astype(float), dims=["depth"],
-                          coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
-                          attrs=dict(long_name=long_names[1], units="PSU", _FillValue=9999999.), )
-    da_dens = xr.DataArray(data=array_series[:, indexes[2]].astype(float), dims=["depth"],
-                           coords=dict(depth=('depth', depth), time=date, lon=lon, lat=lat),
-                           attrs=dict(long_name=long_names[2], units="kg/m^3", _FillValue=9999999.), )
-
-    # Create the dataset and add the data arrays
-    ds = xr.Dataset(attrs=dict(DATA_TYPE=data_type))
-    ds["temperature"], ds["salinity"], ds["density"] = da_temp, da_sal, da_dens
     return ds
 
 
@@ -1193,3 +1127,133 @@ def open_forecaster_basic(path_files):
     ds = convert_lons(ds)
 
     return ds
+
+
+def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
+    # Seasor/scanfish binning (method from SHOM Jupyter Notebook)
+    lons = obs.lon
+    lats = obs.lat
+    depth = obs.depth
+    time = obs.time
+
+    # Define depth and time bins
+    dist_deb_fin = xgeo.haversine(lons.values[0], lats.values[0], lons.values[-1],
+                                  lats.values[-1]) / 1000
+    depth_top_bottom = depth.max() - depth.min()
+
+    n_time_bin = int(np.floor(dist_deb_fin / horizontal_step))
+    n_depth_bin = int(np.floor(depth_top_bottom / vertical_step))
+
+    i_time_bins = [int(np.floor(len(obs.time) / n_time_bin)) * i for i in range(n_time_bin)]
+    i_depth_bins = np.linspace(0, np.ceil(depth.max() / n_depth_bin) * n_depth_bin, n_depth_bin + 1)
+
+    depth_bins = i_depth_bins[:-1] + i_depth_bins[1] / 2
+    mean_times, mean_lons, mean_lats = [], [], []
+    temp = np.full((n_time_bin - 1, n_depth_bin), np.nan)
+    sal = np.full((n_time_bin - 1, n_depth_bin), np.nan)
+
+    # Binning
+    for it in range(n_time_bin - 1):
+        i0, i1 = i_time_bins[it:it + 2]
+        temp[it] = np.histogram(depth[i0:i1], i_depth_bins, weights=obs['temp'][i0:i1])[0]
+        sal[it] = np.histogram(depth[i0:i1], i_depth_bins, weights=obs['sal'][i0:i1])[0]
+        denom = np.histogram(depth[i0:i1], i_depth_bins)[0]
+        temp[it] = np.where(denom == 0, np.nan, temp[it] / denom)
+        sal[it] = np.where(denom == 0, np.nan, sal[it] / denom)
+        mean_times.append(time[i0:i1].mean().values)
+        mean_lons.append(lons[i0:i1].mean())
+        mean_lats.append(lats[i0:i1].mean())
+
+    # Create xarray dataset
+    da_temp = xr.DataArray(data=temp, dims=["time", "depth"])
+    da_sal = xr.DataArray(data=sal, dims=["time", "depth"])
+    obs_grid = xr.Dataset()
+    obs_grid['temp'], obs_grid['sal'] = da_temp, da_sal
+    obs_grid = obs_grid.assign_coords(
+        {'lon': ('time', mean_lons), 'lat': ('time', mean_lats), 'depth': ('depth', depth_bins),
+         'time': ('time', mean_times)
+         })
+
+    return obs_grid
+
+
+def set_hor_step(mod, obs, horizontal_step, coloc_method='linear'):
+    """
+    Colocate the model and obs on the chosen horizontal grid.
+    Parameters
+    ----------
+    obs : xarray.Dataset
+        Observation dataset.
+    mod : xarray.Dataset
+        Model dataset.
+    hor_step : float
+        Horizontal step of the grid on which to colocate.
+    Returns
+    -------
+    models : dict
+        Dictionnary with models with the updated projection grid.
+    observation : dict
+        Dictionnary with models with the updated projection grid.
+    """
+    horizontal_step = obs.meta.km_to_deg(horizontal_step)
+
+    obs_deb, obs_end = obs.isel(time=0), obs.isel(time=-1)
+    total_distance_obs = np.sqrt(
+        (obs_deb.lon - obs_end.lon) ** 2 + (obs_deb.lat - obs_end.lat) ** 2)
+    total_duration_obs = obs_end.time - obs_deb.time
+
+    time_step_grid = horizontal_step * total_duration_obs / total_distance_obs
+
+    time_step_grid = time_step_grid.data.astype('timedelta64[s]')
+    time_step_grid = str(time_step_grid).split()[0] + 'S'
+    time_min, time_max = obs_deb.time.values, obs_end.time.values
+    time_min, time_max = np.datetime64(time_min), np.datetime64(time_max)
+
+    # Create the new times array to select to retrieve the horizontal resolution
+    tgt_time = pd.date_range(time_min, time_max, freq=time_step_grid)
+
+    # Interpolate the observation on the targeted times
+    obs_coloc = obs.interp(time=tgt_time, method=coloc_method)
+
+    # Interpolate the model on the observation times and locations
+    mod_coloc = colocate_lon_lat_time(mod, obs_coloc, coloc_method, method_z=False)
+    return mod_coloc, obs_coloc
+
+
+def set_vert_step(mod, obs, tgt_grid, vertical_step, coloc_method_z):
+    """
+    Colocate the model and obs on the chosen vertical grid.
+    Parameters
+    ----------
+    obs : xarray.Dataset
+        Observation dataset.
+    mod : xarray.Dataset
+        Model dataset.
+    vertical_step : float
+        Vertical step of the grid on which to colocate.
+    Returns
+    -------
+    models : dict
+        Dictionnary with models with the updated projection grid.
+    observation : dict
+        Dictionnary with models with the updated projection grid.
+    """
+    # Define the target vertical grid
+    if tgt_grid == 'observation':
+        depths = np.arange(np.nanmin(obs.depth.values), np.nanmax(obs.depth.values), vertical_step)
+    elif tgt_grid == 'model':
+        depths = np.arange(np.nanmin(obs.depth.values), np.nanmax(obs.depth.values), vertical_step)
+
+    # Model
+    if 'level' in mod.depth.dims:  # Case croco
+        mod_coloc = mod.meta.vertical_selection_list(depths)
+    else:
+        mod_coloc = mod.interp(depth=depths, method=coloc_method_z)
+
+    # Observation
+    if 'z' in obs.depth.dims:  # Case CMEMS data : depth(z,time)
+        obs_coloc = obs.meta.vertical_selection_list(depths)
+    else:
+        obs_coloc = obs.interp(depth=depths, method=coloc_method_z)
+
+    return mod_coloc, obs_coloc
