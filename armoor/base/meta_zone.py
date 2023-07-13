@@ -373,12 +373,10 @@ class MetazoneAccessor:
 
         """
         logger.info("Applying filter - vertical_selection_depth")
-        if depth and len(depth) == 1:
+        if len(depth) == 1:
             return self.vertical_selection_ponct(depth[0], 'depth')
-        elif depth:  # if output=profiles, only this option should apply
-            return self.vertical_selection_range(depth, 'depth')
         else:
-            return self._obj
+            return self.vertical_selection_range(depth, 'depth')
 
     def vertical_selection_dens(self, depth: list = None) -> xr.Dataset:
         """
@@ -422,14 +420,16 @@ class MetazoneAccessor:
         ds = copy.copy(self._obj)
         if var_vert == 'depth':
             if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # NEMO or TOPAZ
-                return ds.sel(depth=depth, method='nearest')
+                ds = ds.sel(depth=depth, method='nearest')
+                ds['depth'] = depth
+                return ds
 
             elif list(ds.dims.keys()) == ['time', 'z']:  # CMEMS profilers
                 return ds.meta.vertical_selection_ponct_cmems(depth)
 
             elif 'z' in ds.dims or 'level' in ds.dims or (
                     depth in ds.dims and len(ds.depth.dims) == 2):  # CROCO or HYCOM
-                return ds.meta.vertical_seletion_ponct_croco(depth)
+                return ds.meta.vertical_seletion_croco([depth])
 
             else:
                 return ds
@@ -446,15 +446,15 @@ class MetazoneAccessor:
         tgt_ds = tgt_ds.drop('depth').assign_coords(depth=depth)
         return tgt_ds
 
-    def vertical_seletion_ponct_croco(self, depth):
+    def vertical_seletion_croco(self, depth):
         # Regrid1D only seems to work with negative depths: the following lines adapt the depths values
         # to correctly select the depth defined.
         ds = copy.copy(self._obj)
         ds['depth'] = -ds['depth']
-        if depth == 0:
-            depth = ds.depth.min().values
-        tgt_depth = xr.DataArray([-depth], dims="depth", name="depth")
+
+        tgt_depth = xr.DataArray(-np.array(depth), dims="depth", name="depth")
         tgt_ds = ds
+
         for var in ds.variables:
             if var == 'depth' or 'DEPH' in var:
                 pass
@@ -468,6 +468,7 @@ class MetazoneAccessor:
         if "depth" not in list(tgt_ds.coords):
             tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
         tgt_ds['depth'] = -tgt_ds['depth']
+
         return tgt_ds
 
     def vertical_selection_range(self, depth: list, var_vert: str = 'depth') -> xr.Dataset:
@@ -523,8 +524,6 @@ class MetazoneAccessor:
         --------
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
-
-        logger.info("Applying filter - vertical_selection_list")
         if 'depth' in self._obj.dims:  # Selection for NEMO or TOPAZ
             return self._obj.sel(depth=depths, method='nearest')
 
@@ -533,22 +532,8 @@ class MetazoneAccessor:
             return xr.concat(list_ds_z, dim='depth')
 
         elif 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
-            # Regrid1D only seems to work with negative depths: the following lines adapt the deths values
-            # to correctly select the depth defined.
+            return self._obj.meta.vertical_seletion_croco(depths)
 
-            tgt_depth = -xr.DataArray(depths, name="depth", dims="depth")
-            tgt_ds = copy.copy(self._obj)
-            tgt_ds['depth'] = -tgt_ds['depth']
-            for var in self._obj.variables:
-                if var == 'depth':
-                    tgt_ds = tgt_ds.drop_vars(var)
-                elif 'level' in self._obj[var].dims or 'z' in self._obj[var].dims:
-                    da = self._obj[var]
-                    da_tgt = regrid1d(da, tgt_depth)
-                    tgt_ds = tgt_ds.assign({var: da_tgt})
-            tgt_ds = tgt_ds.assign_coords({'depth': depths})
-            tgt_ds['depth'] = -tgt_ds['depth']
-            return tgt_ds
 
     def vertical_selection_slice(self, slice: str = None, var_slice: str = None) -> xr.Dataset:
         """Return a new Dataset whose data is sorted per depth slice.

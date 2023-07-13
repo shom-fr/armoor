@@ -73,6 +73,10 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             # Vertical colocation
             if ver_flag:
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
+    if len(obs_coloc.dims) > 1:
+        for dim in list(obs_coloc.dims.keys()):
+            mod_coloc = mod_coloc.transpose(dim, ...)
+            obs_coloc = obs_coloc.transpose(dim, ...)
 
     return obs_coloc, mod_coloc
 
@@ -102,7 +106,7 @@ def horizontal_colocation(ds, tgt, coloc_method):
         lon_values = np.unique(tgt.lon.values)
         lat_values = np.unique(tgt.lat.values)
 
-    # If tgt lon/lat depend on x/y (ex if tgt from TOPAZ) : DOES NOT WORK
+    # If tgt lon/lat depend on x/y (ex if tgt from TOPAZ)
     if 'x' in tgt.dims:
         ds_coloc_xy = []
         for i_x, x in enumerate(tgt.x):
@@ -267,7 +271,10 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
     list_ds = []
     for i, time in enumerate(obs.time.values):
         # Colocation time
-        mod_interp = mod.interp(time=time, method=method, kwargs={"fill_value": "extrapolate"})
+        if len(mod.time) > 2:  # Interpolation returns NaN otherwise
+            mod_interp = mod.interp(time=time, method=method)
+        else:
+            mod_interp = mod.sel(time=time, method='nearest')
 
         # Colocation lon/lat
         if 'lon' in obs.coords:
@@ -291,8 +298,14 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
                     logger.warning(
                         'Caution : the product you are using does not contain a depth dimension - probably a 2D file.'
                         ' The vertical colocation will fail.')
-                mod_interp = mod_interp.interp(depth=depth, method=method_z,
-                                               kwargs={"fill_value": "extrapolate"}).squeeze()
+
+                if 'depth' in mod_interp.dims:
+                    mod_interp = mod_interp.interp(depth=depth, method=method_z,
+                                                   kwargs={"fill_value": "extrapolate"
+                                                           }).squeeze()
+                elif 'level' in mod_interp.dims:  # Croco
+                    mod_interp = mod_interp.meta.vertical_seletion_croco(depth)
+
             elif 'z' in obs.squeeze().dims:
                 depths = obs.depth.isel(time=i)
                 mod_interp = mod_interp.interp(depth=depths, method=method_z)

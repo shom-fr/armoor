@@ -8,18 +8,20 @@ copy_test_files(folder_test)
 
 class TestBulletins:
 
-    def test_variable_2d(self):  # OK
+    def test_variable_2d(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_2d.ini"])
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_variable_2d_seasor(self):  # OK
+    def test_variable_2d_seasor(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_seasor')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor.ini"])
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -27,39 +29,71 @@ class TestBulletins:
     def test_variable_2d_scanfish(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_scanfish')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_2d_scanfish.ini"])
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_scanfish.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_variable_3d_hycom_steps(self):  # OK
+    def test_variable_2d_hycom(self):
         out_path, logger = change_path(folder_test)
-        logger.info('test_variable_3d_hycom_steps')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_hycom_steps.ini"])
+        logger.info('test_variable_2d_hycom')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_hycom.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_variable_3d_croco_steps(self):  # OK
+    def test_variable_2d_croco(self):
         out_path, logger = change_path(folder_test)
-        logger.info('test_variable_3d_croco_steps')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_croco_steps.ini"])
+        logger.info('test_variable_2d_croco')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_croco.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_variable_3d_steps(self):  # OK
+    def test_variable_3d(self):
         out_path, logger = change_path(folder_test)
-        logger.info('test_variable_3d_steps')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_steps.ini"])
+        logger.info('test_variable_3d')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_variable_3d_scanfish_steps(self):  # OK
+    def test_variable_3d_seasor(self):
         out_path, logger = change_path(folder_test)
-        logger.info('test_variable_3d_scanfish_steps')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/variable_3d_scanfish_steps.ini"])
+        logger.info('test_variable_3d_seasor')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_seasor.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_3d_scanfish(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_3d_scanfish')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_scanfish.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_3d_hycom(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_3d_hycom')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_hycom.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_3d_croco(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_3d_croco')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_croco.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

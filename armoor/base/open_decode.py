@@ -754,7 +754,6 @@ def open_decode_hycom_3d(path_files):
 
     # Convert lons
     hycom = convert_lons(hycom)
-
     return hycom
 
 
@@ -845,7 +844,6 @@ def open_decode_basic(path_files):
     # Convert lons
     ds = convert_lons(ds)
 
-    # TODO
     # Remove duplicate values
     if 'lon' in ds.dims:
         ds = ds.drop_duplicates(['lon'])
@@ -1071,13 +1069,9 @@ def convert_depths(ds):
     xarray.dataset
         Dataset with positive depths.
     """
-    if 'depth' in ds.variables:
-        if np.nanmax(ds.depth.data) < 0:
+    if 'depth' in ds:
+        if np.nanmean(ds.depth.data) < 0:
             ds["depth"] = -ds.depth
-    elif 'depth' in ds.dims:
-        if np.nanmax(ds.depth.data) < 0:
-            ds["depth"] = -ds.depth
-
     return ds
 
 
@@ -1206,6 +1200,7 @@ def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', meth
     # Vertical gridding
     # Define the target vertical grid
     depths = np.arange(np.nanmin(obs.depth.values), np.nanmax(obs.depth.values), vertical_step)
+    depths = [depth for depth in depths if depth > 0]
     if 'z' in obs.depth.dims:  # Case CMEMS data : depth(z,time)
         obs_grid = obs_grid.meta.vertical_selection_list(depths)
     else:
