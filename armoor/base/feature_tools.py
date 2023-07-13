@@ -39,11 +39,11 @@ def manage_output(plot, figure_name, folder_path):
 
 
 def remove_missing_values_ds(models, observation, i, var_mod, vars):
-
     # Remove missing values
     if len(var_mod) == 1:
         obs = observation["xarray_meta_coloc"][i][vars[0]]
         mod = models[i]["xarray_meta_coloc"][var_mod[0]]
+
 
         mod, obs = remove_missing_values(mod, obs)
         observation["xarray_meta_coloc"][i][vars[0]] = obs
@@ -54,8 +54,8 @@ def remove_missing_values_ds(models, observation, i, var_mod, vars):
             mod = models[i]["xarray_meta_coloc"][var_mod[i_var]]
             mod, obs = remove_missing_values(mod, obs)
             observation["xarray_meta_coloc"][i][vars[i_var]] = obs
-
             models[i]["xarray_meta_coloc"][var_mod[i_var]] = mod
+
     return models, observation
 
 
@@ -77,8 +77,15 @@ def remove_missing_values(model, obs):
         Observation dataset with the same missing values as the model.
 
     """
-    model_nan = model.where(~np.isnan(obs))
-    obs_nan = obs.where(~np.isnan(model))
+
+    for coord in ['sig', 's_rho']:
+        if coord in model.coords:
+            model = model.drop(coord)
+        if coord in obs.coords:
+            obs = obs.drop(coord)
+    # .values otherwise returns all NaN for croco and topaz
+    model_nan = model.where(~np.isnan(obs).values)
+    obs_nan = obs.where(~np.isnan(model).values)
 
     list_coord_mod = list(model_nan.coords.keys())
     list_coord_obs = list(obs_nan.coords.keys())

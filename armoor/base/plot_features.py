@@ -2096,6 +2096,8 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, var, vmin=None, vmax
 
     # Squeeze
     mod_meta_coloc, obs_meta_coloc = mod_meta_coloc.squeeze(), obs_meta_coloc.squeeze()
+    mod_meta_coloc = mod_meta_coloc.transpose('time', 'depth')
+    obs_meta_coloc = obs_meta_coloc.transpose('time', 'depth')
 
     # Select the variables to plot
     diff = mod_meta_coloc.transpose().values - obs_meta_coloc.transpose().values
@@ -2172,6 +2174,7 @@ def plot_variable_2d(models, observation, output_path=None):
             for i_mod, mod in enumerate(models):
                 obs_meta_coloc = observation["xarray_meta_coloc"][i_mod][var]
                 mod_meta_coloc = mod["xarray_meta_coloc"][var]
+
                 plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, var, observation['name'],
                                         mod['name'], output_path)
 
