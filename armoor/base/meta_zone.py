@@ -30,53 +30,6 @@ class MetazoneAccessor:
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
 
-    def var_selection(self, vars):
-        """
-        Select the variable in the dataset.
-        Parameters
-        ----------
-        vars : str
-            Variable(s) to select
-
-        Returns
-        -------
-        xarray.Dataset
-            Dataset with the selected parameters
-        """
-        logger.info("Applying filter - var_selection")
-        # create list of variables to keep
-        list_names = ['lon', 'lat', 'time', 'depth', 'bathy']
-        if 'temp' in vars:
-            if type(self._obj.xoa.temp) is xr.core.dataarray.DataArray:
-                list_names.append(self._obj.xoa.temp.name)
-        if 'sal' in vars:
-            if type(self._obj.xoa.sal) is xr.core.dataarray.DataArray:
-                list_names.append(self._obj.xoa.sal.name)
-        if 'dens' in vars:
-            if type(self._obj.xoa.dens) is xr.core.dataarray.DataArray:
-                list_names.append(self._obj.xoa.dens.name)
-        if 'sndspd' in vars:
-            if type(self._obj.xoa.sndspd) is xr.core.dataarray.DataArray:
-                list_names.append(self._obj.xoa.sndspd.name)
-        if 'gbt' in vars:
-            if type(self._obj.xoa.ugbt) is xr.core.dataarray.DataArray:
-                list_names.append(self._obj.xoa.ugbt.name)
-                list_names.append(self._obj.xoa.vgbt.name)
-        if 'mld' in vars:
-            if type(self._obj.xoa.mld) is xr.core.dataarray.DataArray:
-                list_names.append(self._obj.xoa.mld.name)
-        if 'uv' in vars:
-            if type(self._obj.xoa.u) is xr.core.dataarray.DataArray:
-                list_names.append(self._obj.xoa.u.name)
-                list_names.append(self._obj.xoa.v.name)
-
-        # remove the other variables
-        for var in self._obj.variables:
-            if var not in list_names:
-                self._obj = self._obj.drop_vars(var)
-
-        return self._obj
-
     def quality_filter(self, quality: (str, int, int) = (None, None, None)) -> xr.Dataset:
         """
         Subset dataset filtering quality levels.
@@ -225,7 +178,6 @@ class MetazoneAccessor:
 
         lon_target = [lon for lon, lat in coordinates]
         lat_target = [lat for lon, lat in coordinates]
-
         if 'lon' in self._obj.dims:  # Regular grid
             if method in ["linear"]:
                 return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
@@ -552,6 +504,7 @@ class MetazoneAccessor:
                     da = self._obj[var]
                     da_tgt = regrid1d(da, tgt_depth)
                     tgt_ds = tgt_ds.assign({var: da_tgt})
+            tgt_ds = tgt_ds.assign_coords({'depth':depths})
             return tgt_ds
 
     def vertical_selection_slice(self, slice: str = None, var_slice: str = None) -> xr.Dataset:

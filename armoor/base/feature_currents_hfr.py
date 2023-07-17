@@ -38,11 +38,11 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(['current'])
+    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(['current'])
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(['current'])
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].sel_var.selection(['current'])
 
     # Surface current only in this feature
     observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_ponct(0)
@@ -221,6 +221,8 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
+            plg = config_obj["meta_zones"].get("polygon")
+
             observation['xarray_meta'] = observation['xarray_meta'][attribute]
             for i_mod, mod in enumerate(models):
                 mod['xarray_meta'] = mod['xarray_meta'][attribute]
@@ -232,7 +234,7 @@ def plot(config_obj):
                                                                     [attribute])
 
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
-                                                  output_path=sub_func_output_folder)
+                                                  output_path=sub_func_output_folder, plg=plg)
 
         ################################################################################################################
         # CURRENT MAP

@@ -73,6 +73,9 @@ def harmonic_analysis(ds, var, path_nc, path_atlas, path_tools, list_waves, name
     else:
         ds_atlas = xr.open_dataset(os.path.join(path_atlas, 'ssh-atlas.nc')).rename({'W': 'wave'})
 
+    # Assign name in ds
+    ds_atlas = ds_atlas.assign_attrs({'name':name})
+
     return ds_atlas
 
 

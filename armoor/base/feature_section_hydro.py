@@ -23,28 +23,19 @@ def plot(config_obj):
     outputs = config_obj["outputs"]
     output_path = config_obj.get("output_path")
 
-    # SELECT THE VARIABLES
+    # Select the variables
+    config_obj = base.sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    if 'attribute' in outputs[0]:
-        var0 = outputs[0]['attribute']
-    else:
-        raise Exception("Oops, pour utiliser cette fonctionnalité, vous devriez spécifier un attribut...")
-    if "list" not in str(type(var0)):
-        vars = [var0]
-    else:
-        vars = var0
-    observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(vars)
-
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(vars)
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(vars)
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(vars)
-
     # Remove missing values
+    vars = [var for var in list(observation["xarray_meta"].keys()) if
+            var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
+    vars_mod = copy.copy(vars)
+    if 'temp' in vars_mod:
+        vars_mod[vars_mod.index('temp')] = 'ptemp'
     for i_mod, mod in enumerate(models):
-        models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars, vars)
+        models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars_mod, vars)
 
     # PLOTS
     for index_output, output in enumerate(outputs):
@@ -53,14 +44,17 @@ def plot(config_obj):
             st.create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
-        ################################################################################################################
-        # VARIABLE 3D SECTION
-        plot_variable_3d = {"plot_variable_3d": 'variable_3d'}
-        if output["plot"] in plot_variable_3d:
-            base.plot_features.plot_variable_3d(models, observation, output_path=sub_func_output_folder)
 
-        ################################################################################################################
-        # TIMESERIES
-        plot_variable_2d = {"plot_variable_2d": 'variable_2d'}
-        if output["plot"] in plot_variable_2d:
-            base.plot_features.plot_variable_2d(models, observation, output_path=sub_func_output_folder)
+        for var in vars:
+            observation_var, models_var = base.sel_one_var(observation, models, var)
+            ############################################################################################################
+            # VARIABLE 3D SECTION
+            plot_variable_3d = {"plot_variable_3d": 'variable_3d'}
+            if output["plot"] in plot_variable_3d:
+                base.plot_features.plot_variable_3d(models_var, observation_var, output_path=sub_func_output_folder)
+
+            ############################################################################################################
+            # TIMESERIES
+            plot_variable_2d = {"plot_variable_2d": 'variable_2d'}
+            if output["plot"] in plot_variable_2d:
+                base.plot_features.plot_variable_2d(models_var, observation_var, output_path=sub_func_output_folder)

@@ -139,6 +139,13 @@ def open_decode_woa18(path_files):
     # Convert lons
     woa18 = convert_lons(woa18)
 
+    # Convert long names
+    for var in list(woa18.keys()):
+        if var == 'sal':
+            woa18['sal'] = woa18['sal'].assign_attrs({'long_name': "Average salinity"})
+        if var == 'temp':
+            woa18['temp'] = woa18['temp'].assign_attrs({'long_name': "Average  sea temperature"})
+
     return woa18
 
 
@@ -185,7 +192,7 @@ def open_decode_cmems(path_files):
 
     # Decode
     cmems = cmems.xoa.decode()
-    
+
     # Manage profiler depths
     if 'DEPH' in cmems.variables:
         cmems = decode_profiler(cmems)
@@ -210,6 +217,11 @@ def open_decode_cmems(path_files):
     # Remove duplicate time values
     cmems = cmems.drop_duplicates('time')
 
+    # Remove useless variables
+    list_to_remove = ['DC_REFERENCE', 'DEPH', 'QC_DEPH']
+    for var in list(cmems.keys()):
+        if var in list_to_remove:
+            cmems = cmems.drop(var)
     return cmems
 
 
@@ -794,7 +806,7 @@ def open_decode_cora(path_files):
      Returns
      -------
      xarray.Dataset
-         WOA18 dataset.
+         CORA dataset.
      """
     # Open
     cora = xr.open_dataset(path_files)

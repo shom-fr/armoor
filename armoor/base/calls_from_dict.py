@@ -243,7 +243,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str, m
     """
     logger.info("Applying meta zone")
 
-    filters = {"quality": lambda obj: obj.meta.quality_filter, "vars": lambda obj: obj.meta.var_selection,
+    filters = {"quality": lambda obj: obj.meta.quality_filter,
                "depth": lambda obj: obj.meta.vertical_selection_depth,
                "dens": lambda obj: obj.meta.vertical_selection_dens,
                "polygon": lambda obj: obj.meta.horizontal_selection_polygon,

@@ -1,4 +1,6 @@
 import os
+import sys
+import errno
 
 import logging
 logger = logging.getLogger(__name__)
@@ -44,7 +46,11 @@ def get_config_reg_path(input_folder_path: str,
         return final_paths
 
     logger.error(f"File not found for variable : {var}")
+    filename_error = ", ".join(f'{element}_*' for element in files_needed_for_var[var])
+    logger.error(f'Unable to locate file(s) containing "{filename_error}" in {path}.')
 
+    raise FileNotFoundError(
+        errno.ENOENT, os.strerror(errno.ENOENT), filename_error)
 
 def get_obs_path(input_folder_path: str,
                  config_reg_day: str,

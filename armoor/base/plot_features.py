@@ -3,6 +3,7 @@ import os
 import logging
 
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import numpy as np
 from scipy.stats import gaussian_kde
 from scipy import stats
@@ -394,36 +395,46 @@ def add_mini_map(f, extent=None):
     return ax_mini_map
 
 
-def add_plg_minimap(ax_mini_map, ds):
+def add_plg_minimap(ax_mini_map, ds, plg):
     """
     Add the mini map ax to the figure
     Parameters
     ----------
     ax_mini_map
         ax of the minimap
-    ds : DataArray
-        DataArray whose lon/lat to plot.
+    ds: DataArray
+        DataArray whose lon / lat to plot.
+    plg : list
+        Polygon coordinates list.
     """
-    lons = []
-    lats = []
-    if 'time' in ds.dims:
-        ds = ds.isel(time=0)
-    if 'depth' in ds.dims:
-        ds = ds.isel(depth=0)
-    if 'interval' in ds.dims:
-        ds = ds.isel(interval=0, idx_time=0)
-    if 'slice' in ds.dims:
-        ds = ds.isel(slice=0)
-    if 'idx_depth' in ds.dims:
-        ds = ds.isel(idx_depth=0)
-    if 'idx_dens' in ds.dims:
-        ds = ds.isel(idx_dens=0)
-    for i_lon, lon in enumerate(ds.lon.data):
-        for i_lat, lat in enumerate(ds.lat.data):
-            if not np.isnan(ds.isel(lon=i_lon, lat=i_lat)):
-                lons.append(lon)
-                lats.append(lat)
-    ax_mini_map.scatter(lons, lats, transform=ccrs.PlateCarree())
+    if plg:
+        lons = [point[0] for point in plg]
+        lats = [point[1] for point in plg]
+        polygon = mpatches.Polygon(list(zip(lons, lats)), closed=True, facecolor='blue', alpha=0.5,
+                                   transform=ccrs.PlateCarree())
+        ax_mini_map.add_patch(polygon)
+        ax_mini_map.set_extent([min(lons), max(lons), min(lats), max(lats)])
+    else:
+        lons = []
+        lats = []
+        if 'time' in ds.dims:
+            ds = ds.isel(time=0)
+        if 'depth' in ds.dims:
+            ds = ds.isel(depth=0)
+        if 'interval' in ds.dims:
+            ds = ds.isel(interval=0, idx_time=0)
+        if 'slice' in ds.dims:
+            ds = ds.isel(slice=0)
+        if 'idx_depth' in ds.dims:
+            ds = ds.isel(idx_depth=0)
+        if 'idx_dens' in ds.dims:
+            ds = ds.isel(idx_dens=0)
+        for i_lon, lon in enumerate(ds.lon.data):
+            for i_lat, lat in enumerate(ds.lat.data):
+                if not np.isnan(ds.isel(lon=i_lon, lat=i_lat)):
+                    lons.append(lon)
+                    lats.append(lat)
+        ax_mini_map.scatter(lons, lats, transform=ccrs.PlateCarree())
 
 
 def diag_disp(flag_interval, flag_slice, obs_name, model_name, diag_type, mod, obs, output_path=None):
@@ -559,15 +570,10 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
             x.append(obs.item(i))
             y.append(mod.item(i))
 
-    data, x_e, y_e = np.histogram2d(x, y, bins=20, density=True)
-    z = interpn((0.5 * (x_e[1:] + x_e[:-1]), 0.5 * (y_e[1:] + y_e[:-1])), data, np.vstack([x, y]).T, method="splinef2d",
-                bounds_error=False)
-
-    # To be sure to plot all data
-    z[np.where(np.isnan(z))] = 0.0
-
-    # Sort the points by density, so that the densest points are plotted last
-    z, x, y = (list(t) for t in zip(*sorted(zip(z, x, y))))
+    # Sturge's rule
+    nbins = int(1 + 3.322 * np.log2(n))
+    # Compute histogram
+    data, x_e, y_e = np.histogram2d(x, y, bins=nbins, density=True)
 
     slope, intercept, r, p, std_err = stats.linregress(x, y)
     rmse = calculation.rmsec_diag_disp(x, y)
@@ -576,21 +582,41 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
         return slope * x + intercept
 
     mymodel = list(map(myfunc, x))
-    im = axes.scatter(x, y, c=np.array(z) * n, s=4, cmap='jet')
-    min = obs.min() if obs.min() < mod.min() else mod.min()
-    max = obs.max() if obs.max() > mod.max() else mod.max()
-    plt.plot([min, max], [min, max], color='gray', linestyle='dashed', markersize=5)
+
+    vmin = np.nanmin([np.nanmin(obs), np.nanmin(mod)])
+    vmax = np.nanmax([np.nanmax(obs), np.nanmax(mod)])
+
+    markersize = np.tanh(1e5 / n)
+    treshold = 1e-2
+    if markersize < treshold:
+        markersize = treshold
+    axes.scatter(x, y, c='slateblue', s=2*markersize)
+    plt.plot([vmin, vmax], [vmin, vmax],
+             color='gray', linestyle='dashed', markersize=5)
     plt.grid(color='gray', linestyle='--', linewidth=1, zorder=1)
-    plt.plot(x, mymodel, color='red', linestyle='solid', markersize=5, label=f'y = {slope:.3f}*x + {intercept:.3f} \n'
-                                                                             f'Correlation Coef = {r:.3f}\n'
-                                                                             f'Std Err = {std_err:.3f}\n'
-                                                                             f'RMSE = {rmse:.3f}')
-
-    cbar = f.colorbar(im, ticklocation='left')
-    cbar.set_label('Number Of Points', rotation=270, fontsize=15, labelpad=15)
+    plt.plot(x, mymodel,
+             color='red',
+             linestyle='solid',
+             markersize=5,
+             label=f'y = {slope:.3f}*x + {intercept:.3f} \n'
+                   f'Correlation Coef = {r:.3f}\n'
+                   f'Std Err = {std_err:.3f}\n'
+                   f'RMSE = {rmse:.3f}\n'
+                   f'Npts = {n}')
     plt.legend(loc='upper left')
+    cs = axes.contour(
+            np.convolve(x_e, np.ones(2, dtype=int), 'valid') / 2.0,
+            np.convolve(y_e, np.ones(2, dtype=int), 'valid') / 2.0,
+            data.T/data.max(),
+            levels=np.arange(0.1, 1.2, 0.2),
+            cmap="Reds",
+            linewidths=1
+    )
+    axes.clabel(cs, cs.levels, inline=True, fontsize=5, fmt="%1.1f")
 
-    ft.manage_output(plt, f'diag_disp_g_{var_title}_{obs_name}_{model_name}', output_path)
+    ft.manage_output(plt,
+                     f'diag_disp_g_{var_title}_{model_name}_{obs_name}',
+                     output_path)
 
 
 def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metric, cmap=cmocean.cm.thermal, vmin=None,
@@ -1800,7 +1826,6 @@ def plot_ts_metr_point(models, observation, metric, flag_interval, flag_slice, o
     longitudes, latitudes = obs_coloc_base.lon, obs_coloc_base.lat
     obs_name = observation["xarray_meta"].name
     var_title = find_var_title(obs_name, obs_meta)
-
     list_dims_mean = []
     label_title = ''
     if flag_interval:
@@ -2171,7 +2196,7 @@ def create_harmonic_table(models, observations, output_path):
                         f'{model[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
 
 
-def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, figname=''):
+def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, figname='', plg=None):
     """
     Plot statistical time series of model and observation.
 
@@ -2240,7 +2265,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 obs_coloc = observation["xarray_meta_coloc"][i].isel(slice=[idx_slice])
 
                 plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name,
-                                          var_title)
+                                          var_title, plg)
             # Change x interval labels
             if flag_interval:
                 modify_interval_label(axs[4])
@@ -2271,7 +2296,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             mod_name = mod["name"]
             obs_name = observation["name"]
             plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name,
-                                      var_title)
+                                      var_title, plg)
 
         if 'depth' in mod['xarray_meta_coloc'].coords:
             if mod['xarray_meta_coloc'].depth.values.dtype in ['float64', 'float32']:
@@ -2300,7 +2325,8 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         ft.manage_output(plt, f'ts_stats_interval_all_metrics_{obs_name}_{mod_name}{figname}', output_path)
 
 
-def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title):
+def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, mod_name, obs_name, var_title,
+                              plg):
     """
     Plot the statistical time series figure.
     Parameters
@@ -2356,7 +2382,7 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     # add minimap
     ax_mini_map = add_mini_map(f, obs_coloc)
     if 'lon' in list_dims_mean:
-        add_plg_minimap(ax_mini_map, obs_coloc)
+        add_plg_minimap(ax_mini_map, obs_coloc, plg)
     else:
         ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30, transform=ccrs.PlateCarree())
 

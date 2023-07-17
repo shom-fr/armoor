@@ -48,39 +48,43 @@ def plot(config_obj):
         observation = copy.copy(config_obj["observation"])
         models = copy.copy(config_obj["models"])
 
-        # SELECT VAR
-        if 'attribute' in output:
-            var = output['attribute']
-        else:
-            logger.info("You should indicate which variable you want to plot with keyword : attribute = ")
-            var = None
-        observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(var)
-        for i_mod, mod in enumerate(models):
-            mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(var)
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(var)
-            observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(var)
+        # Select the variables
+        config_obj = base.sel_default_vars(config_obj)
+        observation = copy.copy(config_obj["observation"])
+        models = copy.copy(config_obj["models"])
 
-            # Remove missing values
-            models, observation = base.remove_missing_values_ds(models, observation, i_mod, var, var)
+        # Remove missing values
+        vars = [var for var in list(observation["xarray_meta"].keys()) if
+                var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
+
+        vars_mod = copy.copy(vars)
+        if 'temp' in vars_mod:
+            vars_mod[vars_mod.index('temp')] = 'ptemp'
+        for i_mod, mod in enumerate(models):
+            models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars_mod, vars)
 
         # PLOTS
-
-        ################################################################################################################
-        # TIME SERIES STATS
-        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats', "plot_ts_metr_bias_stats": 'bias_stats',
-                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
-                              }
-        if output["plot"] in plot_ts_metr_stats:
-            if 'depth' not in models[0]["xarray_meta_coloc"].dims:
-                models_depth, observation_depth = models, observation
-                base.plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval, flag_slice,
-                                                      output_path=sub_func_output_folder)
-            else:
-                for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
-                    figname = f"_depth{i_depth}"
-                    models_depth, observation_depth = select_depth(models, observation, depth)
+        for var in vars:
+            observation_var, models_var = base.sel_one_var(observation, models, var)
+            ############################################################################################################
+            # TIME SERIES STATS
+            plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
+                                  "plot_ts_metr_bias_stats": 'bias_stats', "plot_ts_metr_RMSE_stats": 'RMSEc_stats',
+                                  "plot_ts_metr_stats": 'all_metrics'
+                                  }
+            if output["plot"] in plot_ts_metr_stats:
+                plg = config_obj["meta_zones"].get("polygon")
+                if 'depth' not in models[0]["xarray_meta_coloc"].dims:
+                    models_depth, observation_depth = models_var, observation_var
                     base.plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval, flag_slice,
-                                                          output_path=sub_func_output_folder, figname=figname)
+                                                          output_path=sub_func_output_folder, plg=plg)
+                else:
+                    for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
+                        figname = f"_depth{i_depth}"
+                        models_depth, observation_depth = select_depth(models_var, observation_var, depth)
+                        base.plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval,
+                                                              flag_slice, output_path=sub_func_output_folder,
+                                                              figname=figname, plg=plg)
 
 
 def select_depth(models, observation, depth):
