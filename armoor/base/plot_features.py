@@ -1141,9 +1141,9 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
                                                                                        dvmin, dvmax)
 
     # Squeeze
-    obs_meta, obs_coloc = obs_meta.squeeze(), obs_coloc.squeeze()
-    mod_meta, mod_coloc = mod_meta.squeeze(), mod_coloc.squeeze()
-    comparison = comparison.squeeze()
+    obs_meta, obs_coloc = clean_dim_order(obs_meta), clean_dim_order(obs_coloc)
+    mod_meta, mod_coloc = clean_dim_order(mod_meta), clean_dim_order(mod_coloc)
+    comparison = clean_dim_order(comparison)
 
     # Plot
     f, axs = figure_5_maps(obs_coloc)
@@ -1168,6 +1168,12 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
     f.suptitle(title, fontsize=17, fontweight='bold')
 
     return f, axs
+
+
+def clean_dim_order(ds):
+    if list(ds.dims) == ['lon', 'lat']:
+        ds = ds.transpose('lat', 'lon')
+    return ds.squeeze()
 
 
 def plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot, time_step,
@@ -1860,15 +1866,19 @@ def add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, nb_vect=50
     logger.info('Current vectors')
 
     # Squeeze
-    obs_meta, obs_coloc = obs_meta.squeeze(), obs_coloc.squeeze()
-    mod_meta, mod_coloc = mod_meta.squeeze(), mod_coloc.squeeze()
+    obs_meta, obs_coloc = clean_dim_order(obs_meta), clean_dim_order(obs_coloc)
+    mod_meta, mod_coloc = clean_dim_order(mod_meta), clean_dim_order(mod_coloc)
 
     for i_ds, ds in enumerate([obs_meta, obs_coloc, mod_meta, mod_coloc]):
         dens = int(len(ds.lon.values) / nb_vect)
         if dens < 1:
             dens = 1
-        axs[i_ds].quiver(ds.lon.values[::dens], ds.lat.values[::dens], ds.u.values[::dens, ::dens],
-                         ds.v.values[::dens, ::dens], transform=ccrs.PlateCarree())
+
+        indexes_dens_lon = np.arange(0, len(ds.lon), dens)
+        indexes_dens_lat = np.arange(0, len(ds.lat), dens)
+        ds_dens = ds.isel(lon=indexes_dens_lon, lat=indexes_dens_lat)
+        axs[i_ds].quiver(ds_dens.lon.values, ds_dens.lat.values, ds_dens.u.values, ds_dens.v.values,
+                         transform=ccrs.PlateCarree())
 
     return axs
 
@@ -2399,12 +2409,13 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                                       mod_name, obs_name, var_title, plg)
 
         if 'depth' in mod['xarray_meta_coloc'].coords:
-            if mod['xarray_meta_coloc'].depth.values.dtype in ['float64', 'float32']:
-                depth = mod['xarray_meta_coloc'].depth.values
+            if np.size(mod['xarray_meta_coloc'].depth.values) == 1:
+                depth = format(mod['xarray_meta_coloc'].depth.values, '.4f')
             elif len(mod['xarray_meta_coloc'].depth.values) > 1:
                 depth = f"{mod['xarray_meta_coloc'].depth.min().values} to" \
                         f" {mod['xarray_meta_coloc'].depth.max().values}"
-            title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDepth : {depth:.4f} m'
+
+            title = f'{var_title} : Time series metrics \n{label_title} Statistics \nDepth : {depth} m'
         elif 'dens' in mod['xarray_meta_coloc'].coords:
             if mod['xarray_meta_coloc'].dens.values.dtype in ['float64', 'float32']:
                 dens = mod['xarray_meta_coloc'].dens.values

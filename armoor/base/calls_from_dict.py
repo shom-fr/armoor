@@ -99,8 +99,6 @@ def get_observation_models_meta(config_obj: dict):
     # Colocate
     observation.update({"xarray_meta_coloc": []})
     logger.info("Collocating model(s) and observation")
-    vertical_step = config_obj.get('vertical_step')
-    horizontal_step = config_obj.get('horizontal_step')
     for index_model, model in enumerate(models):
         # Colocation per model
         obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"],
@@ -265,7 +263,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
     logger.info("Applying meta zone")
 
     # Add default meta-zone
-    if config_obj['functionality'] == "sst":
+    if config_obj['functionality'] in ["sst", "currents_hfr"]:
         if 'depth' not in config_obj["meta_zones"]:
             config_obj["meta_zones"]["depth"] = [0]
 
