@@ -3,6 +3,7 @@ Function to create images for forecaster wed interface
 """
 import os
 import shutil
+import sys
 import tarfile
 
 import gc
@@ -91,6 +92,7 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
                 # Handle other possible exceptions
                 logger.error("Error: An exception occurred :")
                 logger.error(f"{str(e)}")
+                sys.exit()
 
             logger.info(f'{config_reg} - {parameter} - {sub_param}  '
                         f'in {time.time() - start_time} seconds')
