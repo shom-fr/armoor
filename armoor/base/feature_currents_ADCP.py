@@ -67,7 +67,7 @@ def plot(config_obj):
             env_comodo = ''
 
         # PLOTS
-        ################################################################################################################
+        ############################################################################################
         # HOVMOLLER CURRENTS
         plot_hovmoller = {"plot_hovmoller": 'plot_hovmoller'}
         if output["plot"] in plot_hovmoller:
@@ -77,12 +77,15 @@ def plot(config_obj):
                 attribute = "norm"
 
             # Remove missing values
-            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
+            def to_ds_with_coords(ds, attribute):
+                return ds[attribute].to_dataset().assign_coords(ds.coords)
+
+            observation['xarray_meta'] = to_ds_with_coords(observation['xarray_meta'], attribute)
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][
-                    attribute].to_dataset()
+                mod['xarray_meta'] = to_ds_with_coords(mod['xarray_meta'], attribute)
+                mod['xarray_meta_coloc'] = to_ds_with_coords(mod['xarray_meta_coloc'], attribute)
+                observation['xarray_meta_coloc'][i_mod] = to_ds_with_coords(observation['xarray_meta_coloc'][i_mod], attribute)
+
                 models[i_mod] = mod
                 # Remove missing values
                 models, observation = base.remove_missing_values_ds(models, observation, i_mod, [attribute],
@@ -98,7 +101,7 @@ def plot(config_obj):
             base.plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax,
                                                 output_path=sub_func_output_folder)
 
-        ################################################################################################################
+        ############################################################################################
         # HARMONIC TABLES
         harmonic_table = {"harmonic_table": 'harmonic_table'}
 

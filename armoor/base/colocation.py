@@ -73,10 +73,12 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             # Vertical colocation
             if ver_flag:
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
-    if len(obs_coloc.dims) > 1:
-        for dim in list(obs_coloc.dims.keys()):
-            mod_coloc = mod_coloc.transpose(dim, ...)
+
+    # Put dimensions in the same order
+    for dim in list(obs_coloc.dims):
+        if dim in mod_coloc.dims:
             obs_coloc = obs_coloc.transpose(dim, ...)
+            mod_coloc = mod_coloc.transpose(dim, ...)
 
     return obs_coloc, mod_coloc
 

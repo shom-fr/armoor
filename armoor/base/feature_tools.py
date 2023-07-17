@@ -25,8 +25,10 @@ def manage_output(plot, figure_name, folder_path):
 
     """
     if folder_path:
-        figure_name = figure_name.replace(' ', '_').replace('[', '').replace(']', '').replace('/', '')
-        date_now = np.datetime_as_string(np.datetime64('now'), unit='s').replace('-', '').replace(':', '')
+        figure_name = figure_name.replace(' ', '_').replace('[', '').replace(']', '').replace('/',
+                                                                                              '')
+        date_now = np.datetime_as_string(np.datetime64('now'), unit='s').replace('-', '').replace(
+            ':', '')
         # path = os.path.join(folder_path, f'{figure_name}_{date_now}.png')
         path = os.path.join(folder_path, f'{figure_name}.png')
         path = path.replace(':', '-')
@@ -43,7 +45,6 @@ def remove_missing_values_ds(models, observation, i, var_mod, vars):
     if len(var_mod) == 1:
         obs = observation["xarray_meta_coloc"][i][vars[0]]
         mod = models[i]["xarray_meta_coloc"][var_mod[0]]
-
 
         mod, obs = remove_missing_values(mod, obs)
         observation["xarray_meta_coloc"][i][vars[0]] = obs
@@ -77,7 +78,6 @@ def remove_missing_values(model, obs):
         Observation dataset with the same missing values as the model.
 
     """
-
     for coord in ['sig', 's_rho']:
         if coord in model.coords:
             model = model.drop(coord)
@@ -164,21 +164,25 @@ def sel_default_vars(config_obj):
     vars_obs = default_vars_obs + additional_vars
 
     if feature == "clim_hydro":  # Calculate climatologies
-        config_obj['observation']["xarray_meta"] = config_obj['observation']["xarray_meta"].sel_var.selection(vars_obs)
+        config_obj['observation']["xarray_meta"] = config_obj['observation'][
+            "xarray_meta"].sel_var.selection(vars_obs)
         for i_mod, mod in enumerate(config_obj['models']):
-            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby("time.month").mean(
-                "time").rename({'month': 'time'})
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod).groupby("time.month").mean(
-                "time").rename({'month': 'time'}).assign_coords({'time': calendar.month_name[1:13]})
-            config_obj['observation']["xarray_meta_coloc"][i_mod] = config_obj['observation']["xarray_meta_coloc"][
-                i_mod].sel_var.selection(vars_obs).assign_coords({'time': calendar.month_name[1:13]})
+            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby(
+                "time.month").mean("time").rename({'month': 'time'})
+            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod).groupby(
+                "time.month").mean("time").rename({'month': 'time'}).assign_coords(
+                {'time': calendar.month_name[1:13]})
+            config_obj['observation']["xarray_meta_coloc"][i_mod] = \
+            config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(
+                vars_obs).assign_coords({'time': calendar.month_name[1:13]})
     else:
-        config_obj['observation']["xarray_meta"] = config_obj['observation']["xarray_meta"].sel_var.selection(vars_obs)
+        config_obj['observation']["xarray_meta"] = config_obj['observation'][
+            "xarray_meta"].sel_var.selection(vars_obs)
         for i_mod, mod in enumerate(config_obj['models']):
             mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod)
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod)
-            config_obj['observation']["xarray_meta_coloc"][i_mod] = config_obj['observation']["xarray_meta_coloc"][
-                i_mod].sel_var.selection(vars_obs)
+            config_obj['observation']["xarray_meta_coloc"][i_mod] = \
+            config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars_obs)
 
     return config_obj
 
@@ -202,7 +206,8 @@ def sel_one_var(observation, models, var):
     for i_mod, mod in enumerate(models_var):
         mod["xarray_meta"] = mod["xarray_meta"][var_mod]
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod]
-        observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][i_mod][var_obs]
+        observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][i_mod][
+            var_obs]
     observation_var['name'] = observation['name']
     return observation_var, models_var
 
@@ -221,3 +226,5 @@ def check_same_variables(models, observation):
                                f"it is thus removed from observation")
                 observation['xarray_meta'] = observation['xarray_meta'].drop(var_obs)
     return models, observation
+
+

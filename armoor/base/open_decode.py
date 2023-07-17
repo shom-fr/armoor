@@ -228,7 +228,7 @@ def open_decode_cmems(path_files, steps):
         if var in list_to_remove:
             cmems = cmems.drop(var)
 
-    if steps:
+    if steps[1]:
         horizontal_step, vertical_step = steps
         cmems = set_hor_vert_step(cmems, horizontal_step, vertical_step)
 
