@@ -438,8 +438,9 @@ class MetazoneAccessor:
 
     def vertical_selection_ponct_cmems(self, depth):
         depth_diff = np.abs(self._obj['depth'] - depth)
-        nearest_depth_index = [np.argmin(depth_diff.isel(time=i_time).data) for i_time, time in
+        nearest_depth_index = [np.nanargmin(depth_diff.isel(time=i_time).data) for i_time, time in
                                enumerate(self._obj.time)]
+
         ds_nearest_depth = [self._obj.isel(time=i_time, z=nearest_depth_index[i_time]) for
                             i_time, time in enumerate(self._obj.time)]
         tgt_ds = xr.concat(ds_nearest_depth, dim='time')
