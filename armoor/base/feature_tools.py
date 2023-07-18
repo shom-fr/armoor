@@ -78,6 +78,12 @@ def remove_missing_values(model, obs):
         Observation dataset with the same missing values as the model.
 
     """
+    if list(obs.dims) != list(model.dims):
+        if len(obs.dims) > 1:
+            for dim in list(obs.dims):
+                model = model.transpose(dim, ...).squeeze()
+                obs = obs.transpose(dim, ...).squeeze()
+
     for coord in ['sig', 's_rho']:
         if coord in model.coords:
             model = model.drop(coord)
