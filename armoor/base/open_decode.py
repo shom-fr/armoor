@@ -78,7 +78,7 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
             return open_decode_mouillages(path_files[0])
         elif type == "VMADCP":
             logger.info("Opening VMADCP")
-            return open_decode_vmadcp(path_files[0])
+            return open_decode_vmadcp(path_files[0], steps=steps)
         elif type == 'CROCO':
             logger.info("Opening CROCO")
             return open_decode_croco(path_files[0])
@@ -312,7 +312,7 @@ def open_decode_l_adcp(path_file):
     return ladcp
 
 
-def open_decode_vmadcp(path_file) -> xr.Dataset:
+def open_decode_vmadcp(path_file, steps=None) -> xr.Dataset:
     """
     Open txt file form VMADCP observation and store it in dataset.
     Parameters
@@ -372,6 +372,10 @@ def open_decode_vmadcp(path_file) -> xr.Dataset:
 
     # Convert lons
     vmadcp = convert_lons(vmadcp)
+
+    if steps[1]:
+        horizontal_step, vertical_step = steps
+        vmadcp = set_hor_vert_step(vmadcp, horizontal_step, vertical_step)
 
     return vmadcp
 
