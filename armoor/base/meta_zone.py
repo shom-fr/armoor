@@ -429,7 +429,7 @@ class MetazoneAccessor:
 
             elif 'z' in ds.dims or 'level' in ds.dims or (
                     depth in ds.dims and len(ds.depth.dims) == 2):  # CROCO or HYCOM
-                return ds.meta.vertical_seletion_croco([depth])
+                return ds.meta.vertical_seletion_croco_hycom(depth)
 
             else:
                 return ds
@@ -447,15 +447,23 @@ class MetazoneAccessor:
         tgt_ds = tgt_ds.drop('depth').assign_coords(depth=depth)
         return tgt_ds
 
-    def vertical_seletion_croco(self, depth):
-        # Regrid1D only seems to work with negative depths: the following lines adapt the depths values
-        # to correctly select the depth defined.
+    def vertical_seletion_croco_hycom(self, depth):
+        # Regrid1D only seems to work with negative depths for croco:
+        # the following lines adapt the depths values to correctly select the depth defined.
         ds = copy.copy(self._obj)
-        ds['depth'] = -ds['depth']
+        if 'level' in ds.dims:  # For croco
+            ds['depth'] = -ds['depth']
+            depth = -depth
 
-        tgt_depth = xr.DataArray(-np.array(depth), dims="depth", name="depth")
+        # Create target depth(s) dataset
+        if np.size(depth) == 1:
+            depth = [depth]
+        else:
+            depth = np.array(depth)
+        tgt_depth = xr.DataArray(depth, dims="depth", name="depth")
+
+        # Select depth(s)
         tgt_ds = ds
-
         for var in ds.variables:
             if var == 'depth' or 'DEPH' in var:
                 pass
@@ -466,9 +474,13 @@ class MetazoneAccessor:
                         da_tgt = regrid1d(da, tgt_depth)
                         tgt_ds = tgt_ds.assign({var: da_tgt})
 
+        # Assign depth coordinates values
         if "depth" not in list(tgt_ds.coords):
             tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
-        tgt_ds['depth'] = -tgt_ds['depth']
+
+        # Positive depths for croco
+        if 'level' in ds.dims:
+            tgt_ds['depth'] = -tgt_ds['depth']
 
         return tgt_ds
 
@@ -533,8 +545,7 @@ class MetazoneAccessor:
             return xr.concat(list_ds_z, dim='depth')
 
         elif 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
-            return self._obj.meta.vertical_seletion_croco(depths)
-
+            return self._obj.meta.vertical_seletion_croco_hycom(depths)
 
     def vertical_selection_slice(self, slice: str = None, var_slice: str = None) -> xr.Dataset:
         """Return a new Dataset whose data is sorted per depth slice.

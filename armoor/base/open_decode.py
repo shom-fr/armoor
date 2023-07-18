@@ -683,11 +683,11 @@ def open_decode_hycom_currents(path_files):
     elif len(path_files) == 3:  # Test if 3D
         logger.info("HYCOM 3D")
         path_h, path_u, path_v = path_files[0], path_files[1], path_files[2]
-        hycom = xr.open_dataset(path_h).xoa.decode().squeeze(drop=True)
+        hycom = xr.open_dataset(path_h).rename({'h': 'dz'}).xoa.decode().squeeze(drop=True)
         if 'level' not in hycom.variables:
             raise Exception('Ooops ! Pour lire une sortie de courant du modèle HYCOM,'
                             ' vous devez renseigner les fichiers dans l\'ordre suivant : h, u, v')
-        hycom.coords["depth"] = dz2depth(hycom.level, centered=True)
+        hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
 
     u = xr.open_dataset(path_u).xoa.decode().squeeze(drop=True)
     v = xr.open_dataset(path_v).xoa.decode().squeeze(drop=True)
@@ -701,15 +701,15 @@ def open_decode_hycom_currents(path_files):
     vt_hycom = shift(v, {"x": "left", "y": "left"}).xoa.reloc(v=False)
     hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
     hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
-    if 'level' in hycom:
-        hycom = hycom.drop_vars('level')
+
+    # Rename
+    hycom = hycom.rename({'level': 'z'})
 
     # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)
 
     # Convert lons
     hycom = convert_lons(hycom)
-
     return hycom
 
 

@@ -306,7 +306,7 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
                                                    kwargs={"fill_value": "extrapolate"
                                                            }).squeeze()
                 elif 'level' in mod_interp.dims:  # Croco
-                    mod_interp = mod_interp.meta.vertical_seletion_croco(depth)
+                    mod_interp = mod_interp.meta.vertical_seletion_croco_hycom(depth)
 
             elif 'z' in obs.squeeze().dims:
                 depths = obs.depth.isel(time=i)
