@@ -702,7 +702,7 @@ def open_decode_hycom_currents(path_files):
     hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
     hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
 
-    # Rename
+    # Rename depth
     hycom = hycom.rename({'level': 'z'})
 
     # Regrid if necessary
@@ -730,12 +730,12 @@ def open_decode_hycom_3d(path_files):
     logger.info("Decoding HYCOM 3D")
     # Open the file with depth values
     path_h = path_files[0]
-    hycom = xr.open_dataset(path_h).xoa.decode().squeeze(drop=True)
+    hycom = xr.open_dataset(path_h).rename({'h': 'dz'}).xoa.decode().squeeze(drop=True)
     if 'level' not in hycom.variables:
         raise Exception('Ooops ! Pour lire une sortie 3D du modèle HYCOM,'
                         ' vous devez renseigner les fichiers dans l\'ordre suivant :  h, variables.')
 
-    hycom.coords["depth"] = dz2depth(hycom.level, centered=True)
+    hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
 
     # Open the variable(s) and add them to the dataset
     for path in path_files[1:]:
@@ -745,15 +745,12 @@ def open_decode_hycom_3d(path_files):
         for var in list(ds_var.keys()):
             if var not in list_coords:
                 var_name = var
-
         hycom[var_name] = ds_var[var_name]
 
-    if list(hycom.depth.dims) == ['level']:
-        depths = hycom.depth
-        hycom = hycom.drop_vars('depth')
-        hycom = hycom.rename({'level': 'depth'})
-        hycom['depth'] = depths.data
+    # Rename
+    hycom = hycom.rename({'level': 'z'})
 
+    # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)
 
     # Convert lons
