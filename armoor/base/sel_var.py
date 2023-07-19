@@ -164,7 +164,7 @@ class SSTAccessor:
                 return self._obj.ptemp.sel(depth=depth, method='nearest').sel_var.convert_K_C()
             elif 'z' in self._obj.dims:
                 return self._obj.ptemp.sel(z=depth).sel_var.convert_K_C()
-            elif 'depth' in self._obj.variables:
+            elif 'depth' in list(self._obj.keys()):
                 depth = xr.DataArray([0], name="depth", dims="depth")
                 return regrid1d(self._obj.ptemp, depth).sel_var.convert_K_C()
             else:  # if no depth (obs sst for example)

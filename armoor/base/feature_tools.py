@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import logging
 import calendar
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,10 @@ def manage_output(plot, figure_name, folder_path):
 
     """
     if folder_path:
-        figure_name = figure_name.replace(' ', '_').replace('[', '').replace(']', '').replace('/', '')
-        date_now = np.datetime_as_string(np.datetime64('now'), unit='s').replace('-', '').replace(':', '')
+        figure_name = figure_name.replace(' ', '_').replace('[', '').replace(']', '').replace('/',
+                                                                                              '')
+        date_now = np.datetime_as_string(np.datetime64('now'), unit='s').replace('-', '').replace(
+            ':', '')
         # path = os.path.join(folder_path, f'{figure_name}_{date_now}.png')
         path = os.path.join(folder_path, f'{figure_name}.png')
         path = path.replace(':', '-')
@@ -42,6 +45,7 @@ def remove_missing_values_ds(models, observation, i, var_mod, vars):
     if len(var_mod) == 1:
         obs = observation["xarray_meta_coloc"][i][vars[0]]
         mod = models[i]["xarray_meta_coloc"][var_mod[0]]
+
         mod, obs = remove_missing_values(mod, obs)
         observation["xarray_meta_coloc"][i][vars[0]] = obs
         models[i]["xarray_meta_coloc"][var_mod[0]] = mod
@@ -52,6 +56,7 @@ def remove_missing_values_ds(models, observation, i, var_mod, vars):
             mod, obs = remove_missing_values(mod, obs)
             observation["xarray_meta_coloc"][i][vars[i_var]] = obs
             models[i]["xarray_meta_coloc"][var_mod[i_var]] = mod
+
     return models, observation
 
 
@@ -73,27 +78,28 @@ def remove_missing_values(model, obs):
         Observation dataset with the same missing values as the model.
 
     """
-    if np.size(np.unique(model.lon.data)) == np.size(model.lon.data):  # Verify no duplicates in coords
-        model_nan = model.where(~np.isnan(obs))
-        obs_nan = obs.where(~np.isnan(model))
-        if model_nan.dims != model.dims:
-            model_nan = model_nan.squeeze()
-        if len(list(obs_nan.coords)) <= len(list(obs.coords)):
-            try:
-                model_nan = model_nan.assign_coords(model.coords)
-            except:
-                model_nan = model_nan.assign_coords(model.squeeze().coords)
-        if obs_nan.dims != obs.dims:
-            obs_nan = obs_nan.squeeze()
-        if len(list(obs_nan.coords)) <= len(list(obs.coords)):
-            try:
-                obs_nan = obs_nan.assign_coords(obs.coords)
-            except:
-                obs_nan = obs_nan.assign_coords(obs.squeeze().coords)
+    if list(obs.dims) != list(model.dims):
+        if len(obs.dims) > 1:
+            for dim in list(obs.dims):
+                model = model.transpose(dim, ...).squeeze()
+                obs = obs.transpose(dim, ...).squeeze()
 
-        return model_nan, obs_nan
-    else:
-        return model, obs
+    for coord in ['sig', 's_rho']:
+        if coord in model.coords:
+            model = model.drop(coord)
+        if coord in obs.coords:
+            obs = obs.drop(coord)
+    # .values otherwise returns all NaN for croco and topaz
+    model_nan = model.where(~np.isnan(obs).values)
+    obs_nan = obs.where(~np.isnan(model).values)
+
+    list_coord_mod = list(model_nan.coords.keys())
+    list_coord_obs = list(obs_nan.coords.keys())
+    if sorted(list_coord_mod) != sorted(list_coord_obs):
+        model_nan = model_nan.assign_coords(model.coords)
+        obs_nan = obs_nan.assign_coords(obs.coords)
+
+    return model_nan, obs_nan
 
 
 def sel_default_vars(config_obj):
@@ -164,21 +170,25 @@ def sel_default_vars(config_obj):
     vars_obs = default_vars_obs + additional_vars
 
     if feature == "clim_hydro":  # Calculate climatologies
-        config_obj['observation']["xarray_meta"] = config_obj['observation']["xarray_meta"].sel_var.selection(vars_obs)
+        config_obj['observation']["xarray_meta"] = config_obj['observation'][
+            "xarray_meta"].sel_var.selection(vars_obs)
         for i_mod, mod in enumerate(config_obj['models']):
-            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby("time.month").mean(
-                "time").rename({'month': 'time'})
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod).groupby("time.month").mean(
-                "time").rename({'month': 'time'}).assign_coords({'time': calendar.month_name[1:13]})
-            config_obj['observation']["xarray_meta_coloc"][i_mod] = config_obj['observation']["xarray_meta_coloc"][
-                i_mod].sel_var.selection(vars_obs).assign_coords({'time': calendar.month_name[1:13]})
+            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby(
+                "time.month").mean("time").rename({'month': 'time'})
+            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod).groupby(
+                "time.month").mean("time").rename({'month': 'time'}).assign_coords(
+                {'time': calendar.month_name[1:13]})
+            config_obj['observation']["xarray_meta_coloc"][i_mod] = \
+            config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(
+                vars_obs).assign_coords({'time': calendar.month_name[1:13]})
     else:
-        config_obj['observation']["xarray_meta"] = config_obj['observation']["xarray_meta"].sel_var.selection(vars_obs)
+        config_obj['observation']["xarray_meta"] = config_obj['observation'][
+            "xarray_meta"].sel_var.selection(vars_obs)
         for i_mod, mod in enumerate(config_obj['models']):
             mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod)
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod)
-            config_obj['observation']["xarray_meta_coloc"][i_mod] = config_obj['observation']["xarray_meta_coloc"][
-                i_mod].sel_var.selection(vars_obs)
+            config_obj['observation']["xarray_meta_coloc"][i_mod] = \
+            config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars_obs)
 
     return config_obj
 
@@ -202,7 +212,9 @@ def sel_one_var(observation, models, var):
     for i_mod, mod in enumerate(models_var):
         mod["xarray_meta"] = mod["xarray_meta"][var_mod]
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod]
-        observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][i_mod][var_obs]
+        observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][i_mod][
+            var_obs]
+    observation_var['name'] = observation['name']
     return observation_var, models_var
 
 
@@ -220,3 +232,5 @@ def check_same_variables(models, observation):
                                f"it is thus removed from observation")
                 observation['xarray_meta'] = observation['xarray_meta'].drop(var_obs)
     return models, observation
+
+

@@ -24,8 +24,10 @@ def plot(config_obj):
     output_path = config_obj.get("output_path")
 
     # Select the variables
+
     config_obj = base.sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
+
     models = copy.copy(config_obj["models"])
 
     # Remove missing values
@@ -35,7 +37,8 @@ def plot(config_obj):
     if 'temp' in vars_mod:
         vars_mod[vars_mod.index('temp')] = 'ptemp'
     for i_mod, mod in enumerate(models):
-        models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars_mod, vars)
+        models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars_mod,
+                                                            vars)
 
     # PLOTS
     for index_output, output in enumerate(outputs):
@@ -47,14 +50,15 @@ def plot(config_obj):
 
         for var in vars:
             observation_var, models_var = base.sel_one_var(observation, models, var)
-            ############################################################################################################
+            ########################################################################################
             # VARIABLE 3D SECTION
             plot_variable_3d = {"plot_variable_3d": 'variable_3d'}
             if output["plot"] in plot_variable_3d:
-                base.plot_features.plot_variable_3d(models_var, observation_var, output_path=sub_func_output_folder)
-
-            ############################################################################################################
+                base.plot_features.plot_variable_3d(models_var, observation_var,
+                                                    output_path=sub_func_output_folder)
+            ########################################################################################
             # TIMESERIES
             plot_variable_2d = {"plot_variable_2d": 'variable_2d'}
             if output["plot"] in plot_variable_2d:
-                base.plot_features.plot_variable_2d(models_var, observation_var, output_path=sub_func_output_folder)
+                base.plot_features.plot_variable_2d(models_var, observation_var,
+                                                    output_path=sub_func_output_folder)

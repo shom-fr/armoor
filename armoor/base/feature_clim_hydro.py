@@ -102,24 +102,11 @@ def plot(config_obj):
                                                          obs_name=obs_name, mod_name=models_name[i])
                     else:
                         for i_depth, depth in enumerate(models_var[0]["xarray_meta_coloc"].depth.values):
-                            try:
-                                mod["xarray_meta"] = mod["xarray_meta"].sel(depth=depth, method='nearest')
-                            except:
-                                logger.warning("model-meta depth selection : Failed")
-                            try:
-                                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel(depth=depth, method='nearest')
-                            except:
-                                logger.warning("model-meta-coloc depth selection : Failed")
-                            try:
-                                observation_var["xarray_meta"] = observation_var["xarray_meta"].sel(depth=depth,
-                                                                                            method='nearest')
-                            except:
-                                logger.warning("obs-meta depth selection : Failed")
-                            try:
-                                observation_var["xarray_meta_coloc"][i] = observation_var["xarray_meta_coloc"][i].sel(
-                                    depth=depth, method='nearest')
-                            except:
-                                logger.warning("obs-meta-coloc depth selection : Failed")
+                            mod["xarray_meta"] = mod["xarray_meta"].meta.vertical_selection_ponct(depth)
+                            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].meta.vertical_selection_ponct(depth)
+                            observation_var["xarray_meta"] = observation_var["xarray_meta"].meta.vertical_selection_ponct(depth)
+                            observation_var["xarray_meta_coloc"][i] = observation_var["xarray_meta_coloc"][i].meta.vertical_selection_ponct(depth)
+
                             figname = f"depth{i_depth}"
                             base.plot_features.plot_map_metr(flag_interval, flag_slice, mod["xarray_meta"],
                                                              mod["xarray_meta_coloc"], observation_var["xarray_meta"],
