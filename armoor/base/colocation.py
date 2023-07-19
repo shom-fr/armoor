@@ -286,8 +286,7 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
                 mod_interp = mod_interp.interp(lon=lon, lat=lat, method=method,
                                                kwargs={"fill_value": "extrapolate"}).squeeze()
             elif 'x' in mod_interp.dims:  # For curv. grids
-                if __name__ == '__main__':
-                    mod_interp = mod_interp.meta.sel_closest(lon, lat)
+                mod_interp = mod_interp.meta.sel_closest(lon, lat)
 
         # Colocate depth
         if method_z:
