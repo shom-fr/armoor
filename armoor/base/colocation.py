@@ -114,7 +114,7 @@ def horizontal_colocation(ds, tgt, coloc_method):
             tgt_xy = tgt.isel(x=i_x)
             ds_x = ds.interp(lon=tgt_xy.lon.values, lat=tgt_xy.lat.values, method=coloc_method)
             ds_x = ds_x.stack(y=('lon', 'lat')).reset_index('y')
-            ds_x = ds_x.isel(y=slice(0, -1, len(tgt_xy.y)))
+            ds_x = ds_x.isel(y=range(0, len(ds_x.y)+1, len(tgt_xy.y)+1))
             lons = xr.DataArray(ds_x.lon.values, dims='y', coords={'y': tgt_xy.y.values},
                                 name='lon')
             lats = xr.DataArray(ds_x.lat.values, dims='y', coords={'y': tgt_xy.y.values},
