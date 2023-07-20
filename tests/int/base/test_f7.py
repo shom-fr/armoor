@@ -18,7 +18,7 @@ class TestBulletins:
         parser = update_comodo(parser)
         dict2call(parser)
         assert True
-    #
+
     def test_ellipses_tranche(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_ellipses_tranche')

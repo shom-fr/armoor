@@ -38,19 +38,12 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(['current'])
+    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(['current'])
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(['current'])
-
-    # Surface current only in this feature
-    observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_ponct(0)
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].meta.vertical_selection_ponct(0)
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].meta.vertical_selection_ponct(0)
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].meta.vertical_selection_ponct(
-            0)
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+            i_mod].sel_var.selection(['current'])
 
     for index_output, output in enumerate(outputs):
         if output_path:
@@ -75,7 +68,7 @@ def plot(config_obj):
         obs_name = observation['name']
 
         # PLOTS
-        ################################################################################################################
+        ############################################################################################
         # MAP TIDAL CURRENTS
         plot_map_amplitude = {"plot_map_current_harmonic": 'plot_map_current_harmonic'}
         if output["plot"] in plot_map_amplitude:
@@ -106,31 +99,38 @@ def plot(config_obj):
             if 'analysis_start' in output and 'analysis_end' in output:
                 analysis_start = np.datetime64(output["analysis_start"])
                 analysis_end = np.datetime64(output["analysis_end"])
-                observation["xarray_meta"] = observation["xarray_meta"].sel(time=slice(analysis_start, analysis_end))
+                observation["xarray_meta"] = observation["xarray_meta"].sel(
+                    time=slice(analysis_start, analysis_end))
                 for i_mod, mod in enumerate(models):
-                    mod['xarray_meta'] = mod['xarray_meta'].sel(time=slice(analysis_start, analysis_end))
+                    mod['xarray_meta'] = mod['xarray_meta'].sel(
+                        time=slice(analysis_start, analysis_end))
             else:
                 logger.info(f"Oops, pour réaliser l'analyse harmonique vous devriez spécifier "
                             f"la période sur laquelle calculer l'analyse harmonique. Le calcul "
                             f"sera ici fait sur toute la période des fichiers d'entrée...")
 
             # Proceed harmonic analysis on obs
-            ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
-                                                                path_results, path_tools, list_waves, 'obs',
+            ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
+                                                                path_nc, path_results, path_tools,
+                                                                list_waves, 'obs',
                                                                 env_comodo=env_comodo)
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on mod
                 path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
-                ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc, path_results,
+                ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v',
+                                                                    path_nc, path_results,
                                                                     path_tools, list_waves, 'mod',
                                                                     env_comodo=env_comodo)
-                obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, True, False, False, coloc_method='nearest',
-                                                         opt_grid=coloc_product)
+                flags = False, True, False
+                tgt_grid = coloc_product
+                obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, flags, tgt_grid,
+                                                         coloc_method='nearest')
+
                 # Plot the maps
                 base.plot_features.plot_map_harm(mod_coloc, obs_coloc, models_name[i_mod], obs_name,
                                                  output_path=sub_func_output_folder)
 
-        ################################################################################################################
+        ############################################################################################
         # ELLIPSES TIDAL CURRENTS
         plot_tide_current_ellipses = {"plot_tide_current_ellipses": 'plot_tide_current_ellipses'}
         if output["plot"] in plot_tide_current_ellipses:
@@ -161,34 +161,41 @@ def plot(config_obj):
             if 'analysis_start' in output and 'analysis_end' in output:
                 analysis_start = np.datetime64(output["analysis_start"])
                 analysis_end = np.datetime64(output["analysis_end"])
-                observation["xarray_meta"] = observation["xarray_meta"].sel(time=slice(analysis_start, analysis_end))
+                observation["xarray_meta"] = observation["xarray_meta"].sel(
+                    time=slice(analysis_start, analysis_end))
                 for i_mod, mod in enumerate(models):
-                    mod['xarray_meta'] = mod['xarray_meta'].sel(time=slice(analysis_start, analysis_end))
+                    mod['xarray_meta'] = mod['xarray_meta'].sel(
+                        time=slice(analysis_start, analysis_end))
             else:
                 logger.info(f"Oops, pour réaliser l'analyse harmonique vous devriez spécifier "
                             f"la période sur laquelle calculer l'analyse harmonique. Le calcul "
                             f"sera ici fait sur toute la période des fichiers d'entrée...")
 
             # Proceed harmonic analysis on obs
-            ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v', path_nc,
-                                                                path_results, path_tools, list_waves, 'obs',
+            ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
+                                                                path_nc, path_results, path_tools,
+                                                                list_waves, 'obs',
                                                                 env_comodo=env_comodo)
 
             ds_models = []
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on mod
                 path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
-                ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc, path_results,
+                ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v',
+                                                                    path_nc, path_results,
                                                                     path_tools, list_waves, 'mod',
                                                                     env_comodo=env_comodo)
                 ds_models.append(ds_mod)
             # Plot the maps
-            base.plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale, output_path=sub_func_output_folder)
+            base.plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale,
+                                                          output_path=sub_func_output_folder)
 
-        ################################################################################################################
+        ############################################################################################
         # PONCTUAL TIMES SERIES
-        plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point', "plot_ts_metr_bias_point": 'bias_point',
-                              "plot_ts_metr_RMSE_point": 'RMSEc_point', "plot_ts_metr_point": 'all_metrics'
+        plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point',
+                              "plot_ts_metr_bias_point": 'bias_point',
+                              "plot_ts_metr_RMSE_point": 'RMSEc_point',
+                              "plot_ts_metr_point": 'all_metrics'
                               }
         if output["plot"] in plot_ts_metr_point:
             # Select the attributes to plot
@@ -197,22 +204,35 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
-            observation['xarray_meta'] = observation['xarray_meta'][attribute]
+            # Remove missing values
+            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute]
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute]
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute]
+                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][
+                    attribute].to_dataset()
                 models[i_mod] = mod
                 # Remove missing values
-                models, observation = base.remove_missing_values_ds(models, observation, i_mod, [attribute],
-                                                                    [attribute])
+                models, observation = base.remove_missing_values_ds(models, observation, i_mod,
+                                                                    [attribute], [attribute])
 
-            base.plot_features.plot_ts_metr_point(models, observation, plot_ts_metr_point[output["plot"]],
-                                                  flag_interval, flag_slice, output_path=sub_func_output_folder)
-        ################################################################################################################
+            # Select variables to plot
+            observation['xarray_meta'] = observation['xarray_meta'].to_array()
+            for i_mod, mod in enumerate(models):
+                mod['xarray_meta'] = mod['xarray_meta'].to_array()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
+                    i_mod].to_array()
+
+            base.plot_features.plot_ts_metr_point(models, observation,
+                                                  plot_ts_metr_point[output["plot"]], flag_interval,
+                                                  flag_slice, output_path=sub_func_output_folder)
+        ############################################################################################
         # STATS TIMES SERIES
-        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats', "plot_ts_metr_bias_stats": 'bias_stats',
-                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats', "plot_ts_metr_stats": 'all_metrics'
+        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
+                              "plot_ts_metr_bias_stats": 'bias_stats',
+                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats',
+                              "plot_ts_metr_stats": 'all_metrics'
                               }
         if output["plot"] in plot_ts_metr_stats:
             # Select the attributes to plot
@@ -221,24 +241,36 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
-            observation['xarray_meta'] = observation['xarray_meta'][attribute]
+            plg = config_obj["meta_zones"].get("polygon")
+
+            # Remove missing values
+            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute]
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute]
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute]
+                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][
+                    attribute].to_dataset()
                 models[i_mod] = mod
                 # Remove missing values
-                models, observation = base.remove_missing_values_ds(models, observation, i_mod, [attribute],
-                                                                    [attribute])
+                models, observation = base.remove_missing_values_ds(models, observation, i_mod,
+                                                                    [attribute], [attribute])
+
+            # Select variables to plot
+            observation['xarray_meta'] = observation['xarray_meta'].to_array()
+            for i_mod, mod in enumerate(models):
+                mod['xarray_meta'] = mod['xarray_meta'].to_array()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
+                    i_mod].to_array()
 
             base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
-                                                  output_path=sub_func_output_folder)
+                                                  output_path=sub_func_output_folder, plg=plg)
 
-        ################################################################################################################
+        ############################################################################################
         # CURRENT MAP
-        plot_map_metr = {"plot_map_metr_ecart_interval": 'difference', "plot_map_metr_ecart": 'difference',
-                         "plot_map_metr_biais": 'bias', "plot_map_metr_RMSEc": 'RMSEc',
-                         "plot_map_metr_RMSEcentree": 'RMSEcentree'
+        plot_map_metr = {"plot_map_metr_ecart_interval": 'difference',
+                         "plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
+                         "plot_map_metr_RMSEc": 'RMSEc', "plot_map_metr_RMSEcentree": 'RMSEcentree'
                          }
         if output["plot"] in plot_map_metr:
             vmin = output.get('vmin')
@@ -250,11 +282,16 @@ def plot(config_obj):
 
             for i_mod, mod in enumerate(models):
                 # Remove missing values
-                models, observation = base.remove_missing_values_ds(models, observation, i_mod, ['u', 'v', 'norm'],
+                models, observation = base.remove_missing_values_ds(models, observation, i_mod,
+                                                                    ['u', 'v', 'norm'],
                                                                     ['u', 'v', 'norm'])
 
-                base.plot_features.plot_map_metr_current(flag_interval, flag_slice, mod["xarray_meta"],
-                                                         mod["xarray_meta_coloc"], observation["xarray_meta"],
+
+                base.plot_features.plot_map_metr_current(flag_interval, flag_slice,
+                                                         mod["xarray_meta"],
+                                                         mod["xarray_meta_coloc"],
+                                                         observation["xarray_meta"],
                                                          observation["xarray_meta_coloc"][i_mod],
-                                                         plot_map_metr[output["plot"]], cmap, vmin, vmax, dvmin=dvmin,
-                                                         dvmax=dvmax, output_path=sub_func_output_folder, )
+                                                         plot_map_metr[output["plot"]], cmap, vmin,
+                                                         vmax, dvmin=dvmin, dvmax=dvmax,
+                                                         output_path=sub_func_output_folder, )

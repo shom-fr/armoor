@@ -34,12 +34,12 @@ def plot(config_obj):
     # SELECT THE VARIABLES
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
-    observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(['current'])
+    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
 
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(['current'])
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(['current'])
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].sel_var.selection(['current'])
 
     # PLOT
     for index_output, output in enumerate(outputs):
@@ -47,7 +47,7 @@ def plot(config_obj):
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
         else:
-            sub_func_output_folder = output_path
+            sub_func_output_folder = os.getcwd()
 
         # Get the figure parameters from config obj
         vmin = output.get('vmin')
@@ -67,7 +67,7 @@ def plot(config_obj):
             env_comodo = ''
 
         # PLOTS
-        ################################################################################################################
+        ############################################################################################
         # HOVMOLLER CURRENTS
         plot_hovmoller = {"plot_hovmoller": 'plot_hovmoller'}
         if output["plot"] in plot_hovmoller:
@@ -76,19 +76,32 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
-            observation['xarray_meta'] = observation['xarray_meta'][attribute]
+            # Remove missing values
+            def to_ds_with_coords(ds, attribute):
+                return ds[attribute].to_dataset().assign_coords(ds.coords)
+
+            observation['xarray_meta'] = to_ds_with_coords(observation['xarray_meta'], attribute)
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute]
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute]
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][attribute]
+                mod['xarray_meta'] = to_ds_with_coords(mod['xarray_meta'], attribute)
+                mod['xarray_meta_coloc'] = to_ds_with_coords(mod['xarray_meta_coloc'], attribute)
+                observation['xarray_meta_coloc'][i_mod] = to_ds_with_coords(observation['xarray_meta_coloc'][i_mod], attribute)
+
+                models[i_mod] = mod
                 # Remove missing values
                 models, observation = base.remove_missing_values_ds(models, observation, i_mod, [attribute],
                                                                     [attribute])
 
+            # Select variables to plot
+            observation['xarray_meta'] = observation['xarray_meta'].to_array()
+            for i_mod, mod in enumerate(models):
+                mod['xarray_meta'] = mod['xarray_meta'].to_array()
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
+                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod].to_array()
+
             base.plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax,
                                                 output_path=sub_func_output_folder)
 
-        ################################################################################################################
+        ############################################################################################
         # HARMONIC TABLES
         harmonic_table = {"harmonic_table": 'harmonic_table'}
 
@@ -165,8 +178,9 @@ def plot(config_obj):
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, False, True, False, coloc_method='nearest',
-                                                       opt_grid='observation')
+                    flags = False, True, False
+                    tgt_grid = 'observation'
+                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, flags, tgt_grid, coloc_method='nearest')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
 
@@ -253,8 +267,9 @@ def plot(config_obj):
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, False, True, False, coloc_method='nearest',
-                                                       opt_grid='observation')
+                    flags = False, True, False
+                    tgt_grid = 'observation'
+                    ds_obs, ds_mod = base.colocate_all(ds_obs, ds_mod, flags, tgt_grid, coloc_method='nearest')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
                 ds_models.append(ds_mod)
