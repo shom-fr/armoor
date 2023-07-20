@@ -335,11 +335,9 @@ def get_extent(extent, margin=0.05, square=True, min_extent=1.0):
         get_extent((np.linspace(10, 20, 5), np.linspace(10, 20, 5)), margin=-.1, square=True)
     """
     # Get min and max
-    if hasattr(extent, "coords"):
-        lon, lat = extent.lon, extent.lat
-    elif isinstance(extent, dict):
-        extent = extent['lon'], extent['lat']
-
+    lon, lat = extent['lon'], extent['lat']
+    lon = lon.where(lon<1e3)
+    lat = lat.where(lat<1e3)
     xmin = float(np.nanmin(lon))
     xmax = float(np.nanmax(lon))
     ymin = float(np.nanmin(lat))

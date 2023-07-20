@@ -581,57 +581,6 @@ def open_decode_croco(path_file):
         croco = croco.rename({'lon_u': 'lon'})
     if 'lat_u' in croco:
         croco = croco.rename({'lat_u': 'lat'})
-    return croco
-
-
-def open_decode_croco_currents(path_files):
-    """
-    Open 2D or 3D current from CROCO model.
-    Parameters
-    ----------
-    path_files : list of str
-        List of the file to decode.
-
-    Returns
-    -------
-    hycom : xarray.Dataset
-         Model dataset decoded.
-    """
-    logger.info("Decode CROCO currents")
-    croco = xr.open_dataset(path_files).decode_sigma()
-
-    # Verify Croco
-    if 's_rho' not in croco.dims:
-        raise Exception(
-            'Attention, le fichier que vous essayez d\'ouvrir ne semble pas être du Croco....')
-
-    # Remove useless variables
-    croco = croco[['u', 'v']]
-
-    # U processing
-    u = shift(croco.u, {"xi_u": "left"}).xoa.reloc(u=False)
-    u = u.sel(xi=croco.xi_rho)
-    ds['u'] = u
-
-    # V processing
-    v = shift(croco.v, {"eta_v": "left"}).xoa.reloc(v=False)
-    v = v.sel(eta=croco.eta_rho)
-    croco['v'] = v
-
-    # Clean coordinates
-    croco = croco.reset_coords()
-    for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
-                'eta_v']:
-        if var in croco:
-            croco = croco.drop(var)
-    croco = croco.rename({'xi_rho': 'x', 'eta_rho': 'y', 's_rho': 'z'})
-    croco = croco.assign_coords(lon=croco.lon, lat=croco.lat)
-
-    # Regrid if necessary
-    croco = xoa.grid.to_rect(croco)
-
-    # Convert lons
-    croco = convert_lons(croco)
 
     return croco
 
