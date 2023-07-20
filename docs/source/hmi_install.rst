@@ -67,6 +67,7 @@ Here are the instructions to launch the front-end of the forecasters interface:
 Apache Configuration:
 
 * Define the website's URL (internally at Shom).
+* Redirect all requests ``/api`` to the API (back-end server).
 * Redirect all requests ``/*`` to the index.html file (on the front-end server).
 
 Here is an example of Apache Configuration::
@@ -74,28 +75,24 @@ Here is an example of Apache Configuration::
     <VirtualHost *:80>
         ServerName sl-noveltis-int.shom.fr
 
-        DocumentRoot /opt/prevops/fish
+        DocumentRoot /opt/prevops/fish/
+
+        RewriteEngine On
+
+        # Redirect /api to your API server
+        RewriteRule ^/api/(.*)$ http://sl-noveltis-int.shom.fr:3000/$1 [P,L]
+
+        # Redirect / to index.html
+        RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} -f [OR]
+        RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} -d
+        RewriteRule ^ - [L]
+        RewriteRule ^ /index.html
 
         <Directory /opt/prevops/fish>
             Options Indexes FollowSymLinks
             AllowOverride All
             Require all granted
         </Directory>
-
-        RewriteEngine On
-        RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} -f [OR]
-        RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI} -d
-
-        RewriteRule ^ - [L]
-        RewriteRule ^ /index.html
-
-        ProxyRequests Off
-        ProxyPreserveHost On
-
-        ProxyVia Block
-        <Proxy *>
-            Require all granted
-        </Proxy>
 
     </VirtualHost>
 
