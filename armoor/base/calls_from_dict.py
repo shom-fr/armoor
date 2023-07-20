@@ -126,7 +126,6 @@ def get_observation_models_meta(config_obj: dict):
                 model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval)
         else:  # no interval
             model.update({"xarray_meta_coloc": mod_coloc})
-
         # Tranches verticales
         if 'slice' in config_obj["meta_zones"]:
             if 'depth' in config_obj["meta_zones"]:

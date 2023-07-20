@@ -339,13 +339,11 @@ def get_extent(extent, margin=0.05, square=True, min_extent=1.0):
         lon, lat = extent.lon, extent.lat
     elif isinstance(extent, dict):
         extent = extent['lon'], extent['lat']
-    if isinstance(extent, (list, np.ndarray)):
-        xmin, xmax, ymin, ymax = extent
-    else:  # tuple
-        xmin = float(np.min(lon))
-        xmax = float(np.max(lon))
-        ymin = float(np.min(lat))
-        ymax = float(np.max(lat))
+
+    xmin = float(np.nanmin(lon))
+    xmax = float(np.nanmax(lon))
+    ymin = float(np.nanmin(lat))
+    ymax = float(np.nanmax(lat))
 
     # Scale
     if square or margin or min_extent is not None:

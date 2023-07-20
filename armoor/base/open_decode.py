@@ -537,53 +537,50 @@ def open_decode_croco(path_file):
     croco : xarray.Dataset
          Model dataset decoded.
     """
-    croco = xr.open_dataset(path_file)
-
-    croco = croco.decode_sigma()
+    croco = xr.open_dataset(path_file).decode_sigma()
 
     # Remove variables that are never used in the features. May need to be completed.
-    list_to_keep = ['temp', 'salt']
+    list_to_keep = ['temp', 'salt', 'u', 'v', 'h']
     for var in list(croco.keys()):
         if var not in list_to_keep:
             croco = croco.drop_vars(var)
 
-    # Depth becomes a variable
-    if 'depth' in croco:
-        croco = croco.reset_coords('depth')
+    # Convert currents if necessary
+    if 'u' in croco:
+        # U processing
+        u = shift(croco.u, {"xi_u": "left"}).xoa.reloc(u=False)
+        u = u.sel(xi=croco.xi_rho, method='nearest')
+        croco['u'] = u
 
-    # Rename coordinates
-    croco = croco.rename_dims({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-    croco = croco.drop_vars(['xi_rho', 'eta_rho'])
+        # V processing
+        v = shift(croco.v, {"eta_v": "left"}).xoa.reloc(v=False)
+        v = v.sel(eta=croco.eta_rho, method='nearest')
+        croco['v'] = v
 
-    if len(croco['lon']) == len(np.unique(croco.lon_rho.data)):
-        longitude = np.unique(croco.lon_rho.data)
-        latitude = np.unique(croco.lat_rho.data)
-    elif len(croco['lon']) == len(np.unique(croco.lon_rho.data)) - 1:
-        longitude = np.unique(croco.lon_rho.data)[:-1]
-        latitude = np.unique(croco.lat_rho.data)[:-1]
+    # Clean coordinates
+    croco = croco.reset_coords()
+    for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
+                'eta_v', 'depth_w', 'sig', 's_w']:
+        if var in croco:
+            croco = croco.drop(var)
+    croco = croco.rename({'xi_rho': 'x', 'eta_rho': 'y', 's_rho': 'z'})
+    croco = croco.assign_coords(lon=croco.lon, lat=croco.lat, depth=croco.depth)
 
-    croco['lon'] = longitude
-    croco['lat'] = latitude
+    # Regrid if necessary
+    croco = xoa.grid.to_rect(croco)
 
-    # Remove useless coordinates
-    croco = croco.reset_coords(drop=True)
-
-    # Set depth as coordinates
-    if 'depth' in croco:
-        croco = croco.assign_coords(depth=croco.depth)
+    # Convert lons
+    croco = convert_lons(croco)
 
     # Convert depths
-    if 'depth' in croco:
-        if croco.depth.min() < 0 and croco.depth.max() > 0:
-            croco['depth'] = -croco.depth.where((croco.depth < 0) & (croco.depth > -1e5))
-        croco = croco.where(~np.isnan(croco.depth))
-
     croco = convert_depths(croco)
-    croco = convert_lons(croco)
 
     # Decode
     croco = croco.xoa.decode()
-
+    if 'lon_u' in croco:
+        croco = croco.rename({'lon_u': 'lon'})
+    if 'lat_u' in croco:
+        croco = croco.rename({'lat_u': 'lat'})
     return croco
 
 
@@ -601,57 +598,34 @@ def open_decode_croco_currents(path_files):
          Model dataset decoded.
     """
     logger.info("Decode CROCO currents")
-    ds = xr.open_dataset(path_files).decode_sigma()
-    ds = xoa.grid.to_rect(ds)
+    croco = xr.open_dataset(path_files).decode_sigma()
 
     # Verify Croco
-    if 's_rho' not in ds.dims:
+    if 's_rho' not in croco.dims:
         raise Exception(
             'Attention, le fichier que vous essayez d\'ouvrir ne semble pas être du Croco....')
 
-    # Retrieve grid
-    ds = ds.rename_dims({'s_rho': 'z'})
-    longitude = ds.lon_rho.where(ds.lon_rho < 1e30)
-    latitude = ds.lat_rho.where(ds.lat_rho < 1e30)
-    longitude = np.unique(longitude.data)[:-1]
-    latitude = np.unique(latitude.data)[:-1]
-
-    # Depth processing
-    depth = ds.depth
-    if depth.min() < 0 < depth.max():
-        depth = -depth.where((depth < 0) & (depth > -1e5))
-    depth = depth.rename({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-    depth['lat'] = latitude
-    depth['lon'] = longitude
-    depth = depth.drop_vars(['lon_rho', 'lat_rho'])
+    # Remove useless variables
+    croco = croco[['u', 'v']]
 
     # U processing
-    u = shift(ds.u, {"xi_u": "left"}).xoa.reloc(u=False)
-    longitude_u = np.unique(u.lon.data)[:-2]
-    latitude_u = np.unique(u.lat.data)[:-2]
-    u = u.drop_vars(['lon', 'lat'])
-    u = u.rename({'eta_rho': 'lat', 'xi': 'lon', 's_rho': 'z'})
-    u['lon'] = longitude_u
-    u['lat'] = latitude_u
-    u = u.where(u < 1e30)
-    u = u.interp(lon=longitude)
+    u = shift(croco.u, {"xi_u": "left"}).xoa.reloc(u=False)
+    u = u.sel(xi=croco.xi_rho)
+    ds['u'] = u
 
     # V processing
-    v = shift(ds.v, {"eta_v": "left"}).xoa.reloc(v=False)
-    longitude_v = np.unique(v.lon.data)[:-2]
-    latitude_v = np.unique(v.lat.data)[:-2]
-    v = v.drop_vars(['lon', 'lat'])
-    v = v.rename({'eta': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-    v['lon'] = longitude_v
-    v['lat'] = latitude_v
-    v = v.where(v < 1e30)
-    v = v.interp(lat=latitude)
-
-    # Create output croco dataset
-    croco = xr.Dataset()
-    croco['u'] = u
+    v = shift(croco.v, {"eta_v": "left"}).xoa.reloc(v=False)
+    v = v.sel(eta=croco.eta_rho)
     croco['v'] = v
-    croco = croco.assign_coords(depth=depth)
+
+    # Clean coordinates
+    croco = croco.reset_coords()
+    for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
+                'eta_v']:
+        if var in croco:
+            croco = croco.drop(var)
+    croco = croco.rename({'xi_rho': 'x', 'eta_rho': 'y', 's_rho': 'z'})
+    croco = croco.assign_coords(lon=croco.lon, lat=croco.lat)
 
     # Regrid if necessary
     croco = xoa.grid.to_rect(croco)

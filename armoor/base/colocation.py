@@ -7,6 +7,7 @@ import xesmf as xe
 import logging
 import pandas as pd
 import matplotlib.pyplot as plt
+from armoor import base
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +76,8 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
 
     # Put dimensions in the same order
-    for dim in list(obs_coloc.dims):
-        if dim in mod_coloc.dims:
-            obs_coloc = obs_coloc.transpose(dim, ...)
-            mod_coloc = mod_coloc.transpose(dim, ...)
+    # mod_coloc = base.set_dim_order(mod_coloc)
+    # obs_coloc = base.set_dim_order(obs_coloc)
 
     return obs_coloc, mod_coloc
 
@@ -133,7 +132,7 @@ def horizontal_colocation(ds, tgt, coloc_method):
         elif len(dims) == 3:
             ds_coloc = ds_coloc.transpose(dims[0], dims[1], dims[2])
         elif len(dims) == 4:
-            ds_coloc = ds_coloc.transpose(dims[0], dims[1], dims[2], dims[4])
+            ds_coloc = ds_coloc.transpose(dims[0], dims[1], dims[2], dims[3])
 
     # Regrid ds if necessary
     elif 'x' in ds.dims:
