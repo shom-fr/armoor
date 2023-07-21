@@ -98,8 +98,8 @@ Here is an example of Apache Configuration::
     </VirtualHost>
 
 
-You can verify that the API is responding correctly thought the Apache configuration with
-``curl --noproxy '*' -x GET http://sl-noveltis-int.shom.fr/api/ping/`` and expecting a "pong" response.
+You can verify that the API is responding correctly through the Apache configuration with
+``curl --noproxy '*' -x GET shom_url/api/ping/`` and expecting a "pong" response.
 
 Hosting the API and Website
 ---------------------------
