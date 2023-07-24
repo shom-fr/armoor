@@ -45,7 +45,8 @@ You can launch the API with Uvicorn using the following script::
     source activate armoor_env
     uvicorn armoor.tick.forecaster_api:app --workers 4 --host 0.0.0.0 --port port_api
 
-You can verify that the API is responding correctly by accessing host:port_api/ping/ and expecting a "pong" response.
+You can verify that the API is responding correctly by accessing host:port_api/ping/ and
+``curl --noproxy '*' -x GET host:port_api/ping/`` and expecting a "pong" response.
 
 
 Forecasters Interface
@@ -96,6 +97,9 @@ Here is an example of Apache Configuration::
 
     </VirtualHost>
 
+
+You can verify that the API is responding correctly through the Apache configuration with
+``curl --noproxy '*' -x GET shom_url/api/ping/`` and expecting a "pong" response.
 
 Hosting the API and Website
 ---------------------------
