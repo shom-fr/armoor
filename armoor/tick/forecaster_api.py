@@ -10,6 +10,11 @@ from armoor.tick.forecaster import Forecaster
 from armoor.tick.models import StatusUpdate, TicketData, User
 from armoor.tick.ticket import Ticket
 
+import logging
+import armoor.cli.logger_tools as log
+log.setup_logging()
+logger = logging.getLogger(__name__)
+
 # api : application to launch with the forecaster web interface
 app = FastAPI()
 
@@ -37,6 +42,7 @@ def login(user: User):
     """
     # Check if a user is in the right group to log-in
     def is_in_authorized_group(groups):
+        logger.info(f'Groups : {groups}')
         if isinstance(groups, str):
             groups = [groups]
         for group in groups:
@@ -66,12 +72,15 @@ def login(user: User):
                           attributes=['memberOf'])
         # Check if the user is not in the authorized group
         if not is_in_authorized_group(connection.entries[0].memberOf.value):
+            logger.info('Not in authorized group')
             raise HTTPException(status_code=403,
                                 detail='Not authorized')
     else:
+        logger.info('Unsuccessful bind')
         raise HTTPException(status_code=403,
                             detail='Not authorized')
 
+    logger.info(f'Successful bind {username}')
     # The user is authorized to login
     return {'username': username}
 
@@ -84,6 +93,7 @@ async def ping():
     -------
     message response
     """
+    logger.info('pong')
     return 'pong'
 
 
@@ -99,6 +109,7 @@ async def create(ticket_data: TicketData) -> str:
     -------
 
     """
+    logger.info('create')
     issue_id = Ticket().create_ticket(ticket_data.info)
     return f"Ticket created {issue_id}"
 
@@ -115,6 +126,7 @@ async def get_template(ticket_kind: str):
     -------
     The template of the selected kind of issue
     """
+    logger.info('get_template')
     return Ticket().get_template(ticket_kind)
 
 
@@ -132,6 +144,7 @@ async def search_tickets(config_reg: str, request: str, state: str) -> dict:
     -------
     A dictionary of the resulting search tickets
     """
+    logger.info('search_tickets')
     return Ticket().search_tickets(config_reg,
                                    request,
                                    state)
@@ -149,6 +162,7 @@ async def get_description(issue_id: str) -> list:
     -------
     Description of the issue
     """
+    logger.info('get_description')
     return Ticket().get_description_api(issue_id)
 
 
@@ -165,6 +179,7 @@ async def get_validation_status(config_reg: str, production_time: str):
     -------
     The status of the production
     """
+    logger.info('get_validation_status')
     return forecaster.get_status(config_reg,
                                  production_time)
 
@@ -181,6 +196,7 @@ async def update_validation_status(status_update: StatusUpdate) -> str:
     -------
 
     """
+    logger.info('update_validation_status')
     forecaster.set_status(status_update.config_reg,
                           status_update.production_time,
                           status_update.status,
