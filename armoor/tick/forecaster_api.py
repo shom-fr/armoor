@@ -42,7 +42,7 @@ def login(user: User):
         for group in groups:
             for branch in group.split(','):
                 branch = branch.split('=')
-                if branch[0] == 'CN' and branch[1] == forecaster.authorized_user_group:
+                if branch[0] in ['CN', 'cn'] and branch[1] == forecaster.authorized_user_group:
                     return True
         return False
 
