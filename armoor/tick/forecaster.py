@@ -23,6 +23,8 @@ class Forecaster:
         self.domain = ''
         self.search_base = ''
         self.authorized_user_group = ''
+        self.ldap_bind_user = ''
+        self.ldap_bind_password = ''
 
         rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "forecaster.ini"))
@@ -45,6 +47,9 @@ class Forecaster:
         self.domain = self.cfg_forecaster['domain']
         self.search_base = self.cfg_forecaster['search_base']
         self.authorized_user_group = self.cfg_forecaster['authorized_user_group']
+        self.ldap_bind_user = self.cfg_forecaster['ldap_bind_user']
+        self.ldap_bind_password = self.cfg_forecaster['ldap_bind_password']
+
 
     def get_status(self, config_reg, production_time) -> dict:
         """
