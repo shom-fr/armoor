@@ -65,6 +65,7 @@ def login(user: User):
         conn.search(search_base, search_filter)
 
         if len(conn.entries) == 1:
+            logger.info(f'{user2authenticate} in authorized group or gid')
             user_dn = conn.entries[0].entry_dn
 
             # Attempt to bind with the user's DN and password
@@ -74,6 +75,7 @@ def login(user: User):
                 logger.info('User authenticated!')
                 user_conn.unbind()
                 return True
+            logger.info('The user bind attempt failed. Most likely, the password failed.')
 
         # User authentication failed
         logger.info('User authentication failed.')
@@ -84,11 +86,11 @@ def login(user: User):
         logger.info(f'Successful bind with {forecaster.ldap_bind_user}')
         # Check if the user is not in the authorized group
         if not authenticate_user(username, password):
-            logger.info('Not in authorized group')
+            logger.info(f'Bind failed : {username}')
             raise HTTPException(status_code=403,
                                 detail='Not authorized')
     else:
-        logger.info('Unsuccessful bind')
+        logger.info(f'Unsuccessful bind with {forecaster.ldap_bind_user}')
         raise HTTPException(status_code=403,
                             detail='Not authorized')
 
