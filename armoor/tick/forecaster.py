@@ -20,7 +20,6 @@ class Forecaster:
         self.approval_path = ''
         self.origins = []
         self.ldap_server_url = ''
-        self.domain = ''
         self.search_base = ''
         self.authorized_user_group = ''
         self.ldap_bind_user = ''
@@ -44,7 +43,6 @@ class Forecaster:
         self.approval_path = self.cfg_forecaster['approval_path']
         self.origins = self.cfg_forecaster['origins']
         self.ldap_server_url = self.cfg_forecaster['ldap_server_url']
-        self.domain = self.cfg_forecaster['domain']
         self.search_base = self.cfg_forecaster['search_base']
         self.authorized_user_group = self.cfg_forecaster['authorized_user_group']
         self.ldap_bind_user = self.cfg_forecaster['ldap_bind_user']

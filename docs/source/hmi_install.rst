@@ -15,16 +15,29 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
     approval_path = '/path_to_front/shom-ui/assets/data'
     origins = 'http://localhost', 'https://shom_url.fr'
     ldap_server_url = 'ldap://shom_ldap_url'
-    domain = 'SHOM_DOMAIN'
-    search_base = 'OU=ShomUsers,DC=shom,DC=shom_loc'
-    authorized_user_group = 'shom_users'
+    search_base = 'ou=ShomUsers,dc=shom,dc=shom_loc'
+    authorized_user_group = 'cn=outils-shom,ou=ShomGroups,dc=shom,dc=shom_loc'
+    ldap_bind_user = 'ldap_authorized_user'
+    ldap_bind_password = '*************'
 
 * approval_path : Path where the images from the script are copied
 * origins : List of URLs from which requests to the API originate, e.g., 'http://localhost', 'https://shom_url.fr'
-* ldap_server_url : Shom's LDAP server addres
-* domain : Domain name to use in the LDAP
+* ldap_server_url : Shom's LDAP server address
 * search_base : LDAP mask used to create a distinguished name (DN) when the user logs in
 * authorized_user_group : Definition of LDAP groups allowed to connect to the web application
+* ldap_bind_user = user authorized to connect to the LDAP server
+* ldap_bind_password = password of the ``ldap_bind_user``
+
+.. NOTE::
+
+    You can check LDAP parameters from the ``forecaster.cfg`` configuration files with this command:
+
+    ``ldapsearch -H ldap_server_url -x -D ldap_bind_user -w ldap_bind_password -b search_base "(&(objectClass=person)(memberOf=authorized_user_group)(XXXXXX))"``
+
+    Where ``XXXXXX`` can be the user either ``sn=user_name`` or ``mail=user_mail`` with user_name/user_mail a member of the authorized_user_group.
+
+    The result of this command will return the user you are looking for.
+
 
 **auth.cfg**::
 

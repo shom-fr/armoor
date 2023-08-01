@@ -48,18 +48,22 @@ def login(user: User):
 
     # Open connection to LDAP
     server = Server(forecaster.ldap_server_url, get_info=ALL)
+    logger.info('Server : OK.')
     conn = Connection(server=server,
                       user=forecaster.ldap_bind_user,
                       password=forecaster.ldap_bind_password,
                       authentication=SIMPLE,
                       auto_bind=True)
+    logger.info('Connection : OK.')
 
     def authenticate_user(user2authenticate, pwd):
         search_base = forecaster.search_base
-        search_filter = f'(&(objectClass=inetOrgPerson)(uid={user2authenticate}))'
+        search_filter = f'(&(objectClass=person)' \
+                        f'(memberOf={forecaster.authorized_user_group})' \
+                        f'(|(sn={user2authenticate})(mail={user2authenticate}))) '
 
         # Search for the user in the LDAP directory
-        conn.search(search_base, search_filter, attributes=['dn'])
+        conn.search(search_base, search_filter)
 
         if len(conn.entries) == 1:
             user_dn = conn.entries[0].entry_dn
