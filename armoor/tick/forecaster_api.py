@@ -4,7 +4,7 @@ Api for forecaster web interface
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from ldap3 import ALL, NTLM, Connection, Server
+from ldap3 import ALL, SIMPLE, Connection, Server
 
 from armoor.tick.forecaster import Forecaster
 from armoor.tick.models import StatusUpdate, TicketData, User
@@ -41,37 +41,49 @@ def login(user: User):
     username if authorized to login
     """
     # Check if a user is in the right group to log-in
-    def is_in_authorized_group(groups):
-        logger.info(f'Groups : {groups}')
-        if isinstance(groups, str):
-            groups = [groups]
-        for group in groups:
-            for branch in group.split(','):
-                branch = branch.split('=')
-                if branch[0] in ['CN', 'cn'] and branch[1] == forecaster.authorized_user_group:
-                    return True
-        return False
-
     # Get params from request
     username = user.username
     password = user.password
 
     # Open connection to LDAP
     server = Server(forecaster.ldap_server_url, get_info=ALL)
-    connection = Connection(server=server,
-                            user=f'{forecaster.domain}\\{username}',
-                            password=password,
-                            authentication=NTLM)
-    connection.bind()
+    logger.info('Server : OK.')
+    conn = Connection(server=server,
+                      user=forecaster.ldap_bind_user,
+                      password=forecaster.ldap_bind_password,
+                      authentication=SIMPLE,
+                      auto_bind=True)
+    logger.info('Connection : OK.')
+
+    def authenticate_user(user2authenticate, pwd):
+        search_base = forecaster.search_base
+        search_filter = f'(&(objectClass=person)' \
+                        f'(memberOf={forecaster.authorized_user_group})' \
+                        f'(|(sn={user2authenticate})(mail={user2authenticate}))) '
+
+        # Search for the user in the LDAP directory
+        conn.search(search_base, search_filter)
+
+        if len(conn.entries) == 1:
+            user_dn = conn.entries[0].entry_dn
+
+            # Attempt to bind with the user's DN and password
+            user_conn = Connection(server, user=user_dn, password=pwd, authentication=SIMPLE)
+            if user_conn.bind():
+                # User authenticated successfully
+                logger.info('User authenticated!')
+                user_conn.unbind()
+                return True
+
+        # User authentication failed
+        logger.info('User authentication failed.')
+        return False
 
     # Check if the result of the bind is successful
-    if connection.result['description'] == 'success':
-        # Search for the groups to which the user belongs
-        connection.search(search_base=forecaster.search_base,
-                          search_filter=f'(sAMAccountName={username})',
-                          attributes=['memberOf'])
+    if conn.result['description'] == 'success':
+        logger.info(f'Successful bind with {forecaster.ldap_bind_user}')
         # Check if the user is not in the authorized group
-        if not is_in_authorized_group(connection.entries[0].memberOf.value):
+        if not authenticate_user(username, password):
             logger.info('Not in authorized group')
             raise HTTPException(status_code=403,
                                 detail='Not authorized')
@@ -80,8 +92,9 @@ def login(user: User):
         raise HTTPException(status_code=403,
                             detail='Not authorized')
 
-    logger.info(f'Successful bind {username}')
+    logger.info(f'Successful bind : {username}')
     # The user is authorized to login
+    conn.unbind()
     return {'username': username}
 
 
