@@ -21,6 +21,7 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
     ldap_user_attribute= 'uid'
     ldap_bind_user = 'ldap_authorized_user'
     ldap_bind_password = '*************'
+    tmp_authorized_gid = ?
 
 * approval_path : Path where the images from the script are copied
 * origins : List of URLs from which requests to the API originate, e.g., 'http://localhost', 'https://shom_url.fr'
@@ -29,8 +30,9 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
 * authorized_user_group : Definition of LDAP groups allowed to connect to the web application
 * ldap_user_object_class : user objectClass (ex: posixAccount)
 * ldap_user_attribute : user input attribute (ex: uid)
-* ldap_bind_user = user authorized to connect to the LDAP server
-* ldap_bind_password = password of the ``ldap_bind_user``
+* ldap_bind_user : user authorized to connect to the LDAP server
+* ldap_bind_password : password of the ``ldap_bind_user``
+* tmp_authorized_gid : ?
 
 .. NOTE::
 
