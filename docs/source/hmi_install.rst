@@ -17,8 +17,8 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
     ldap_server_url = 'ldap://shom_ldap_url'
     search_base = 'ou=ShomUsers,dc=shom,dc=shom_loc'
     authorized_user_group = 'cn=outils-shom,ou=ShomGroups,dc=shom,dc=shom_loc'
-    ldap_user_object_class = 'uid'
-    ldap_user_attribute= 'posixAccount'
+    ldap_user_object_class = 'posixAccount'
+    ldap_user_attribute= 'uid'
     ldap_bind_user = 'ldap_authorized_user'
     ldap_bind_password = '*************'
 
@@ -27,8 +27,8 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
 * ldap_server_url : Shom's LDAP server address
 * search_base : LDAP mask used to create a distinguished name (DN) when the user logs in
 * authorized_user_group : Definition of LDAP groups allowed to connect to the web application
-* ldap_user_object_class : user input attribute (ex: uid)
-* ldap_user_attribute : user objectClass (ex: posixAccount)
+* ldap_user_object_class : user objectClass (ex: posixAccount)
+* ldap_user_attribute : user input attribute (ex: uid)
 * ldap_bind_user = user authorized to connect to the LDAP server
 * ldap_bind_password = password of the ``ldap_bind_user``
 
