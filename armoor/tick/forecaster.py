@@ -22,6 +22,8 @@ class Forecaster:
         self.ldap_server_url = ''
         self.search_base = ''
         self.authorized_user_group = ''
+        self.ldap_user_object_class = ''
+        self.ldap_user_attribute = ''
         self.ldap_bind_user = ''
         self.ldap_bind_password = ''
 
@@ -45,6 +47,8 @@ class Forecaster:
         self.ldap_server_url = self.cfg_forecaster['ldap_server_url']
         self.search_base = self.cfg_forecaster['search_base']
         self.authorized_user_group = self.cfg_forecaster['authorized_user_group']
+        self.ldap_user_object_class = self.cfg_forecaster['ldap_user_object_class']
+        self.ldap_user_attribute = self.cfg_forecaster['ldap_user_attribute']
         self.ldap_bind_user = self.cfg_forecaster['ldap_bind_user']
         self.ldap_bind_password = self.cfg_forecaster['ldap_bind_password']
 

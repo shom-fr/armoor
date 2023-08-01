@@ -17,6 +17,8 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
     ldap_server_url = 'ldap://shom_ldap_url'
     search_base = 'ou=ShomUsers,dc=shom,dc=shom_loc'
     authorized_user_group = 'cn=outils-shom,ou=ShomGroups,dc=shom,dc=shom_loc'
+    ldap_user_object_class = 'uid'
+    ldap_user_attribute= 'posixAccount'
     ldap_bind_user = 'ldap_authorized_user'
     ldap_bind_password = '*************'
 
@@ -25,6 +27,8 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
 * ldap_server_url : Shom's LDAP server address
 * search_base : LDAP mask used to create a distinguished name (DN) when the user logs in
 * authorized_user_group : Definition of LDAP groups allowed to connect to the web application
+* ldap_user_object_class : user input attribute (ex: uid)
+* ldap_user_attribute : user objectClass (ex: posixAccount)
 * ldap_bind_user = user authorized to connect to the LDAP server
 * ldap_bind_password = password of the ``ldap_bind_user``
 
@@ -32,9 +36,9 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
 
     You can check LDAP parameters from the ``forecaster.cfg`` configuration files with this command:
 
-    ``ldapsearch -H ldap_server_url -x -D ldap_bind_user -w ldap_bind_password -b search_base "(&(objectClass=person)(memberOf=authorized_user_group)(XXXXXX))"``
+    ``ldapsearch -H ldap_server_url -x -D ldap_bind_user -w ldap_bind_password -b search_base "(&(objectClass=ldap_user_object_class)(memberOf=authorized_user_group)(ldap_user_attribute=XXXXXX))"``
 
-    Where ``XXXXXX`` can be the user either ``sn=user_name`` or ``mail=user_mail`` with user_name/user_mail a member of the authorized_user_group.
+    Where ``XXXXXX`` can be for example ``user_name`` if ldap_user_attribute= ``sn`` or ``user_mail`` if ldap_user_attribute= ``mail`` with user_name/user_mail a member of the authorized_user_group.
 
     The result of this command will return the user you are looking for.
 
