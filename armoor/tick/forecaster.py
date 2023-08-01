@@ -26,6 +26,7 @@ class Forecaster:
         self.ldap_user_attribute = ''
         self.ldap_bind_user = ''
         self.ldap_bind_password = ''
+        self.tmp_authorized_gid = ''
 
         rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "forecaster.ini"))
@@ -51,6 +52,7 @@ class Forecaster:
         self.ldap_user_attribute = self.cfg_forecaster['ldap_user_attribute']
         self.ldap_bind_user = self.cfg_forecaster['ldap_bind_user']
         self.ldap_bind_password = self.cfg_forecaster['ldap_bind_password']
+        self.tmp_authorized_gid = self.cfg_forecaster['tmp_authorized_gid']
 
 
     def get_status(self, config_reg, production_time) -> dict:
