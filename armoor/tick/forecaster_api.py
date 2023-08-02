@@ -58,8 +58,8 @@ def login(user: User):
     def authenticate_user(user2authenticate, pwd):
         search_base = forecaster.search_base
         search_filter = f'(&(objectClass={forecaster.ldap_user_object_class})' \
-                        f'({forecaster.authorized_user_group_attribute}={forecaster.authorized_user_group})' \
-                        f'({forecaster.ldap_user_attribute}={user2authenticate}))'
+                        f'(memberOf={forecaster.authorized_user_group})' \
+                        f'({forecaster.ldap_user_attribute}={user2authenticate})) '
 
         # Search for the user in the LDAP directory
         conn.search(search_base, search_filter)

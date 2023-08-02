@@ -16,7 +16,6 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
     origins = 'http://localhost', 'https://shom_url.fr'
     ldap_server_url = 'ldap://shom_ldap_url'
     search_base = 'ou=ShomUsers,dc=shom,dc=shom_loc'
-    authorized_user_group_attribute = 'memberOf'
     authorized_user_group = 'cn=outils-shom,ou=ShomGroups,dc=shom,dc=shom_loc'
     ldap_user_object_class = 'posixAccount'
     ldap_user_attribute= 'uid'
@@ -27,8 +26,7 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
 * origins : List of URLs from which requests to the API originate, e.g., 'http://localhost', 'https://shom_url.fr'
 * ldap_server_url : This setting defines the address or URL of Shom's LDAP server. It is the location where the web application will connect to perform LDAP queries and authentication against Shom's LDAP directory.
 * search_base : This is an LDAP mask used to create a distinguished name (DN) when a user logs in. The search base helps define the starting point in the LDAP directory tree for user searches.
-* authorized_user_group_attribute : This attribute specifies the LDAP attribute used to determine the user's group membership, such as ``gidNumber``, ``memberOf``, etc. It helps the web application identify the user's groups.
-* authorized_user_group : This parameter lists the LDAP groups that are allowed to connect to the web application. The value provided here should match the attribute specified in ``authorized_user_group_attribute``, e.g., ``42`` for ``gidNumber`` or ``cn=outils-shom,ou=ShomGroups,dc=shom,dc=shom_loc`` for ``memberOf``.
+* authorized_user_group : This parameter is the LDAP group that is allowed to connect to the web application.
 * ldap_user_object_class : This specifies the LDAP object class used for user entries in the directory, such as ``posixAccount``. It helps define the type of LDAP object representing users.
 * ldap_user_attribute : This is the user input attribute used for user identification, such as uid. Users will typically provide this attribute when logging into the web application.
 * ldap_bind_user : This refers to the LDAP user who is authorized to connect to the LDAP server on behalf of the web application. The application uses the credentials of this user for queries and authentication purposes.
@@ -38,7 +36,7 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
 
     You can check LDAP parameters from the ``forecaster.cfg`` configuration files with this command:
 
-    ``ldapsearch -H ldap_server_url -x -D ldap_bind_user -w ldap_bind_password -b search_base "(&(objectClass=ldap_user_object_class)(authorized_user_group_attribute=authorized_user_group)(ldap_user_attribute=XXXXXX))"``
+    ``ldapsearch -H ldap_server_url -x -D ldap_bind_user -w ldap_bind_password -b search_base "(&(objectClass=ldap_user_object_class)(memberOf=authorized_user_group)(ldap_user_attribute=XXXXXX))"``
 
     Where ``XXXXXX`` can be for example ``user_name`` if ldap_user_attribute= ``sn`` or ``user_mail`` if ldap_user_attribute= ``mail`` with user_name/user_mail a member of the authorized_user_group.
 
