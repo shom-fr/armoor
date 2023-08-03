@@ -9,6 +9,8 @@ import gitlab
 import requests
 from xoa import cfgm
 
+import logging
+logger = logging.getLogger(__name__)
 
 class Ticket:
     """
@@ -40,15 +42,19 @@ class Ticket:
         more_info = 'More information with : armoor-tick-authentication -h'
         try:
             self.project = self.connect_to_project()
-        except gitlab.exceptions.GitlabGetError:
-            print('--- Error : Please update gitlab project id ---')
-            print(more_info)
-        except gitlab.exceptions.GitlabAuthenticationError:
-            print('--- Error : Please update gitlab token ---')
-            print(more_info)
-        except requests.exceptions.ConnectionError:
-            print('--- Error : Please update gitlab url ---')
-            print(more_info)
+            logger.info('Connection to project : OK.')
+        except gitlab.exceptions.GitlabGetError as e:
+            logger.error('--- Error : Please update gitlab project id ---')
+            logger.error(more_info)
+            logger.error(e)
+        except gitlab.exceptions.GitlabAuthenticationError as e:
+            logger.error('--- Error : Please update gitlab token ---')
+            logger.error(more_info)
+            logger.error(e)
+        except requests.exceptions.ConnectionError as e:
+            logger.error('--- Error : Please update gitlab url ---')
+            logger.error(more_info)
+            logger.error(e)
 
     def connect_to_project(self):
         """
