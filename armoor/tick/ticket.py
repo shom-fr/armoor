@@ -162,9 +162,13 @@ class Ticket:
         issue id of the ticket created
         """
         # title with labels and T0
-        title = f'{ticket_data.get("model")}_{ticket_data.get("config")} - '
-        title += ' - '.join([ticket_data[field] for field in ['production_time',
-                                                             'title']])
+        model = ticket_data.get("model" '')
+        config = ticket_data.get("config", '')
+        production_time = ticket_data.get("production_time", '')
+        issue_title = ticket_data.get("title", '')
+
+        title = f'{model}_{config} - '
+        title += ' - '.join([production_time, issue_title])
 
         # retrieve linked issues
         related = ticket_data.get('related')
