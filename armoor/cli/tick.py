@@ -81,7 +81,7 @@ def search(argv=None):
 
     request = formated_ticket.get('request', '')
     config = formated_ticket.get('config', '')
-    state = formated_ticket.get('state')
+    state = formated_ticket.get('state', 'opened')
 
     show_tickets(ticket.search_tickets(config, request, state))
 
