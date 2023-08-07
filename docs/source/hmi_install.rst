@@ -49,11 +49,19 @@ Place the configuration files forecaster.cfg and auth.cfg in the current executi
         token = TOKEN
         url = GITLAB_URL_SERVER
         project = ID_PROJECT
+       [[proxies]]
+          [[[http]]]
+             address = http://10.10.1.10
+             port = 3128
+          [[[https]]]
+             address = http://10.10.1.10:1080
+             port = 1080
 
 
 * token : Token used for authentication (e.g., glpat-uy8upta6xMoTh5yUTrfH).
 * url : GitLab server address (e.g., https://gitlab.com/).
 * project : Project identifier (e.g., 9549702).
+* proxies (optional): Custom proxies for the GitLab session.
 
 You can launch the API with Uvicorn using the following script::
 
