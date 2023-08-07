@@ -22,6 +22,7 @@ class Ticket:
         self.gitlab_token = ''
         self.gitlab_url = ''
         self.gitlab_project_id = -1
+        self.gitlab_proxies = None
         self.project = None
         self.rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_auth = cfgm.ConfigManager(os.path.join(self.rootdir, "auth.ini"))
@@ -65,7 +66,12 @@ class Ticket:
         """
         self.get_gitlab_authentication_information()
 
-        gitlab_project = gitlab.Gitlab(self.gitlab_url, self.gitlab_token)
+        session = None
+        if self.gitlab_proxies:
+            session = requests.Session()
+            session.proxies.update(self.gitlab_proxies)
+
+        gitlab_project = gitlab.Gitlab(self.gitlab_url, self.gitlab_token, session=session)
         gitlab_project.auth()
 
         return gitlab_project.projects.get(self.gitlab_project_id)
@@ -80,6 +86,11 @@ class Ticket:
         self.gitlab_token = self.cfg_auth['gitlab']['token']
         self.gitlab_url = self.cfg_auth['gitlab']['url']
         self.gitlab_project_id = self.cfg_auth['gitlab']['project']
+        self.gitlab_proxies = self.cfg_auth['gitlab'].get('proxies')
+        if self.gitlab_proxies:
+            for proxy in self.gitlab_proxies:
+                self.gitlab_proxies[proxy] = f"{self.gitlab_proxies[proxy]['address']}:{self.gitlab_proxies[proxy]['port']}"
+            logger.info(f'Proxies : {self.gitlab_proxies}')
 
     def format_ticket_for_gitlab(self, data: dict) -> str:
         """
@@ -112,6 +123,7 @@ class Ticket:
         print(f'token : {self.gitlab_token}')
         print(f'url : {self.gitlab_url}')
         print(f'id : {self.gitlab_project_id}')
+        print(f'proxies : {self.gitlab_proxies}')
 
     def get_template(self, kind: str) -> dict:
         """
