@@ -79,12 +79,9 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
         elif type == "VMADCP":
             logger.info("Opening VMADCP")
             return open_decode_vmadcp(path_files[0], steps=steps)
-        elif type == 'CROCO':
+        elif type in ['CROCO', 'CROCO_currents']:
             logger.info("Opening CROCO")
             return open_decode_croco(path_files[0])
-        elif type == 'CROCO_currents':
-            logger.info("Opening CROCO currents")
-            return open_decode_croco_currents(path_files[0])
         elif type == 'HYCOM_currents':
             logger.info("Opening HYCOM currents")
             return open_decode_hycom_currents(path_files)
@@ -574,6 +571,8 @@ def open_decode_croco(path_file):
 
     # Convert depths
     croco = convert_depths(croco)
+    depths_clean = croco.depth.where(croco.depth > 0)
+    croco['depth'] = depths_clean
 
     # Decode
     croco = croco.xoa.decode()

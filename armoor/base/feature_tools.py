@@ -41,6 +41,7 @@ def manage_output(plot, figure_name, folder_path):
 
 
 def remove_missing_values_ds(models, observation, i, var_mod, vars):
+
     # Remove missing values
     if len(var_mod) == 1:
         obs = observation["xarray_meta_coloc"][i][vars[0]]
@@ -89,6 +90,7 @@ def remove_missing_values(model, obs):
             model = model.drop(coord)
         if coord in obs.coords:
             obs = obs.drop(coord)
+
     # .values otherwise returns all NaN for croco and topaz
     model_nan = model.where(~np.isnan(obs).values)
     obs_nan = obs.where(~np.isnan(model).values)

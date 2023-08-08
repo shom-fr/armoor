@@ -336,8 +336,8 @@ def get_extent(extent, margin=0.05, square=True, min_extent=1.0):
     """
     # Get min and max
     lon, lat = extent['lon'], extent['lat']
-    lon = lon.where(lon<1e3)
-    lat = lat.where(lat<1e3)
+    lon = lon.where(lon < 1e3)
+    lat = lat.where(lat < 1e3)
     xmin = float(np.nanmin(lon))
     xmax = float(np.nanmax(lon))
     ymin = float(np.nanmin(lat))
@@ -556,31 +556,14 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
     plt.xlabel(f"{obs_name} Observations")
     plt.ylabel(f"{model_name} Model ")
 
-    n = 1
-    if 'lat' in mod.dims:
-        n = n * len(mod['lat'])
-    if 'lon' in mod.dims:
-        n = n * len(mod['lon'])
-    if 'interval' in mod.dims:
-        n = n * len(mod['idx_time'])
-    elif 'time' in mod.dims:
-        n = n * len(mod['time'])
-    if 'depth' in mod.dims:
-        n = n * len(mod['depth'])
-    elif 'dens' in mod.dims:
-        n = n * len(mod['dens'])
-
-    x = []
-    y = []
-
     # Flatten dataarray because dask array doesn't work with flatten
     obs = obs.values.ravel()
     mod = mod.values.ravel()
 
-    for i in range(n):
-        if not math.isnan(obs.item(i)) and not math.isnan(mod.item(i)):
-            x.append(obs.item(i))
-            y.append(mod.item(i))
+    x = obs[~np.isnan(obs)]
+    y = mod[~np.isnan(mod)]
+
+    n = len(x)
 
     # Sturge's rule
     nbins = int(1 + 3.322 * np.log2(n))

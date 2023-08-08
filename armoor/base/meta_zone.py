@@ -416,8 +416,10 @@ class MetazoneAccessor:
         --------
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
+
         logger.info("Applying filter - vertical_selection_ponct")
         ds = copy.copy(self._obj)
+
         if var_vert == 'depth':
             if 'depth' in ds.dims and len(ds.depth.dims) == 1:  # NEMO or TOPAZ
                 ds = ds.sel(depth=depth, method='nearest')
@@ -481,6 +483,8 @@ class MetazoneAccessor:
         # Positive depths for croco
         if 'level' in ds.dims:
             tgt_ds['depth'] = -tgt_ds['depth']
+
+        tgt_ds = tgt_ds.squeeze()
 
         return tgt_ds
 
