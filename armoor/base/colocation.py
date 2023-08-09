@@ -7,6 +7,7 @@ import xesmf as xe
 import logging
 import pandas as pd
 import matplotlib.pyplot as plt
+from armoor import base
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +76,8 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
 
     # Put dimensions in the same order
-    for dim in list(obs_coloc.dims):
-        if dim in mod_coloc.dims:
-            obs_coloc = obs_coloc.transpose(dim, ...)
-            mod_coloc = mod_coloc.transpose(dim, ...)
+    # mod_coloc = base.set_dim_order(mod_coloc)
+    # obs_coloc = base.set_dim_order(obs_coloc)
 
     return obs_coloc, mod_coloc
 
@@ -115,7 +114,7 @@ def horizontal_colocation(ds, tgt, coloc_method):
             tgt_xy = tgt.isel(x=i_x)
             ds_x = ds.interp(lon=tgt_xy.lon.values, lat=tgt_xy.lat.values, method=coloc_method)
             ds_x = ds_x.stack(y=('lon', 'lat')).reset_index('y')
-            ds_x = ds_x.isel(y=slice(0, -1, len(tgt_xy.y)))
+            ds_x = ds_x.isel(y=range(0, len(ds_x.y) + 1, len(tgt_xy.y) + 1))
             lons = xr.DataArray(ds_x.lon.values, dims='y', coords={'y': tgt_xy.y.values},
                                 name='lon')
             lats = xr.DataArray(ds_x.lat.values, dims='y', coords={'y': tgt_xy.y.values},
@@ -133,7 +132,7 @@ def horizontal_colocation(ds, tgt, coloc_method):
         elif len(dims) == 3:
             ds_coloc = ds_coloc.transpose(dims[0], dims[1], dims[2])
         elif len(dims) == 4:
-            ds_coloc = ds_coloc.transpose(dims[0], dims[1], dims[2], dims[4])
+            ds_coloc = ds_coloc.transpose(dims[0], dims[1], dims[2], dims[3])
 
     # Regrid ds if necessary
     elif 'x' in ds.dims:
@@ -157,10 +156,8 @@ def vertical_colocation(ds, tgt, coloc_method):
 
     # Case ds has depth(lon/lat/time) dimension and tgt has depth(depth) dimension
     elif 'depth' in depth_tgt.dims and 'depth' not in depth_ds.dims:
-        da_depth = xr.DataArray(depth_tgt.values, name="depth", dims="depth")
-        for var in ds.variables:  # Regrid for all variables
-            if 'sig' in ds[var].dims:
-                ds[var] = regrid1d(ds[var], da_depth)
+        ds = ds.meta.vertical_seletion_croco_hycom(depth)
+
     return ds
 
 
@@ -304,7 +301,7 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
                     mod_interp = mod_interp.interp(depth=depth, method=method_z,
                                                    kwargs={"fill_value": "extrapolate"
                                                            }).squeeze()
-                elif 'level' in mod_interp.dims:  # Croco
+                elif 'level' in mod_interp.dims or 'z' in mod_interp.dims:  # Croco or hycom
                     mod_interp = mod_interp.meta.vertical_seletion_croco_hycom(depth)
 
             elif 'z' in obs.squeeze().dims:

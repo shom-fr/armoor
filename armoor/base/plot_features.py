@@ -335,17 +335,13 @@ def get_extent(extent, margin=0.05, square=True, min_extent=1.0):
         get_extent((np.linspace(10, 20, 5), np.linspace(10, 20, 5)), margin=-.1, square=True)
     """
     # Get min and max
-    if hasattr(extent, "coords"):
-        lon, lat = extent.lon, extent.lat
-    elif isinstance(extent, dict):
-        extent = extent['lon'], extent['lat']
-    if isinstance(extent, (list, np.ndarray)):
-        xmin, xmax, ymin, ymax = extent
-    else:  # tuple
-        xmin = float(np.min(lon))
-        xmax = float(np.max(lon))
-        ymin = float(np.min(lat))
-        ymax = float(np.max(lat))
+    lon, lat = extent['lon'], extent['lat']
+    lon = lon.where(lon < 1e3)
+    lat = lat.where(lat < 1e3)
+    xmin = float(np.nanmin(lon))
+    xmax = float(np.nanmax(lon))
+    ymin = float(np.nanmin(lat))
+    ymax = float(np.nanmax(lat))
 
     # Scale
     if square or margin or min_extent is not None:
@@ -560,31 +556,14 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
     plt.xlabel(f"{obs_name} Observations")
     plt.ylabel(f"{model_name} Model ")
 
-    n = 1
-    if 'lat' in mod.dims:
-        n = n * len(mod['lat'])
-    if 'lon' in mod.dims:
-        n = n * len(mod['lon'])
-    if 'interval' in mod.dims:
-        n = n * len(mod['idx_time'])
-    elif 'time' in mod.dims:
-        n = n * len(mod['time'])
-    if 'depth' in mod.dims:
-        n = n * len(mod['depth'])
-    elif 'dens' in mod.dims:
-        n = n * len(mod['dens'])
-
-    x = []
-    y = []
-
     # Flatten dataarray because dask array doesn't work with flatten
     obs = obs.values.ravel()
     mod = mod.values.ravel()
 
-    for i in range(n):
-        if not math.isnan(obs.item(i)) and not math.isnan(mod.item(i)):
-            x.append(obs.item(i))
-            y.append(mod.item(i))
+    x = obs[~np.isnan(obs)]
+    y = mod[~np.isnan(mod)]
+
+    n = len(x)
 
     # Sturge's rule
     nbins = int(1 + 3.322 * np.log2(n))
@@ -1870,15 +1849,26 @@ def add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, nb_vect=50
     mod_meta, mod_coloc = clean_dim_order(mod_meta), clean_dim_order(mod_coloc)
 
     for i_ds, ds in enumerate([obs_meta, obs_coloc, mod_meta, mod_coloc]):
-        dens = int(len(ds.lon.values) / nb_vect)
-        if dens < 1:
-            dens = 1
+        if 'lon' in ds.dims:
+            dens = int(len(ds.lon.values) / nb_vect)
+            if dens < 1:
+                dens = 1
 
-        indexes_dens_lon = np.arange(0, len(ds.lon), dens)
-        indexes_dens_lat = np.arange(0, len(ds.lat), dens)
-        ds_dens = ds.isel(lon=indexes_dens_lon, lat=indexes_dens_lat)
-        axs[i_ds].quiver(ds_dens.lon.values, ds_dens.lat.values, ds_dens.u.values, ds_dens.v.values,
-                         transform=ccrs.PlateCarree())
+            indexes_dens_lon = np.arange(0, len(ds.lon), dens)
+            indexes_dens_lat = np.arange(0, len(ds.lat), dens)
+            ds_dens = ds.isel(lon=indexes_dens_lon, lat=indexes_dens_lat)
+            axs[i_ds].quiver(ds_dens.lon.values, ds_dens.lat.values, ds_dens.u.values, ds_dens.v.values,
+                             transform=ccrs.PlateCarree())
+        elif 'x' in ds.dims:
+            dens = int(len(ds.x.values) / nb_vect)
+            if dens < 1:
+                dens = 1
+
+            indexes_dens_x = np.arange(0, len(ds.x), dens)
+            indexes_dens_y = np.arange(0, len(ds.y), dens)
+            ds_dens = ds.isel(x=indexes_dens_x, y=indexes_dens_y)
+            axs[i_ds].quiver(ds_dens.x.values, ds_dens.y.values, ds_dens.u.values,
+                             ds_dens.v.values, transform=ccrs.PlateCarree())
 
     return axs
 

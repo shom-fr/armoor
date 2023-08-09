@@ -149,24 +149,23 @@ class SSTAccessor:
             return self._obj.sst.sel_var.convert_K_C()
         elif 'temp' in self._obj:
             logger.info('SST retrieved from temperature variable')
-            if 'depth' in self._obj.dims:
+            if 'depth' in self._obj.squeeze().dims:
                 return self._obj.temp.sel(depth=depth, method='nearest').sel_var.convert_K_C()
-            elif 'z' in self._obj.dims:
+            elif 'z' in self._obj.squeeze().dims:
                 return self._obj.temp.sel(z=depth).sel_var.convert_K_C()
-            elif 'depth' in self._obj.variables:
-                depth = xr.DataArray([0], name="depth", dims="depth")
-                return regrid1d(self._obj.temp, depth).sel_var.convert_K_C()
+            elif 'depth' in self._obj.variables and ('z' in self._obj.dims or 'level' in self._obj.dims):
+                return self._obj.meta.vertical_selection_ponct(depth).sel_var.convert_K_C()
             else:  # if no depth (obs sst for example)
                 return self._obj.temp.sel_var.convert_K_C()
         elif 'ptemp' in self._obj:
             logger.info('SST retrieved from potential temperature variable')
-            if 'depth' in self._obj.dims:
+            if 'depth' in self._obj.squeeze().dims:
                 return self._obj.ptemp.sel(depth=depth, method='nearest').sel_var.convert_K_C()
-            elif 'z' in self._obj.dims:
+            elif 'z' in self._obj.squeeze().dims:
                 return self._obj.ptemp.sel(z=depth).sel_var.convert_K_C()
-            elif 'depth' in list(self._obj.keys()):
+            elif 'depth' in list(self._obj.keys()) and ('z' in self._obj.dims or 'level' in self._obj.dims):
                 depth = xr.DataArray([0], name="depth", dims="depth")
-                return regrid1d(self._obj.ptemp, depth).sel_var.convert_K_C()
+                return self._obj.meta.vertical_selection_ponct(depth).sel_var.convert_K_C()
             else:  # if no depth (obs sst for example)
                 return self._obj.ptemp.sel_var.convert_K_C()
 

@@ -44,16 +44,6 @@ def plot(config_obj):
     for i_mod, mod in enumerate(models):
         models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars_mod, vars)
 
-    obs = observation['xarray_meta_coloc'][0].sst
-    mod = models[0]['xarray_meta_coloc'].sst
-    # plt.pcolormesh(obs.lon, obs.lat, obs.isel(time=0))
-    # plt.savefig('obs.png')
-    # plt.close()
-    #
-    # plt.pcolormesh(mod.lon, mod.lat, mod.isel(time=0))
-    # plt.savefig('mod.png')
-    # plt.close()
-
     # Get names
     models_name = [m['name'] for m in models]
     obs_name = observation['name']

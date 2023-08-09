@@ -41,6 +41,7 @@ def manage_output(plot, figure_name, folder_path):
 
 
 def remove_missing_values_ds(models, observation, i, var_mod, vars):
+
     # Remove missing values
     if len(var_mod) == 1:
         obs = observation["xarray_meta_coloc"][i][vars[0]]
@@ -89,6 +90,7 @@ def remove_missing_values(model, obs):
             model = model.drop(coord)
         if coord in obs.coords:
             obs = obs.drop(coord)
+
     # .values otherwise returns all NaN for croco and topaz
     model_nan = model.where(~np.isnan(obs).values)
     obs_nan = obs.where(~np.isnan(model).values)
@@ -99,7 +101,18 @@ def remove_missing_values(model, obs):
         model_nan = model_nan.assign_coords(model.coords)
         obs_nan = obs_nan.assign_coords(obs.coords)
 
+    # Put dimension in the right order
+    obs_nan = set_dim_order(obs_nan)
+    model_nan = set_dim_order(model_nan)
     return model_nan, obs_nan
+
+
+def set_dim_order(ds):
+    if 'lon' in list(ds.squeeze().dims):
+        ds = ds.transpose('lat', 'lon', ...)
+    elif 'x' in list(ds.squeeze().dims):
+        ds = ds.transpose('y', 'x', ...)
+    return ds
 
 
 def sel_default_vars(config_obj):
@@ -179,8 +192,8 @@ def sel_default_vars(config_obj):
                 "time.month").mean("time").rename({'month': 'time'}).assign_coords(
                 {'time': calendar.month_name[1:13]})
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
-            config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(
-                vars_obs).assign_coords({'time': calendar.month_name[1:13]})
+                config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(
+                    vars_obs).assign_coords({'time': calendar.month_name[1:13]})
     else:
         config_obj['observation']["xarray_meta"] = config_obj['observation'][
             "xarray_meta"].sel_var.selection(vars_obs)
@@ -188,7 +201,7 @@ def sel_default_vars(config_obj):
             mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod)
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod)
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
-            config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars_obs)
+                config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars_obs)
 
     return config_obj
 
@@ -232,5 +245,3 @@ def check_same_variables(models, observation):
                                f"it is thus removed from observation")
                 observation['xarray_meta'] = observation['xarray_meta'].drop(var_obs)
     return models, observation
-
-
