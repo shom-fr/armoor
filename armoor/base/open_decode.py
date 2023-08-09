@@ -554,14 +554,17 @@ def open_decode_croco(path_file):
         v = v.sel(eta=croco.eta_rho, method='nearest')
         croco['v'] = v
 
+    # Remove duplicate coords
+    if 'lon' in croco and 'lon_rho' in croco:
+        croco = croco.drop(['lon', 'lat'])
+
     # Clean coordinates
-    croco = croco.reset_coords()
+    croco = croco.rename(
+        {'xi_rho': 'x', 'eta_rho': 'y', 's_rho': 'z', 'lon_rho': 'lon', 'lat_rho': 'lat'})
     for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
                 'eta_v', 'depth_w', 'sig', 's_w']:
         if var in croco:
             croco = croco.drop(var)
-    croco = croco.rename({'xi_rho': 'x', 'eta_rho': 'y', 's_rho': 'z'})
-    croco = croco.assign_coords(lon=croco.lon, lat=croco.lat, depth=croco.depth)
 
     # Regrid if necessary
     croco = xoa.grid.to_rect(croco)
@@ -570,9 +573,8 @@ def open_decode_croco(path_file):
     croco = convert_lons(croco)
 
     # Convert depths
+    croco['depth'] = croco.depth.where(abs(croco.depth) < 1e30)
     croco = convert_depths(croco)
-    depths_clean = croco.depth.where(croco.depth > 0)
-    croco['depth'] = depths_clean
 
     # Decode
     croco = croco.xoa.decode()
