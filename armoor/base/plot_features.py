@@ -564,43 +564,44 @@ def diag_disp_figure(mod, obs, var_title, title, obs_name, model_name, output_pa
     y = mod[~np.isnan(mod)]
 
     n = len(x)
+    if n != 0:
 
-    # Sturge's rule
-    nbins = int(1 + 3.322 * np.log2(n))
-    # Compute histogram
-    data, x_e, y_e = np.histogram2d(x, y, bins=nbins, density=True)
+        # Sturge's rule
+        nbins = int(1 + 3.322 * np.log2(n))
+        # Compute histogram
+        data, x_e, y_e = np.histogram2d(x, y, bins=nbins, density=True)
 
-    slope, intercept, r, p, std_err = stats.linregress(x, y)
-    rmse = calculation.rmsec_diag_disp(x, y)
+        slope, intercept, r, p, std_err = stats.linregress(x, y)
+        rmse = calculation.rmsec_diag_disp(x, y)
 
-    def myfunc(x):
-        return slope * x + intercept
+        def myfunc(x):
+            return slope * x + intercept
 
-    mymodel = list(map(myfunc, x))
+        mymodel = list(map(myfunc, x))
 
-    vmin = np.nanmin([np.nanmin(obs), np.nanmin(mod)])
-    vmax = np.nanmax([np.nanmax(obs), np.nanmax(mod)])
+        vmin = np.nanmin([np.nanmin(obs), np.nanmin(mod)])
+        vmax = np.nanmax([np.nanmax(obs), np.nanmax(mod)])
 
-    markersize = np.tanh(1e5 / n)
-    treshold = 1e-2
-    if markersize < treshold:
-        markersize = treshold
-    axes.scatter(x, y, c='slateblue', s=2 * markersize)
-    plt.plot([vmin, vmax], [vmin, vmax], color='gray', linestyle='dashed', markersize=5)
-    plt.grid(color='gray', linestyle='--', linewidth=1, zorder=1)
-    plt.plot(x, mymodel, color='red', linestyle='solid', markersize=5,
-             label=f'y = {slope:.3f}*x + {intercept:.3f} \n'
-                   f'Correlation Coef = {r:.3f}\n'
-                   f'Std Err = {std_err:.3f}\n'
-                   f'RMSE = {rmse:.3f}\n'
-                   f'Npts = {n}')
-    plt.legend(loc='upper left')
-    cs = axes.contour(np.convolve(x_e, np.ones(2, dtype=int), 'valid') / 2.0,
-                      np.convolve(y_e, np.ones(2, dtype=int), 'valid') / 2.0, data.T / data.max(),
-                      levels=np.arange(0.1, 1.2, 0.2), cmap="Reds", linewidths=1)
-    axes.clabel(cs, cs.levels, inline=True, fontsize=5, fmt="%1.1f")
+        markersize = np.tanh(1e5 / n)
+        treshold = 1e-2
+        if markersize < treshold:
+            markersize = treshold
+        axes.scatter(x, y, c='slateblue', s=2 * markersize)
+        plt.plot([vmin, vmax], [vmin, vmax], color='gray', linestyle='dashed', markersize=5)
+        plt.grid(color='gray', linestyle='--', linewidth=1, zorder=1)
+        plt.plot(x, mymodel, color='red', linestyle='solid', markersize=5,
+                 label=f'y = {slope:.3f}*x + {intercept:.3f} \n'
+                       f'Correlation Coef = {r:.3f}\n'
+                       f'Std Err = {std_err:.3f}\n'
+                       f'RMSE = {rmse:.3f}\n'
+                       f'Npts = {n}')
+        plt.legend(loc='upper left')
+        cs = axes.contour(np.convolve(x_e, np.ones(2, dtype=int), 'valid') / 2.0,
+                          np.convolve(y_e, np.ones(2, dtype=int), 'valid') / 2.0, data.T / data.max(),
+                          levels=np.arange(0.1, 1.2, 0.2), cmap="Reds", linewidths=1)
+        axes.clabel(cs, cs.levels, inline=True, fontsize=5, fmt="%1.1f")
 
-    ft.manage_output(plt, f'diag_disp_g_{var_title}_{model_name}_{obs_name}_{figname}', output_path)
+        ft.manage_output(plt, f'diag_disp_g_{var_title}_{model_name}_{obs_name}_{figname}', output_path)
 
 
 def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metric,

@@ -91,7 +91,7 @@ Relative to vertical restriction:
         #. a slice of water (z ∈ [x0 meters, x1 meters])
 
     * ``density`` : The selection of immersions and slices of water is done in the same way as with *depth*, except that we indicate potential densities (instead of depths in meters).
-    * ``slice`` : To group into vertical slices, in meters.
+    * ``slice`` : To group into vertical slices between the specified depth or density levels specified.
 
 Other restrictions :
 
