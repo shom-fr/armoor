@@ -627,7 +627,8 @@ def open_decode_hycom_currents(path_files):
     hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
 
     # Rename depth
-    hycom = hycom.rename({'level': 'z'})
+    if 'level' in hycom:
+        hycom = hycom.rename({'level': 'z'})
 
     # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)

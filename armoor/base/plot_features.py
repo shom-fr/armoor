@@ -1849,15 +1849,26 @@ def add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, nb_vect=50
     mod_meta, mod_coloc = clean_dim_order(mod_meta), clean_dim_order(mod_coloc)
 
     for i_ds, ds in enumerate([obs_meta, obs_coloc, mod_meta, mod_coloc]):
-        dens = int(len(ds.lon.values) / nb_vect)
-        if dens < 1:
-            dens = 1
+        if 'lon' in ds.dims:
+            dens = int(len(ds.lon.values) / nb_vect)
+            if dens < 1:
+                dens = 1
 
-        indexes_dens_lon = np.arange(0, len(ds.lon), dens)
-        indexes_dens_lat = np.arange(0, len(ds.lat), dens)
-        ds_dens = ds.isel(lon=indexes_dens_lon, lat=indexes_dens_lat)
-        axs[i_ds].quiver(ds_dens.lon.values, ds_dens.lat.values, ds_dens.u.values, ds_dens.v.values,
-                         transform=ccrs.PlateCarree())
+            indexes_dens_lon = np.arange(0, len(ds.lon), dens)
+            indexes_dens_lat = np.arange(0, len(ds.lat), dens)
+            ds_dens = ds.isel(lon=indexes_dens_lon, lat=indexes_dens_lat)
+            axs[i_ds].quiver(ds_dens.lon.values, ds_dens.lat.values, ds_dens.u.values, ds_dens.v.values,
+                             transform=ccrs.PlateCarree())
+        elif 'x' in ds.dims:
+            dens = int(len(ds.x.values) / nb_vect)
+            if dens < 1:
+                dens = 1
+
+            indexes_dens_x = np.arange(0, len(ds.x), dens)
+            indexes_dens_y = np.arange(0, len(ds.y), dens)
+            ds_dens = ds.isel(x=indexes_dens_x, y=indexes_dens_y)
+            axs[i_ds].quiver(ds_dens.x.values, ds_dens.y.values, ds_dens.u.values,
+                             ds_dens.v.values, transform=ccrs.PlateCarree())
 
     return axs
 

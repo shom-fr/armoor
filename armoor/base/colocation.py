@@ -114,7 +114,7 @@ def horizontal_colocation(ds, tgt, coloc_method):
             tgt_xy = tgt.isel(x=i_x)
             ds_x = ds.interp(lon=tgt_xy.lon.values, lat=tgt_xy.lat.values, method=coloc_method)
             ds_x = ds_x.stack(y=('lon', 'lat')).reset_index('y')
-            ds_x = ds_x.isel(y=range(0, len(ds_x.y)+1, len(tgt_xy.y)+1))
+            ds_x = ds_x.isel(y=range(0, len(ds_x.y) + 1, len(tgt_xy.y) + 1))
             lons = xr.DataArray(ds_x.lon.values, dims='y', coords={'y': tgt_xy.y.values},
                                 name='lon')
             lats = xr.DataArray(ds_x.lat.values, dims='y', coords={'y': tgt_xy.y.values},
@@ -156,10 +156,8 @@ def vertical_colocation(ds, tgt, coloc_method):
 
     # Case ds has depth(lon/lat/time) dimension and tgt has depth(depth) dimension
     elif 'depth' in depth_tgt.dims and 'depth' not in depth_ds.dims:
-        da_depth = xr.DataArray(depth_tgt.values, name="depth", dims="depth")
-        for var in ds.variables:  # Regrid for all variables
-            if 'sig' in ds[var].dims:
-                ds[var] = regrid1d(ds[var], da_depth)
+        ds = ds.meta.vertical_seletion_croco_hycom(depth)
+
     return ds
 
 
@@ -303,7 +301,7 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
                     mod_interp = mod_interp.interp(depth=depth, method=method_z,
                                                    kwargs={"fill_value": "extrapolate"
                                                            }).squeeze()
-                elif 'level' in mod_interp.dims:  # Croco
+                elif 'level' in mod_interp.dims or 'z' in mod_interp.dims:  # Croco or hycom
                     mod_interp = mod_interp.meta.vertical_seletion_croco_hycom(depth)
 
             elif 'z' in obs.squeeze().dims:
