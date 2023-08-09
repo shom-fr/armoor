@@ -551,7 +551,7 @@ class MetazoneAccessor:
         elif 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
             return self._obj.meta.vertical_seletion_croco_hycom(depths)
 
-    def vertical_selection_slice(self, slice: str = None, var_slice: str = None) -> xr.Dataset:
+    def vertical_selection_slice(self, slice: list = None, var_slice: str = None) -> xr.Dataset:
         """Return a new Dataset whose data is sorted per depth slice.
 
         Parameters
@@ -566,20 +566,7 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_slice")
 
-        if 'depth' not in self._obj.dims:
-            depth_values = np.unique(self._obj.depth.data)
-
-            if len(depth_values) > len(self._obj.z.data):
-                logger.info(
-                    f"too many unique depth values, the grid is resampled with only {len(self._obj.z.data)}"
-                    f" values")
-                depth_values = np.linspace(depth_values[0], depth_values[-1], len(self._obj.z.data))
-            self._obj = self._obj.meta.vertical_selection_list(depth_values)
-
-        start = self._obj.isel(depth=[0])[var_slice].data[0]
-        end = self._obj.isel(depth=[-1])[var_slice].data[0]
-        vertical_slice = pandas.interval_range(start=start, end=end, freq=float(slice))
-        ds_group = self._obj.groupby_bins(var_slice, vertical_slice)
+        ds_group = self._obj.groupby_bins(var_slice, slice)
         liste_ds = []
 
         for label, ds in ds_group:
@@ -592,7 +579,7 @@ class MetazoneAccessor:
             ds = ds.assign_coords(slice=i)  # ajoute une dimension de date moyenne sur l'intervalle
             ds[var_slice + "_value"] = ds[var_slice]
             ds = ds.assign_coords(
-                depth=np.arange(len(ds[var_slice])))  # change les dates en indices
+                depth=np.arange(len(ds[var_slice])))  # change les profondeurs en indices
             liste_ds[i] = ds
 
         ds = xr.concat(liste_ds, 'slice')
