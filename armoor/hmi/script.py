@@ -136,6 +136,7 @@ def create_data_json_file(model_json: dict,
     logger.info(f'{json_data_path}')
     with open(json_data_path, 'w', encoding='utf-8') as json_file:
         json.dump(model_json, json_file, indent=4, ensure_ascii=False)
+    os.chmod(json_data_path, 0o666)
 
 
 def make_tarfile(output_folder_path: str,
