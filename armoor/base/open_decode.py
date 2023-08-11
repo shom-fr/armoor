@@ -14,6 +14,9 @@ from xoa.grid import dz2depth, shift
 import matplotlib.pyplot as plt
 import xoa.geo as xgeo
 
+import concurrent.futures
+import dask
+
 logger = logging.getLogger(__name__)
 
 
@@ -803,36 +806,55 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
     elif model_type == 'atmfrc/cumul':
         logger.info("atmfrc - cumul")
         cumul_gribs = path_files
-        dss_cumul = []
-        for grib in cumul_gribs:
-            dss_cumul.append(
-                xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": ""}))
 
-        ds_cumul = xr.combine_nested(dss_cumul, concat_dim="valid_time", combine_attrs="override")
-        ds_cumul = ds_cumul.drop_vars(["time", "surface"])
-        ds_cumul = ds_cumul.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
+        def open_dataset(grib):
+            return xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": ""})
+
+        # Use parallel processing to load datasets
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            dss_cumul = list(executor.map(open_dataset, cumul_gribs))
+
+        # Use Dask to parallelize and concatenate the datasets
+        dask_dss_cumul = [dask.delayed(ds.drop_vars(["time", "surface"])
+                                       .rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"}))
+                          for ds in dss_cumul]
+
+        # Compute the concatenated result using Dask
+        ds_cumul = xr.concat(dask.compute(*dask_dss_cumul), dim="time")
+
+        # Sort the result
         ds_cumul = ds_cumul.sortby('time')
         return ds_cumul
 
     elif model_type == 'atmfrc/insta':
         logger.info("atmfrc - insta")
         insta_gribs = path_files
+
+        def open_dataset_for_level(grib, level):
+            return xr.open_dataset(
+                grib,
+                engine="cfgrib",
+                backend_kwargs={
+                    "indexpath": "",
+                    "filter_by_keys": {
+                        "edition": 2,
+                        "level": level
+                    }
+                },
+                drop_variables=["heightAboveGround", "meanSea", "surface"]
+            )
+
+        # Use parallel processing to load datasets
         dss_insta = []
         for grib in insta_gribs:
-            dss = []
-            for level in [0, 2, 10]:
-                dss.append(xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": "",
-                                                                                  "filter_by_keys": {
-                                                                                      "edition": 2,
-                                                                                      "level": level
-                                                                                      },
-                                                                                  },
-                                           drop_variables=["heightAboveGround", "meanSea",
-                                                           "surface", ], ))
+            dss = [dask.delayed(open_dataset_for_level)(grib, level) for level in [0, 2, 10]]
+            dss_insta.append(dask.compute(*dss))
 
-            dss_insta.append(xr.merge(dss, combine_attrs="override"))
+        # Merge datasets for different levels
+        merged_dss_insta = [xr.merge(ds_list, combine_attrs="override") for ds_list in dss_insta]
 
-        ds_insta = xr.combine_nested(dss_insta, concat_dim="valid_time", combine_attrs="override")
+        # Combine merged datasets along 'valid_time' dimension
+        ds_insta = xr.concat(merged_dss_insta, dim="valid_time")
         ds_insta = ds_insta.drop_vars(["step", "time"])
         ds_insta = ds_insta.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
         ds_insta = ds_insta.sortby('time')

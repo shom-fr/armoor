@@ -86,7 +86,7 @@ def temporal_colocation(ds, tgt, coloc_method):
     logger.info('Time colocation')
     time_values = np.unique(tgt.time.values)
 
-    if ds.dims["time"] > 1:
+    if len(ds["time"]) > 1:
         ds = ds.interp(time=time_values, method=coloc_method, kwargs={"fill_value": "extrapolate"})
     else:
         ds = pick_time(ds, time_values)
