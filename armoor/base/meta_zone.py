@@ -453,7 +453,8 @@ class MetazoneAccessor:
         # Regrid1D only seems to work with negative depths for croco:
         # the following lines adapt the depths values to correctly select the depth defined.
         ds = copy.copy(self._obj)
-        if 'level' in ds.dims:  # For croco
+        # TODO condition
+        if False and 'level' in ds.dims:  # For croco
             ds['depth'] = -ds['depth']
             depth = -depth
 
