@@ -2,21 +2,18 @@
 import os
 import logging
 import copy
-import numpy as np
-import pandas as pd
-import logging
 import calendar
+import numpy as np
 import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
 
-def manage_output(plot, figure_name, folder_path):
+def manage_output(figure_name, folder_path):
     """
 
     Parameters
     ----------
-    plot
     figure_name
     folder_path
 
@@ -27,43 +24,55 @@ def manage_output(plot, figure_name, folder_path):
     if folder_path:
         figure_name = figure_name.replace(' ', '_').replace('[', '').replace(']', '').replace('/',
                                                                                               '')
-        date_now = np.datetime_as_string(np.datetime64('now'), unit='s').replace('-', '').replace(
-            ':', '')
-        # path = os.path.join(folder_path, f'{figure_name}_{date_now}.png')
         path = os.path.join(folder_path, f'{figure_name}.png')
         path = path.replace(':', '-')
         path = path.replace(' ', '')
         logger.info(f'Saving :: {path}')
-        plot.savefig(path, bbox_inches='tight', format='png')
-        plot.close('all')
+        plt.savefig(path, bbox_inches='tight', format='png')
+        plt.close('all')
     else:
-        plot.show()
+        plt.show()
 
 
-def remove_missing_values_ds(models, observation, i, var_mod, vars):
+def remove_missing_values_ds(models, observation, i, vars_mod, vars_obs):
+    """
+    Remove the missing values in model and observation to retrieve the two datasets
+    on the exact same extents.
+    Parameters
+    ----------
+    models : list of xarray.dataset
+    observation : dict of xarray.dataset
+    i : int
+        Index of the model to consider.
+    vars_mod : list
+        List of the variables to consider in the model.
+    vars_obs : list
+        List of the variables to consider in the observation.
 
+    """
     # Remove missing values
-    if len(var_mod) == 1:
-        obs = observation["xarray_meta_coloc"][i][vars[0]]
-        mod = models[i]["xarray_meta_coloc"][var_mod[0]]
+    if len(vars_mod) == 1:
+        obs = observation["xarray_meta_coloc"][i][vars_obs[0]]
+        mod = models[i]["xarray_meta_coloc"][vars_mod[0]]
 
         mod, obs = remove_missing_values(mod, obs)
-        observation["xarray_meta_coloc"][i][vars[0]] = obs
-        models[i]["xarray_meta_coloc"][var_mod[0]] = mod
+        observation["xarray_meta_coloc"][i][vars_obs[0]] = obs
+        models[i]["xarray_meta_coloc"][vars_mod[0]] = mod
     else:
-        for i_var, var in enumerate(var_mod):
-            obs = observation["xarray_meta_coloc"][i][vars[i_var]]
-            mod = models[i]["xarray_meta_coloc"][var_mod[i_var]]
+        for i_var, _ in enumerate(vars_mod):
+            obs = observation["xarray_meta_coloc"][i][vars_obs[i_var]]
+            mod = models[i]["xarray_meta_coloc"][vars_mod[i_var]]
             mod, obs = remove_missing_values(mod, obs)
-            observation["xarray_meta_coloc"][i][vars[i_var]] = obs
-            models[i]["xarray_meta_coloc"][var_mod[i_var]] = mod
+            observation["xarray_meta_coloc"][i][vars_obs[i_var]] = obs
+            models[i]["xarray_meta_coloc"][vars_mod[i_var]] = mod
 
     return models, observation
 
 
 def remove_missing_values(model, obs):
     """
-    Remove the missing values in model and observation to retrieve the two datasets on the exact same extents.
+    Remove the missing values in model and observation to retrieve the two datasets
+    on the exact same extents.
     Parameters
     ----------
     model : xr.DataArray
@@ -82,8 +91,8 @@ def remove_missing_values(model, obs):
     if list(obs.dims) != list(model.dims):
         if len(obs.dims) > 1:
             for dim in list(obs.dims):
-                model = model.transpose(dim, ...).squeeze()
-                obs = obs.transpose(dim, ...).squeeze()
+                model = model.transpose(dim, ...)
+                obs = obs.transpose(dim, ...)
 
     for coord in ['sig', 's_rho']:
         if coord in model.coords:
@@ -92,6 +101,7 @@ def remove_missing_values(model, obs):
             obs = obs.drop(coord)
 
     # .values otherwise returns all NaN for croco and topaz
+
     model_nan = model.where(~np.isnan(obs).values)
     obs_nan = obs.where(~np.isnan(model).values)
 
@@ -107,17 +117,24 @@ def remove_missing_values(model, obs):
     return model_nan, obs_nan
 
 
-def set_dim_order(ds):
-    if 'lon' in list(ds.squeeze().dims):
-        ds = ds.transpose('lat', 'lon', ...)
-    elif 'x' in list(ds.squeeze().dims):
-        ds = ds.transpose('y', 'x', ...)
-    return ds
+def set_dim_order(dataset):
+    """
+    Clean the dimension order to ensure maps will be correctly plotted.
+    Parameters
+    ----------
+    dataset : xarray.dataset
+    """
+    if 'lon' in list(dataset.squeeze().dims):
+        dataset = dataset.transpose('lat', 'lon', ...)
+    elif 'x' in list(dataset.squeeze().dims):
+        dataset = dataset.transpose('y', 'x', ...)
+    return dataset
 
 
 def sel_default_vars(config_obj):
     """
-    Select the default and optional parameters in the model and observation datasets from the config_obj
+    Select the default and optional parameters in the model and observation datasets
+    from the config_obj
     Parameters
     ----------
     config_obj : dict
@@ -202,11 +219,18 @@ def sel_default_vars(config_obj):
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod)
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
                 config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars_obs)
-
     return config_obj
 
 
 def sel_one_var(observation, models, var):
+    """
+    Select a variable in the model and observation
+    Parameters
+    ----------
+    models : list of xarray.dataset
+    observation : dict of xarray.dataset
+    var : str
+    """
     # Adjust potential / insitu variables for models and obs
     observation_var = copy.deepcopy(observation)
     models_var = copy.deepcopy(models)
@@ -232,16 +256,24 @@ def sel_one_var(observation, models, var):
 
 
 def check_same_variables(models, observation):
+    """
+    Verify that the model and observation have the same variables
+    Parameters
+    ----------
+    models : list of xarray.dataset
+    observation : dict of xarray.dataset
+
+    """
     # Verify the same variables are in the model and observation
-    for i, mod in enumerate(models):
+    for imod, mod in enumerate(models):
         for var_mod in list(mod['xarray_meta'].keys()):
             if var_mod not in observation:
-                logger.warning(f"{var_mod} is not included in the observation product ; "
-                               f"it is thus removed from model {imod}")
+                logger.warning("%s is not included in the observation product ; "
+                               "it is thus removed from model %s", var_mod, imod)
                 model = model.drop(var_mod)
         for var_obs in list(observation['xarray_meta'].keys()):
             if var_obs not in mod['xarray_meta']:
-                logger.warning(f"{var_obs} is not included in model {imod} ; "
-                               f"it is thus removed from observation")
+                logger.warning("%s is not included in the observation product ; "
+                               "it is thus removed from model %s", var_obs, imod)
                 observation['xarray_meta'] = observation['xarray_meta'].drop(var_obs)
     return models, observation

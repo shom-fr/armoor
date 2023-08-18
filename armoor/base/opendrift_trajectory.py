@@ -1,4 +1,5 @@
 """Calculate trajectories with OpenDrift"""
+import logging
 from opendrift.readers import reader_netCDF_CF_generic
 from opendrift.readers import reader_shape
 from opendrift.models.oceandrift import OceanDrift
@@ -6,7 +7,6 @@ import cartopy.io.shapereader as shpreader
 import xarray as xr
 import numpy as np
 
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def check_delta_constant(mod):
     delta_lat_0 = mod.lat.data[1] - mod.lat.data[0]
     delta_lon_1 = mod.lon.data[2] - mod.lon.data[1]
     delta_lat_1 = mod.lat.data[2] - mod.lat.data[1]
-    return (delta_lat_1 == delta_lat_0 and delta_lon_1 == delta_lon_0)
+    return delta_lat_1 == delta_lat_0 and delta_lon_1 == delta_lon_0
 
 
 def regrid_constant_delta(mod):
@@ -84,7 +84,8 @@ def regrid_constant_delta(mod):
 
 def calculate_trajectory(path_model, lons, lats, times, time_step, nb_step, output_file):
     """
-    Calculate the trajectories of the drifting particules with OpenDrift. The particules are dropped at each observation
+    Calculate the trajectories of the drifting particules with OpenDrift.
+    The particules are dropped at each observation
     date and location.
 
     Parameters
@@ -116,7 +117,8 @@ def calculate_trajectory(path_model, lons, lats, times, time_step, nb_step, outp
 
     # Read the model
     reader_analysis = reader_netCDF_CF_generic.Reader(path_model)
-    shpfilename = shpreader.natural_earth(resolution='110m', category='cultural', name='admin_0_countries')
+    shpfilename = shpreader.natural_earth(resolution='110m', category='cultural',
+                                          name='admin_0_countries')
     reader_natural = reader_shape.Reader.from_shpfiles(shpfilename)
     o.add_reader([reader_natural, reader_analysis])
     o.set_config('general:use_auto_landmask', False)  # Disabling the automatic GSHHG landmask
