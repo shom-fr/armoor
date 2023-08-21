@@ -475,7 +475,7 @@ class MetazoneAccessor:
         # Regrid1D only seems to work with negative depths for croco:
         # the following lines adapt the depths values to correctly select the depth defined.
         dataset = copy.copy(self._obj)
-        if 'level' in dataset.dims:  # For croco
+        if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
             dataset['depth'] = -dataset['depth']
             depth = -depth
 
@@ -503,7 +503,7 @@ class MetazoneAccessor:
             tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
 
         # Positive depths for croco
-        if 'level' in dataset.dims:
+        if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
             tgt_ds['depth'] = -tgt_ds['depth']
 
         tgt_ds = tgt_ds.squeeze()
