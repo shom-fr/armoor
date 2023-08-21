@@ -586,6 +586,9 @@ def open_decode_croco(path_file):
     if 'lat_u' in croco:
         croco = croco.rename({'lat_u': 'lat'})
 
+    # Assign croco attrs
+    croco = croco.assign_attrs({'type':'CROCO'})
+
     return croco
 
 
