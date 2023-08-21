@@ -95,7 +95,7 @@ def get_observation_models_meta(config_obj: dict):
 
     # Set colocation flags
     flags = set_coloc_flags(config_obj)
-    temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag = flags
+    _, horizontal_colocation_flag, vertical_colocation_flag = flags
 
     # Colocate
     observation.update({"xarray_meta_coloc": []})

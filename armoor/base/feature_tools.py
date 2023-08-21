@@ -27,7 +27,7 @@ def manage_output(figure_name, folder_path):
         path = os.path.join(folder_path, f'{figure_name}.png')
         path = path.replace(':', '-')
         path = path.replace(' ', '')
-        logger.info(f'Saving :: {path}')
+        logger.info('Saving :: %s', path)
         plt.savefig(path, bbox_inches='tight', format='png')
         plt.close('all')
     else:

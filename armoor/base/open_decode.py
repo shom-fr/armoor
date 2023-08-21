@@ -3,6 +3,7 @@
 import os
 import logging
 import datetime
+import concurrent.futures
 import xarray as xr
 import xoa
 import xoa.grid
@@ -12,8 +13,6 @@ from xoa.grid import dz2depth, shift
 import numpy as np
 import gsw
 import pandas as pd
-
-import concurrent.futures
 import dask
 
 logger = logging.getLogger(__name__)
@@ -1131,15 +1130,15 @@ def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
 
     # Binning
     for it in range(n_time_bin - 1):
-        i0, i1 = i_time_bins[it:it + 2]
-        temp[it] = np.histogram(depth[i0:i1], i_depth_bins, weights=obs['temp'][i0:i1])[0]
-        sal[it] = np.histogram(depth[i0:i1], i_depth_bins, weights=obs['sal'][i0:i1])[0]
-        denom = np.histogram(depth[i0:i1], i_depth_bins)[0]
+        i_0, i_1 = i_time_bins[it:it + 2]
+        temp[it] = np.histogram(depth[i_0:i_1], i_depth_bins, weights=obs['temp'][i_0:i_1])[0]
+        sal[it] = np.histogram(depth[i_0:i_1], i_depth_bins, weights=obs['sal'][i_0:i_1])[0]
+        denom = np.histogram(depth[i_0:i_1], i_depth_bins)[0]
         temp[it] = np.where(denom == 0, np.nan, temp[it] / denom)
         sal[it] = np.where(denom == 0, np.nan, sal[it] / denom)
-        mean_times.append(time[i0:i1].mean().values)
-        mean_lons.append(lons[i0:i1].mean())
-        mean_lats.append(lats[i0:i1].mean())
+        mean_times.append(time[i_0:i_1].mean().values)
+        mean_lons.append(lons[i_0:i_1].mean())
+        mean_lats.append(lats[i_0:i_1].mean())
 
     # Create xarray dataset
     da_temp = xr.DataArray(data=temp, dims=["time", "depth"])
