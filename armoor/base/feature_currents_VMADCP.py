@@ -1,7 +1,7 @@
 """Create figures for feature 8:currents_VMADCP"""
 import os
 import copy
-from armoor.base.feature_tools import remove_missing_values_ds
+from armoor.base.tools_features import remove_missing_values_ds
 from armoor.base import plot_features
 import armoor.hmi.script_tools as st
 
