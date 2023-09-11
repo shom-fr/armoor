@@ -190,7 +190,7 @@ Example of configuration file for a *global scatter plots* and a *statistical ti
 Run test
 --------
 
-Unit tests verify the correct opening and decoding of observation and model products, as well as the meta zones and some internally calculated variables.
+The 3 unit tests verify the correct opening and decoding of observation and model products, the meta zones and some internally calculated variables.
 To run the unit tests, use the following command::
 
     pytest your_path_to/tests/uni/test_open_data.py
@@ -199,15 +199,15 @@ To run the unit tests, use the following command::
 
 Integration tests verify the accurate running of the required features. To run the integration tests use the following command::
 
-    pytest your_path_to/tests/int/base/test_f1.py
-    pytest your_path_to/tests/int/base/test_f2.py
-    pytest your_path_to/tests/int/base/test_f3.py
-    pytest your_path_to/tests/int/base/test_f4.py
-    pytest your_path_to/tests/int/base/test_f5.py
-    pytest your_path_to/tests/int/base/test_f6.py
-    pytest your_path_to/tests/int/base/test_f7.py
-    pytest your_path_to/tests/int/base/test_f8.py
-    pytest your_path_to/tests/int/base/test_f9.py
+    pytest your_path_to/tests/int/base/test_sst.py
+    pytest your_path_to/tests/int/base/test_prof_hydro_vessel.py
+    pytest your_path_to/tests/int/base/test_prof_hydro_mooring.py
+    pytest your_path_to/tests/int/base/test_section_hydro.py
+    pytest your_path_to/tests/int/base/test_clim_hydro.py
+    pytest your_path_to/tests/int/base/test_currents_hfr.py
+    pytest your_path_to/tests/int/base/test_currents_ADCP.py
+    pytest your_path_to/tests/int/base/test_currents_VMADCP.py
+    pytest your_path_to/tests/int/base/test_drifters.py
     pytest your_path_to/tests/int/base/test_VA.py
 
 Note that for ``test_6`` and ``test_7`` you will need to specify the parameters : ``path_comodo`` and

@@ -2,7 +2,7 @@
 import os
 import copy
 import logging
-from armoor.base.feature_tools import remove_missing_values_ds, sel_one_var, sel_default_vars
+from armoor.base.tools_features import remove_missing_values_ds, sel_one_var, sel_default_vars
 from armoor.base import plot_features
 import armoor.hmi.script_tools as st
 
