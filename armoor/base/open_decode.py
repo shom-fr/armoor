@@ -811,7 +811,7 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         logger.info("woa18")
         data_set_temp = xr.open_mfdataset(path_files, decode_times=False)
         data_set_temp = data_set_temp.drop_vars('depth_bnds')
-        return data_set_temp
+        return data_set_temp.xoa.decode()
 
     if model_type == 'rivers':
         logger.info("rivers")
@@ -841,7 +841,7 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
 
         # Sort the result
         ds_cumul = ds_cumul.sortby('time')
-        return ds_cumul
+        return ds_cumul.xoa.decode()
 
     if model_type == 'atmfrc/insta':
         logger.info("atmfrc - insta")
@@ -875,10 +875,10 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         ds_insta = ds_insta.drop_vars(["step", "time"])
         ds_insta = ds_insta.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
         ds_insta = ds_insta.sortby('time')
-        return ds_insta
+        return ds_insta.xoa.decode()
 
     logger.info("Basic type")
-    return open_forecaster_basic(path_files)
+    return open_decode_basic(path_files)
 
 
 ####################### Tools #######################
@@ -1061,38 +1061,6 @@ def depth_from_press(dataset):
     dataset = dataset.rename({'depth': 'z'})
     adepth = adepth.rename({'depth': 'z'})
     dataset = dataset.assign_coords(depth=adepth)
-    return dataset
-
-
-def open_forecaster_basic(path_files):
-    """
-     Open netcdf file(s) and store it into a ready-to-use dataset.
-     Parameters
-     ----------
-     path_files : str, list of str
-         Path to the netcdf files.
-     Returns
-     -------
-     xarray.Dataset
-         dataset.
-     """
-    # Open
-    if len(path_files) > 1:
-        logger.info("multiple files from list")
-        dataset = xr.open_mfdataset(path_files)
-    else:
-        logger.info("single file")
-        dataset = xr.open_dataset(path_files[0])
-
-    # Regrid if necessary
-    dataset = xoa.grid.to_rect(dataset)
-
-    # Convert depths
-    dataset = convert_depths(dataset)
-
-    # Convert lons
-    dataset = convert_lons(dataset)
-
     return dataset
 
 
