@@ -219,7 +219,8 @@ def create_param_images(config_reg: str,
                                                     param["var"],
                                                     model2plot_xr,
                                                     obs2plot_xr,
-                                                    paths)
+                                                    paths,
+                                                    param.get("obs"))
     logger.info(f'Creating images for all steps : {len(config_reg_times)}')
     # Loop on times to create all images
     param_title = param["name"]
@@ -425,11 +426,12 @@ def get_path2save(reg_time: str,
     return path2save
 
 
-def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names):
+def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names, obs_name):
     """
     Retrieve data to plot and colorbar min and max
     Parameters
     ----------
+    obs_name: observation name
     file_names: file names to decumulate data
     func : visualisation function
     var_m : valiable to plot
@@ -479,9 +481,16 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names):
         obs_da = obs2plot_xr[var_m]
         obs_da = convert_k_c(obs_da)
 
-        flags = True, True, False
+        if 'woa' in obs_name:
+            logger.info('woa')
+            flags = False, True, False
+        else:
+            logger.info('sst')
+            flags = True, True, False
+
         da_obs_coloc, da_model_coloc = colocate_all(obs_da, model_da, flags, "model")
-        difference = da_model_coloc - da_obs_coloc
+        difference = da_model_coloc - da_obs_coloc.squeeze()
+
         cbar_range = np.nanmin(difference), np.nanmax(difference)
         data2plot_all_times = difference
 
