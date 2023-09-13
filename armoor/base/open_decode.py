@@ -230,7 +230,7 @@ def open_decode_cmems(path_files, steps):
         if var in list_to_remove:
             cmems = cmems.drop(var)
 
-    if steps[1]:
+    if steps and steps[1]:
         horizontal_step, vertical_step = steps
         cmems = set_hor_vert_step(cmems, horizontal_step, vertical_step)
 
@@ -357,7 +357,7 @@ def open_decode_vmadcp(path_file, steps=None) -> xr.Dataset:
     # Convert lons
     vmadcp = convert_lons(vmadcp)
 
-    if steps[1]:
+    if steps and steps[1]:
         horizontal_step, vertical_step = steps
         vmadcp = set_hor_vert_step(vmadcp, horizontal_step, vertical_step)
 
@@ -479,8 +479,9 @@ def open_decode_scanfish(path_file, steps):
     scanfish = scanfish.assign_attrs({"type": 'scanfish'})
 
     # Regrid
-    horizontal_step, vertical_step = steps
-    scanfish = set_hor_vert_step_radiales(scanfish, horizontal_step, vertical_step)
+    if steps and steps[1]:
+        horizontal_step, vertical_step = steps
+        scanfish = set_hor_vert_step_radiales(scanfish, horizontal_step, vertical_step)
     return scanfish
 
 
@@ -519,8 +520,9 @@ def open_decode_seasoar(path_file, steps):
     seasoar = seasoar.assign_attrs({"type": 'seasoar'})
 
     # Regrid
-    horizontal_step, vertical_step = steps
-    seasoar = set_hor_vert_step_radiales(seasoar, horizontal_step, vertical_step)
+    if steps and steps.get(1):
+        horizontal_step, vertical_step = steps
+        seasoar = set_hor_vert_step_radiales(seasoar, horizontal_step, vertical_step)
     return seasoar
 
 
