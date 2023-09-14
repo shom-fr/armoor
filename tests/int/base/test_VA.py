@@ -219,7 +219,7 @@ class TestBulletins:
 
         logger.info("test_82_test_variable_3d_PSY4_SCA_nov.ini")
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/82_test_variable_3d_PSY4_SCA_nov.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/82_test_variable_3d_PSY4_SCA.ini"])
         parser.update({'output_path': out_path})
         create_folder(f'tmp')
         dict2call(parser)
