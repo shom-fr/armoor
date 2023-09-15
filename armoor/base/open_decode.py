@@ -520,7 +520,7 @@ def open_decode_seasoar(path_file, steps):
     seasoar = seasoar.assign_attrs({"type": 'seasoar'})
 
     # Regrid
-    if steps and steps.get(1):
+    if steps and steps[1]:
         horizontal_step, vertical_step = steps
         seasoar = set_hor_vert_step_radiales(seasoar, horizontal_step, vertical_step)
     return seasoar
