@@ -228,7 +228,7 @@ def open_decode_cmems(path_files, steps):
     list_to_remove = ['DC_REFERENCE', 'DEPH', 'QC_DEPH']
     for var in list(cmems.keys()):
         if var in list_to_remove:
-            cmems = cmems.drop(var)
+            cmems = cmems.drop_vars(var)
 
     if steps and steps[1]:
         horizontal_step, vertical_step = steps
@@ -561,7 +561,7 @@ def open_decode_croco(path_file):
 
     # Remove duplicate coords
     if 'lon' in croco and 'lon_rho' in croco:
-        croco = croco.drop(['lon', 'lat'])
+        croco = croco.drop_vars(['lon', 'lat'])
 
     # Clean coordinates
     croco = croco.rename(
@@ -569,7 +569,7 @@ def open_decode_croco(path_file):
     for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
                 'eta_v', 'depth_w', 'sig', 's_w']:
         if var in croco:
-            croco = croco.drop(var)
+            croco = croco.drop_vars(var)
 
     # Regrid if necessary
     croco = xoa.grid.to_rect(croco)
@@ -765,7 +765,7 @@ def open_decode_basic(path_files):
     list_to_remove = ['sst_dtime']
     for var in list(dataset.keys()):
         if var in list_to_remove:
-            dataset = dataset.drop(var)
+            dataset = dataset.drop_vars(var)
 
     # Decode
     dataset = dataset.xoa.decode()
