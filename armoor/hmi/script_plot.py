@@ -58,34 +58,24 @@ def hmi_image(data: xr.Dataset,
     legend = cfgm_plots_dict.get('legend').get(func)
     legend.update({"title": title})
     legend.update({"cbar_range": cbar_range})
+    legend.update({"rarification": int(rarification) if rarification else 1})
 
-    rarification = int(rarification) if rarification else 1
+    func_mapping = {
+        "visu_temp": base_map,
+        "visu_sal": base_map,
+        "visu_diff_sst": base_map,
+        "visu_diff_sss": base_map,
+        "visu_solarflux": base_map,
+        'visu_precip': base_map,
+        'visu_mixedlayer_clim': base_map,
+        "visu_mixedlayer": base_map,
+        "visu_current": stream,
+        "visu_windforcing": stream_wind,
+        "visu_runoff": runoff
+    }
 
-    if func in ["visu_temp", "visu_sal", "visu_diff_sst",
-                "visu_diff_sss", "visu_solarflux", 'visu_precip',
-                'visu_mixedlayer_clim', "visu_mixedlayer"]:
-        base_map(data,
-                 legend,
-                 path2save)
-
-    elif func in ["visu_current"]:
-        stream(data,
-               legend,
-               path2save,
-               rarification)
-
-    elif func in ["visu_windforcing"]:
-        stream_wind(data,
-                    legend,
-                    path2save,
-                    rarification)
-
-    elif func == "visu_runoff":
-        runoff(data,
-               legend,
-               cbar_range,
-               path2save)
-
+    if func in func_mapping:
+        func_mapping[func](data, legend, path2save)
     else:
         logger.error(f'{func} is not yet implemented for {title}')
 
@@ -198,8 +188,7 @@ def base_map(data: xr.Dataset, legend: dict, path2save: str):
 
 def stream_wind(data: xr.Dataset,
                 legend: dict,
-                path2save: str,
-                rarification: int):
+                path2save: str):
     """
     Function called to plot wind
     Parameters
@@ -218,6 +207,7 @@ def stream_wind(data: xr.Dataset,
     norm = np.sqrt(data['u'] ** 2 + data['v'] ** 2)
     lon = data['lon']
     lat = data['lat']
+    rarification = legend["rarification"]
 
     axes = base_frame(legend["title"],
                       legend["var_name"],
@@ -243,8 +233,7 @@ def stream_wind(data: xr.Dataset,
 
 def stream(data: xr.Dataset,
            legend: dict,
-           path2save: str,
-           rarification: int):
+           path2save: str):
     """
     Function called to plot current
     Parameters
@@ -263,6 +252,7 @@ def stream(data: xr.Dataset,
     norm = np.sqrt(data['u'] ** 2 + data['v'] ** 2)
     lon = data['lon']
     lat = data['lat']
+    rarification = legend["rarification"]
 
     axes = base_frame(legend["title"],
                       legend["var_name"],
@@ -285,15 +275,16 @@ def stream(data: xr.Dataset,
 
 def runoff(data: xr.Dataset,
            legend: dict,
-           model_time: str,
            path2save: str):
     """
     Function called to plot runoff from rivers
+
+    Note: the cbar_range in legend is use to store the  model time step
+
     Parameters
     ----------
     data : data to plot
     legend : all information needed to customise the plot
-    model_time : model time step
     path2save : path to save the plot
 
     Returns
@@ -307,7 +298,7 @@ def runoff(data: xr.Dataset,
 
     for dataset in data:
         plt.plot(dataset['TIME'], dataset['RVFL'], marker="o")
-    model_time = datetime.strptime(model_time, '%Y-%m-%dT%H:%M')
+    model_time = datetime.strptime(legend["cbar_range"], '%Y-%m-%dT%H:%M')
     axes.axvline(model_time)
     axes.legend([dataset.attrs['platform_name'] for dataset in data])
     plt.gcf().autofmt_xdate()

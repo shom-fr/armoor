@@ -356,7 +356,7 @@ and add the following line by replacing ``/path/to/output/tests/P3/`` with your 
 
 To run tests for all the different parameters, use the following command::
 
-    pytest your_path_to/tests/uni/hmi/test_forecaster_script.py
+    pytest your_path_to/tests/int/hmi/test_forecaster_script.py
 
 In the ``path_p3`` folder, you must have the ``data`` folder containing ``hycom3d_med_20220310``, ``hycom3d_indien_20220310`` and
 ``hycom3d_manga_20220310`` from ``/home/shom_simurep/public_no_ftp/Noveltis_19AC22/Developpement/InterfacePrevisionnistes``.
