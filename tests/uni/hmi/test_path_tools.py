@@ -65,7 +65,7 @@ class TestPathTools:
         input_folder_path = get_input_folder_path()
         config_reg_day = f"{config_reg}_{test_day}"
 
-        assert get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/insta", 'uv') == \
+        assert get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/insta", 'uv').sort() == \
                [os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203090000_0000_ana_insta.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203090000_0001_ana_insta.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203090000_0002_ana_insta.grib'),
@@ -194,8 +194,8 @@ class TestPathTools:
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203100000_0101_fcst_insta.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203100000_0102_fcst_insta.grib')]
 
-        assert get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'tp') == \
-               get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'hfsen') == \
+        assert get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'tp').sort() == \
+               get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'hfsen').sort() == \
                [os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'cumul', 'arpege_202203090000_0001_ana_cumul.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'cumul', 'arpege_202203090000_0002_ana_cumul.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'cumul', 'arpege_202203090000_0003_ana_cumul.grib'),
