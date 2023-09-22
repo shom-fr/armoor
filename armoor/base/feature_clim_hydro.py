@@ -74,8 +74,7 @@ def plot(config_obj):
             # TIME SERIES POINT
             plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point'}
             if output["plot"] in plot_ts_metr_point:
-                plot_features.plot_ts_metr_point(models_var, observation_var,
-                                                 plot_ts_metr_point[output["plot"]], flag_interval,
+                plot_features.plot_ts_metr_point(models_var, observation_var, flag_interval,
                                                  flag_slice, output_path=sub_func_output_folder)
 
             ########################################################################################

@@ -77,7 +77,6 @@ def harmonic_analysis(ds_to_anal, var, path_nc, path_atlas, path_tools, list_wav
 
     # Assign name in ds
     ds_atlas = ds_atlas.assign_attrs({'name': name})
-
     return ds_atlas
 
 

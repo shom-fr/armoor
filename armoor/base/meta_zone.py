@@ -13,6 +13,7 @@ from xoa.regrid import regrid1d
 from matplotlib import path
 
 logger = logging.getLogger(__name__)
+xr.set_options(keep_attrs=True)
 
 
 @xr.register_dataarray_accessor("meta")
@@ -591,7 +592,6 @@ class MetazoneAccessor:
             same Dataset averaged over the vertical slice.
         """
         logger.info("Applying filter - vertical_selection_slice")
-
         ds_group = self._obj.groupby_bins(var_slice, slices)
         liste_ds = []
 
@@ -842,6 +842,19 @@ class MetazoneAccessor:
         dataset = dataset.rename({'date_time': 'time'})
         dataset['interval'] = dataset['interval_label']
         dataset = dataset.drop_vars('interval_label')
+
+        inter_labels = []
+        for inter_label in dataset.interval.data:
+            inter_label = inter_label.split('to')
+            if len(inter_label[0]) > 16:
+                inter_label[0] = inter_label[0][:16]
+                print(inter_label[0])
+            if len(inter_label[1]) > 16:
+                inter_label[1] = inter_label[1][1:17]
+                print(inter_label[1])
+            inter_labels.append(f"{inter_label[0]} to {inter_label[1]}")
+        dataset['interval'] = inter_labels
+
         return dataset
 
     # Overload emulation

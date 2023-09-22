@@ -81,8 +81,7 @@ def plot(config_obj):
                                   }
 
             if output["plot"] in plot_ts_metr_point:
-                plot_features.plot_ts_metr_point(models_var, observation_var,
-                                                 plot_ts_metr_point[output["plot"]], flag_interval,
+                plot_features.plot_ts_metr_point(models_var, observation_var, flag_interval,
                                                  flag_slice, output_path=sub_func_output_folder)
 
             ########################################################################################
@@ -120,7 +119,7 @@ def plot(config_obj):
             # DISP DIAG
             if "diag_disp" in output["plot"]:
                 for i, mod in enumerate(models_var):
-                    plot_features.diag_disp(flag_interval, flag_slice, obs_name, models_name[i],
-                                            output["plot"], mod["xarray_meta_coloc"],
+                    plot_features.diag_disp(flag_interval, flag_slice, output["plot"],
+                                            mod["xarray_meta_coloc"],
                                             observation_var["xarray_meta_coloc"][i],
                                             output_path=sub_func_output_folder)

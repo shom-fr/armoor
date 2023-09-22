@@ -185,10 +185,10 @@ def plot(config_obj):
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    flags = False, True, False
+                    flags = False, False, True
                     tgt_grid = 'observation'
                     ds_obs, ds_mod = colocate_all(ds_obs, ds_mod, flags, tgt_grid,
-                                                  coloc_method='nearest')
+                                                  coloc_method_z='nearest')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
 
@@ -279,10 +279,10 @@ def plot(config_obj):
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    flags = False, True, False
+                    flags = False, False, True
                     tgt_grid = 'observation'
                     ds_obs, ds_mod = colocate_all(ds_obs, ds_mod, flags, tgt_grid,
-                                                  coloc_method='nearest')
+                                                  coloc_method_z='nearest')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
                 ds_models.append(ds_mod)
