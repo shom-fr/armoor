@@ -220,8 +220,7 @@ def plot(config_obj):
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
                     i_mod].to_array()
 
-            plot_features.plot_ts_metr_point(models, observation,
-                                             plot_ts_metr_point[output["plot"]], flag_interval,
+            plot_features.plot_ts_metr_point(models, observation, flag_interval,
                                              flag_slice, output_path=sub_func_output_folder)
         ############################################################################################
         # STATS TIMES SERIES

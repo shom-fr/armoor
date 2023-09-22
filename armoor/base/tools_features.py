@@ -245,13 +245,16 @@ def sel_one_var(observation, models, var):
         var_mod = var
         var_obs = var
 
-    observation_var['xarray_meta'] = observation_var['xarray_meta'][var_obs]
+    # Select variable and add mod/obs name
+    observation_var['xarray_meta'] = observation_var['xarray_meta'][var_obs].assign_attrs(
+        {'name': observation['name']})
     for i_mod, mod in enumerate(models_var):
-        mod["xarray_meta"] = mod["xarray_meta"][var_mod]
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod]
+        mod["xarray_meta"] = mod["xarray_meta"][var_mod].assign_attrs({'name': mod['name']})
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod].assign_attrs(
+            {'name': mod['name']})
         observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][i_mod][
-            var_obs]
-    observation_var['name'] = observation['name']
+            var_obs].assign_attrs({'name': observation['name']})
+
     return observation_var, models_var
 
 

@@ -76,8 +76,6 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_sound_speed()
             elif var == 'geostrophic_current':
                 dataset = self._obj.sel_var.sel_geo_current()
-
-
             liste_ds.append(dataset)
 
         # Remove None datasets
@@ -88,9 +86,13 @@ class SSTAccessor:
             ds_all = liste_ds[0]
         elif len(liste_ds) > 1:
             ds_all = xr.merge(liste_ds)
+
         # Convert to dataset for homogeneous processing
         if not isinstance(ds_all, xr.Dataset):
             ds_all = ds_all.to_dataset()
+
+        # Assign attributes (name especially)
+        ds_all = ds_all.assign_attrs(self._obj.attrs)
 
         return ds_all
 
@@ -254,9 +256,8 @@ class SSTAccessor:
         if sal is not None and cons_temp is not None and pres is not None:
             return gsw.sound_speed(sal, cons_temp, pres)
 
-        logger.warning(
-            "To compute sound speed you need to have salinity, "
-            "potential temperature and depth in your dataset.")
+        logger.warning("To compute sound speed you need to have salinity, "
+                       "potential temperature and depth in your dataset.")
         return self._obj
 
     def sel_mixed_layer_depth(self):
@@ -313,8 +314,9 @@ class SSTAccessor:
             Data array containing SST in Celcius degrees.
         """
 
-        if 'units' in self._obj.attrs and self._obj.attrs['units'] == 'kelvin':
-            return self._obj - 273.15
-        if self._obj.max() > 200:
-            return self._obj - 273.15
+        if 'units' in self._obj.attrs and self._obj.attrs['units'] == 'kelvin' or self._obj.max() > 200:
+            self._obj = self._obj - 273.15
+            self._obj.attrs['units'] = 'degC'
+            return self._obj
+        self._obj.attrs['units'] = 'degC'
         return self._obj
