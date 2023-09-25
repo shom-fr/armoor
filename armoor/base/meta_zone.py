@@ -848,10 +848,8 @@ class MetazoneAccessor:
             inter_label = inter_label.split('to')
             if len(inter_label[0]) > 16:
                 inter_label[0] = inter_label[0][:16]
-                print(inter_label[0])
             if len(inter_label[1]) > 16:
                 inter_label[1] = inter_label[1][1:17]
-                print(inter_label[1])
             inter_labels.append(f"{inter_label[0]} to {inter_label[1]}")
         dataset['interval'] = inter_labels
 
