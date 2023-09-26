@@ -125,7 +125,7 @@ Here are the different possible attributes and their purpose:
 
 * ``rarification`` : rarification factor to reduce quivers density. It is used in the functions *visu_current* and *visu_windforcing*.
 
-* ``multiprocess`` : used for acceleration purposes by parallelization on all model's time steps. Its default value is *True* and it is only set to *False* with the function *visu_mixedlayer_clim*.
+* ``multiprocess`` : used for acceleration purposes by parallelization on all model's time steps. Its default value is *True*.
 
 
 Example
@@ -177,7 +177,6 @@ Example of configuration file::
                 name = Débits des fleuves
                 func = visu_runoff
                 var = RVFL
-                forcing_model = rivers
             [[[param_4]]]
                 name = Précipitations
                 func = visu_precip

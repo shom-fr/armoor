@@ -819,7 +819,9 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         logger.info("rivers")
         data_set_list = []
         for path_list in path_files:
-            data_set_list.append(xr.open_mfdataset(path_files[path_list]))
+            data_set_list.append(xr.open_mfdataset(path_files[path_list],
+                                                   drop_variables=["LATITUDE", "LONGITUDE", "POSITION_QC"])
+                                 )
         return data_set_list
 
     if model_type == 'atmfrc/cumul':
