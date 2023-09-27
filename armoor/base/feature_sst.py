@@ -112,8 +112,7 @@ def plot(config_obj):
                                                 observation_var["xarray_meta_coloc"][i],
                                                 plot_map_metr[output["plot"]], cmap, vmin, vmax,
                                                 output_path=sub_func_output_folder, dvmin=dvmin,
-                                                dvmax=dvmax, mod_name=models_name[i],
-                                                obs_name=obs_name)
+                                                dvmax=dvmax)
 
             ########################################################################################
             # DISP DIAG

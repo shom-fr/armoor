@@ -102,8 +102,7 @@ def plot(config_obj):
                                                     observation_var["xarray_meta_coloc"][i],
                                                     plot_map_metr[output["plot"]], cmap, vmin, vmax,
                                                     output_path=sub_func_output_folder, dvmin=dvmin,
-                                                    dvmax=dvmax, obs_name=obs_name,
-                                                    mod_name=models_name[i])
+                                                    dvmax=dvmax)
                     else:
                         for i_depth, depth in enumerate(
                                 models_var[0]["xarray_meta_coloc"].depth.values):
@@ -125,5 +124,4 @@ def plot(config_obj):
                                                         observation_var["xarray_meta_coloc"][i],
                                                         plot_map_metr[output["plot"]], cmap, vmin,
                                                         vmax, output_path=sub_func_output_folder,
-                                                        dvmin=dvmin, dvmax=dvmax, obs_name=obs_name,
-                                                        mod_name=models_name[i], figname=figname)
+                                                        dvmin=dvmin, dvmax=dvmax)

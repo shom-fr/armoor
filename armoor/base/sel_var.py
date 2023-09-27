@@ -29,7 +29,7 @@ class SSTAccessor:
         self._obj = xarray_obj
         xoa.register_accessors()
         xoa.register_accessors(decode_sigma=True)
-
+        xr.set_options(keep_attrs=True)
         path_cfg = '../../config/cf.cfg'
 
         try:

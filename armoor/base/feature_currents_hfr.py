@@ -38,12 +38,15 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
+    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
+        ['current']).assign_attrs({'name': observation['name']})
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current']).assign_attrs(
+            {'name': mod['name']})
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
+            ['current']).assign_attrs({'name': mod['name']})
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current'])
+            i_mod].sel_var.selection(['current']).assign_attrs({'name': observation['name']})
 
     for output in outputs:
         if output_path:
@@ -112,20 +115,20 @@ def plot(config_obj):
             # Proceed harmonic analysis on obs
             ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
                                                            path_nc, path_results, path_tools,
-                                                           list_waves, 'obs', env_comodo=env_comodo)
+                                                           list_waves, env_comodo=env_comodo)
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on mod
                 path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
                 ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc,
                                                                path_results, path_tools, list_waves,
-                                                               'mod', env_comodo=env_comodo)
+                                                               env_comodo=env_comodo)
                 flags = False, True, False
                 tgt_grid = coloc_product
                 obs_coloc, mod_coloc = colocate_all(ds_obs, ds_mod, flags, tgt_grid,
                                                     coloc_method='nearest')
 
                 # Plot the maps
-                plot_features.plot_map_harm(mod_coloc, obs_coloc, models_name[i_mod], obs_name,
+                plot_features.plot_map_harm(mod_coloc, obs_coloc,
                                             output_path=sub_func_output_folder)
 
         ############################################################################################
@@ -172,7 +175,7 @@ def plot(config_obj):
             # Proceed harmonic analysis on obs
             ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
                                                            path_nc, path_results, path_tools,
-                                                           list_waves, 'obs', env_comodo=env_comodo)
+                                                           list_waves, env_comodo=env_comodo)
 
             ds_models = []
             for i_mod, mod in enumerate(models):
@@ -180,7 +183,7 @@ def plot(config_obj):
                 path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
                 ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc,
                                                                path_results, path_tools, list_waves,
-                                                               'mod', env_comodo=env_comodo)
+                                                               env_comodo=env_comodo)
                 ds_models.append(ds_mod)
             # Plot the maps
             plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale,
@@ -220,8 +223,8 @@ def plot(config_obj):
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
                     i_mod].to_array()
 
-            plot_features.plot_ts_metr_point(models, observation, flag_interval,
-                                             flag_slice, output_path=sub_func_output_folder)
+            plot_features.plot_ts_metr_point(models, observation, flag_interval, flag_slice,
+                                             output_path=sub_func_output_folder)
         ############################################################################################
         # STATS TIMES SERIES
         plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
@@ -239,12 +242,15 @@ def plot(config_obj):
             plg = config_obj["meta_zones"].get("polygon")
 
             # Remove missing values
-            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
+            observation['xarray_meta'] = observation['xarray_meta'][
+                attribute].to_dataset().assign_attrs({'name': observation['name']})
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
+                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset().assign_attrs(
+                    {'name': mod['name']})
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][
+                    attribute].to_dataset().assign_attrs({'name': mod['name']})
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][
-                    attribute].to_dataset()
+                    attribute].to_dataset().assign_attrs({'name': observation['name']})
                 models[i_mod] = mod
                 # Remove missing values
                 models, observation = remove_missing_values_ds(models, observation, i_mod,
