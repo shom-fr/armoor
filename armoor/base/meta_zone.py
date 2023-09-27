@@ -479,6 +479,8 @@ class MetazoneAccessor:
         if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
             dataset['depth'] = -dataset['depth']
             depth = -depth
+            if np.size(depth) != 1 and depth[0] > depth[-1]:
+                depth = np.flip(depth)
 
         # Create target depth(s) dataset
         if np.size(depth) == 1:
@@ -508,6 +510,9 @@ class MetazoneAccessor:
             tgt_ds['depth'] = -tgt_ds['depth']
 
         tgt_ds = tgt_ds.squeeze()
+        # Reindex depths if necessary
+        if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0]>tgt_ds.depth.data[-1]:
+            tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
 
         return tgt_ds
 
@@ -827,8 +832,10 @@ class MetazoneAccessor:
         liste_ds = []
 
         for label, dataset in ds_group:
-            label = str(label)[1:-1].replace(", ", " to ") + ' '
-            dataset['interval_label'] = label.replace(':00 ', ' ')
+            label = str(label)[1:-1].split(',')
+            label0 = np.datetime_as_string(np.datetime64(label[0]), unit='h')
+            label1 = np.datetime_as_string(np.datetime64(label[1]), unit='h')
+            dataset['interval_label'] = f"{label0} to {label1}"
             liste_ds.append(dataset)
 
         for i_ds, dataset in enumerate(liste_ds):
@@ -843,19 +850,8 @@ class MetazoneAccessor:
         dataset['interval'] = dataset['interval_label']
         dataset = dataset.drop_vars('interval_label')
 
-        inter_labels = []
-        for inter_label in dataset.interval.data:
-            inter_label = inter_label.split('to')
-            if len(inter_label[0]) > 16:
-                inter_label[0] = inter_label[0][:16]
-            if len(inter_label[1]) > 16:
-                inter_label[1] = inter_label[1][1:17]
-            inter_labels.append(f"{inter_label[0]} to {inter_label[1]}")
-        dataset['interval'] = inter_labels
-
         return dataset
 
-    # Overload emulation
     def time_selection_climatological(self, cycle: str):
         """
                 Subset dataset filtering elements along time dimension, selecting dates within

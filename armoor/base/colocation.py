@@ -60,6 +60,7 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             logger.info('Colocating the model on the observation grid')
             obs_coloc = obs
             mod_coloc = mod
+
             # If observation is profiler
             if 'time' in obs.lon.dims and len(obs.time) > 1:
                 logger.info('Profiler type colocation')
@@ -95,6 +96,7 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             # Vertical colocation
             if ver_flag:
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
+
     return obs_coloc, mod_coloc
 
 
@@ -119,8 +121,7 @@ def temporal_colocation(ds_to_coloc, tgt, coloc_method):
     logger.info('Time colocation')
     time_values = np.unique(tgt.time.values)
     if len(ds_to_coloc.time.data) > 1:
-        ds_to_coloc = ds_to_coloc.interp(time=time_values, method=coloc_method,
-                                         kwargs={"fill_value": "extrapolate"})
+        ds_to_coloc = ds_to_coloc.interp(time=time_values, method=coloc_method)
     else:
         ds_to_coloc = pick_time(ds_to_coloc, time_values)
 

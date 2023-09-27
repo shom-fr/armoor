@@ -7,7 +7,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def harmonic_analysis(ds_to_anal, var, path_nc, path_atlas, path_tools, list_waves, name,
+def harmonic_analysis(ds_to_anal, var, path_nc, path_atlas, path_tools, list_waves,
                       env_comodo=''):
     """
     Run the harmonic analysis to retrive the amplitude, phase of each tidal component. Can be used
@@ -28,8 +28,6 @@ def harmonic_analysis(ds_to_anal, var, path_nc, path_atlas, path_tools, list_wav
     list_waves : str
         List of the waves to include in the harmonic analysis. Ex: "M2 S2 K1 O1 P1 Q1 N2 2N2 L2 La2
         E2 L2 J1 Mu2 Nu2".
-    name : str
-        Model or observation name to be used in the result file name.
     env_comodo : str
         Commandline to load the comodo environment
     Returns
@@ -37,6 +35,8 @@ def harmonic_analysis(ds_to_anal, var, path_nc, path_atlas, path_tools, list_wav
     ds_atlas : xarray.Dataset
         Dataset with the results of the harmonic analysis.
     """
+    # Name of the dataset
+    name = ds_to_anal.attrs['name']
     # Clean dataset
     if 'time' in ds_to_anal.lon.dims:
         lon = ds_to_anal.lon.values[0]

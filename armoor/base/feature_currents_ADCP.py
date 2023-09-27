@@ -78,9 +78,12 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
-            # Remove missing values
+            # Select attribute in good format
             def to_ds_with_coords(dataset, attribute):
-                return dataset[attribute].to_dataset().assign_coords(dataset.coords)
+                dataset_coords = dataset[attribute].to_dataset().assign_coords(dataset.coords)
+                dataset_coords = dataset_coords.assign_attrs(dataset.attrs)
+                dataset_coords = dataset_coords.assign_attrs(dataset[attribute].attrs)
+                return dataset_coords
 
             observation['xarray_meta'] = to_ds_with_coords(observation['xarray_meta'], attribute)
             for i_mod, mod in enumerate(models):
@@ -101,7 +104,6 @@ def plot(config_obj):
                 mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
                     i_mod].to_array()
-
             plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax, dvmin, dvmax,
                                            output_path=sub_func_output_folder)
 
@@ -157,7 +159,8 @@ def plot(config_obj):
             # Calculate harmonic analysis
             ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
                                                            path_nc, path_results, path_tools,
-                                                           list_waves, 'obs', env_comodo=env_comodo)
+                                                           list_waves,
+                                                           env_comodo=env_comodo)
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
             # Re-add the depth / slice values
@@ -178,7 +181,7 @@ def plot(config_obj):
                 # Calculate harmonic analysis
                 ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'], 'u v',
                                                                path_nc, path_results, path_tools,
-                                                               list_waves, 'mod',
+                                                               list_waves,
                                                                env_comodo=env_comodo)
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
 
@@ -250,7 +253,7 @@ def plot(config_obj):
             # Calculate harmonic analysis
             ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
                                                            path_nc, path_results, path_tools,
-                                                           list_waves, 'obs', env_comodo=env_comodo)
+                                                           list_waves, env_comodo=env_comodo)
 
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
@@ -272,7 +275,7 @@ def plot(config_obj):
                 # Calculate harmonic analysis
                 ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'], 'u v',
                                                                path_nc, path_results, path_tools,
-                                                               list_waves, 'mod',
+                                                               list_waves,
                                                                env_comodo=env_comodo)
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
 
