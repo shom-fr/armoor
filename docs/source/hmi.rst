@@ -177,6 +177,7 @@ Example of configuration file::
                 name = Débits des fleuves
                 func = visu_runoff
                 var = RVFL
+                forcing_model = rivers
             [[[param_4]]]
                 name = Précipitations
                 func = visu_precip
@@ -194,7 +195,6 @@ Example of configuration file::
                 func = visu_mixedlayer_clim
                 var = temp
                 forcing_model = woa18
-                multiprocess = False
             [[[param_3]]]
                 name = Champ de flux solaire ayant forcé le modèle
                 func = visu_solarflux
