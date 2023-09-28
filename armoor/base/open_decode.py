@@ -251,7 +251,7 @@ def open_decode_l_adcp(path_file):
         L-ADCP observation dataset.
     """
     # Read the .txt file
-    file = pd.read_csv(path_file, sep='\t')
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
 
     # List the index labels of the measurements
     idx_stations = np.unique(file['Station'])
@@ -314,7 +314,7 @@ def open_decode_vmadcp(path_file, steps=None) -> xr.Dataset:
         VMADCP observation dataset.
     """
     # Read the .txt file
-    file = pd.read_csv(path_file, sep='\t')
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
 
     # List the index labels of the measurements
     idx_stations = np.unique(file['Station'])
@@ -378,7 +378,7 @@ def open_decode_mouillages(path_file):
         mooring observation dataset.
     """
     # Read the .txt file
-    file = pd.read_csv(path_file, sep='\t')
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
 
     # Rename the columns
     for col in file.columns.tolist():
@@ -459,7 +459,7 @@ def open_decode_scanfish(path_file, steps):
         scanfish observation dataset.
     """
     # Read the .txt file
-    file = pd.read_csv(path_file, sep='\t')
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
     depth = file['DepSM']
     time = (file["TimeJ"] * 24 * 3600 * np.timedelta64(1, 's')) + np.datetime64('1970-01-01') + \
            file["TimeY"] * np.timedelta64(1, 's')
@@ -500,7 +500,7 @@ def open_decode_seasoar(path_file, steps):
         seasoar observation dataset.
     """
     # Read the .txt file
-    file = pd.read_csv(path_file, sep='\t')
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
     depth = file['DepSM']
     time = (file["TimeJ"] * 24 * 3600 * np.timedelta64(1, 's')) + np.datetime64('2000-01-01') + \
            file["TimeQ"] * np.timedelta64(1, 's')
@@ -589,7 +589,7 @@ def open_decode_croco(path_file):
         croco = croco.rename({'lat_u': 'lat'})
 
     # Assign croco attrs
-    croco = croco.assign_attrs({'type':'CROCO'})
+    croco = croco.assign_attrs({'type': 'CROCO'})
 
     return croco
 
@@ -823,8 +823,8 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         data_set_list = []
         for path_list in path_files:
             data_set_list.append(xr.open_mfdataset(path_files[path_list],
-                                                   drop_variables=["LATITUDE", "LONGITUDE", "POSITION_QC"])
-                                 )
+                                                   drop_variables=["LATITUDE", "LONGITUDE",
+                                                                   "POSITION_QC"]))
         return data_set_list
 
     if model_type == 'atmfrc/cumul':
@@ -839,9 +839,8 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
             dss_cumul = list(executor.map(open_dataset, cumul_gribs))
 
         # Use Dask to parallelize and concatenate the datasets
-        dask_dss_cumul = [dask.delayed(ds.drop_vars(["time", "surface"])
-                                       .rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"}))
-                          for ds in dss_cumul]
+        dask_dss_cumul = [dask.delayed(ds.drop_vars(["time", "surface"]).rename(
+            {"longitude": "lon", "latitude": "lat", "valid_time": "time"})) for ds in dss_cumul]
 
         # Compute the concatenated result using Dask
         ds_cumul = xr.concat(dask.compute(*dask_dss_cumul), dim="time")
@@ -855,18 +854,10 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         insta_gribs = path_files
 
         def open_dataset_for_level(grib, level):
-            return xr.open_dataset(
-                grib,
-                engine="cfgrib",
-                backend_kwargs={
-                    "indexpath": "",
-                    "filter_by_keys": {
-                        "edition": 2,
-                        "level": level
+            return xr.open_dataset(grib, engine="cfgrib",
+                backend_kwargs={"indexpath": "", "filter_by_keys": {"edition": 2, "level": level
                     }
-                },
-                drop_variables=["heightAboveGround", "meanSea", "surface"]
-            )
+                    }, drop_variables=["heightAboveGround", "meanSea", "surface"])
 
         # Use parallel processing to load datasets
         dss_insta = []
