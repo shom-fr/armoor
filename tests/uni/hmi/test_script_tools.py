@@ -11,11 +11,11 @@ copy_test_files()
 class TestScriptTools:
 
 
-    def test_decumul(self):
-        test_name = 'decumul'
+    def test_decumul_med(self):
+        test_name = 'decumul_med'
         _, logger = change_path(f'test_{test_name}')
 
-        config_reg = f'{model}_{config}'
+        config_reg = f'{model}_med'
         input_folder_path = get_input_folder_path()
         config_reg_day = f"{config_reg}_{test_day}"
 
@@ -23,10 +23,56 @@ class TestScriptTools:
         list_cut, cumul_time_in_h = get_cumul_info(cumul_data_paths)
 
         assert list_cut == [6, 6, 6, 6, 42]
-        assert all(cumul_time_in_h == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                                       1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3,
-                                       3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3])
+        assert all(cumul_time_in_h == [1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                                       3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+                                       3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+                                       3, 3, 3, 3, 3, 3, 3, 3, 3, 3])
 
+    def test_decumul_indien(self):
+        test_name = 'decumul_indien'
+        _, logger = change_path(f'test_{test_name}')
+
+        config_reg = f'{model}_indien'
+        input_folder_path = get_input_folder_path()
+        config_reg_day = f"{config_reg}_{test_day}"
+
+        cumul_data_paths = get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'tp')
+        list_cut, cumul_time_in_h = get_cumul_info(cumul_data_paths)
+
+        assert list_cut == [2, 1, 1, 1, 34]
+        assert all(cumul_time_in_h == [3, 3,
+                                       6,
+                                       6,
+                                       6,
+                                       3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+                                       3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3])
+
+    def test_decumul_manga(self):
+        test_name = 'decumul_manga'
+        _, logger = change_path(f'test_{test_name}')
+
+        config_reg = f'{model}_manga'
+        input_folder_path = get_input_folder_path()
+        config_reg_day = f"{config_reg}_{test_day}"
+
+        cumul_data_paths = get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'tp')
+        list_cut, cumul_time_in_h = get_cumul_info(cumul_data_paths)
+
+        assert list_cut == [6, 6, 6, 6, 32]
+        assert all(cumul_time_in_h == [1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1,
+                                       1, 1, 1, 1, 1, 1, 21,
+                                       3, 3, 3, 3, 3,
+                                       3, 3, 3, 3, 3,
+                                       3, 3, 3, 3, 3,
+                                       3, 3, 3, 3, 3,
+                                       3, 3, 3, 3, 3])
 
 
     def test_times(self):
