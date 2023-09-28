@@ -164,11 +164,12 @@ def plot(config_obj):
                 mod_traj = opendrift_trajectory.calculate_trajectory(path_model, lons, lats, times,
                                                                      time_step, nb_step,
                                                                      output_file)
-                models[i_mod]['traj'] = mod_traj
+                models[i_mod]['traj'] = mod_traj.assign_attrs({'name': mod['name']})
 
-            # Plot the trajectories
-            plot_features.plot_difference_trajectory(observation['xarray_meta'], models[0]['traj'],
-                                                     output_path=sub_func_output_folder)
+                # Plot the trajectories
+                plot_features.plot_difference_trajectory(observation['xarray_meta'],
+                                                         models[i_mod]['traj'],
+                                                         output_path=sub_func_output_folder)
 
 
 ####################################################################################################
