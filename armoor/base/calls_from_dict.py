@@ -70,10 +70,12 @@ def get_observation_models_meta(config_obj: dict):
     observation.update({"xarray": open_decode(observation.pop("path"), config_obj['functionality'],
                                               obs_type, steps=steps)
                         })
+    observation['xarray'] = observation['xarray'].assign_attrs({'name': observation.get("name")})
     logger.info("Applying : decode and meta zone on observation")
     observation.update({"xarray_meta": apply_metas2dataset(observation["xarray"], config_obj,
                                                            get_method(observation))
                         })
+
     logger.info("File(s) read for observation")
 
     # Open model dataset from path then decode dataset and apply meta-zone
@@ -86,6 +88,7 @@ def get_observation_models_meta(config_obj: dict):
         logger.info("Opening model from file(s)")
         model.update(
             {"xarray": open_decode(model.pop("path"), config_obj['functionality'], mod_type)})
+        model['xarray'] = model['xarray'].assign_attrs({'name': model.get("name")})
         logger.info("Applying : decode and meta zone on model")
         model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj,
                                                          get_method(model), mod_obs='mod')
@@ -133,6 +136,8 @@ def get_observation_models_meta(config_obj: dict):
                 var_slice = 'depth'
             elif 'dens' in config_obj["meta_zones"]:
                 var_slice = 'dens'
+            else:
+                var_slice = 'depth'
 
             logger.info('Découpage par tranches verticales sur la variable %s', var_slice)
             if horizontal_colocation_flag or vertical_colocation_flag:

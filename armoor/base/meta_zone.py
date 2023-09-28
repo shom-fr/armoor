@@ -13,6 +13,7 @@ from xoa.regrid import regrid1d
 from matplotlib import path
 
 logger = logging.getLogger(__name__)
+xr.set_options(keep_attrs=True)
 
 
 @xr.register_dataarray_accessor("meta")
@@ -478,6 +479,8 @@ class MetazoneAccessor:
         if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
             dataset['depth'] = -dataset['depth']
             depth = -depth
+            if np.size(depth) != 1 and depth[0] > depth[-1]:
+                depth = np.flip(depth)
 
         # Create target depth(s) dataset
         if np.size(depth) == 1:
@@ -507,6 +510,9 @@ class MetazoneAccessor:
             tgt_ds['depth'] = -tgt_ds['depth']
 
         tgt_ds = tgt_ds.squeeze()
+        # Reindex depths if necessary
+        if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0]>tgt_ds.depth.data[-1]:
+            tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
 
         return tgt_ds
 
@@ -591,7 +597,6 @@ class MetazoneAccessor:
             same Dataset averaged over the vertical slice.
         """
         logger.info("Applying filter - vertical_selection_slice")
-
         ds_group = self._obj.groupby_bins(var_slice, slices)
         liste_ds = []
 
@@ -827,8 +832,10 @@ class MetazoneAccessor:
         liste_ds = []
 
         for label, dataset in ds_group:
-            label = str(label)[1:-1].replace(", ", " to ") + ' '
-            dataset['interval_label'] = label.replace(':00 ', ' ')
+            label = str(label)[1:-1].split(',')
+            label0 = np.datetime_as_string(np.datetime64(label[0]), unit='h')
+            label1 = np.datetime_as_string(np.datetime64(label[1]), unit='h')
+            dataset['interval_label'] = f"{label0} to {label1}"
             liste_ds.append(dataset)
 
         for i_ds, dataset in enumerate(liste_ds):
@@ -842,9 +849,9 @@ class MetazoneAccessor:
         dataset = dataset.rename({'date_time': 'time'})
         dataset['interval'] = dataset['interval_label']
         dataset = dataset.drop_vars('interval_label')
+
         return dataset
 
-    # Overload emulation
     def time_selection_climatological(self, cycle: str):
         """
                 Subset dataset filtering elements along time dimension, selecting dates within
