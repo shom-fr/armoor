@@ -644,6 +644,7 @@ def open_decode_hycom_currents(path_files):
 
     # Convert lons
     hycom = convert_lons(hycom)
+
     return hycom
 
 

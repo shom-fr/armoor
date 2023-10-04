@@ -322,12 +322,13 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
 
                 xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath,
                                                                         maximum=max_bath)
+            else:
+                logger.warning("Caution ! No bathymetry variable was found in the product.")
 
         # Radius for ADCP feature
         if "radius" in config_obj["meta_zones"] and mod_obs == 'mod' and config_obj[
             "functionality"] in ['ADCP']:
             xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
-
         # Other meta-zones, one by one
         for name, meta_filter in filters.items():
             if name in config_obj["meta_zones"]:

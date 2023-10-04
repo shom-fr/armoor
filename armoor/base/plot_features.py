@@ -40,8 +40,42 @@ xr.set_options(keep_attrs=True)
 
 
 def get_title_figname(figtitle, obs, mod_name, obs_name):
+    """
+    Provides generic figure title and file name.
+    Parameters
+    ----------
+    figtitle : str
+        title of the figure
+    obs : xr.dataset
+        dataset from which to retrieve the lon/lat/time/depth information
+    mod_name : str
+        model name
+    obs_name : str
+        observation name
+
+    Returns
+    -------
+    title : str
+        figure title to display
+    figname : str
+        name of the figure to save
+
+    """
+    # Adapt figtitle
+    if "RMSEc" in figtitle:
+        figtitle = figtitle.replace("RMSEc", 'centered RMSE')
+
     # Variable
     if 'Theta-S' in figtitle:
+        title_type = f"{figtitle}"
+        var_name = ''
+    elif "tidal wave" in figtitle:
+        title_type = f"{figtitle}"
+        var_name = ''
+    elif "Stick plot" in figtitle:
+        title_type = f"{figtitle}"
+        var_name = 'current'
+    elif "rajector" in figtitle:  # for trajectories
         title_type = f"{figtitle}"
         var_name = ''
     else:
@@ -94,28 +128,35 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
                 time = f"{time_min}_to_{time_max}"
 
     # Depth
-    if 'slice' in obs.dims:
-        title_depth = f"Slice: {obs.slice.data}"
-        depth = obs.slice.data
-    elif 'depth' in obs.dims and len(obs.depth) > 1:
-        title_depth = f"Depth: {min(obs.depth.values):.4f}m to {max(obs.depth.values):.4f}m"
-        depth = f"{min(obs.depth.values):.2f}m_to_{max(obs.depth.values):.2f}m"
-    elif 'dens' in obs.dims and len(obs.dens) > 1:
-        title_depth = f"Density: {min(obs.dens.values):.4f} to {max(obs.dens.values):.4f}"
-        depth = f"{min(obs.dens.values):.2f}_to_{max(obs.dens.values):.2f}"
-    elif 'depth' in obs.dims and len(obs.depth) == 1:
-        title_depth = f"Depth: {obs.depth.values}m"
-        depth = obs.depth.values
+    if 'profile' in figtitle:
+        title_depth = ""
+        depth = f"{min(obs.depth.values):.1f}m_to_{max(obs.depth.values):.1f}m"
+    elif 'slice' in obs.dims:
+        title_depth = f"Slice: {obs.slice.data}m"
+        depth = f"{obs.slice.data}m"
+    elif 'depth' in obs.coords and np.size(obs.depth) > 1:
+        title_depth = f"Depth: {min(obs.depth.values):.1f}m to {max(obs.depth.values):.1f}m"
+        depth = f"{min(obs.depth.values):.1f}m_to_{max(obs.depth.values):.1f}m"
+    elif 'dens' in obs.dims and np.size(obs.dens) > 1:
+        title_depth = f"Density: {min(obs.dens.values):.1f} to {max(obs.dens.values):.1f}"
+        depth = f"{min(obs.dens.values):.1f}m_to_{max(obs.dens.values):.1f}m"
+    elif 'depth' in obs.coords and np.size(obs.depth) == 1:
+        if obs.depth.data.shape == (1,):
+            title_depth = f"Depth: {obs.depth.values[0]:.1f}m"
+            depth = f"{obs.depth.values[0]:.1f}m"
+        else:
+            title_depth = f"Depth: {obs.depth.values:.1f}m"
+            depth = f"{obs.depth.values:.1f}m"
     elif 'dens' in obs.dims and len(obs.dens) == 1:
-        title_depth = f"Density: {obs.dens.values:.4f}"
-        depth = f"{obs.dens.values:.2f}"
+        title_depth = f"Density: {obs.dens.values:.1f}"
+        depth = f"{obs.dens.values:.1f}"
     else:
         title_depth = "Depth : 0 m"
-        depth = 0
+        depth = '0m'
 
     # Results
     title = f"{title_type}\n" \
-            f"Model(s) : {mod_name} - Observation : {obs_name}\n" \
+            f"Model(s) : {mod_name} \nObservation : {obs_name}\n" \
             f"{title_time}" \
             f"{title_loc} {title_depth}"
 
@@ -247,7 +288,7 @@ def figure_3_maps(ds, type):
 
     axs = [ax0, ax1, ax2]
     if type == 'harm':
-        labels = [LABELS_MAP_HARM[0], LABELS_MAP_HARM[3], LABELS_MAP_HARM[4]]
+        labels = [LABELS_MAP_HARM[0], LABELS_MAP_HARM[2], LABELS_MAP_HARM[4]]
     elif type == 'classic':
         labels = [LABELS_MAP[0], LABELS_MAP[3], LABELS_MAP[4]]
 
@@ -1300,10 +1341,11 @@ def plot_difference_trajectory(obs, mod, output_path=None):
             distances.append(distance.values)
 
     # Get title and fignames
-    _, figname = get_title_figname('Difference trajectory', obs, mod.attrs['name'],
-                                   obs.attrs['name'])
+    title, figname = get_title_figname('Difference trajectory', obs, mod.attrs['name'],
+                                       obs.attrs['name'])
     # Plot
-    f = plt.figure(figsize=(20, 20))
+    f = plt.figure(figsize=(10, 10))
+    f.suptitle(title, fontsize=15, fontweight='bold')
     ax0 = plt.subplot2grid((2, 1), (0, 0))
     ax1 = plt.subplot2grid((2, 1), (1, 0))
     ax0.plot(mod.time, distances)
@@ -1377,7 +1419,7 @@ def plot_map_harm(models, observations, output_path=None):
                                        cmap=cmocean.cm.balance, transform=ccrs.PlateCarree())
 
             # Add the colorbar, titles etc.
-            title, figname = get_title_figname(f'{wave_name} tidal wave', observation,
+            title, figname = get_title_figname(f'{wave_name} tidal wave {var}', observation,
                                                model.attrs['name'], observation.attrs['name'])
             f.suptitle(title, fontsize=15, fontweight='bold')
 
@@ -1812,8 +1854,7 @@ def add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, nb_vect=50
     for i_ds, ds in enumerate([obs_meta, obs_coloc, mod_meta, mod_coloc]):
         if 'lon' in ds.dims:
             dens = int(len(ds.lon.values) / nb_vect)
-            if dens < 1:
-                dens = 1
+            dens = max(dens, 1)
 
             indexes_dens_lon = np.arange(0, len(ds.lon), dens)
             indexes_dens_lat = np.arange(0, len(ds.lat), dens)
@@ -1822,8 +1863,7 @@ def add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, nb_vect=50
                              ds_dens.v.values, transform=ccrs.PlateCarree())
         elif 'x' in ds.dims:
             dens = int(len(ds.x.values) / nb_vect)
-            if dens < 1:
-                dens = 1
+            dens = max(dens, 1)
             indexes_dens_x = np.arange(0, len(ds.x), dens)
             indexes_dens_y = np.arange(0, len(ds.y), dens)
             ds_dens = ds.isel(x=indexes_dens_x, y=indexes_dens_y)
@@ -2076,8 +2116,8 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
         ax.invert_yaxis()
 
     # Add the colorbar, titles etc.
-    title, figname = get_title_figname('3D variable', obs_meta_coloc, obs_meta_coloc.attrs['name'],
-                                       mod_meta_coloc.attrs['name'])
+    title, figname = get_title_figname('3D variable', obs_meta_coloc, mod_meta_coloc.attrs['name'],
+                                       obs_meta_coloc.attrs['name'])
     _, var_unit = find_var_title(obs_meta_coloc)
 
     f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
@@ -2137,7 +2177,7 @@ def plot_variable_2d(models, observation, output_path=None):
 
 def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
     """
-    Plot 2d figure, Hovmoller diagram.
+    Plot 2d figure.
     Parameters
     ----------
     obs_meta_coloc : xarray.dataset
@@ -2150,7 +2190,7 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
         Path where to save the figures.
 
     """
-    logger.info('2D figure, Hovmoller diagram.')
+    logger.info('2D figure, time series')
     # Squeeze
     mod_meta_coloc, obs_meta_coloc = mod_meta_coloc.squeeze(), obs_meta_coloc.squeeze()
 
@@ -2461,7 +2501,8 @@ def plot_profile_unique(models, observation, radius, output_path=None):
             ax.plot(mod_nearest - mod_buffer_std, -1 * mod_nearest.depth, linewidth=0.01)
             ax.fill_betweenx(-1 * mod_nearest.depth.values,
                              (mod_nearest - mod_buffer_std).squeeze(),
-                             (mod_nearest + mod_buffer_std).squeeze(), alpha=0.2)
+                             (mod_nearest + mod_buffer_std).squeeze(), alpha=0.2,
+                             label=f'{mod["name"]} +/- std')
 
         # Add the plot features
         plt.legend()
@@ -2470,8 +2511,8 @@ def plot_profile_unique(models, observation, radius, output_path=None):
         ax.set_ylabel('Depth [m]', fontsize=12)
         ax.set_xlabel(var_title, fontsize=12)
 
-        title, figname = get_title_figname(f"Unique profile radius {radius}", obs, mod["name"],
-                                           obs.attrs['name'])
+        title, figname = get_title_figname(f"Unique profile radius {radius}km", obs,
+                                           [mod["name"] for mod in models], obs.attrs['name'])
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
         # Add the mini-map
@@ -2497,18 +2538,20 @@ def plot_profile_multi(models, observation, radius, output_path=None):
 
     """
     logger.info('Multi vertical profiles')
-    # Whole period
-    linewidth = 0.3
-    plot_profile_multi_figure(models, observation, radius, linewidth, output_path)
 
-    # Each interval
-    for i_inter, _ in enumerate(observation.interval):
-        obs = observation.isel(interval=[i_inter])
-        linewidth = 0.6
-        plot_profile_multi_figure(models, obs, radius, linewidth, output_path)
+    for mod in models:
+        # Whole period
+        linewidth = 0.3
+        plot_profile_multi_figure(mod, observation, radius, linewidth, output_path)
+
+        # Each interval
+        for i_inter, _ in enumerate(observation.interval):
+            obs = observation.isel(interval=[i_inter])
+            linewidth = 0.6
+            plot_profile_multi_figure(mod, obs, radius, linewidth, output_path)
 
 
-def plot_profile_multi_figure(models, observation, radius, linewidth, output_path=None):
+def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=None):
     """
     Create the multi vertical profiles figures of a variable for feature 2
     Parameters
@@ -2528,42 +2571,40 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
 
     # Plot the profiles
     f, ax = figure_1_profile()
-    dict_mod = {}
 
+    mod_buffer_all_points = []
     #  "en traits fins, tous les profils observés"
     for i_inter, _ in enumerate(observation.interval):
         for i_idx_time, _ in enumerate(observation.idx_time):
-            obs = observation.isel(idx_time=[i_idx_time], interval=[i_inter]).squeeze()
+            obs = observation.isel(idx_time=i_idx_time, interval=i_inter).squeeze()
             ax.plot(obs.values, -1 * obs.depth, c="k", linewidth=linewidth,
-                    label=f'{obs.attrs["name"]}')
+                    label=f'Mean {obs.attrs["name"]}')
 
             # "en traits fins les profils modèles des disques définis
             # et temporellement les plus proches"
-            for i_mod, mod in enumerate(models):
-                dict_mod[str(i_mod)] = []
 
-                points = [obs.lon.data], [obs.lat.data]
-                time = obs.time.values
-                var = mod["xarray_meta"].name
-                mod_sel = mod["xarray"].sel(time=time, method='nearest')[var]
+            points = [obs.lon.data], [obs.lat.data]
+            var = mod["xarray_meta"].name
+            time = obs.time.values
 
-                mod_buffer = mod_sel.meta.horizontal_selection_cloud_dots(points, radius)
-                dict_mod[str(i_mod) + 'depth'] = mod_buffer.depth.values
-                for i_idx_point, _ in enumerate(mod_buffer.idx_point):
-                    mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
-                    dict_mod[str(i_mod)].append(mod_buffer_idx.values)
-                    ax.plot(mod_buffer_idx.values, -1 * mod_buffer_idx.depth, c=COLORS[i_mod],
-                            linewidth=linewidth, label=f'{mod["name"]}')
+            mod_sel = mod["xarray"].sel(time=time, method='nearest')[var]
+
+            mod_buffer = mod_sel.meta.horizontal_selection_cloud_dots(points, radius)
+            if len(mod_buffer.idx_point) > 0:
+                mod_buffer_all_points.append(mod_buffer)
+            for i_idx_point, _ in enumerate(mod_buffer.idx_point):
+                mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
+                ax.plot(mod_buffer_idx.values, -1 * mod_buffer_idx.depth.values, c="tab:blue",
+                        linewidth=linewidth, label=f'{mod["name"]}')
 
     # "en trait épais le profil moyen des observations" + "zone grisée observation"
-    add_std_profile(ax, observation, observation.depth, '.3', f'Mean {observation.attrs["name"]}')
+    add_std_profile(ax, observation, observation.depth, '.3', f'{observation.attrs["name"]}')
 
-    # "en trait épais, le profil moyen modèle(moyenne sur les disques)"
+    # "en trait épais, le profil moyen modèle (moyenne sur les disques)" + "zone grisée modele"
     # (rapport v4, stephanie demande le plus proche)
-    for i_mod, mod in enumerate(models):
-        # Add the mean profile and its std
-        depth = np.array(dict_mod[str(i_mod) + 'depth'])
-        add_std_profile(ax, dict_mod[str(i_mod)], depth, COLORS[i_mod], f'Mean {mod["name"]}')
+    mod_buffer_all_points = xr.concat(mod_buffer_all_points, 'idx_point', combine_attrs="drop")
+    add_std_profile(ax, mod_buffer_all_points, mod_buffer_all_points.depth, 'tab:blue',
+                    f'{mod["name"]}')
 
     #  Add the legend and show figure
     handles, labels = plt.gca().get_legend_handles_labels()
@@ -2576,15 +2617,15 @@ def plot_profile_multi_figure(models, observation, radius, linewidth, output_pat
     ax.set_ylabel('Depth [m]')
     ax.set_xlabel(var_title)
 
-    mod_names = [mod['name'] for mod in models]
-    title, figname = get_title_figname(f'Multi profile radius {radius}', observation, mod_names,
+    title, figname = get_title_figname(f'Multi profile radius {radius}km', observation, mod['name'],
                                        obs.attrs['name'])
     f.suptitle(title, x=0.33, fontsize=17, fontweight='bold')
 
     # Add the mini-map
     ax_mini_map = add_mini_map(f, observation)
-    ax_mini_map.scatter(observation.lon, observation.lat, 30, c='navy',
+    ax_mini_map.scatter(mod_buffer_all_points.lon, mod_buffer_all_points.lat, 30, c='tab:blue',
                         transform=ccrs.PlateCarree())
+    ax_mini_map.scatter(observation.lon, observation.lat, 30, c="k", transform=ccrs.PlateCarree())
 
     ft.manage_output(figname, output_path)
 
@@ -2608,14 +2649,19 @@ def add_std_profile(ax, data, depth, color, name):
 
     """
     if len(data) > 0:
-        try:
+        if 'idx_point' in data.dims:
+            mean = data.mean('idx_point').squeeze()
+            std = data.std('idx_point').squeeze()
+        elif 'interval' in data.dims:
             mean = data.mean(["idx_time", 'interval']).squeeze()
             std = data.std(["idx_time", 'interval']).squeeze()
-        except:
+        else:
             mean = np.nanmean(np.array(data), 0)
             std = np.nanstd(np.array(data), 0)
+
         ax.plot(mean, -1 * depth, c=color, marker='o', linewidth=1.5, label=name)
-        ax.fill_betweenx(-1 * depth, mean - std, mean + std, color=color, alpha=0.3, linewidth=0.01)
+        ax.fill_betweenx(-1 * depth, mean - std, mean + std, color=color, alpha=0.3, linewidth=0.01,
+                         label=f"{name} +/- std")
 
 
 def plot_diag_ts_multi(models, observation, radius, output_path=None):
@@ -2865,8 +2911,8 @@ def plot_stick_plots(models, observation, output_path=None):
         add_second_x_axis(f, ax, obs)
 
         # Set title
-        title, figname = get_title_figname('Stick plot', obs, observation['name'],
-                                           [mod['name'] for mod in models])
+        title, figname = get_title_figname('Stick plot', obs.norm, [mod['name'] for mod in models],
+                                           observation['name'])
 
         f.suptitle(title, fontsize=12, fontweight='bold')
         # Save figure
@@ -2898,8 +2944,9 @@ def plot_stick_plots(models, observation, output_path=None):
                 add_second_x_axis(f, ax, obs)
 
                 # Set title
-                title, figname = get_title_figname('Stick plot', obs, observation['name'],
-                                                   [mod['name'] for mod in models])
+                title, figname = get_title_figname('Stick plot', obs,
+                                                   [mod['name'] for mod in models],
+                                                   observation['name'])
 
                 f.suptitle(title, fontsize=12, fontweight='bold')
                 # Save figure
@@ -2932,8 +2979,9 @@ def plot_stick_plots(models, observation, output_path=None):
                 add_second_x_axis(f, ax, obs)
 
                 # Set title
-                title, figname = get_title_figname('Stick plot', obs, observation['name'],
-                                                   [mod['name'] for mod in models])
+                title, figname = get_title_figname('Stick plot', obs,
+                                                   [mod['name'] for mod in models],
+                                                   observation['name'])
 
                 f.suptitle(title, fontsize=12, fontweight='bold')
                 # Save figure
