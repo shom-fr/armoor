@@ -852,10 +852,13 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
         insta_gribs = path_files
 
         def open_dataset_for_level(grib, level):
-            return xr.open_dataset(grib, engine="cfgrib",
-                backend_kwargs={"indexpath": "", "filter_by_keys": {"edition": 2, "level": level
-                    }
-                    }, drop_variables=["heightAboveGround", "meanSea", "surface"])
+            return xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": "",
+                                                                          "filter_by_keys": {
+                                                                              "edition": 2,
+                                                                              "level": level
+                                                                              }
+                                                                          },
+                                   drop_variables=["heightAboveGround", "meanSea", "surface"])
 
         # Use parallel processing to load datasets
         dss_insta = []

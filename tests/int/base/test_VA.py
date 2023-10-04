@@ -203,6 +203,17 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_80_ellipses_ADCP_CROCO(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_80_ellipses_ADCP_CROCO.ini")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/80_ellipses_ADCP_CROCO.ini"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
     def test_82_test_variable_3d_PSY4_SCA(self):
         out_path, logger = change_path(folder_test)
 

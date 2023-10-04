@@ -69,7 +69,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     if 'Theta-S' in figtitle:
         title_type = f"{figtitle}"
         var_name = ''
-    elif "tidal wave" in figtitle:
+    elif "tidal wave" in figtitle or "Tidal" in figtitle:
         title_type = f"{figtitle}"
         var_name = ''
     elif "Stick plot" in figtitle:
@@ -107,7 +107,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]}\n"
             time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
     elif 'analysis_period' in obs.attrs:
-        title_time = f"Analysis period : {obs.analysis_period.replace(':00', '')}\n"
+        title_time = f"Obs analysis period : {obs.analysis_period.replace(':00', '')}\n"
         time = f"analysis_{obs.analysis_period.replace(':00', '')}"
     else:
         if 'time' in obs.coords and np.size(obs.time.data) == 1:
@@ -1492,104 +1492,71 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
     logger.info('Map with the tidal current ellipses.')
     # One plot per tidal wave
     for i_wave, _ in enumerate(observations.wave):
-        wave_name = str(observations.waveNames[i_wave].values).split('\'')[1]
         freq = observations.wave[i_wave].values
         if freq > 0:
             # If vertical immersions : on plot per immersion (depth)
             if 'depth' in observations.dims:
                 for i_depth, _ in enumerate(observations.depth):
-                    # Select and plot
-                    obs = observations.isel(wave=i_wave, depth=i_depth).drop('waveNames').squeeze()
-                    f, ax = figure_1_map(obs)
-                    ax = plot_ellipses_tide_current_figure(freq, ax, obs, 'k', scale)
-                    for i_mod, mod in enumerate(models):
-                        mod = mod.isel(wave=i_wave, depth=i_depth)
-                        ax = plot_ellipses_tide_current_figure(freq, ax, mod, COLORS[i_mod], scale)
-
-                    # Add legend, show and save figure
-                    add_scale(ax, scale)
-                    handles, labels = plt.gca().get_legend_handles_labels()
-                    by_label = dict(zip(labels, handles))
-                    plt.legend(by_label.values(), by_label.keys())
-
-                    title, figname = get_title_figname(f'Tidal current ellipses {wave_name}', obs,
-                                                       mod.attrs['name'], obs.attrs['name'])
-                    f.suptitle(title, fontsize=15, fontweight='bold')
-                    f.subplots_adjust(top=0.85)
-
-                    ft.manage_output(figname, output_path)
+                    plot_ellipses_tide_current_generic(observations, models, i_wave, scale,
+                                                       output_path, i_depth=i_depth)
 
             # If vertical immersions : on plot per immersion (density)
             elif 'dens' in observations.dims:
                 for i_dens, _ in enumerate(observations.dens):
-                    # Select and plot
-                    obs = observations.isel(wave=i_wave, dens=i_dens).drop('waveNames').squeeze()
-                    f, ax = figure_1_map(obs)
-                    ax = plot_ellipses_tide_current_figure(freq, ax, obs, 'k', scale)
-                    for i_mod, mod in enumerate(models):
-                        mod = mod.isel(wave=i_wave, dens=i_dens)
-                        ax = plot_ellipses_tide_current_figure(freq, ax, mod, COLORS[i_mod], scale)
-
-                    # Add legend, show and save figure
-                    add_scale(ax, scale)
-                    handles, labels = plt.gca().get_legend_handles_labels()
-                    by_label = dict(zip(labels, handles))
-                    plt.legend(by_label.values(), by_label.keys())
-
-                    title, figname = get_title_figname(f'Tidal current ellipses {wave_name}', obs,
-                                                       mod.attrs['name'], obs.attrs['name'])
-                    f.suptitle(title, fontsize=15, fontweight='bold')
-                    f.subplots_adjust(top=0.85)
-                    ft.manage_output(figname, output_path)
+                    plot_ellipses_tide_current_generic(observations, models, i_wave, scale,
+                                                       output_path, i_dens=i_dens)
             # If vertical slices : one plot per slice
             elif 'slice' in observations.dims:
                 for i_slice, _ in enumerate(observations.slice):
-                    # Select and plot
-                    obs = observations.isel(wave=i_wave, slice=i_slice).drop('waveNames').squeeze()
-                    f, ax = figure_1_map(obs)
-                    ax = plot_ellipses_tide_current_figure(freq, ax, obs, 'k', scale)
-                    for i_mod, mod in enumerate(models):
-                        mod = mod.isel(wave=i_wave, slice=i_slice)
-                        ax = plot_ellipses_tide_current_figure(freq, ax, mod, COLORS[i_mod], scale)
-
-                    # Add legend, show and save figure
-                    add_scale(ax, scale)
-                    handles, labels = plt.gca().get_legend_handles_labels()
-                    by_label = dict(zip(labels, handles))
-                    plt.legend(by_label.values(), by_label.keys())
-
-                    title, figname = get_title_figname(f'Tidal current ellipses {wave_name}', obs,
-                                                       mod.attrs['name'], obs.attrs['name'])
-                    f.suptitle(title, fontsize=15, fontweight='bold')
-                    f.subplots_adjust(top=0.85)
-                    ft.manage_output(figname, output_path)
-
+                    plot_ellipses_tide_current_generic(observations, models, i_wave, scale,
+                                                       output_path, i_slice=i_slice)
             else:
                 # Get the variables of interest
-                observation = observations.isel(wave=i_wave).drop('waveNames').squeeze()
+                plot_ellipses_tide_current_generic(observations, models, i_wave, scale, output_path)
 
-                f, ax = figure_1_map(observation)
-                for i_lon, _ in enumerate(observation.lon):
-                    obs = observation.isel(lon=[i_lon], lat=[i_lon])
-                    ax = plot_ellipses_tide_current_figure(freq, ax, obs, 'k', scale)
-                    for i_mod, mod in enumerate(models):
-                        mod = mod.isel(wave=i_wave).isel(lon=[i_lon], lat=[i_lon])
-                        ax = plot_ellipses_tide_current_figure(freq, ax, mod, COLORS[i_mod], scale)
 
-                # Add legend, show and save figure
-                handles, labels = plt.gca().get_legend_handles_labels()
-                by_label = dict(zip(labels, handles))
-                plt.legend(by_label.values(), by_label.keys())
+def plot_ellipses_tide_current_generic(observation, models, i_wave, scale, output_path, i_dens=None,
+                                       i_depth=None, i_slice=None):
+    wave_name = str(observation.waveNames[i_wave].values).split('\'')[1]
+    freq = observation.wave[i_wave].values
+    observation = observation.isel(wave=i_wave)
+    models = [mod.isel(wave=i_wave) for mod in models]
+    if i_dens is not None:
+        observation = observation.isel(dens=i_dens)
+        models = [mod.isel(dens=i_dens) for mod in models]
+    elif i_depth is not None:
+        observation = observation.isel(depth=i_depth)
+        models = [mod.isel(depth=i_depth) for mod in models]
+    elif i_slice is not None:
+        observation = observation.isel(slice=i_slice)
+        models = [mod.isel(slice=i_slice) for mod in models]
+    observation = observation.drop('waveNames').squeeze()
 
-                title, figname = get_title_figname(f'Tidal current ellipses {wave_name}', obs,
-                                                   mod.attrs['name'], obs.attrs['name'])
-                f.suptitle(title, fontsize=17, fontweight='bold')
-                f.subplots_adjust(top=0.85)
+    f, ax = figure_1_map(observation)
+    if np.size(observation.lon) > 1:
+        for i_lon, _ in enumerate(observation.lon):
+            obs = observation.isel(lon=[i_lon], lat=[i_lon])
+            ax = plot_ellipses_tide_current_figure(freq, ax, obs, 'k', scale)
+            for i_mod, mod in enumerate(models):
+                mod = mod.isel(lon=[i_lon], lat=[i_lon])
+                ax = plot_ellipses_tide_current_figure(freq, ax, mod, COLORS[i_mod], scale)
+    else:
+        ax = plot_ellipses_tide_current_figure(freq, ax, observation, 'k', scale)
+        for i_mod, mod in enumerate(models):
+            ax = plot_ellipses_tide_current_figure(freq, ax, mod, COLORS[i_mod], scale)
 
-                # Add the scale
-                add_scale(ax, scale)
+    # Add legend, show and save figure
+    add_scale(ax, scale)
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys())
 
-                ft.manage_output(figname, output_path)
+    title, figname = get_title_figname(f'Tidal current ellipses {wave_name}', observation,
+                                       [mod.attrs['name'] for mod in models], observation.attrs['name'])
+
+    f.suptitle(title, fontsize=15, fontweight='bold')
+    f.subplots_adjust(top=0.85)
+    ft.manage_output(figname, output_path)
 
 
 def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
@@ -1614,7 +1581,6 @@ def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
         ax of the figure
     """
     logger.info('Figure of the tidal current ellipsis.')
-
     # Retrieve the variables
     ds_name = ds.name
     u_a, u_g = ds.u_a.values, ds.u_G.values
