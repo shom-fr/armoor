@@ -243,20 +243,21 @@ class MetazoneAccessor:
         logger.info("Applying filter - sel_closest")
         mindist = 100000
         for i_x, _ in enumerate(self._obj.x.values):
-            for i_y, _ in enumerate(self._obj.y.values):
-                dataset = self._obj.isel(x=i_x, y=i_y)
-                lon0, lat0 = dataset.lon.values, dataset.lat.values
-                lon1, lat1 = lon_target, lat_target
-                deg2rad = math.pi / 180.0
-                dist = math.sin(deg2rad * (lat0 - lat1) * 0.5) ** 2
-                dist += (math.cos(deg2rad * lat0) * math.cos(deg2rad * lat1) * math.sin(
-                    deg2rad * (lon0 - lon1) * 0.5) ** 2)
-                dist = 2.0 * math.asin(math.sqrt(dist))
+            dataset = self._obj.isel(x=i_x)
+            lon0, lat0 = dataset.lon.values, dataset.lat.values
+            lon1, lat1 = lon_target, lat_target
+            deg2rad = math.pi / 180.0
+            dist = np.sin(deg2rad * (lat0 - lat1) * 0.5) ** 2
+            dist += (np.cos(deg2rad * lat0) * np.cos(deg2rad * lat1) * np.sin(
+                deg2rad * (lon0 - lon1) * 0.5) ** 2)
+            dist = 2.0 * np.arcsin(np.sqrt(dist))
+            argmin = np.argmin(dist)
+            dist = np.min(dist)
 
-                if dist <= mindist:
-                    i_x_min = i_x
-                    i_y_min = i_y
-                    mindist = dist
+            if dist <= mindist:
+                i_x_min = i_x
+                i_y_min = argmin
+                mindist = dist
 
         dataset = self._obj.isel(x=i_x_min, y=i_y_min)
 
@@ -511,9 +512,8 @@ class MetazoneAccessor:
 
         tgt_ds = tgt_ds.squeeze()
         # Reindex depths if necessary
-        if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0]>tgt_ds.depth.data[-1]:
+        if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0] > tgt_ds.depth.data[-1]:
             tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
-
         return tgt_ds
 
     def vertical_selection_range(self, depth: list, var_vert: str = 'depth') -> xr.Dataset:
