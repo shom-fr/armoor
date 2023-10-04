@@ -220,6 +220,8 @@ def set_coloc_flags(config_obj):
         temporal_colocation_flag = True
         vertical_colocation_flag = True
         horizontal_colocation_flag = True
+        if 'tide' in config_obj['outputs'][0]["plot"]:
+            temporal_colocation_flag = False
 
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
@@ -289,7 +291,11 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
 
     filters = {"quality": lambda obj: obj.meta.quality_filter,
                "depth": lambda obj: obj.meta.vertical_selection_depth,
+               "min_depth": lambda obj: obj.meta.vertical_selection_min_depth,
+               "max_depth": lambda obj: obj.meta.vertical_selection_max_depth,
                "dens": lambda obj: obj.meta.vertical_selection_dens,
+               "min_dens": lambda obj: obj.meta.vertical_selection_min_dens,
+               "max_dens": lambda obj: obj.meta.vertical_selection_max_dens,
                "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
                "start": lambda obj: obj.meta.time_selection_start,
                "end": lambda obj: obj.meta.time_selection_end,
