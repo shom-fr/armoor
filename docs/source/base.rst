@@ -56,6 +56,7 @@ The model's section is very similar to the observation's one, the main differenc
     For each model, you must provide a unique model name in double brackets ``[[model_name]]`` then provide the same 5 attributes as the observation.
 
 The only other difference concerns the ``type`` values, that are specific regarding the models : *CROCO*, *CROCO_currents*, *HYCOM_currents*, *HYCOM_3D* and *CORA*. Any other type of model will be automatically decoded.
+If you intend to use a 3D HYCOM model, the files must be ordered in the following way : *h.nc*, *other_variables.nc*.
 
 4. Meta-zone
 -------------
@@ -84,13 +85,15 @@ Relative to horizontal restriction:
 
 Relative to vertical restriction:
 
-    * ``depth`` : Selection by z level, passing 1, 2 or 3 arguments as follows:
+    * ``depth`` : Selectiion of listed immersions by depth.
+    * ``density`` : Selectiion of listed immersions by depth.
 
-        #. an immersion (z=x0 meters);
-        #. a list of immersions (z=x0, x1, x2 meters)
-        #. a slice of water (z ∈ [x0 meters, x1 meters])
+    * ``depth_min`` : Minimum authorized depth value.
+    * ``depth_max`` : Maximum authorized depth value.
 
-    * ``density`` : The selection of immersions and slices of water is done in the same way as with *depth*, except that we indicate potential densities (instead of depths in meters).
+    * ``dens_min`` : Minimum authorized density value.
+    * ``dens_max`` : Maximum authorized density value.
+
     * ``slice`` : To group into vertical slices between the specified depth or density levels specified.
 
 Other restrictions :

@@ -269,7 +269,10 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing the mixed layer depth.
         """
-        return compute_mixed_layer(self._obj['temp'])
+        if "temp" in self._obj:
+            return compute_mixed_layer(self._obj['temp'])
+        else :
+            return compute_mixed_layer(self._obj['ptemp'])
 
     def sel_density(self):
         """

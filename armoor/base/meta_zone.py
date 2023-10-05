@@ -243,21 +243,21 @@ class MetazoneAccessor:
         logger.info("Applying filter - sel_closest")
         mindist = 100000
         for i_x, _ in enumerate(self._obj.x.values):
-            for i_y, _ in enumerate(self._obj.y.values):
-                dataset = self._obj.isel(x=i_x, y=i_y)
-                lon0, lat0 = dataset.lon.values, dataset.lat.values
-                lon1, lat1 = lon_target, lat_target
-                deg2rad = math.pi / 180.0
-                dist = math.sin(deg2rad * (lat0 - lat1) * 0.5) ** 2
-                dist += (math.cos(deg2rad * lat0) * math.cos(deg2rad * lat1) * math.sin(
-                    deg2rad * (lon0 - lon1) * 0.5) ** 2)
-                dist = 2.0 * math.asin(math.sqrt(dist))
+            dataset = self._obj.isel(x=i_x)
+            lon0, lat0 = dataset.lon.values, dataset.lat.values
+            lon1, lat1 = lon_target, lat_target
+            deg2rad = math.pi / 180.0
+            dist = np.sin(deg2rad * (lat0 - lat1) * 0.5) ** 2
+            dist += (np.cos(deg2rad * lat0) * np.cos(deg2rad * lat1) * np.sin(
+                deg2rad * (lon0 - lon1) * 0.5) ** 2)
+            dist = 2.0 * np.arcsin(np.sqrt(dist))
+            argmin = np.argmin(dist)
+            dist = np.min(dist)
 
-                if dist <= mindist:
-                    i_x_min = i_x
-                    i_y_min = i_y
-                    mindist = dist
-
+            if dist <= mindist:
+                i_x_min = i_x
+                i_y_min = argmin
+                mindist = dist
         dataset = self._obj.isel(x=i_x_min, y=i_y_min)
 
         return dataset
@@ -375,9 +375,68 @@ class MetazoneAccessor:
 
         """
         logger.info("Applying filter - vertical_selection_depth")
+        depth = np.array(depth, dtype=float)
         if len(depth) == 1:
             return self.vertical_selection_ponct(depth[0], 'depth')
-        return self.vertical_selection_range(depth, 'depth')
+        return self.vertical_selection_list(depth)
+
+    def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
+        """
+
+        Parameters
+        ----------
+        depth
+
+        Returns
+        -------
+
+        """
+        logger.info("Applying filter - vertical_selection_depth")
+        max_depth = self._obj.depth.max(skipna=True)
+        return self.vertical_selection_range([min_depth, max_depth], 'depth')
+
+    def vertical_selection_max_depth(self, max_depth: list = None) -> xr.Dataset:
+        """
+
+        Parameters
+        ----------
+        depth
+
+        Returns
+        -------
+
+        """
+        logger.info("Applying filter - vertical_selection_depth")
+        min_depth = self._obj.depth.min(skipna=True)
+        return self.vertical_selection_range([min_depth, max_depth], 'depth')
+
+    def vertical_selection_min_dens(self, min_dens: list = None) -> xr.Dataset:
+        """
+
+        Parameters
+        ----------
+        min_dens
+
+        Returns
+        -------
+
+        """
+        max_dens = self._obj.dens.max(skipna=True)
+        return self.vertical_selection_range([min_dens, max_dens], 'dens')
+
+    def vertical_selection_max_dens(self, max_dens: list = None) -> xr.Dataset:
+        """
+
+        Parameters
+        ----------
+        max_dens
+
+        Returns
+        -------
+
+        """
+        min_dens = self._obj.dens.min(skipna=True)
+        return self.vertical_selection_range([min_dens, max_dens], 'dens')
 
     def vertical_selection_dens(self, depth: list = None) -> xr.Dataset:
         """
@@ -391,6 +450,7 @@ class MetazoneAccessor:
 
         """
         logger.info("Applying filter - vertical_selection_dens")
+        depth = np.array(depth, dtype=float)
         if depth and len(depth) == 1:
             return self.vertical_selection_ponct(depth[0], 'dens')
         if depth:  # if output=profiles, only this option should apply
@@ -511,7 +571,7 @@ class MetazoneAccessor:
 
         tgt_ds = tgt_ds.squeeze()
         # Reindex depths if necessary
-        if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0]>tgt_ds.depth.data[-1]:
+        if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0] > tgt_ds.depth.data[-1]:
             tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
 
         return tgt_ds
@@ -539,8 +599,8 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_range")
         # Get min and max values
-        dmin = depth[0]
-        dmax = depth[1]
+        dmin = float(depth[0])
+        dmax = float(depth[1])
         # Select all depth between min and max
         if len(depth) == 2:
             selection = (self._obj[var_vert] >= dmin) & (self._obj[var_vert] <= dmax)

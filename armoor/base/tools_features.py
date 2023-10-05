@@ -146,8 +146,8 @@ def sel_default_vars(config_obj):
         Meta-zone, models and observation from the parser with the selected variables.
     """
     feature = config_obj["functionality"]
+    additional_vars = [config_obj['meta_zones']['var']] if 'var' in config_obj['meta_zones'] else []
 
-    additional_vars = config_obj['meta_zones']['vars'] if 'vars' in config_obj['meta_zones'] else []
     if feature == "sst":  # F1
         default_vars_mod = ['SST']
         default_vars_obs = ['SST']

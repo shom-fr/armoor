@@ -159,6 +159,7 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
             interval)
+    print(config_obj)
     return config_obj
 
 
@@ -220,10 +221,12 @@ def set_coloc_flags(config_obj):
         temporal_colocation_flag = True
         vertical_colocation_flag = True
         horizontal_colocation_flag = True
+        if 'tide' in config_obj['outputs'][0]["plot"]:
+            temporal_colocation_flag = False
 
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
-        temporal_colocation_flag = False
+        temporal_colocation_flag = True
         vertical_colocation_flag = False
         horizontal_colocation_flag = True
 
@@ -289,7 +292,11 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
 
     filters = {"quality": lambda obj: obj.meta.quality_filter,
                "depth": lambda obj: obj.meta.vertical_selection_depth,
+               "min_depth": lambda obj: obj.meta.vertical_selection_min_depth,
+               "max_depth": lambda obj: obj.meta.vertical_selection_max_depth,
                "dens": lambda obj: obj.meta.vertical_selection_dens,
+               "min_dens": lambda obj: obj.meta.vertical_selection_min_dens,
+               "max_dens": lambda obj: obj.meta.vertical_selection_max_dens,
                "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
                "start": lambda obj: obj.meta.time_selection_start,
                "end": lambda obj: obj.meta.time_selection_end,
@@ -322,12 +329,13 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
 
                 xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath,
                                                                         maximum=max_bath)
+            else:
+                logger.warning("Caution ! No bathymetry variable was found in the product.")
 
         # Radius for ADCP feature
         if "radius" in config_obj["meta_zones"] and mod_obs == 'mod' and config_obj[
             "functionality"] in ['ADCP']:
             xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
-
         # Other meta-zones, one by one
         for name, meta_filter in filters.items():
             if name in config_obj["meta_zones"]:
