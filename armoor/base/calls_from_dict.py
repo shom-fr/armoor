@@ -159,6 +159,7 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
             interval)
+    print(config_obj)
     return config_obj
 
 
@@ -225,7 +226,7 @@ def set_coloc_flags(config_obj):
 
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
-        temporal_colocation_flag = False
+        temporal_colocation_flag = True
         vertical_colocation_flag = False
         horizontal_colocation_flag = True
 
