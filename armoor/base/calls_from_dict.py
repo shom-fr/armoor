@@ -116,7 +116,7 @@ def get_observation_models_meta(config_obj: dict):
 
         # Interval temporels successifs
         if 'interval' in config_obj["meta_zones"]:
-            logger.info('Découpage par intervalles temporels...')
+            logger.info('Temporal interval segmentation...')
             if horizontal_colocation_flag or vertical_colocation_flag:
                 interval = config_obj["meta_zones"]["interval"]
                 model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval)
@@ -139,7 +139,7 @@ def get_observation_models_meta(config_obj: dict):
             else:
                 var_slice = 'depth'
 
-            logger.info('Découpage par tranches verticales sur la variable %s', var_slice)
+            logger.info('Vertical slicing on variable %s', var_slice)
             if horizontal_colocation_flag or vertical_colocation_flag:
                 vert_slice = config_obj["meta_zones"]["slice"]
                 model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(
@@ -159,7 +159,6 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
             interval)
-    print(config_obj)
     return config_obj
 
 

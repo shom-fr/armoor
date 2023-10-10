@@ -222,9 +222,8 @@ class MetazoneAccessor:
         radius_km = self._obj.meta.km_to_deg(radius)
 
         if distance > radius_km:
-            logger.info('Oops, le modèle ne contient pas de point qui respecte le critère '
-                        'de rayon. Le point le plus proche est utilisé, '
-                        'à la position %s N %s E .', self._obj.lat.data, self._obj.lon.data)
+            logger.info('Oops, the model does not contain a point that meets the radius criteria. '
+                        'The nearest point is used at position %s N %s E.', self._obj.lat.data, self._obj.lon.data)
 
         return self._obj
 
@@ -438,7 +437,7 @@ class MetazoneAccessor:
         min_dens = self._obj.dens.min(skipna=True)
         return self.vertical_selection_range([min_dens, max_dens], 'dens')
 
-    def vertical_selection_dens(self, depth: list = None) -> xr.Dataset:
+    def vertical_selection_dens(self, dens: list = None) -> xr.Dataset:
         """
 
         Parameters
@@ -450,12 +449,27 @@ class MetazoneAccessor:
 
         """
         logger.info("Applying filter - vertical_selection_dens")
-        depth = np.array(depth, dtype=float)
-        if depth and len(depth) == 1:
-            return self.vertical_selection_ponct(depth[0], 'dens')
-        if depth:  # if output=profiles, only this option should apply
-            return self.vertical_selection_range(depth, 'dens')
+        dens = np.array(dens, dtype=float)
+
+        if dens and np.size(dens) == 1:
+            return self.vertical_selection_ponct(dens, 'dens')
+        if dens:  # if output=profiles, only this option should apply
+            return self.vertical_selection_range(dens, 'dens')
         return self._obj
+
+    def vertical_selection_dens_from_depth(self, dens):
+        difference_densite = np.abs(self._obj['dens'] - dens).fillna(100000)
+        if 'z' in self._obj.dims:
+            indice_min_densite = difference_densite.argmin(dim='z')
+            self._obj = self._obj.isel(z=indice_min_densite)
+        elif 'depth' in self._obj.dims:
+            indice_min_densite = difference_densite.argmin(dim='depth')
+            self._obj = self._obj.isel(depth=indice_min_densite)
+        self._obj = self._obj.drop('dens').assign_coords({'dens':dens})
+        if 'depth' in self._obj.coords:
+            self._obj = self._obj.reset_coords('depth')
+        return self._obj
+
 
     def vertical_selection_ponct(self, depth: float, var_vert: str = 'depth') -> xr.Dataset:
         """
@@ -496,7 +510,11 @@ class MetazoneAccessor:
 
             return dataset
         if var_vert == 'dens':
-            return dataset.sel(dens=depth, method='nearest')
+            if 'dens' in dataset.dims:
+                return dataset.sel(dens=depth, method='nearest')
+            elif 'dens' not in dataset:
+                dataset["dens"] = dataset.sel_var.sel_density()
+            return dataset.meta.vertical_selection_dens_from_depth(dens=depth)
 
     def vertical_selection_ponct_cmems(self, depth):
         """
@@ -522,6 +540,61 @@ class MetazoneAccessor:
         return tgt_ds
 
     def vertical_seletion_croco_hycom(self, depth):
+        """
+        Vertical selection of one level in a Croco or Hycom product.
+        Parameters
+        ----------
+        depth : float or list of floats
+            Depth(s) to select.
+
+        Returns
+        -------
+        Croco or Hycom product at the required depth.
+        """
+        # Regrid1D only seems to work with negative depths for croco:
+        # the following lines adapt the depths values to correctly select the depth defined.
+        dataset = copy.copy(self._obj)
+        if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
+            dataset['depth'] = -dataset['depth']
+            depth = -depth
+            if np.size(depth) != 1 and depth[0] > depth[-1]:
+                depth = np.flip(depth)
+
+        # Create target depth(s) dataset
+        if np.size(depth) == 1:
+            depth = [depth]
+        else:
+            depth = np.array(depth)
+        tgt_depth = xr.DataArray(depth, dims="depth", name="depth")
+
+        # Select depth(s)
+        tgt_ds = dataset
+        for var in dataset.variables:
+            if var == 'depth' or 'DEPH' in var:
+                pass
+            else:
+                for var_depth in ['level', 'z', 'DEPTH', 'sig']:
+                    if var_depth in dataset[var].dims and len(dataset[var][var_depth]) > 1:
+                        da_var = dataset[var]
+                        da_tgt = regrid1d(da_var, tgt_depth)
+                        tgt_ds = tgt_ds.assign({var: da_tgt})
+
+        # Assign depth coordinates values
+        if "depth" not in list(tgt_ds.coords):
+            tgt_ds = tgt_ds.assign_coords(depth=tgt_depth)
+
+        # Positive depths for croco
+        if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
+            tgt_ds['depth'] = -tgt_ds['depth']
+
+        tgt_ds = tgt_ds.squeeze()
+        # Reindex depths if necessary
+        if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0] > tgt_ds.depth.data[-1]:
+            tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
+
+        return tgt_ds
+
+    def vertical_seletion_croco_hycom_dens(self, depth):
         """
         Vertical selection of one level in a Croco or Hycom product.
         Parameters
