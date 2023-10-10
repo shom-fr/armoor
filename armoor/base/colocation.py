@@ -150,14 +150,6 @@ def horizontal_colocation(ds_to_coloc, tgt, coloc_method):
     """
     logger.info('Horizontal colocation')
 
-    import matplotlib.pyplot as plt
-    ds_to_coloc.lon.where(ds_to_coloc.lon < 1000).plot()
-    plt.savefig('lon.png')
-    plt.close()
-    ds_to_coloc.lat.where(ds_to_coloc.lat < 1000).plot()
-    plt.savefig('lat.png')
-    plt.close()
-
     # Drop duplicates in lon/lat
     if 'lon' in ds_to_coloc.dims:
         ds_to_coloc = ds_to_coloc.drop_duplicates('lon').drop_duplicates('lat')

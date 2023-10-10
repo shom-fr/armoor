@@ -134,10 +134,13 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data}m"
         depth = f"{obs.slice.data}m"
+    elif 'dens' in obs.coords and np.size(obs.dens) == 1:
+        title_depth = f"Density: {obs.dens.values:.1f}"
+        depth = f"{obs.dens.values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
         title_depth = f"Depth: {min(obs.depth.values):.1f}m to {max(obs.depth.values):.1f}m"
         depth = f"{min(obs.depth.values):.1f}m_to_{max(obs.depth.values):.1f}m"
-    elif 'dens' in obs.dims and np.size(obs.dens) > 1:
+    elif 'dens' in obs.coords and np.size(obs.dens) > 1:
         title_depth = f"Density: {min(obs.dens.values):.1f} to {max(obs.dens.values):.1f}"
         depth = f"{min(obs.dens.values):.1f}m_to_{max(obs.dens.values):.1f}m"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
@@ -147,9 +150,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         else:
             title_depth = f"Depth: {obs.depth.values:.1f}m"
             depth = f"{obs.depth.values:.1f}m"
-    elif 'dens' in obs.dims and len(obs.dens) == 1:
-        title_depth = f"Density: {obs.dens.values:.1f}"
-        depth = f"{obs.dens.values:.1f}"
+
     else:
         title_depth = "Depth : 0 m"
         depth = '0m'

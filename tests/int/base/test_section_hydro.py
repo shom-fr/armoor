@@ -17,6 +17,24 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_variable_2d_hycom_manga(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_2d_hycom_manga')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_hycom_manga.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_2d_hycom_manga_dens(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_2d_hycom_manga_dens')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_hycom_manga_dens.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_variable_2d_seasor(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_seasor')
