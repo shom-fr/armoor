@@ -222,9 +222,8 @@ class MetazoneAccessor:
         radius_km = self._obj.meta.km_to_deg(radius)
 
         if distance > radius_km:
-            logger.info('Oops, le modèle ne contient pas de point qui respecte le critère '
-                        'de rayon. Le point le plus proche est utilisé, '
-                        'à la position %s N %s E .', self._obj.lat.data, self._obj.lon.data)
+            logger.info('Oops, the model does not contain a point that meets the radius criteria. '
+                        'The nearest point is used at position %s N %s E.', self._obj.lat.data, self._obj.lon.data)
 
         return self._obj
 

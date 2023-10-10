@@ -117,23 +117,23 @@ def plot(config_obj):
             if "tidal_waves" in output:
                 list_waves = output["tidal_waves"]
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " les ondes à calculer...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify "
+                                 "the tidal waves to calculate...")
 
             # Path where to get the comodo tool
             if 'path_comodo' in output:
                 path_tools = output["path_comodo"]
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " le chemin vers les Comodo tools à utiliser...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify"
+                                 " the path to the Comodo tools to use...")
 
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
                 path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " le chemin où sauvegarder les fichiers résultats...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify "
+                                 "the path where to save the result files...")
 
             # Definition of the period for the harmonic analysis
             if 'analysis_start' in output and 'analysis_end' in output:
@@ -145,9 +145,9 @@ def plot(config_obj):
                     mod['xarray_meta'] = mod['xarray_meta'].sel(
                         time=slice(analysis_start, analysis_end))
             else:
-                logger.info("Oops, pour réaliser l'analyse harmonique vous devriez spécifier "
-                            "la période sur laquelle calculer l'analyse harmonique. Le calcul "
-                            "sera ici fait sur toute la période des fichiers d'entrée...")
+                logger.info("Oops, to perform harmonic analysis, you should specify "
+                            "the period over which to calculate the harmonic analysis. "
+                            "The calculation will be done over the entire period of the input files.")
 
             # Process harmonic analysis on observation
             logger.info("Beginning of the harmonic analysis on the observation.")
@@ -211,23 +211,23 @@ def plot(config_obj):
             if "tidal_waves" in output:
                 list_waves = output["tidal_waves"]
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " les ondes à calculer...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify the tidal "
+                                 "waves to calculate...")
 
             # Path where to get the comodo tool
             if 'path_comodo' in output:
                 path_tools = output["path_comodo"]
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " le chemin vers les Comodo tools à utiliser...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify "
+                                 "the path to the Comodo tools to use...")
 
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
                 path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " le chemin où sauvegarder les fichiers résultats...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify "
+                                 "the path where to save the result files..")
 
             # Definition of the period for the harmonic analysis
             if 'analysis_start' in output and 'analysis_end' in output:
@@ -240,9 +240,9 @@ def plot(config_obj):
                         time=slice(analysis_start, analysis_end))
 
             else:
-                logger.info("Oops, pour réaliser l'analyse harmonique vous devriez spécifier "
-                            "la période sur laquelle calculer l'analyse harmonique. Le calcul "
-                            "sera ici fait sur toute la période des fichiers d'entrée.")
+                logger.info("Oops, to perform harmonic analysis, you should specify the period "
+                            "over which to calculate the harmonic analysis. The calculation will "
+                            "be done over the entire period of the input files.")
 
             # Process harmonic analysis on observation
             # If metazone per slice, calculate average per slice
