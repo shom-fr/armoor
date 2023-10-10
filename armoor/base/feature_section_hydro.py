@@ -25,7 +25,6 @@ def plot(config_obj):
     output_path = config_obj.get("output_path")
 
     # Select the variables
-
     config_obj = sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
 

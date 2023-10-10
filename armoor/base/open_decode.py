@@ -666,13 +666,17 @@ def open_decode_hycom_3d(path_files):
     logger.info("Decoding HYCOM 3D")
     # Open the file with depth values
     path_h = path_files[0]
-    hycom = xr.open_dataset(path_h).rename({'h': 'dz'}).xoa.decode().squeeze(drop=True)
-    if 'level' not in hycom.variables:
-        raise ValueError('Ooops ! Pour lire une sortie 3D du modèle HYCOM,'
-                         ' vous devez renseigner les fichiers dans l\'ordre suivant : '
-                         ' h, variables.')
+    hycom = xr.open_dataset(path_h)
 
-    hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
+    if 'h' not in hycom.variables and 'sigma' not in hycom.variables:
+        raise ValueError('Ooops ! To read a 3D output from the HYCOM model,'
+                         ' you need to provide the files in the following order: '
+                         'h/sigma, variables.')
+    if 'h' in hycom:
+        hycom = hycom.rename({'h': 'dz'}).xoa.decode().squeeze(drop=True)
+        hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
+    elif 'sigma' in hycom:
+        hycom = hycom.rename({'sigma': 'dens'}).xoa.decode().squeeze(drop=True)
 
     # Open the variable(s) and add them to the dataset
     for path in path_files[1:]:
@@ -692,6 +696,11 @@ def open_decode_hycom_3d(path_files):
 
     # Convert lons
     hycom = convert_lons(hycom)
+
+    # Add dens coordinate
+    if 'dens' in hycom:
+        hycom = hycom.assign_coords(dens=hycom.dens)
+
     return hycom
 
 

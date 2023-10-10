@@ -270,9 +270,10 @@ class SSTAccessor:
             Data array containing the mixed layer depth.
         """
         if "temp" in self._obj:
-            return compute_mixed_layer(self._obj['temp'])
-        else :
-            return compute_mixed_layer(self._obj['ptemp'])
+            self._obj = compute_mixed_layer(self._obj['temp'])
+        elif "ptemp" in self._obj:
+            self._obj = compute_mixed_layer(self._obj['ptemp'])
+        return self._obj
 
     def sel_density(self):
         """
@@ -283,7 +284,19 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing density.
         """
-        return self._obj.xoa.dens
+        if "dens" in self._obj:
+            return self._obj.xoa.dens
+        else:
+            temp = self._obj.sel_var.sel_temp()
+            sal = self._obj.sel_var.sel_sal()
+            if "pres" in self._obj:
+                pres = self._obj['pres']
+            else:
+                pres = gsw.p_from_z(self._obj.depth, self._obj.lat, geo_strf_dyn_height=0,
+                                    sea_surface_geopotential=0)
+            dens = gsw.density.rho(sal, temp, pres)
+            dens.name = 'dens'
+            return dens
 
     def sel_pdensity(self):
         """
@@ -317,7 +330,8 @@ class SSTAccessor:
             Data array containing SST in Celcius degrees.
         """
 
-        if 'units' in self._obj.attrs and self._obj.attrs['units'] == 'kelvin' or self._obj.max() > 200:
+        if 'units' in self._obj.attrs and self._obj.attrs[
+            'units'] == 'kelvin' or self._obj.max() > 200:
             self._obj = self._obj - 273.15
             self._obj.attrs['units'] = 'degC'
             return self._obj
