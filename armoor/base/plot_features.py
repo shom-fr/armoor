@@ -790,6 +790,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter,
                                                   comparison_inter, title, vmin, vmax, metric, cmap,
                                                   dvmin=dvmin, dvmax=dvmax)
+                    # Save figure
+                    ft.manage_output(figname, output_path)
 
             elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
                 for index_depth, _ in enumerate(obs_coloc.depth):
@@ -803,6 +805,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter,
                                                   comparison_inter, title, vmin, vmax, metric, cmap,
                                                   dvmin=dvmin, dvmax=dvmax)
+                    # Save figure
+                    ft.manage_output(figname, output_path)
 
             elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
                 for index_dens, _ in enumerate(obs_coloc.dens):
@@ -817,6 +821,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                     plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter,
                                                   comparison_inter, title, vmin, vmax, metric, cmap,
                                                   dvmin=dvmin, dvmax=dvmax)
+                    # Save figure
+                    ft.manage_output(figname, output_path)
             else:
                 # Select the data to plot
                 obs_coloc_inter = obs_coloc.isel(interval=[index_time])
@@ -827,8 +833,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                 plot_map_metr_profiles_figure(mod_coloc_inter, obs_coloc_inter, comparison_inter,
                                               title, vmin, vmax, metric, cmap, dvmin=dvmin,
                                               dvmax=dvmax)
-            # Save figure
-            ft.manage_output(figname, output_path)
+                # Save figure
+                ft.manage_output(figname, output_path)
     else:
         if flag_slice:
             for index_slice, _ in enumerate(obs_coloc.slice):
@@ -841,6 +847,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                 plot_map_metr_profiles_figure(mod_coloc_slice, obs_coloc_slice, comparison_slice,
                                               title, vmin, vmax, metric, cmap, dvmin=dvmin,
                                               dvmax=dvmax)
+                # Save figure
+                ft.manage_output(figname, output_path)
 
         elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
             for index_depth, _ in enumerate(obs_coloc.depth):
@@ -853,6 +861,8 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                 plot_map_metr_profiles_figure(mod_coloc_depth, obs_coloc_depth, comparison_depth,
                                               title, vmin, vmax, metric, cmap, dvmin=dvmin,
                                               dvmax=dvmax)
+                # Save figure
+                ft.manage_output(figname, output_path)
 
         elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
             for index_dens, _ in enumerate(obs_coloc.dens):
@@ -865,14 +875,16 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                 plot_map_metr_profiles_figure(mod_coloc_dens, obs_coloc_dens, comparison_dens,
                                               title, vmin, vmax, metric, cmap, dvmin=dvmin,
                                               dvmax=dvmax)
+                # Save figure
+                ft.manage_output(figname, output_path)
         else:
             title, figname = get_title_figname(f'Map {metric}', obs_coloc, mod_coloc.attrs['name'],
                                                obs_coloc.attrs['name'])
 
             plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax,
                                           metric, cmap, dvmin=dvmin, dvmax=dvmax)
-        # Save figure
-        ft.manage_output(figname, output_path)
+            # Save figure
+            ft.manage_output(figname, output_path)
 
 
 def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap,
@@ -1971,7 +1983,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 axs[0].legend(loc=5)
                 axs[1].legend(loc=5)
                 mod_names = [mod['name'] for mod in models]
-                title, figname = get_title_figname('Metric statistics', obs_coloc, mod_names,
+                title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
                                                    observation['name'])
 
                 f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
@@ -2321,10 +2333,10 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 modify_interval_label(axs[4])
 
             # Set title and save
-            mod_name = [mod['xarray_meta_coloc'].name for mod in models]
+            mod_name = [mod['xarray_meta_coloc'].attrs.name for mod in models]
             title, figname = get_title_figname(
                 f'Time series metrics on {list_dims_mean} dimensions', obs_coloc, mod_name,
-                observation["xarray_meta"].name)
+                observation["xarray_meta"].attrs.name)
             f.suptitle(title, fontsize=17, fontweight='bold')
             ft.manage_output(figname, output_path)
 
@@ -2355,9 +2367,9 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             modify_interval_label(axs[4])
 
         # Add title and save fig
-        mod_name = [mod['name'] for mod in models]
+        mod_name = [mod.attrs['name'] for mod in models]
         title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
-                                           obs_coloc, mod_name, observation['name'])
+                                           obs_coloc, mod_name, observation.attrs['name'])
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
         ft.manage_output(figname, output_path)
 
