@@ -228,7 +228,7 @@ def vertical_colocation(ds_to_coloc, tgt, coloc_method):
     depth_tgt = tgt.depth
 
     # Colocate only if needed
-    if (depth_tgt == depth_ds).all():
+    if np.size(depth_tgt) == np.size(depth_ds) and (depth_tgt == depth_ds).all():
         return ds_to_coloc
     else:
         if np.size(depth_tgt) != 1 and np.size(depth_ds) != 1:
