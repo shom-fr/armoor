@@ -128,9 +128,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
                 time = f"{time_min}_to_{time_max}"
 
     # Depth
-    if 'profile' in figtitle:
+    if 'profile' in figtitle or "Theta-S" in figtitle:
         title_depth = ""
-        depth = f"{min(obs.depth.values):.1f}m_to_{max(obs.depth.values):.1f}m"
+        depth = f"{obs.depth.min().data:.1f}m_to_{obs.depth.max().data:.1f}m"
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data}m"
         depth = f"{obs.slice.data}m"
@@ -150,7 +150,6 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         else:
             title_depth = f"Depth: {obs.depth.values:.1f}m"
             depth = f"{obs.depth.values:.1f}m"
-
     else:
         title_depth = "Depth : 0 m"
         depth = '0m'
@@ -2557,7 +2556,7 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
         for i_idx_time, _ in enumerate(observation.idx_time):
             obs = observation.isel(idx_time=i_idx_time, interval=i_inter).squeeze()
             ax.plot(obs.values, -1 * obs.depth, c="k", linewidth=linewidth,
-                    label=f'Mean {obs.attrs["name"]}')
+                    label=f'{obs.attrs["name"]}')
 
             # "en traits fins les profils modèles des disques définis
             # et temporellement les plus proches"
@@ -2577,13 +2576,13 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
                         linewidth=linewidth, label=f'{mod["name"]}')
 
     # "en trait épais le profil moyen des observations" + "zone grisée observation"
-    add_std_profile(ax, observation, observation.depth, '.3', f'{observation.attrs["name"]}')
+    add_std_profile(ax, observation, observation.depth, '.3', f'{observation.attrs["name"]} - mean')
 
     # "en trait épais, le profil moyen modèle (moyenne sur les disques)" + "zone grisée modele"
     # (rapport v4, stephanie demande le plus proche)
     mod_buffer_all_points = xr.concat(mod_buffer_all_points, 'idx_point', combine_attrs="drop")
     add_std_profile(ax, mod_buffer_all_points, mod_buffer_all_points.depth, 'tab:blue',
-                    f'{mod["name"]}')
+                    f'{mod["name"]} - nearest')
 
     #  Add the legend and show figure
     handles, labels = plt.gca().get_legend_handles_labels()
