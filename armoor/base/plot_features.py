@@ -2333,10 +2333,10 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 modify_interval_label(axs[4])
 
             # Set title and save
-            mod_name = [mod['xarray_meta_coloc'].attrs.name for mod in models]
+            mod_name = [mod['name'] for mod in models]
             title, figname = get_title_figname(
                 f'Time series metrics on {list_dims_mean} dimensions', obs_coloc, mod_name,
-                observation["xarray_meta"].attrs.name)
+                observation['name'])
             f.suptitle(title, fontsize=17, fontweight='bold')
             ft.manage_output(figname, output_path)
 
@@ -2367,9 +2367,9 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             modify_interval_label(axs[4])
 
         # Add title and save fig
-        mod_name = [mod.attrs['name'] for mod in models]
+        mod_name = [mod['name'] for mod in models]
         title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
-                                           obs_coloc, mod_name, observation.attrs['name'])
+                                           obs_coloc, mod_name, observation['name'])
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
         ft.manage_output(figname, output_path)
 
