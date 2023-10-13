@@ -50,6 +50,10 @@ def remove_missing_values_ds(models, observation, i, vars_mod, vars_obs):
         List of the variables to consider in the observation.
 
     """
+    # Adjust variable names
+    if 'temp' in vars_mod:
+        vars_mod[vars_mod.index('temp')] = 'ptemp'
+
     # Remove missing values
     if len(vars_mod) == 1:
         obs = observation["xarray_meta_coloc"][i][vars_obs[0]]
@@ -154,14 +158,14 @@ def sel_default_vars(config_obj):
 
     elif feature == "prof_hydro_vessel":  # F2
         default_vars_mod = ['ptemp', 'sal', 'pdens']
-        default_vars_obs = ['temp', 'sal', 'dens']
-        for var in ['temp', 'ptemp', 'dens', 'pdens']:
+        default_vars_obs = ['temp', 'sal', 'pdens']
+        for var in ['temp', 'ptemp',  'pdens']:
             if var in additional_vars:
                 additional_vars.remove(var)
 
     elif feature == "prof_hydro_mooring":  # F3
         default_vars_mod = ['ptemp', 'sal', 'pdens']
-        default_vars_obs = ['temp', 'sal', 'dens']
+        default_vars_obs = ['temp', 'sal', 'pdens']
         for var in ['temp', 'ptemp', 'dens', 'pdens']:
             if var in additional_vars:
                 additional_vars.remove(var)
@@ -234,13 +238,9 @@ def sel_one_var(observation, models, var):
     # Adjust potential / insitu variables for models and obs
     observation_var = copy.deepcopy(observation)
     models_var = copy.deepcopy(models)
-
     if var in ['temp', 'ptemp']:
         var_mod = 'ptemp'
         var_obs = 'temp'
-    elif var in ['dens', 'pdens']:
-        var_mod = 'pdens'
-        var_obs = 'dens'
     else:
         var_mod = var
         var_obs = var

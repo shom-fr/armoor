@@ -51,8 +51,6 @@ def plot(config_obj):
                     var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
 
         vars_mod = copy.copy(vars_obs)
-        if 'temp' in vars_mod:
-            vars_mod[vars_mod.index('temp')] = 'ptemp'
         for i_mod, _ in enumerate(models):
             models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
                                                            vars_obs)

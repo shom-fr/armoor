@@ -750,6 +750,8 @@ class MetazoneAccessor:
         dataset = dataset.rename({var_slice: 'idx_' + var_slice})
         dataset = dataset.rename({var_slice + '_value': var_slice})
         dataset['slice'] = dataset['slice_label']
+        if "depth" in dataset:
+            dataset = dataset.assign_coords({"depth":dataset.depth})
         return dataset
 
     def time_selection_start(self, start=None) -> xr.Dataset:
@@ -982,6 +984,7 @@ class MetazoneAccessor:
         dataset = dataset.rename({'date_time': 'time'})
         dataset['interval'] = dataset['interval_label']
         dataset = dataset.drop_vars('interval_label')
+        dataset = dataset.assign_coords({'time':dataset.time})
 
         return dataset
 
