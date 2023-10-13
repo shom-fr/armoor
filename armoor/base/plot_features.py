@@ -2700,9 +2700,10 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
         if "idx_time" in observation.dims:
             for i_idx_time, _ in enumerate(observation.idx_time):
                 obs = observation.isel(idx_time=[i_idx_time], interval=[i_inter])
-                im_obs = ax.scatter(obs.sal.values, obs.temp.values, 30, obs.depth.values,
-                                    vmin=vmin, vmax=vmax, marker="^", zorder=2,
-                                    label=f'{obs.attrs["name"]}', alpha=0.3, cmap='autumn')
+                if not np.isnan(obs.sal.max(skipna=True).values):
+                    im_obs = ax.scatter(obs.sal.values, obs.temp.values, 30, obs.depth.values,
+                                        vmin=vmin, vmax=vmax, marker="^", zorder=2,
+                                        label=f'{obs.attrs["name"]}', alpha=0.3, cmap='autumn')
 
                 # "en traits fin les profils modèles des disques définis
                 # et temporellement les plus proches"
