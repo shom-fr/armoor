@@ -307,7 +307,14 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing density.
         """
-        return self._obj.xoa.pden
+        ds_dens = self._obj.xoa.pdens
+        if ds_dens is None:
+            sal = self._obj.sel_var.sel_sal()
+            temp = self._obj.sel_var.sel_temp()
+            self._obj['pdens'] = gsw.sigma0(sal, temp)
+            return self._obj['pdens']
+        else:
+            return ds_dens
 
     def sel_ssh(self):
         """

@@ -420,7 +420,7 @@ class MetazoneAccessor:
         -------
 
         """
-        max_dens = self._obj.dens.max(skipna=True)
+        max_dens = self._obj.pdens.max(skipna=True)
         return self.vertical_selection_range([min_dens, max_dens], 'dens')
 
     def vertical_selection_max_dens(self, max_dens: list = None) -> xr.Dataset:
@@ -434,7 +434,7 @@ class MetazoneAccessor:
         -------
 
         """
-        min_dens = self._obj.dens.min(skipna=True)
+        min_dens = self._obj.pdens.min(skipna=True)
         return self.vertical_selection_range([min_dens, max_dens], 'dens')
 
     def vertical_selection_dens(self, dens: list = None) -> xr.Dataset:
@@ -457,15 +457,15 @@ class MetazoneAccessor:
             return self.vertical_selection_range(dens, 'dens')
         return self._obj
 
-    def vertical_selection_dens_from_depth(self, dens):
-        difference_densite = np.abs(self._obj['dens'] - dens).fillna(100000)
+    def vertical_selection_dens_from_depth(self, pdens):
+        difference_densite = np.abs(self._obj['pdens'] - pdens).fillna(100000)
         if 'z' in self._obj.dims:
             indice_min_densite = difference_densite.argmin(dim='z')
             self._obj = self._obj.isel(z=indice_min_densite)
         elif 'depth' in self._obj.dims:
             indice_min_densite = difference_densite.argmin(dim='depth')
             self._obj = self._obj.isel(depth=indice_min_densite)
-        self._obj = self._obj.drop('dens').assign_coords({'dens':dens})
+        self._obj = self._obj.drop('pdens').assign_coords({'pdens':pdens})
         if 'depth' in self._obj.coords:
             self._obj = self._obj.reset_coords('depth')
         return self._obj
@@ -510,11 +510,11 @@ class MetazoneAccessor:
 
             return dataset
         if var_vert == 'dens':
-            if 'dens' in dataset.dims:
-                return dataset.sel(dens=depth, method='nearest')
-            elif 'dens' not in dataset:
-                dataset["dens"] = dataset.sel_var.sel_density()
-            return dataset.meta.vertical_selection_dens_from_depth(dens=depth)
+            if 'pdens' in dataset.dims:
+                return dataset.sel(pdens=depth, method='nearest')
+            elif 'pdens' not in dataset:
+                dataset["pdens"] = dataset.sel_var.sel_pdensity()
+            return dataset.meta.vertical_selection_dens_from_depth(pdens=depth)
 
     def vertical_selection_ponct_cmems(self, depth):
         """
