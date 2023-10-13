@@ -311,8 +311,10 @@ class SSTAccessor:
         if ds_dens is None:
             sal = self._obj.sel_var.sel_sal()
             temp = self._obj.sel_var.sel_temp()
-            self._obj['pdens'] = gsw.sigma0(sal, temp)
-            return self._obj['pdens']
+            if not sal is None and not temp is None:
+                pdens = gsw.sigma0(sal, temp)
+                self._obj['pdens'] = pdens
+                return self._obj['pdens']
         else:
             return ds_dens
 
