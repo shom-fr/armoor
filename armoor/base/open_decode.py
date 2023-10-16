@@ -184,7 +184,7 @@ def open_decode_cmems(path_files, steps):
 
     # Variables to drop/rename to prevent random behaviours
     for var in list(cmems.keys()):
-        if "POSITION" in var:
+        if "POSITION" in var or 'LOCATION' in var:
             cmems = cmems.drop_vars(var)
         elif var[-3:] == "_QC":
             cmems = cmems.rename({var: f"QC_{var[:-3]}"})
@@ -721,7 +721,7 @@ def open_decode_cora(path_files):
     cora = cora.drop_dims(['N_HISTORY', 'N_CALIB', 'N_PARAM'])
     # Variables to drop/rename to prevent random behaviours
     for var in list(cora.keys()):
-        if "POSITION" in var:
+        if "POSITION" in var or 'LOCATION' in var:
             cora = cora.drop_vars(var)
         elif var[-3:] == "_QC":
             cora = cora.rename({var: f"QC_{var[:-3]}"})

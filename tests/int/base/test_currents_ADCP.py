@@ -9,6 +9,17 @@ copy_test_files(folder_test)
 
 class TestBulletins:
 
+
+    def test_ellipses(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_ellipses')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ellipses.ini"])
+        parser.update({'output_path': out_path})
+        create_folder(f'results_comodo')
+        parser = update_comodo(parser)
+        dict2call(parser)
+        assert True
+
     def test_harmonic_table(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_harmonic_table')
