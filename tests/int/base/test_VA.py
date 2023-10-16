@@ -246,6 +246,16 @@ class TestBulletins:
         create_folder(f'tmp')
         dict2call(parser)
         assert True
+    def test_84_diag_disp_argo(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_84_diag_disp_argo.ini")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/84_diag_disp_argo.ini"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
 
     def test_87_ser_temp_ponct_SCA(self):
         out_path, logger = change_path(folder_test)
