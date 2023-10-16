@@ -62,7 +62,7 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             mod_coloc = mod
 
             # If observation is profiler
-            if time_flag and 'time' in obs.lon.dims and len(obs.time) > 1:
+            if time_flag and 'time' in obs.lon.dims:
                 logger.info('Profiler type colocation')
                 mod_coloc = colocate_lon_lat_time(mod, obs, coloc_method, coloc_method_z)
 
