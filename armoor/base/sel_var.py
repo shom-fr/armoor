@@ -314,6 +314,7 @@ class SSTAccessor:
             if not sal is None and not temp is None:
                 pdens = gsw.sigma0(sal, temp)
                 self._obj['pdens'] = pdens
+                self._obj['pdens'] =self._obj['pdens'].assign_attrs({'units':'kg/m3'})
                 return self._obj['pdens']
         else:
             return ds_dens
