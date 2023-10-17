@@ -2411,7 +2411,7 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
 
     # ECART-TYPE
     mod_std = mod_coloc.std(list_dims_mean, skipna=True).squeeze()
-    axs[2].plot(time_coloc, mod_std, '-o', label=f'St_d {mod_name} ')
+    axs[2].plot(time_coloc, mod_std, '-o', label=f'Std {mod_name} ')
 
     # RMSE
     rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
