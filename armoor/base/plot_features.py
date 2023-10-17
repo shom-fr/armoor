@@ -203,7 +203,7 @@ def figure_5_maps(ds):
         gl.ylabel_style = {'size': 12}
         ax.add_feature(cfeature.LAND, zorder=1, edgecolor='k')
         ax.set_title(label, fontsize=13)
-    f.subplots_adjust(left=0.02, bottom=0.02, right=0.99, top=0.92, hspace=0.25)
+    f.subplots_adjust(left=0.02, bottom=0.02, right=0.99, top=0.9, hspace=0.25)
 
     return f, axs
 
@@ -280,7 +280,7 @@ def figure_3_maps(ds, type):
         3 axes for observation, model and comparison maps over observation extent.
     """
 
-    f = plt.figure(figsize=(10, 15))
+    f = plt.figure(figsize=(10, 18))
     ax0 = plt.subplot2grid((3, 2), (0, 0), projection=ccrs.Mercator(), aspect='equal')
     ax1 = plt.subplot2grid((3, 2), (0, 1), projection=ccrs.Mercator(), aspect='equal')
     ax2 = plt.subplot2grid((3, 2), (1, 0), colspan=2, rowspan=2, projection=ccrs.Mercator(),
@@ -373,7 +373,7 @@ def figure_2lin_ts():
     axs : list
         2 axes for observation, model and comparison time series.
     """
-    f = plt.figure(figsize=(11, 7))
+    f = plt.figure(figsize=(15, 9))
     ax0 = plt.subplot2grid((2, 1), (0, 0))
     ax1 = plt.subplot2grid((2, 1), (1, 0))
 
@@ -650,7 +650,7 @@ def diag_disp_figure(mod, obs, title):
 
     """
     logger.info('Dispersion diagram')
-    f, axes = plt.subplots()
+    f, axes = plt.subplots(figsize=(10,10))
     f.suptitle(title, fontsize=12, fontweight='bold')
     plt.xlabel(f"{obs.attrs['name']} Observations")
     plt.ylabel(f"{mod.attrs['name']} Model ")
