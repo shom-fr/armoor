@@ -203,7 +203,7 @@ def figure_5_maps(ds):
         gl.ylabel_style = {'size': 12}
         ax.add_feature(cfeature.LAND, zorder=1, edgecolor='k')
         ax.set_title(label, fontsize=13)
-    f.subplots_adjust(left=0.02, bottom=0.02, right=0.99, top=0.9, hspace=0.25)
+    f.subplots_adjust(left=0.02, bottom=0.02, right=0.99, top=0.87, hspace=0.25)
 
     return f, axs
 
@@ -265,7 +265,7 @@ def figure_1_map(ds):
     gl.xlabel_style = {'size': 12}
     gl.ylabel_style = {'size': 12}
     ax.add_feature(cfeature.LAND, zorder=1, edgecolor='k')
-    f.subplots_adjust(left=0.04, bottom=0.03, right=0.98, top=0.9, hspace=0.2)
+    f.subplots_adjust(left=0.04, bottom=0.03, right=0.98, top=0.85, hspace=0.2)
     return f, ax
 
 
@@ -650,7 +650,7 @@ def diag_disp_figure(mod, obs, title):
 
     """
     logger.info('Dispersion diagram')
-    f, axes = plt.subplots(figsize=(10,10))
+    f, axes = plt.subplots(figsize=(10, 10))
     f.suptitle(title, fontsize=12, fontweight='bold')
     plt.xlabel(f"{obs.attrs['name']} Observations")
     plt.ylabel(f"{mod.attrs['name']} Model ")
@@ -1357,7 +1357,7 @@ def plot_difference_trajectory(obs, mod, output_path=None):
                                        obs.attrs['name'])
     # Plot
     f = plt.figure(figsize=(10, 10))
-    f.suptitle(title, fontsize=15, fontweight='bold')
+    f.suptitle(title, x=0.3, fontsize=15, fontweight='bold')
     ax0 = plt.subplot2grid((2, 1), (0, 0))
     ax1 = plt.subplot2grid((2, 1), (1, 0))
     ax0.plot(mod.time, distances)
@@ -1564,7 +1564,8 @@ def plot_ellipses_tide_current_generic(observation, models, i_wave, scale, outpu
     plt.legend(by_label.values(), by_label.keys())
 
     title, figname = get_title_figname(f'Tidal current ellipses {wave_name}', observation,
-                                       [mod.attrs['name'] for mod in models], observation.attrs['name'])
+                                       [mod.attrs['name'] for mod in models],
+                                       observation.attrs['name'])
 
     f.suptitle(title, fontsize=15, fontweight='bold')
     f.subplots_adjust(top=0.85)
@@ -1949,7 +1950,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
             title, figname = get_title_figname('Metric statistics', obs_coloc, mod_names,
                                                observation['name'])
 
-            f.suptitle(title, fontsize=17, fontweight='bold')
+            f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
 
             # Rotate x labels
             for label in ax.get_xticklabels():
@@ -2336,7 +2337,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             title, figname = get_title_figname(
                 f'Time series metrics on {list_dims_mean} dimensions', obs_coloc, mod_name,
                 observation['name'])
-            f.suptitle(title, fontsize=17, fontweight='bold')
+            f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
             ft.manage_output(figname, output_path)
 
     # Case no vertical slices
@@ -2491,7 +2492,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
 
         title, figname = get_title_figname(f"Unique profile radius {radius}km", obs,
                                            [mod["name"] for mod in models], obs.attrs['name'])
-        f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+        f.suptitle(title, fontsize=17, fontweight='bold')
 
         # Add the mini-map
         ax_mini_map = add_mini_map(f, obs)
@@ -2597,7 +2598,7 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
 
     title, figname = get_title_figname(f'Multi profile radius {radius}km', observation, mod['name'],
                                        obs.attrs['name'])
-    f.suptitle(title, x=0.33, fontsize=17, fontweight='bold')
+    f.suptitle(title, fontsize=17, fontweight='bold')
 
     # Add the mini-map
     ax_mini_map = add_mini_map(f, observation)
@@ -2893,7 +2894,7 @@ def plot_stick_plots(models, observation, output_path=None):
         title, figname = get_title_figname('Stick plot', obs.norm, [mod['name'] for mod in models],
                                            observation['name'])
 
-        f.suptitle(title, fontsize=12, fontweight='bold')
+        f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
         # Save figure
         ft.manage_output(figname, output_path)
     else:
