@@ -51,8 +51,6 @@ def plot(config_obj):
                     var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
 
         vars_mod = copy.copy(vars_obs)
-        if 'temp' in vars_mod:
-            vars_mod[vars_mod.index('temp')] = 'ptemp'
         for i_mod, _ in enumerate(models):
             models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
                                                            vars_obs)
@@ -76,13 +74,12 @@ def plot(config_obj):
                                                      plg=plg)
                 else:
                     for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
-                        figname = f"_depth{i_depth}"
                         models_depth, observation_depth = select_depth(models_var, observation_var,
                                                                        depth)
                         plot_features.plot_ts_metr_stats(models_depth, observation_depth,
                                                          flag_interval, flag_slice,
                                                          output_path=sub_func_output_folder,
-                                                         figname=figname, plg=plg)
+                                                         plg=plg)
 
 
 def select_depth(models, observation, depth):

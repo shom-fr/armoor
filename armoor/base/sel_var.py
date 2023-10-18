@@ -29,7 +29,7 @@ class SSTAccessor:
         self._obj = xarray_obj
         xoa.register_accessors()
         xoa.register_accessors(decode_sigma=True)
-
+        xr.set_options(keep_attrs=True)
         path_cfg = '../../config/cf.cfg'
 
         try:
@@ -76,8 +76,6 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_sound_speed()
             elif var == 'geostrophic_current':
                 dataset = self._obj.sel_var.sel_geo_current()
-
-
             liste_ds.append(dataset)
 
         # Remove None datasets
@@ -88,9 +86,13 @@ class SSTAccessor:
             ds_all = liste_ds[0]
         elif len(liste_ds) > 1:
             ds_all = xr.merge(liste_ds)
+
         # Convert to dataset for homogeneous processing
         if not isinstance(ds_all, xr.Dataset):
             ds_all = ds_all.to_dataset()
+
+        # Assign attributes (name especially)
+        ds_all = ds_all.assign_attrs(self._obj.attrs)
 
         return ds_all
 
@@ -254,9 +256,8 @@ class SSTAccessor:
         if sal is not None and cons_temp is not None and pres is not None:
             return gsw.sound_speed(sal, cons_temp, pres)
 
-        logger.warning(
-            "To compute sound speed you need to have salinity, "
-            "potential temperature and depth in your dataset.")
+        logger.warning("To compute sound speed you need to have salinity, "
+                       "potential temperature and depth in your dataset.")
         return self._obj
 
     def sel_mixed_layer_depth(self):
@@ -268,7 +269,11 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing the mixed layer depth.
         """
-        return compute_mixed_layer(self._obj['temp'])
+        if "temp" in self._obj:
+            self._obj = compute_mixed_layer(self._obj['temp'])
+        elif "ptemp" in self._obj:
+            self._obj = compute_mixed_layer(self._obj['ptemp'])
+        return self._obj
 
     def sel_density(self):
         """
@@ -279,7 +284,19 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing density.
         """
-        return self._obj.xoa.dens
+        if "dens" in self._obj:
+            return self._obj.xoa.dens
+        else:
+            temp = self._obj.sel_var.sel_temp()
+            sal = self._obj.sel_var.sel_sal()
+            if "pres" in self._obj:
+                pres = self._obj['pres']
+            else:
+                pres = gsw.p_from_z(self._obj.depth, self._obj.lat, geo_strf_dyn_height=0,
+                                    sea_surface_geopotential=0)
+            dens = gsw.density.rho(sal, temp, pres)
+            dens.name = 'dens'
+            return dens
 
     def sel_pdensity(self):
         """
@@ -290,7 +307,17 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing density.
         """
-        return self._obj.xoa.pden
+        ds_dens = self._obj.xoa.pdens
+        if ds_dens is None:
+            sal = self._obj.sel_var.sel_sal()
+            temp = self._obj.sel_var.sel_temp()
+            if not sal is None and not temp is None:
+                pdens = gsw.sigma0(sal, temp)
+                self._obj['pdens'] = pdens
+                self._obj['pdens'] =self._obj['pdens'].assign_attrs({'units':'kg/m3'})
+                return self._obj['pdens']
+        else:
+            return ds_dens
 
     def sel_ssh(self):
         """
@@ -313,8 +340,10 @@ class SSTAccessor:
             Data array containing SST in Celcius degrees.
         """
 
-        if 'units' in self._obj.attrs and self._obj.attrs['units'] == 'kelvin':
-            return self._obj - 273.15
-        if self._obj.max() > 200:
-            return self._obj - 273.15
+        if 'units' in self._obj.attrs and self._obj.attrs[
+            'units'] == 'kelvin' or self._obj.max() > 200:
+            self._obj = self._obj - 273.15
+            self._obj.attrs['units'] = 'degC'
+            return self._obj
+        self._obj.attrs['units'] = 'degC'
         return self._obj

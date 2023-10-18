@@ -34,12 +34,15 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
+    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
+        ['current']).assign_attrs({'name': observation['name']})
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current']).assign_attrs(
+            {'name': mod['name']})
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
+            ['current']).assign_attrs({'name': mod['name']})
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current'])
+            i_mod].sel_var.selection(['current']).assign_attrs({'name': observation['name']})
 
     # PLOT
     for output in outputs:
@@ -161,12 +164,12 @@ def plot(config_obj):
                 mod_traj = opendrift_trajectory.calculate_trajectory(path_model, lons, lats, times,
                                                                      time_step, nb_step,
                                                                      output_file)
-                models[i_mod]['traj'] = mod_traj
+                models[i_mod]['traj'] = mod_traj.assign_attrs({'name': mod['name']})
 
-            # Plot the trajectories
-            plot_features.plot_difference_trajectory(observation['xarray_meta'], models[0]['traj'],
-                                                     observation['name'], models[0]['name'],
-                                                     'distance', output_path=sub_func_output_folder)
+                # Plot the trajectories
+                plot_features.plot_difference_trajectory(observation['xarray_meta'],
+                                                         models[i_mod]['traj'],
+                                                         output_path=sub_func_output_folder)
 
 
 ####################################################################################################

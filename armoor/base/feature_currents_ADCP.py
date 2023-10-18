@@ -78,9 +78,12 @@ def plot(config_obj):
             else:
                 attribute = "norm"
 
-            # Remove missing values
+            # Select attribute in good format
             def to_ds_with_coords(dataset, attribute):
-                return dataset[attribute].to_dataset().assign_coords(dataset.coords)
+                dataset_coords = dataset[attribute].to_dataset().assign_coords(dataset.coords)
+                dataset_coords = dataset_coords.assign_attrs(dataset.attrs)
+                dataset_coords = dataset_coords.assign_attrs(dataset[attribute].attrs)
+                return dataset_coords
 
             observation['xarray_meta'] = to_ds_with_coords(observation['xarray_meta'], attribute)
             for i_mod, mod in enumerate(models):
@@ -101,7 +104,6 @@ def plot(config_obj):
                 mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
                     i_mod].to_array()
-
             plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax, dvmin, dvmax,
                                            output_path=sub_func_output_folder)
 
@@ -115,23 +117,23 @@ def plot(config_obj):
             if "tidal_waves" in output:
                 list_waves = output["tidal_waves"]
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " les ondes à calculer...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify "
+                                 "the tidal waves to calculate...")
 
             # Path where to get the comodo tool
             if 'path_comodo' in output:
                 path_tools = output["path_comodo"]
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " le chemin vers les Comodo tools à utiliser...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify"
+                                 " the path to the Comodo tools to use...")
 
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
                 path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " le chemin où sauvegarder les fichiers résultats...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify "
+                                 "the path where to save the result files...")
 
             # Definition of the period for the harmonic analysis
             if 'analysis_start' in output and 'analysis_end' in output:
@@ -143,9 +145,9 @@ def plot(config_obj):
                     mod['xarray_meta'] = mod['xarray_meta'].sel(
                         time=slice(analysis_start, analysis_end))
             else:
-                logger.info("Oops, pour réaliser l'analyse harmonique vous devriez spécifier "
-                            "la période sur laquelle calculer l'analyse harmonique. Le calcul "
-                            "sera ici fait sur toute la période des fichiers d'entrée...")
+                logger.info("Oops, to perform harmonic analysis, you should specify "
+                            "the period over which to calculate the harmonic analysis. "
+                            "The calculation will be done over the entire period of the input files.")
 
             # Process harmonic analysis on observation
             logger.info("Beginning of the harmonic analysis on the observation.")
@@ -157,7 +159,8 @@ def plot(config_obj):
             # Calculate harmonic analysis
             ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
                                                            path_nc, path_results, path_tools,
-                                                           list_waves, 'obs', env_comodo=env_comodo)
+                                                           list_waves,
+                                                           env_comodo=env_comodo)
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
             # Re-add the depth / slice values
@@ -178,17 +181,17 @@ def plot(config_obj):
                 # Calculate harmonic analysis
                 ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'], 'u v',
                                                                path_nc, path_results, path_tools,
-                                                               list_waves, 'mod',
+                                                               list_waves,
                                                                env_comodo=env_comodo)
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
 
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    flags = False, True, False
+                    flags = False, False, True
                     tgt_grid = 'observation'
                     ds_obs, ds_mod = colocate_all(ds_obs, ds_mod, flags, tgt_grid,
-                                                  coloc_method='nearest')
+                                                  coloc_method_z='nearest')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
 
@@ -208,23 +211,23 @@ def plot(config_obj):
             if "tidal_waves" in output:
                 list_waves = output["tidal_waves"]
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " les ondes à calculer...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify the tidal "
+                                 "waves to calculate...")
 
             # Path where to get the comodo tool
             if 'path_comodo' in output:
                 path_tools = output["path_comodo"]
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " le chemin vers les Comodo tools à utiliser...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify "
+                                 "the path to the Comodo tools to use...")
 
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
                 path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
             else:
-                raise ValueError("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                 " le chemin où sauvegarder les fichiers résultats...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify "
+                                 "the path where to save the result files..")
 
             # Definition of the period for the harmonic analysis
             if 'analysis_start' in output and 'analysis_end' in output:
@@ -237,9 +240,9 @@ def plot(config_obj):
                         time=slice(analysis_start, analysis_end))
 
             else:
-                logger.info("Oops, pour réaliser l'analyse harmonique vous devriez spécifier "
-                            "la période sur laquelle calculer l'analyse harmonique. Le calcul "
-                            "sera ici fait sur toute la période des fichiers d'entrée.")
+                logger.info("Oops, to perform harmonic analysis, you should specify the period "
+                            "over which to calculate the harmonic analysis. The calculation will "
+                            "be done over the entire period of the input files.")
 
             # Process harmonic analysis on observation
             # If metazone per slice, calculate average per slice
@@ -250,7 +253,7 @@ def plot(config_obj):
             # Calculate harmonic analysis
             ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
                                                            path_nc, path_results, path_tools,
-                                                           list_waves, 'obs', env_comodo=env_comodo)
+                                                           list_waves, env_comodo=env_comodo)
 
             ds_obs = ds_obs.assign_attrs({'name': observation['name']})
 
@@ -272,17 +275,17 @@ def plot(config_obj):
                 # Calculate harmonic analysis
                 ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta_coloc'], 'u v',
                                                                path_nc, path_results, path_tools,
-                                                               list_waves, 'mod',
+                                                               list_waves,
                                                                env_comodo=env_comodo)
                 ds_mod = ds_mod.assign_attrs({'name': mod['name']})
 
                 # Re-add the depth / slice values + colocate
                 if "depth" in mod['xarray_meta_coloc'].dims:
                     ds_mod['depth'] = mod['xarray_meta_coloc']['depth']
-                    flags = False, True, False
+                    flags = False, False, True
                     tgt_grid = 'observation'
                     ds_obs, ds_mod = colocate_all(ds_obs, ds_mod, flags, tgt_grid,
-                                                  coloc_method='nearest')
+                                                  coloc_method_z='nearest')
                 elif "slice" in mod['xarray_meta_coloc'].dims:
                     ds_mod['slice'] = mod['xarray_meta_coloc']['slice']
                 ds_models.append(ds_mod)
