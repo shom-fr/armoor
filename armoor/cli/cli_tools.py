@@ -11,6 +11,7 @@ from configobj import ConfigObj
 from validate import Validator, VdtTypeError
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -96,44 +97,6 @@ def try_str2float(value) -> float:
         else:
             raise ValueError("depth or step must be positive values")
     return None
-
-
-def depth_config_obj(depths) -> list:
-    """ @4
-    if depths length is 1 : it's for the selection of a layer
-    if depths length is 2 : it's for the selection of all the layers between the 2 values.
-    if depths length is 3 : it's for the selection of some layers between the 2 first values,
-        with a certain step (third value)
-
-    Parameters
-    ----------
-    depths : str or list of depths
-        1 : layer
-        2 : layer min and layer max
-        3 : layer min, layer max and step
-
-    Returns
-    -------
-    depths : list
-        depths (length from 1 to 3)
-    """
-    # case of sandwich depths
-    if isinstance(depths, list) and len(depths) <= 3:
-        depths = [try_str2float(depth) for depth in depths]
-        # check if depths are in the right order
-        if len(depths) >= 2 and depths[0] >= depths[1]:
-            raise ValueError(f'depth {depths[0]} < {depths[1]} must be true')
-        # check if step is lower the the interval between depth min and depth max
-        if len(depths) == 3 and depths[1] - depths[0] <= depths[2]:
-            raise ValueError(f'step {depths[2]} is too large {depths[0]} - {depths[1]} = {depths[1] - depths[0]}')
-        return depths
-    # case of one layer of depth
-    elif isinstance(depths, str):
-        return [try_str2float(depths)]
-    # other cases through an error
-    else:
-        logger.error(f' depth_config_Obj : {type(depths) = }')
-        raise ArgumentTypeError("error with depth param")
 
 
 # function to check if the coordinates provided are well formatted
@@ -247,8 +210,6 @@ def remove_keys_with_none_value(dictionary: dict) -> dict:
         if value is None:
             del dictionary[key]
     return dictionary
-
-
 
 
 # function to check if the coordinates provided are well formatted

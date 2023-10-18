@@ -5,7 +5,7 @@ from xoa import cfgm
 
 from argparse import ArgumentParser
 
-from armoor.cli.cli_tools import int_or_string_configobj, depth_config_obj, coords_config_obj, format_cofig_obj2dict
+from armoor.cli.cli_tools import int_or_string_configobj, coords_config_obj, format_cofig_obj2dict
 
 import logging
 
@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 from xoa.cfgm import register_validation_functions
 
 register_validation_functions(absolute_or_relative_time=int_or_string_configobj)
-register_validation_functions(depth=depth_config_obj)
 register_validation_functions(coordinates=coords_config_obj)
 
 

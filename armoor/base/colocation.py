@@ -60,8 +60,9 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             logger.info('Colocating the model on the observation grid')
             obs_coloc = obs
             mod_coloc = mod
+
             # If observation is profiler
-            if 'time' in obs.lon.dims and len(obs.time) > 1:
+            if time_flag and 'time' in obs.lon.dims:
                 logger.info('Profiler type colocation')
                 mod_coloc = colocate_lon_lat_time(mod, obs, coloc_method, coloc_method_z)
 
@@ -95,6 +96,7 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             # Vertical colocation
             if ver_flag:
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
+
     return obs_coloc, mod_coloc
 
 
@@ -119,8 +121,7 @@ def temporal_colocation(ds_to_coloc, tgt, coloc_method):
     logger.info('Time colocation')
     time_values = np.unique(tgt.time.values)
     if len(ds_to_coloc.time.data) > 1:
-        ds_to_coloc = ds_to_coloc.interp(time=time_values, method=coloc_method,
-                                         kwargs={"fill_value": "extrapolate"})
+        ds_to_coloc = ds_to_coloc.interp(time=time_values, method=coloc_method)
     else:
         ds_to_coloc = pick_time(ds_to_coloc, time_values)
 
@@ -148,6 +149,7 @@ def horizontal_colocation(ds_to_coloc, tgt, coloc_method):
 
     """
     logger.info('Horizontal colocation')
+
     # Drop duplicates in lon/lat
     if 'lon' in ds_to_coloc.dims:
         ds_to_coloc = ds_to_coloc.drop_duplicates('lon').drop_duplicates('lat')
@@ -190,7 +192,11 @@ def horizontal_colocation(ds_to_coloc, tgt, coloc_method):
 
     # Regrid ds if necessary
     elif 'x' in ds_to_coloc.dims:
-        ds_coloc = convert_curv_rect(ds_to_coloc, lon_values, lat_values)
+        if np.size(lon_values) == 1 and np.size(lat_values) == 1:
+            ds_coloc = ds_to_coloc.meta.sel_closest(lon_values, lat_values)
+
+        else:
+            ds_coloc = convert_curv_rect(ds_to_coloc, lon_values, lat_values)
 
     else:
         ds_coloc = ds_to_coloc.interp(lon=lon_values, lat=lat_values, method=coloc_method,
@@ -221,17 +227,23 @@ def vertical_colocation(ds_to_coloc, tgt, coloc_method):
     depth_ds = ds_to_coloc.depth
     depth_tgt = tgt.depth
 
+    if coloc_method is None:
+        coloc_method = "nearest"
+
     # Colocate only if needed
-    if np.size(depth_tgt) != 1 and np.size(depth_ds) != 1:
-        # Case ds and tgt have depth(depth) dimension
-        if 'depth' in depth_tgt.dims and 'depth' in depth_ds.dims:
-            ds_coloc = ds_to_coloc.interp(depth=depth_tgt, method=coloc_method)
+    if np.size(depth_tgt) == np.size(depth_ds) and (depth_tgt == depth_ds).all():
+        return ds_to_coloc
+    else:
+        if np.size(depth_tgt) != 1 and np.size(depth_ds) != 1:
+            # Case ds and tgt have depth(depth) dimension
+            if 'depth' in depth_tgt.dims and 'depth' in depth_ds.dims:
+                ds_coloc = ds_to_coloc.interp(depth=depth_tgt, method=coloc_method)
 
-        # Case ds has depth(lon/lat/time) dimension and tgt has depth(depth) dimension
-        elif 'depth' in depth_tgt.dims and 'depth' not in depth_ds.dims:
-            ds_coloc = ds_to_coloc.meta.vertical_seletion_croco_hycom(depth_tgt)
+            # Case ds has depth(lon/lat/time) dimension and tgt has depth(depth) dimension
+            elif 'depth' in depth_tgt.dims and 'depth' not in depth_ds.dims:
+                ds_coloc = ds_to_coloc.meta.vertical_seletion_croco_hycom(depth_tgt)
 
-        return ds_coloc
+            return ds_coloc
     return ds_to_coloc
 
 

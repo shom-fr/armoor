@@ -61,8 +61,6 @@ def plot(config_obj):
         vars_obs = [var for var in list(observation["xarray_meta"].keys()) if
                     var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
         vars_mod = copy.copy(vars_obs)
-        if 'temp' in vars_mod:
-            vars_mod[vars_mod.index('temp')] = 'ptemp'
         for i_mod, mod in enumerate(models):
             models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
                                                            vars_obs)
@@ -74,8 +72,7 @@ def plot(config_obj):
             # TIME SERIES POINT
             plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point'}
             if output["plot"] in plot_ts_metr_point:
-                plot_features.plot_ts_metr_point(models_var, observation_var,
-                                                 plot_ts_metr_point[output["plot"]], flag_interval,
+                plot_features.plot_ts_metr_point(models_var, observation_var, flag_interval,
                                                  flag_slice, output_path=sub_func_output_folder)
 
             ########################################################################################
@@ -103,8 +100,7 @@ def plot(config_obj):
                                                     observation_var["xarray_meta_coloc"][i],
                                                     plot_map_metr[output["plot"]], cmap, vmin, vmax,
                                                     output_path=sub_func_output_folder, dvmin=dvmin,
-                                                    dvmax=dvmax, obs_name=obs_name,
-                                                    mod_name=models_name[i])
+                                                    dvmax=dvmax)
                     else:
                         for i_depth, depth in enumerate(
                                 models_var[0]["xarray_meta_coloc"].depth.values):
@@ -126,5 +122,4 @@ def plot(config_obj):
                                                         observation_var["xarray_meta_coloc"][i],
                                                         plot_map_metr[output["plot"]], cmap, vmin,
                                                         vmax, output_path=sub_func_output_folder,
-                                                        dvmin=dvmin, dvmax=dvmax, obs_name=obs_name,
-                                                        mod_name=models_name[i], figname=figname)
+                                                        dvmin=dvmin, dvmax=dvmax)

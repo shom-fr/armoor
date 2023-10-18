@@ -25,7 +25,6 @@ def plot(config_obj):
     output_path = config_obj.get("output_path")
 
     # Select the variables
-
     config_obj = sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
 
@@ -35,8 +34,6 @@ def plot(config_obj):
     vars_obs = [var for var in list(observation["xarray_meta"].keys()) if
                 var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
     vars_mod = copy.copy(vars_obs)
-    if 'temp' in vars_mod:
-        vars_mod[vars_mod.index('temp')] = 'ptemp'
     for i_mod, mod in enumerate(models):
         models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
                                                        vars_obs)
