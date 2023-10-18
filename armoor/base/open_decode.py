@@ -812,11 +812,13 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
     if model_type == 'woa18':
         logger.info("woa18")
         data_set_temp = xr.open_mfdataset(path_files, decode_times=False)
-        variables_to_drop = ['depth_bnds', 's_oa', 's_ma', 's_dd', 's_sd', 's_gp', 's_mn', 's_se']
+        variables_to_drop = ['depth_bnds',
+                             's_oa', 's_ma', 's_dd', 's_sd', 's_gp', 's_mn', 's_se',
+                             't_oa', 't_ma', 't_dd', 't_sd', 't_gp', 't_mn', 't_se']
         for var in variables_to_drop:
             if var in data_set_temp:
                 data_set_temp = data_set_temp.drop_vars(var)
-        return data_set_temp.xoa.decode()
+        return data_set_temp
 
     if model_type == 'rivers':
         logger.info("rivers")
