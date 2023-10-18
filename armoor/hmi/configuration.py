@@ -212,7 +212,7 @@ def rename_vars(param_xr: xr.Dataset) -> xr.Dataset:
                         'ptemp': 'temp',
                         'analysed_sst': 'sst',
                         's_an': 'sss',
-                        'sig': 'sss'}
+                        't_an': 'temp'}
 
     for var in variables2rename:
         try:
