@@ -65,7 +65,20 @@ class TestPathTools:
         input_folder_path = get_input_folder_path()
         config_reg_day = f"{config_reg}_{test_day}"
 
-        assert get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/insta", 'uv') == \
+        def get_timestamp_from_path(path, delimiter):
+            filename = os.path.basename(path)
+            parts = filename.split(delimiter)
+            timestamp_str = parts[1]
+            return timestamp_str
+
+        def sort_river_dict(my_dict):
+            for key in my_dict:
+                my_dict[key] = sorted(my_dict[key], key=lambda x: get_timestamp_from_path(x, 'GL_TS'))
+            return my_dict
+
+
+        assert sorted(get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/insta", 'uv'),
+                      key=lambda x: get_timestamp_from_path(x, 'arpege')) == \
                [os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203090000_0000_ana_insta.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203090000_0001_ana_insta.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203090000_0002_ana_insta.grib'),
@@ -194,8 +207,10 @@ class TestPathTools:
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203100000_0101_fcst_insta.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'insta', 'arpege_202203100000_0102_fcst_insta.grib')]
 
-        assert get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'tp') == \
-               get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'hfsen') == \
+        assert sorted(get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'tp'),
+                      key=lambda x: get_timestamp_from_path(x, 'arpege')) == \
+               sorted(get_forcing_model_path(input_folder_path, config_reg_day, "atmfrc/cumul", 'hfsen'),
+                      key=lambda x: get_timestamp_from_path(x, 'arpege')) == \
                [os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'cumul', 'arpege_202203090000_0001_ana_cumul.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'cumul', 'arpege_202203090000_0002_ana_cumul.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'cumul', 'arpege_202203090000_0003_ana_cumul.grib'),
@@ -263,7 +278,7 @@ class TestPathTools:
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'cumul', 'arpege_202203100000_0099_fcst_cumul.grib'),
                 os.path.join('..', 'empty_data', config_reg_day, 'atmfrc', 'cumul', 'arpege_202203100000_0102_fcst_cumul.grib')]
 
-        assert get_forcing_model_path(input_folder_path, config_reg_day, "rivers", 'RVFL') == \
+        assert sort_river_dict(get_forcing_model_path(input_folder_path, config_reg_day, "rivers", 'RVFL')) == \
                {'GL_TS_RF_EXSC0001':
                     [os.path.join('..', 'empty_data', config_reg_day, 'rivers', 'GL_TS_RF_EXSC0001_20220226.nc'),
                      os.path.join('..', 'empty_data', config_reg_day, 'rivers', 'GL_TS_RF_EXSC0001_20220227.nc'),

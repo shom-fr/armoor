@@ -17,6 +17,7 @@ test_day = datetime.now(timezone.utc).strftime("%Y%m%d")
 model = 'hycom3d'
 config = 'med'
 
+
 def change_path(folder_test):
     os.chdir(paths["path_p3"])
 
@@ -30,9 +31,16 @@ def change_path(folder_test):
 
 
 def copy_test_files():
-    source_dir = os.path.join(rootdir, "..", "..", "..", "data", "P3", "empty_data", "hycom3d_med_")
-    destination_dir = os.path.join(paths["path_p3"],"empty_data", f'hycom3d_med_{test_day}')
+    copy_empty_data_files('med')
+    copy_empty_data_files('manga')
+    copy_empty_data_files('indien')
+
+
+def copy_empty_data_files(local_config):
+    source_dir = os.path.join(rootdir, "..", "..", "..", "data", "P3", "empty_data", f"hycom3d_{local_config}_")
+    destination_dir = os.path.join(paths["path_p3"], "empty_data", f'hycom3d_{local_config}_{test_day}')
     shutil.copytree(source_dir, destination_dir, dirs_exist_ok=True)
 
+
 def get_input_folder_path() -> str:
-    return os.path.join('..',"empty_data")
+    return os.path.join('..', "empty_data")

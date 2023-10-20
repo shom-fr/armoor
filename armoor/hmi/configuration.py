@@ -211,7 +211,8 @@ def rename_vars(param_xr: xr.Dataset) -> xr.Dataset:
                         'vair': 'v',
                         'ptemp': 'temp',
                         'analysed_sst': 'sst',
-                        's_an': 'sss'}
+                        's_an': 'sss',
+                        't_an': 'temp'}
 
     for var in variables2rename:
         try:
@@ -273,9 +274,5 @@ def read_netcdfs(paths: list, data_type: str = None) -> xr.Dataset:
     """
     logger.info('Opening file(s)')
     xarray_obj = open_decode(paths, func='forecaster', type=data_type)
-
-    if data_type not in ['rivers']:
-        logger.info('Decoding xarray')
-        xarray_obj = xarray_obj.read.decode()
 
     return xarray_obj

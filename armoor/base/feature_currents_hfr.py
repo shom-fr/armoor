@@ -1,12 +1,12 @@
 """Create figures for feature 6:currents_hfr"""
+import logging
 import os
 import copy
-from armoor import base
 import numpy as np
-import armoor.base.feature_tools as ft
+from armoor.base.tools_features import remove_missing_values_ds
+from armoor.base import plot_features, comodo_tide_feature
+from armoor.base.colocation import colocate_all
 import armoor.hmi.script_tools as st
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +38,17 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
+    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
+        ['current']).assign_attrs({'name': observation['name']})
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current']).assign_attrs(
+            {'name': mod['name']})
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
+            ['current']).assign_attrs({'name': mod['name']})
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current'])
+            i_mod].sel_var.selection(['current']).assign_attrs({'name': observation['name']})
 
-    for index_output, output in enumerate(outputs):
+    for output in outputs:
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             st.create_folder(sub_func_output_folder)
@@ -77,23 +80,23 @@ def plot(config_obj):
             if "tidal_waves" in output:
                 list_waves = output["tidal_waves"]
             else:
-                raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                " les ondes à calculer...")
+                raise ValueError("Oops, to perform harmonic analysis, you should specify the tidal "
+                                 "waves to calculate...")
 
             # Path where to get the comodo tool
             if 'path_comodo' in output:
                 path_tools = output["path_comodo"]
             else:
-                raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                " le chemin vers les Comodo tools à utiliser...")
+                raise ValueError("Oops, to perform harmonic analysis, you should "
+                                 "specify the path to the Comodo tools to use...")
 
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
                 path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
             else:
-                raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                " le chemin où sauvegarder les fichiers résultats...")
+                raise ValueError("Oops, to perform harmonic analysis, you should "
+                                 "specify the path where to save the result files...")
 
             # Definition of the period for the harmonic analysis
             if 'analysis_start' in output and 'analysis_end' in output:
@@ -105,30 +108,29 @@ def plot(config_obj):
                     mod['xarray_meta'] = mod['xarray_meta'].sel(
                         time=slice(analysis_start, analysis_end))
             else:
-                logger.info(f"Oops, pour réaliser l'analyse harmonique vous devriez spécifier "
-                            f"la période sur laquelle calculer l'analyse harmonique. Le calcul "
-                            f"sera ici fait sur toute la période des fichiers d'entrée...")
+                logger.info("Oops, to perform harmonic analysis, you should specify the period "
+                            "over which to calculate the harmonic analysis. "
+                            "The calculation will be done over the entire "
+                            "period of the input files.")
 
             # Proceed harmonic analysis on obs
-            ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
-                                                                path_nc, path_results, path_tools,
-                                                                list_waves, 'obs',
-                                                                env_comodo=env_comodo)
+            ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
+                                                           path_nc, path_results, path_tools,
+                                                           list_waves, env_comodo=env_comodo)
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on mod
                 path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
-                ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v',
-                                                                    path_nc, path_results,
-                                                                    path_tools, list_waves, 'mod',
-                                                                    env_comodo=env_comodo)
+                ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc,
+                                                               path_results, path_tools, list_waves,
+                                                               env_comodo=env_comodo)
                 flags = False, True, False
                 tgt_grid = coloc_product
-                obs_coloc, mod_coloc = base.colocate_all(ds_obs, ds_mod, flags, tgt_grid,
-                                                         coloc_method='nearest')
+                obs_coloc, mod_coloc = colocate_all(ds_obs, ds_mod, flags, tgt_grid,
+                                                    coloc_method='nearest')
 
                 # Plot the maps
-                base.plot_features.plot_map_harm(mod_coloc, obs_coloc, models_name[i_mod], obs_name,
-                                                 output_path=sub_func_output_folder)
+                plot_features.plot_map_harm(mod_coloc, obs_coloc,
+                                            output_path=sub_func_output_folder)
 
         ############################################################################################
         # ELLIPSES TIDAL CURRENTS
@@ -139,23 +141,23 @@ def plot(config_obj):
             if "tidal_waves" in output:
                 list_waves = output["tidal_waves"]
             else:
-                raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                " les ondes à calculer...")
+                raise ValueError("Oops, to perform harmonic analysis,"
+                                 " you should specify the waves to calculate...")
 
             # Path where to get the comodo tool
             if 'path_comodo' in output:
                 path_tools = output["path_comodo"]
             else:
-                raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                " le chemin vers les Comodo tools à utiliser...")
+                raise ValueError("Oops, to perform harmonic analysis,"
+                                 " you should specify the path to the Comodo tools to use...")
 
             # Path where to save the results
             if 'path_results' in output:
                 path_results = output["path_results"]
                 path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
             else:
-                raise Exception("Oops, pour réaliser l'analyse harmonique vous devriez spécifier"
-                                " le chemin où sauvegarder les fichiers résultats...")
+                raise ValueError("Oops, to perform harmonic analysis, you should"
+                                 " specify the path where to save the result files...")
 
             # Definition of the period for the harmonic analysis
             if 'analysis_start' in output and 'analysis_end' in output:
@@ -167,28 +169,27 @@ def plot(config_obj):
                     mod['xarray_meta'] = mod['xarray_meta'].sel(
                         time=slice(analysis_start, analysis_end))
             else:
-                logger.info(f"Oops, pour réaliser l'analyse harmonique vous devriez spécifier "
-                            f"la période sur laquelle calculer l'analyse harmonique. Le calcul "
-                            f"sera ici fait sur toute la période des fichiers d'entrée...")
+                logger.info("Oops, to perform harmonic analysis, you should specify the period"
+                            " over which to calculate the harmonic analysis."
+                            " The calculation will be done over"
+                            " the entire period of the input files.")
 
             # Proceed harmonic analysis on obs
-            ds_obs = base.comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
-                                                                path_nc, path_results, path_tools,
-                                                                list_waves, 'obs',
-                                                                env_comodo=env_comodo)
+            ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
+                                                           path_nc, path_results, path_tools,
+                                                           list_waves, env_comodo=env_comodo)
 
             ds_models = []
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on mod
                 path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
-                ds_mod = base.comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v',
-                                                                    path_nc, path_results,
-                                                                    path_tools, list_waves, 'mod',
-                                                                    env_comodo=env_comodo)
+                ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc,
+                                                               path_results, path_tools, list_waves,
+                                                               env_comodo=env_comodo)
                 ds_models.append(ds_mod)
             # Plot the maps
-            base.plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale,
-                                                          output_path=sub_func_output_folder)
+            plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale,
+                                                     output_path=sub_func_output_folder)
 
         ############################################################################################
         # PONCTUAL TIMES SERIES
@@ -213,8 +214,8 @@ def plot(config_obj):
                     attribute].to_dataset()
                 models[i_mod] = mod
                 # Remove missing values
-                models, observation = base.remove_missing_values_ds(models, observation, i_mod,
-                                                                    [attribute], [attribute])
+                models, observation = remove_missing_values_ds(models, observation, i_mod,
+                                                               [attribute], [attribute])
 
             # Select variables to plot
             observation['xarray_meta'] = observation['xarray_meta'].to_array()
@@ -224,9 +225,8 @@ def plot(config_obj):
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
                     i_mod].to_array()
 
-            base.plot_features.plot_ts_metr_point(models, observation,
-                                                  plot_ts_metr_point[output["plot"]], flag_interval,
-                                                  flag_slice, output_path=sub_func_output_folder)
+            plot_features.plot_ts_metr_point(models, observation, flag_interval, flag_slice,
+                                             output_path=sub_func_output_folder)
         ############################################################################################
         # STATS TIMES SERIES
         plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
@@ -244,16 +244,19 @@ def plot(config_obj):
             plg = config_obj["meta_zones"].get("polygon")
 
             # Remove missing values
-            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
+            observation['xarray_meta'] = observation['xarray_meta'][
+                attribute].to_dataset().assign_attrs({'name': observation['name']})
             for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
+                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset().assign_attrs(
+                    {'name': mod['name']})
+                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][
+                    attribute].to_dataset().assign_attrs({'name': mod['name']})
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][
-                    attribute].to_dataset()
+                    attribute].to_dataset().assign_attrs({'name': observation['name']})
                 models[i_mod] = mod
                 # Remove missing values
-                models, observation = base.remove_missing_values_ds(models, observation, i_mod,
-                                                                    [attribute], [attribute])
+                models, observation = remove_missing_values_ds(models, observation, i_mod,
+                                                               [attribute], [attribute])
 
             # Select variables to plot
             observation['xarray_meta'] = observation['xarray_meta'].to_array()
@@ -263,8 +266,8 @@ def plot(config_obj):
                 observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
                     i_mod].to_array()
 
-            base.plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
-                                                  output_path=sub_func_output_folder, plg=plg)
+            plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
+                                             output_path=sub_func_output_folder, plg=plg)
 
         ############################################################################################
         # CURRENT MAP
@@ -282,16 +285,14 @@ def plot(config_obj):
 
             for i_mod, mod in enumerate(models):
                 # Remove missing values
-                models, observation = base.remove_missing_values_ds(models, observation, i_mod,
-                                                                    ['u', 'v', 'norm'],
-                                                                    ['u', 'v', 'norm'])
+                models, observation = remove_missing_values_ds(models, observation, i_mod,
+                                                               ['u', 'v', 'norm'],
+                                                               ['u', 'v', 'norm'])
 
-
-                base.plot_features.plot_map_metr_current(flag_interval, flag_slice,
-                                                         mod["xarray_meta"],
-                                                         mod["xarray_meta_coloc"],
-                                                         observation["xarray_meta"],
-                                                         observation["xarray_meta_coloc"][i_mod],
-                                                         plot_map_metr[output["plot"]], cmap, vmin,
-                                                         vmax, dvmin=dvmin, dvmax=dvmax,
-                                                         output_path=sub_func_output_folder, )
+                plot_features.plot_map_metr_current(flag_interval, flag_slice, mod["xarray_meta"],
+                                                    mod["xarray_meta_coloc"],
+                                                    observation["xarray_meta"],
+                                                    observation["xarray_meta_coloc"][i_mod],
+                                                    plot_map_metr[output["plot"]], cmap, vmin, vmax,
+                                                    dvmin=dvmin, dvmax=dvmax,
+                                                    output_path=sub_func_output_folder, )

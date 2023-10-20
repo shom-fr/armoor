@@ -14,12 +14,12 @@ class TestReadVar:
         logger.info('test_sel_sound_speed')
         path_ds = ["../data/test_uni/read_var/nemo_for_sound_speed.nc"]
         ds = open_decode(path_ds)
-        sound_speed = ds.read_sst.sel(['sound_speed'])
+        sound_speed = ds.sel_var.selection(['sound_speed'])
         assert sound_speed.max() > 1000
 
     def test_sel_mld(self):  # needs xoa latest version
         logger.info('test_sel_mld')
         path_ds = ["../data/test_uni/read_var/woa18_decav_t03_04.nc"]
         ds = open_decode(path_ds, type='WOA18')
-        _ = ds.read_sst.sel(['mld'])
+        mld = ds.sel_var.selection(['mld'])
         assert True

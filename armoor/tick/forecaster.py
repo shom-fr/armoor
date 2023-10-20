@@ -10,6 +10,10 @@ import pytz
 
 from xoa import cfgm
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Forecaster:
     """
@@ -20,9 +24,12 @@ class Forecaster:
         self.approval_path = ''
         self.origins = []
         self.ldap_server_url = ''
-        self.domain = ''
         self.search_base = ''
         self.authorized_user_group = ''
+        self.ldap_user_object_class = ''
+        self.ldap_user_attribute = ''
+        self.ldap_bind_user = ''
+        self.ldap_bind_password = ''
 
         rootdir = os.path.abspath(os.path.dirname(__file__))
         cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "forecaster.ini"))
@@ -39,12 +46,16 @@ class Forecaster:
         -------
         None
         """
+        logger.info('Forecaster initialization')
         self.approval_path = self.cfg_forecaster['approval_path']
         self.origins = self.cfg_forecaster['origins']
         self.ldap_server_url = self.cfg_forecaster['ldap_server_url']
-        self.domain = self.cfg_forecaster['domain']
         self.search_base = self.cfg_forecaster['search_base']
         self.authorized_user_group = self.cfg_forecaster['authorized_user_group']
+        self.ldap_user_object_class = self.cfg_forecaster['ldap_user_object_class']
+        self.ldap_user_attribute = self.cfg_forecaster['ldap_user_attribute']
+        self.ldap_bind_user = self.cfg_forecaster['ldap_bind_user']
+        self.ldap_bind_password = self.cfg_forecaster['ldap_bind_password']
 
     def get_status(self, config_reg, production_time) -> dict:
         """
@@ -63,9 +74,12 @@ class Forecaster:
         -------
         status of the approbation
         """
+        logger.info('get_status')
+        logger.info(f'Regional configuration : {config_reg}')
+        logger.info(f'Production time : {production_time}')
         status = {"status": "no_production", "last_update": "", "reporter": ""}
         approbation_file = os.path.join(self.approval_path, f'{config_reg}_{production_time}', 'data.json')
-
+        logger.info(f'Reading status from : {approbation_file}')
         if os.path.isfile(approbation_file):
             status = self.read_status(approbation_file)
 
@@ -85,6 +99,7 @@ class Forecaster:
         -------
         None
         """
+        logger.info('set_status')
         approbation_file = os.path.join(self.approval_path, f'{config_reg}_{production_time}', 'data.json')
 
         protected_status = ['validated', 'refused']
@@ -107,6 +122,7 @@ class Forecaster:
         -------
         The approval status data
         """
+        logger.info('read_status')
         # Opening JSON file
         with open(status_file_path, "r", encoding="utf-8") as status_file:
             # returns JSON object as
@@ -130,6 +146,7 @@ class Forecaster:
         -------
         None
         """
+        logger.info('write_status')
         with open(status_file_path, "r", encoding="utf-8") as status_file:
             data = json.load(status_file)
 

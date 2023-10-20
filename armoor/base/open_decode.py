@@ -1,18 +1,19 @@
 """XrReaderAccessor
 """
-import xarray as xr
-import xoa.grid
-import xoa.cf as xcf
-import numpy as np
 import os
-import xoa
-import gsw
 import logging
 import datetime
-import pandas as pd
-from xoa.grid import dz2depth, shift
-import matplotlib.pyplot as plt
+import concurrent.futures
+import xarray as xr
+import xoa
+import xoa.grid
+import xoa.cf as xcf
 import xoa.geo as xgeo
+from xoa.grid import dz2depth, shift
+import numpy as np
+import gsw
+import pandas as pd
+import dask
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,8 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
         Poste 1 : functionnality.
      type : str
         type of txt file or model.
+     steps : float
+        Horizontal and vertical steps.
 
      Returns
      -------
@@ -42,61 +45,57 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
     try:
         rootdir = os.path.abspath(os.path.dirname(__file__))
         path = os.path.join(rootdir, '..', '..', 'config', 'cf.cfg')
-        logger.info(f'using path : {path}')
+        logger.info('using path : %s', path)
     except:
         logger.warning('cf.cfg file not found')
         directory = os.getcwd()
-        logger.warning(f'using path : {directory}')
+        logger.warning('using path : %s', directory)
     xcf.register_cf_specs(path)
 
     if not isinstance(path_files, (list, dict)):
-        raise TypeError(f"Only list or dict are allowed : {path_files} ")
+        raise TypeError("Only list or dict are allowed : %s", path_files)
 
     # Open file
     if func == 'forecaster':
         logger.info("forecaster")
         return open_forecaster(path_files, type)
 
-    else:
-        if type == "WOA18":
-            logger.info("Opening WOA18")
-            return open_decode_woa18(path_files)
-        elif type == "CMEMS":
-            logger.info("Opening CMEMS")
-            return open_decode_cmems(path_files, steps=steps)
-        elif type == "scanfish":
-            logger.info("Opening Scanfish")
-            return open_decode_scanfish(path_files[0], steps=steps)
-        elif type == "seasoar":
-            logger.info("Opening Seasoar")
-            return open_decode_seasoar(path_files[0], steps=steps)
-        elif type == "LADCP":
-            logger.info("Opening L-ADCP")
-            return open_decode_l_adcp(path_files[0])
-        elif type == "mouillage":
-            logger.info("Opening Mooring")
-            return open_decode_mouillages(path_files[0])
-        elif type == "VMADCP":
-            logger.info("Opening VMADCP")
-            return open_decode_vmadcp(path_files[0], steps=steps)
-        elif type == 'CROCO':
-            logger.info("Opening CROCO")
-            return open_decode_croco(path_files[0])
-        elif type == 'CROCO_currents':
-            logger.info("Opening CROCO currents")
-            return open_decode_croco_currents(path_files[0])
-        elif type == 'HYCOM_currents':
-            logger.info("Opening HYCOM currents")
-            return open_decode_hycom_currents(path_files)
-        elif type == 'HYCOM_3D':
-            logger.info("Opening HYCOM 3D currents")
-            return open_decode_hycom_3d(path_files)
-        elif type == 'CORA':
-            logger.info("Opening CORA")
-            return open_decode_cora(path_files[0])
-        else:
-            logger.info("Opening non specific file type")
-            return open_decode_basic(path_files)
+    if type == "WOA18":
+        logger.info("Opening WOA18")
+        return open_decode_woa18(path_files)
+    if type == "CMEMS":
+        logger.info("Opening CMEMS")
+        return open_decode_cmems(path_files, steps=steps)
+    if type == "scanfish":
+        logger.info("Opening Scanfish")
+        return open_decode_scanfish(path_files[0], steps=steps)
+    if type == "seasoar":
+        logger.info("Opening Seasoar")
+        return open_decode_seasoar(path_files[0], steps=steps)
+    if type == "LADCP":
+        logger.info("Opening L-ADCP")
+        return open_decode_l_adcp(path_files[0])
+    if type == "mouillage":
+        logger.info("Opening Mooring")
+        return open_decode_mouillages(path_files[0])
+    if type == "VMADCP":
+        logger.info("Opening VMADCP")
+        return open_decode_vmadcp(path_files[0], steps=steps)
+    if type in ['CROCO', 'CROCO_currents']:
+        logger.info("Opening CROCO")
+        return open_decode_croco(path_files[0])
+    if type == 'HYCOM_currents':
+        logger.info("Opening HYCOM currents")
+        return open_decode_hycom_currents(path_files)
+    if type == 'HYCOM_3D':
+        logger.info("Opening HYCOM 3D currents")
+        return open_decode_hycom_3d(path_files)
+    if type == 'CORA':
+        logger.info("Opening CORA")
+        return open_decode_cora(path_files[0])
+
+    logger.info("Opening non specific file type")
+    return open_decode_basic(path_files)
 
 
 def open_decode_woa18(path_files):
@@ -159,6 +158,8 @@ def open_decode_cmems(path_files, steps):
      ----------
      path_files : str, list of str
          Path to the netcdf files.
+     steps : float
+        Horizontal and vertical steps
      Returns
      -------
      xarray.Dataset
@@ -168,21 +169,22 @@ def open_decode_cmems(path_files, steps):
     if len(path_files) > 1:
         list_ds_cmems = []
         for path in path_files:
-            ds = xr.open_dataset(path)
-            lon_ds = ds.LONGITUDE.assign_coords(LONGITUDE=ds.TIME.data).rename(
+            dataset = xr.open_dataset(path)
+            lon_ds = dataset.LONGITUDE.assign_coords(LONGITUDE=dataset.TIME.data).rename(
                 {'LONGITUDE': 'TIME'})
-            lat_ds = ds.LATITUDE.assign_coords(LATITUDE=ds.TIME.data).rename({'LATITUDE': 'TIME'})
-            ds = ds.drop_vars(['LONGITUDE', 'LATITUDE'])
-            ds['LATITUDE'] = lat_ds
-            ds['LONGITUDE'] = lon_ds
-            list_ds_cmems.append(ds)
+            lat_ds = dataset.LATITUDE.assign_coords(LATITUDE=dataset.TIME.data).rename(
+                {'LATITUDE': 'TIME'})
+            dataset = dataset.drop_vars(['LONGITUDE', 'LATITUDE'])
+            dataset['LATITUDE'] = lat_ds
+            dataset['LONGITUDE'] = lon_ds
+            list_ds_cmems.append(dataset)
         cmems = xr.concat(list_ds_cmems, dim='TIME')
     else:
         cmems = xr.open_dataset(path_files[0])
 
     # Variables to drop/rename to prevent random behaviours
     for var in list(cmems.keys()):
-        if "POSITION" in var:
+        if "POSITION" in var or 'LOCATION' in var:
             cmems = cmems.drop_vars(var)
         elif var[-3:] == "_QC":
             cmems = cmems.rename({var: f"QC_{var[:-3]}"})
@@ -226,9 +228,9 @@ def open_decode_cmems(path_files, steps):
     list_to_remove = ['DC_REFERENCE', 'DEPH', 'QC_DEPH']
     for var in list(cmems.keys()):
         if var in list_to_remove:
-            cmems = cmems.drop(var)
+            cmems = cmems.drop_vars(var)
 
-    if steps[1]:
+    if steps and steps[1]:
         horizontal_step, vertical_step = steps
         cmems = set_hor_vert_step(cmems, horizontal_step, vertical_step)
 
@@ -249,62 +251,47 @@ def open_decode_l_adcp(path_file):
         L-ADCP observation dataset.
     """
     # Read the .txt file
-    file = open(path_file, 'r', encoding="ISO-8859-1")
-    lines = file.readlines()
-    n_line = len(lines)
-    for i in range(n_line):
-        lines[i] = lines[i].split('\t')
-        lines[i][-1] = lines[i][-1].rstrip('\n')
-
-    # Remove header
-    lines = np.array(lines[1:])
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
 
     # List the index labels of the measurements
-    list_measures = []
-    for i, i_station in enumerate(np.unique(lines[:, 0])):
-        list_measures.append(lines[lines[:, 0] == i_station])
-
-    # Because the depths size is not always the same, we need to fill the smaller arrays with nan values
-    # Get the maximum size of the depths list
-    size_max = max([len(a) for a in list_measures])
-    # Get the exhaustive list of depth values
-    index_sizemax = [len(a) for a in list_measures].index(size_max)
-    depth = list_measures[index_sizemax][:, 6]
+    idx_stations = np.unique(file['Station'])
 
     # Separate the measurements
     list_ds = []
-    for i_mes, array_series in enumerate(list_measures):
-        # Fill the small arrays with nan values
-        array_same_size = np.lib.pad(array_series, ((0, size_max - len(array_series)), (0, 0)),
-                                     'constant', constant_values='NaN')
-        # Set the right depth values
-        array_same_size[:, 6] = depth
-
-        # Get measurements coordinates
-        lon = float(array_same_size[0][5])
-        lat = float(array_same_size[0][4])
-        time = f"{array_same_size[0][2]} {array_same_size[0][3]}"
-        if time[0] == ' ':
-            time = time[1:]
-        time = datetime.datetime.strptime(time, '%m/%d/%Y %H:%M')
+    for idx in idx_stations:
+        measur = file[file['Station'] == idx]
+        head = measur.iloc[0]
+        lat = head[' Latitude']
+        lon = head[' Longitude']
+        time = f"{head[' Mon/Day/Yr']} {head[' hh:mm']}"
+        time = datetime.datetime.strptime(time, ' %m/%d/%Y %H:%M')
         time = np.datetime64(time)
-        bottom_depth = np.nan
 
-        # Convert the array into xr.dataset and add it to the list of measurements
-        list_ds.append(array2ds(array_same_size, lon, lat, time, bottom_depth, 'LADCP'))
+        measur = measur[[' ud', ' vd', ' z']].astype(float).rename(
+            columns={' ud': 'U', ' vd': 'V', ' z': 'depth'}).set_index('depth')
 
-    # Merge the datasets
+        measur_ds = measur.to_xarray()
+        measur_ds = measur_ds.assign_coords(lon=lon, lat=lat, time=time)
+        list_ds.append(measur_ds.reset_coords())
+
+    # Concat the dataset
     ladcp = xr.concat(list_ds, dim='time')
+    ladcp = ladcp.set_coords(['lon', 'lat'])
+
+    # Add variables attributes
+    ladcp['U'] = ladcp['U'].assign_attrs(
+        {'long_name': "W-E current", 'units': "m/s", '_FillValue': 9999999.
+         })
+    ladcp['V'] = ladcp['V'].assign_attrs(
+        {'long_name': "S-N current", 'units': "m/s", '_FillValue': 9999999.
+         })
+
+    ladcp['depth'] = ladcp['depth'].assign_attrs(
+        {'long_name': "Instrument depth", 'units': "m", '_FillValue': 9999999.
+         })
 
     # Decode
     ladcp = ladcp.xoa.decode()
-
-    # Clean lon/lat
-    if len(np.unique(ladcp.lon.values)) == 1:
-        lon_values = np.unique(ladcp.lon.values)
-        lat_values = np.unique(ladcp.lat.values)
-        ladcp = ladcp.drop_vars(['lon', 'lat'])
-        ladcp = ladcp.assign_coords({'lon': lon_values, 'lat': lat_values})
 
     # Convert lons
     ladcp = convert_lons(ladcp)
@@ -319,53 +306,50 @@ def open_decode_vmadcp(path_file, steps=None) -> xr.Dataset:
     ----------
     path_file : str
         Path to the VMADCP txt file.
-
+    steps : float
+        Horizontal and vertical steps
     Returns
     -------
     dataset : xarray.dataset
         VMADCP observation dataset.
     """
-    logger.info("VMADCP")
     # Read the .txt file
-    file = open(path_file, 'r', encoding="ISO-8859-1")
-    lines = file.readlines()
-    n_line = len(lines)
-    for i in range(n_line):
-        lines[i] = lines[i].split('\t')
-        lines[i][-1] = lines[i][-1].rstrip('\n')
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
 
-    # Remove header, set fill values
-    lines = np.array(lines[1:])
-    lines[lines == ''] = 9999999.
-
-    # Get the number of measurements and the number of depths
-    size_depth = np.count_nonzero(lines[:, 1] == '1')
-    nb_measures = int(lines[-1, 1])
+    # List the index labels of the measurements
+    idx_stations = np.unique(file['Station'])
 
     # Separate the measurements
     list_ds = []
-    for i in range(0, nb_measures):
-        # Get measurements coordinates
-        lon = float(lines[i * size_depth][5])
-        lat = float(lines[i * size_depth][6])
-
-        if lines[i * size_depth][7] == '':
-            bottom_depth = np.nan
-        else:
-            bottom_depth = float(lines[i * size_depth][7])
-
-        time = f"{lines[i * size_depth][3]} {lines[i * size_depth][4]}"
+    for idx in idx_stations:
+        measur = file[file['Station'] == idx]
+        head = measur.iloc[0]
+        lat = head['Latitude [degrees_north]']
+        lon = head['Longitude [degrees_east]']
+        time = f"{head['mon/day/yr']} {head['hh:mm:ss']}"
         time = datetime.datetime.strptime(time, '%m/%d/%Y %H:%M:%S')
         time = np.datetime64(time)
 
-        # Subset the numpy array selecting only the specific measurements
-        array_series = lines[i * size_depth:(i + 1) * size_depth, :]
+        measur = measur[['U [cm/s]', 'V [cm/s]', 'Depth [m]']].astype(float).rename(
+            columns={'U [cm/s]': 'U', 'V [cm/s]': 'V', 'Depth [m]': 'depth'}).set_index('depth')
+        measur_ds = measur.to_xarray()
+        measur_ds = measur_ds.assign_coords(lon=lon, lat=lat, time=time)
+        list_ds.append(measur_ds.reset_coords())
 
-        # Convert the array into xr.dataset and add it to the list of measurements
-        list_ds.append(array2ds(array_series, lon, lat, time, bottom_depth, 'VMADCP'))
+    # Concat the dataset
+    vmadcp = xr.concat(list_ds, dim='time').set_coords(['lon', 'lat'])
 
-    # Merge the datasets
-    vmadcp = xr.concat(list_ds, dim='time')
+    # Add variables attributes
+    vmadcp['U'] = (vmadcp['U'] / 100).assign_attrs(
+        {'long_name': "W-E current", 'units': "m/s", '_FillValue': 9999999.
+         })
+    vmadcp['V'] = (vmadcp['V'] / 100).assign_attrs(
+        {'long_name': "S-N current", 'units': "m/s", '_FillValue': 9999999.
+         })
+
+    vmadcp['depth'] = vmadcp['depth'].assign_attrs(
+        {'long_name': "Instrument depth", 'units': "m", '_FillValue': 9999999.
+         })
 
     # Decode
     vmadcp = vmadcp.xoa.decode()
@@ -373,7 +357,7 @@ def open_decode_vmadcp(path_file, steps=None) -> xr.Dataset:
     # Convert lons
     vmadcp = convert_lons(vmadcp)
 
-    if steps[1]:
+    if steps and steps[1]:
         horizontal_step, vertical_step = steps
         vmadcp = set_hor_vert_step(vmadcp, horizontal_step, vertical_step)
 
@@ -393,56 +377,70 @@ def open_decode_mouillages(path_file):
     dataset : xarray.dataset
         mooring observation dataset.
     """
-    logger.info("mooring")
     # Read the .txt file
-    file = open(path_file, 'r', encoding="ISO-8859-1")
-    lines = file.readlines()
-    n_line = len(lines)
-    for i in range(n_line):
-        lines[i] = lines[i].split('\t')
-        lines[i][-1] = lines[i][-1].rstrip('\n')  # Remove header
-    lines = lines[1:]
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
 
-    # Get the line indexes of the start of each new measurement, set fill values
-    first_column = np.array([line[0] for line in lines], dtype=object)
-    first_column[first_column == ''] = '9999999'
-    first_column = first_column.astype(float)
-    index_mesures = np.where(first_column != 9999999.)[0]
-    np.append(index_mesures, len(lines))
-    nb_dates = len(index_mesures)
+    # Rename the columns
+    for col in file.columns.tolist():
+        if 'BinDep' in col:
+            file = file.rename(columns={col: 'depth'})
+        elif 'S-N' in col:
+            file = file.rename(columns={col: 'V'})
+        elif 'W-E' in col:
+            file = file.rename(columns={col: 'U'})
+        elif 'Ampl' in col:
+            file = file.rename(columns={col: 'Ampl'})
+        elif 'Dir' in col:
+            file = file.rename(columns={col: 'Dir'})
+
+    # Get the line indexes of the start of each new measurement
+    index_mesures = file[file['Cruise'].notna()].index
 
     # Separate the measurements
     list_ds = []
-    for i in range(nb_dates - 1):
-        # Get measurements coordinates
-        i_line_deb = index_mesures[i]
-        date = np.datetime64(lines[i_line_deb][3], "ns")
-        lon = float(lines[i_line_deb][4])
-        lat = float(lines[i_line_deb][5])
-        bottom_depth = float(lines[i_line_deb][6])
+    for i in range(len(index_mesures) - 1):
+        # Get coordinates
+        line_deb = file.iloc[index_mesures[i]]
+        lon = line_deb['Longitude [degrees_east]']
+        lat = line_deb['Latitude [degrees_north]']
+        date = line_deb['yyyy-mm-ddThh:mm:ss.sss']
+        date = np.datetime64(date, "ns")
+        bottom_depth = line_deb['Bot. Depth [m]']
 
-        # Subset the numpy array selecting only the specific measurements
-        array_series_0 = lines[index_mesures[i]:index_mesures[i + 1]]
-        array_series_1 = []
-        for line in array_series_0[1:]:
-            line_edit = line[:-1] if line[-1] == "" else line
-            line_edit = np.array(line_edit[7:], dtype=object)
-            line_edit[line_edit == ''] = '999999.'
-            line_edit = line_edit.astype(float)
-            array_series_1.append(line_edit)
-        array_series = np.array(array_series_1)
+        # Get measurements
+        measur = file.iloc[index_mesures[i] + 1:index_mesures[i + 1]].set_index('depth')
+        unwanted_prefixes = ['Cruise', 'Station', 'Type', 'yyyy', 'Lon', 'Lat', 'Bot', 'Unnamed']
+        columns_to_drop = measur.columns[measur.columns.str.startswith(tuple(unwanted_prefixes))]
+        measur_ds = measur.drop(columns=columns_to_drop).astype(float).to_xarray()
+        measur_ds = measur_ds.assign_coords(lon=lon, lat=lat, time=date, bottom_depth=bottom_depth)
+        list_ds.append(measur_ds.reset_coords())
 
-        # Convert the array into xr.dataset and add it to the list of measurements
-        list_ds.append(array2ds(array_series, lon, lat, date, bottom_depth, 'mouillages'))
+    # Merge datasets
+    mouillage = xr.concat(list_ds, dim='time').set_coords(['lon', 'lat'])
 
-    # Merge the datasets
-    mouillage = xr.concat(list_ds, dim='time')
+    # Set variables attributes
+    mouillage['U'] = mouillage['U'].assign_attrs(
+        {'long_name': "Corrected Flow 2D W-E", 'units': "m/s", '_FillValue': 9999999.
+         })
+    mouillage['V'] = mouillage['V'].assign_attrs(
+        {'long_name': "Corrected Flow 2D S-N", 'units': "m/s", '_FillValue': 9999999.
+         })
+    mouillage['Ampl'] = mouillage['Ampl'].assign_attrs(
+        {'long_name': "Corrected Flow 2D Amplitude", 'units': "m/s", '_FillValue': 9999999.
+         })
+    mouillage['Dir'] = mouillage['Dir'].assign_attrs(
+        {'long_name': "Corrected Flow 2D Direction", 'units': "deg", '_FillValue': 9999999.
+         })
+    mouillage['depth'] = mouillage['depth'].assign_attrs(
+        {'long_name': "Instrument depth", 'units': "m", '_FillValue': 9999999.
+         })
 
     # Decode
     mouillage = mouillage.xoa.decode()
 
     # Convert lons
     mouillage = convert_lons(mouillage)
+
     return mouillage
 
 
@@ -453,15 +451,16 @@ def open_decode_scanfish(path_file, steps):
     ----------
     path_file : str
         Path to the scanfish txt file.
-
+    steps : float
+        Horizontal and vertical steps.
     Returns
     -------
     dataset : xarray.dataset
         scanfish observation dataset.
     """
     # Read the .txt file
-    file = pd.read_csv(path_file, sep='\t')
-    lons, lats, depth = file["Longitude"], file["Latitude"], file['DepSM']
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
+    depth = file['DepSM']
     time = (file["TimeJ"] * 24 * 3600 * np.timedelta64(1, 's')) + np.datetime64('1970-01-01') + \
            file["TimeY"] * np.timedelta64(1, 's')
 
@@ -480,8 +479,9 @@ def open_decode_scanfish(path_file, steps):
     scanfish = scanfish.assign_attrs({"type": 'scanfish'})
 
     # Regrid
-    horizontal_step, vertical_step = steps
-    scanfish = set_hor_vert_step_radiales(scanfish, horizontal_step, vertical_step)
+    if steps and steps[1]:
+        horizontal_step, vertical_step = steps
+        scanfish = set_hor_vert_step_radiales(scanfish, horizontal_step, vertical_step)
     return scanfish
 
 
@@ -492,15 +492,16 @@ def open_decode_seasoar(path_file, steps):
     ----------
     path_file : str
         Path to the seasoar txt file.
-
+    steps : float
+        Horizontal and vertical steps.
     Returns
     -------
     dataset : xarray.dataset
         seasoar observation dataset.
     """
     # Read the .txt file
-    file = pd.read_csv(path_file, sep='\t')
-    lons, lats, depth = file["Longitude"], file["Latitude"], file['DepSM']
+    file = pd.read_csv(path_file, sep='\t', encoding='latin1')
+    depth = file['DepSM']
     time = (file["TimeJ"] * 24 * 3600 * np.timedelta64(1, 's')) + np.datetime64('2000-01-01') + \
            file["TimeQ"] * np.timedelta64(1, 's')
 
@@ -519,8 +520,9 @@ def open_decode_seasoar(path_file, steps):
     seasoar = seasoar.assign_attrs({"type": 'seasoar'})
 
     # Regrid
-    horizontal_step, vertical_step = steps
-    seasoar = set_hor_vert_step_radiales(seasoar, horizontal_step, vertical_step)
+    if steps and steps[1]:
+        horizontal_step, vertical_step = steps
+        seasoar = set_hor_vert_step_radiales(seasoar, horizontal_step, vertical_step)
     return seasoar
 
 
@@ -537,127 +539,57 @@ def open_decode_croco(path_file):
     croco : xarray.Dataset
          Model dataset decoded.
     """
-    croco = xr.open_dataset(path_file)
-
-    croco = croco.decode_sigma()
+    croco = xr.open_dataset(path_file).decode_sigma()
 
     # Remove variables that are never used in the features. May need to be completed.
-    list_to_keep = ['temp', 'salt']
+    list_to_keep = ['temp', 'salt', 'u', 'v', 'h']
     for var in list(croco.keys()):
         if var not in list_to_keep:
             croco = croco.drop_vars(var)
 
-    # Depth becomes a variable
-    if 'depth' in croco:
-        croco = croco.reset_coords('depth')
+    # Convert currents if necessary
+    if 'u' in croco:
+        # U processing
+        da_u = shift(croco.u, {"xi_u": "left"}).xoa.reloc(u=False)
+        da_u = da_u.sel(xi=croco.xi_rho, method='nearest')
+        croco['u'] = da_u
 
-    # Rename coordinates
-    croco = croco.rename_dims({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-    croco = croco.drop_vars(['xi_rho', 'eta_rho'])
+        # V processing
+        da_v = shift(croco.v, {"eta_v": "left"}).xoa.reloc(v=False)
+        da_v = da_v.sel(eta=croco.eta_rho, method='nearest')
+        croco['v'] = da_v
 
-    if len(croco['lon']) == len(np.unique(croco.lon_rho.data)):
-        longitude = np.unique(croco.lon_rho.data)
-        latitude = np.unique(croco.lat_rho.data)
-    elif len(croco['lon']) == len(np.unique(croco.lon_rho.data)) - 1:
-        longitude = np.unique(croco.lon_rho.data)[:-1]
-        latitude = np.unique(croco.lat_rho.data)[:-1]
+    # Remove duplicate coords
+    if 'lon' in croco and 'lon_rho' in croco:
+        croco = croco.drop_vars(['lon', 'lat'])
 
-    croco['lon'] = longitude
-    croco['lat'] = latitude
-
-    # Remove useless coordinates
-    croco = croco.reset_coords(drop=True)
-
-    # Set depth as coordinates
-    if 'depth' in croco:
-        croco = croco.assign_coords(depth=croco.depth)
-
-    # Convert depths
-    if 'depth' in croco:
-        if croco.depth.min() < 0 and croco.depth.max() > 0:
-            croco['depth'] = -croco.depth.where((croco.depth < 0) & (croco.depth > -1e5))
-        croco = croco.where(~np.isnan(croco.depth))
-
-    croco = convert_depths(croco)
-    croco = convert_lons(croco)
-
-    # Decode
-    croco = croco.xoa.decode()
-
-    return croco
-
-
-def open_decode_croco_currents(path_files):
-    """
-    Open 2D or 3D current from CROCO model.
-    Parameters
-    ----------
-    path_files : list of str
-        List of the file to decode.
-
-    Returns
-    -------
-    hycom : xarray.Dataset
-         Model dataset decoded.
-    """
-    logger.info("Decode CROCO currents")
-    ds = xr.open_dataset(path_files).decode_sigma()
-    ds = xoa.grid.to_rect(ds)
-
-    # Verify Croco
-    if 's_rho' not in ds.dims:
-        raise Exception(
-            'Attention, le fichier que vous essayez d\'ouvrir ne semble pas être du Croco....')
-
-    # Retrieve grid
-    ds = ds.rename_dims({'s_rho': 'z'})
-    longitude = ds.lon_rho.where(ds.lon_rho < 1e30)
-    latitude = ds.lat_rho.where(ds.lat_rho < 1e30)
-    longitude = np.unique(longitude.data)[:-1]
-    latitude = np.unique(latitude.data)[:-1]
-
-    # Depth processing
-    depth = ds.depth
-    if depth.min() < 0 < depth.max():
-        depth = -depth.where((depth < 0) & (depth > -1e5))
-    depth = depth.rename({'eta_rho': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-    depth['lat'] = latitude
-    depth['lon'] = longitude
-    depth = depth.drop_vars(['lon_rho', 'lat_rho'])
-
-    # U processing
-    u = shift(ds.u, {"xi_u": "left"}).xoa.reloc(u=False)
-    longitude_u = np.unique(u.lon.data)[:-2]
-    latitude_u = np.unique(u.lat.data)[:-2]
-    u = u.drop_vars(['lon', 'lat'])
-    u = u.rename({'eta_rho': 'lat', 'xi': 'lon', 's_rho': 'z'})
-    u['lon'] = longitude_u
-    u['lat'] = latitude_u
-    u = u.where(u < 1e30)
-    u = u.interp(lon=longitude)
-
-    # V processing
-    v = shift(ds.v, {"eta_v": "left"}).xoa.reloc(v=False)
-    longitude_v = np.unique(v.lon.data)[:-2]
-    latitude_v = np.unique(v.lat.data)[:-2]
-    v = v.drop_vars(['lon', 'lat'])
-    v = v.rename({'eta': 'lat', 'xi_rho': 'lon', 's_rho': 'z'})
-    v['lon'] = longitude_v
-    v['lat'] = latitude_v
-    v = v.where(v < 1e30)
-    v = v.interp(lat=latitude)
-
-    # Create output croco dataset
-    croco = xr.Dataset()
-    croco['u'] = u
-    croco['v'] = v
-    croco = croco.assign_coords(depth=depth)
+    # Clean coordinates
+    croco = croco.rename(
+        {'xi_rho': 'x', 'eta_rho': 'y', 's_rho': 'z', 'lon_rho': 'lon', 'lat_rho': 'lat'})
+    for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
+                'eta_v', 'depth_w', 'sig', 's_w']:
+        if var in croco:
+            croco = croco.drop_vars(var)
 
     # Regrid if necessary
     croco = xoa.grid.to_rect(croco)
 
     # Convert lons
     croco = convert_lons(croco)
+
+    # Convert depths
+    croco['depth'] = croco.depth.where(abs(croco.depth) < 1e30)
+    croco = convert_depths(croco)
+
+    # Decode
+    croco = croco.xoa.decode()
+    if 'lon_u' in croco:
+        croco = croco.rename({'lon_u': 'lon'})
+    if 'lat_u' in croco:
+        croco = croco.rename({'lat_u': 'lat'})
+
+    # Assign croco attrs
+    croco = croco.assign_attrs({'type': 'CROCO'})
 
     return croco
 
@@ -668,7 +600,8 @@ def open_decode_hycom_currents(path_files):
     Parameters
     ----------
     path_files : list of str
-        List of the files to decode. The first path must refer to the h file, the following ones are the variables.
+        List of the files to decode. The first path must refer to the h file, the following ones
+        are the variables.
 
     Returns
     -------
@@ -685,31 +618,33 @@ def open_decode_hycom_currents(path_files):
         path_h, path_u, path_v = path_files[0], path_files[1], path_files[2]
         hycom = xr.open_dataset(path_h).rename({'h': 'dz'}).xoa.decode().squeeze(drop=True)
         if 'level' not in hycom.variables:
-            raise Exception('Ooops ! Pour lire une sortie de courant du modèle HYCOM,'
-                            ' vous devez renseigner les fichiers dans l\'ordre suivant : h, u, v')
+            raise ValueError('Ooops ! Pour lire une sortie de courant du modèle HYCOM,'
+                             ' vous devez renseigner les fichiers dans l\'ordre suivant : h, u, v')
         hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
 
-    u = xr.open_dataset(path_u).xoa.decode().squeeze(drop=True)
-    v = xr.open_dataset(path_v).xoa.decode().squeeze(drop=True)
-    if 'u' not in u.variables or 'v' not in v.variables:
-        raise Exception('Ooops ! Pour lire une sortie de courant du modèle HYCOM,'
-                        ' vous devez renseigner les fichiers dans l\'ordre suivant : h, u, v.')
-    u = u.u
-    v = v.v
+    ds_u = xr.open_dataset(path_u).xoa.decode().squeeze(drop=True)
+    ds_v = xr.open_dataset(path_v).xoa.decode().squeeze(drop=True)
+    if 'u' not in ds_u.variables or 'v' not in ds_v.variables:
+        raise ValueError('Ooops ! Pour lire une sortie de courant du modèle HYCOM,'
+                         ' vous devez renseigner les fichiers dans l\'ordre suivant : h, u, v.')
+    da_u = ds_u.u
+    da_v = ds_v.v
 
-    ut_hycom = shift(u, {"x": "left", "y": "left"}).xoa.reloc(u=False)
-    vt_hycom = shift(v, {"x": "left", "y": "left"}).xoa.reloc(v=False)
+    ut_hycom = shift(da_u, {"x": "left", "y": "left"}).xoa.reloc(u=False)
+    vt_hycom = shift(da_v, {"x": "left", "y": "left"}).xoa.reloc(v=False)
     hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
     hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
 
-    # Rename
-    hycom = hycom.rename({'level': 'z'})
+    # Rename depth
+    if 'level' in hycom:
+        hycom = hycom.rename({'level': 'z'})
 
     # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)
 
     # Convert lons
     hycom = convert_lons(hycom)
+
     return hycom
 
 
@@ -719,7 +654,8 @@ def open_decode_hycom_3d(path_files):
     Parameters
     ----------
     path_files : list of str
-        List of the files to decode. The first path must refer to the h file, the following ones are the variables.
+        List of the files to decode. The first path must refer to the h file, the following ones
+        are the variables.
 
     Returns
     -------
@@ -730,12 +666,17 @@ def open_decode_hycom_3d(path_files):
     logger.info("Decoding HYCOM 3D")
     # Open the file with depth values
     path_h = path_files[0]
-    hycom = xr.open_dataset(path_h).xoa.decode().squeeze(drop=True)
-    if 'level' not in hycom.variables:
-        raise Exception('Ooops ! Pour lire une sortie 3D du modèle HYCOM,'
-                        ' vous devez renseigner les fichiers dans l\'ordre suivant :  h, variables.')
+    hycom = xr.open_dataset(path_h)
 
-    hycom.coords["depth"] = dz2depth(hycom.level, centered=True)
+    if 'h' not in hycom.variables and 'sigma' not in hycom.variables:
+        raise ValueError('Ooops ! To read a 3D output from the HYCOM model,'
+                         ' you need to provide the files in the following order: '
+                         'h/sigma, variables.')
+    if 'h' in hycom:
+        hycom = hycom.rename({'h': 'dz'}).xoa.decode().squeeze(drop=True)
+        hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
+    elif 'sigma' in hycom:
+        hycom = hycom.rename({'sigma': 'dens'}).xoa.decode().squeeze(drop=True)
 
     # Open the variable(s) and add them to the dataset
     for path in path_files[1:]:
@@ -745,19 +686,21 @@ def open_decode_hycom_3d(path_files):
         for var in list(ds_var.keys()):
             if var not in list_coords:
                 var_name = var
-
         hycom[var_name] = ds_var[var_name]
 
-    if list(hycom.depth.dims) == ['level']:
-        depths = hycom.depth
-        hycom = hycom.drop_vars('depth')
-        hycom = hycom.rename({'level': 'depth'})
-        hycom['depth'] = depths.data
+    # Rename
+    hycom = hycom.rename({'level': 'z'})
 
+    # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)
 
     # Convert lons
     hycom = convert_lons(hycom)
+
+    # Add dens coordinate
+    if 'dens' in hycom:
+        hycom = hycom.assign_coords(dens=hycom.dens)
+
     return hycom
 
 
@@ -778,7 +721,7 @@ def open_decode_cora(path_files):
     cora = cora.drop_dims(['N_HISTORY', 'N_CALIB', 'N_PARAM'])
     # Variables to drop/rename to prevent random behaviours
     for var in list(cora.keys()):
-        if "POSITION" in var:
+        if "POSITION" in var or 'LOCATION' in var:
             cora = cora.drop_vars(var)
         elif var[-3:] == "_QC":
             cora = cora.rename({var: f"QC_{var[:-3]}"})
@@ -825,100 +768,130 @@ def open_decode_basic(path_files):
      """
     # Open
     if len(path_files) > 1:
-        ds = xr.open_mfdataset(path_files)
+        dataset = xr.open_mfdataset(path_files)
     else:
-        ds = xr.open_dataset(path_files[0])
+        dataset = xr.open_dataset(path_files[0])
 
     list_to_remove = ['sst_dtime']
-    for var in list(ds.keys()):
+    for var in list(dataset.keys()):
         if var in list_to_remove:
-            ds = ds.drop(var)
+            dataset = dataset.drop_vars(var)
 
     # Decode
-    ds = ds.xoa.decode()
-    if "lon_longitude" in ds:
-        ds = ds.drop_vars(["lon_longitude", 'lat_latitude'])
+    dataset = dataset.xoa.decode()
+    if "lon_longitude" in dataset:
+        dataset = dataset.drop_vars(["lon_longitude", 'lat_latitude'])
 
     # Regrid if necessary
-    ds = xoa.grid.to_rect(ds)
+    dataset = xoa.grid.to_rect(dataset)
 
     # Convert depths
-    ds = convert_depths(ds)
+    dataset = convert_depths(dataset)
 
     # Convert lons
-    ds = convert_lons(ds)
+    dataset = convert_lons(dataset)
 
     # Remove duplicate values
-    if 'lon' in ds.dims:
-        ds = ds.drop_duplicates(['lon'])
-    if 'lat' in ds.dims:
-        ds = ds.drop_duplicates(['lat'])
-    return ds
+    if 'lon' in dataset.dims:
+        dataset = dataset.drop_duplicates(['lon'])
+    if 'lat' in dataset.dims:
+        dataset = dataset.drop_duplicates(['lat'])
+    return dataset
 
 
 def open_forecaster(path_files, model_type=None) -> xr.Dataset:
+    """
+
+    Parameters
+    ----------
+    path_files
+    model_type
+
+    Returns
+    -------
+
+    """
     if model_type == 'HYCOM_currents':
         logger.info("HYCOM_currents")
         return open_decode_hycom_currents(path_files)
 
-    elif model_type == 'HYCOM_3D':
+    if model_type == 'HYCOM_3D':
         logger.info("HYCOM_3D")
         return open_decode_hycom_3d(path_files)
 
-    elif model_type == 'woa18':
+    if model_type == 'woa18':
         logger.info("woa18")
         data_set_temp = xr.open_mfdataset(path_files, decode_times=False)
-        data_set_temp = data_set_temp.drop_vars('depth_bnds')
+        variables_to_drop = ['depth_bnds',
+                             's_oa', 's_ma', 's_dd', 's_sd', 's_gp', 's_mn', 's_se',
+                             't_oa', 't_ma', 't_dd', 't_sd', 't_gp', 't_mn', 't_se']
+        for var in variables_to_drop:
+            if var in data_set_temp:
+                data_set_temp = data_set_temp.drop_vars(var)
         return data_set_temp
 
-    elif model_type == 'rivers':
+    if model_type == 'rivers':
         logger.info("rivers")
         data_set_list = []
         for path_list in path_files:
-            data_set_list.append(xr.open_mfdataset(path_files[path_list]))
+            data_set_list.append(xr.open_mfdataset(path_files[path_list],
+                                                   drop_variables=["LATITUDE", "LONGITUDE",
+                                                                   "POSITION_QC"]))
         return data_set_list
 
-    elif model_type == 'atmfrc/cumul':
+    if model_type == 'atmfrc/cumul':
         logger.info("atmfrc - cumul")
         cumul_gribs = path_files
-        dss_cumul = []
-        for grib in cumul_gribs:
-            dss_cumul.append(
-                xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": ""}))
 
-        ds_cumul = xr.combine_nested(dss_cumul, concat_dim="valid_time", combine_attrs="override")
-        ds_cumul = ds_cumul.drop_vars(["time", "surface"])
-        ds_cumul = ds_cumul.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
+        def open_dataset(grib):
+            return xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": ""})
+
+        # Use parallel processing to load datasets
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            dss_cumul = list(executor.map(open_dataset, cumul_gribs))
+
+        # Use Dask to parallelize and concatenate the datasets
+        dask_dss_cumul = [dask.delayed(ds.drop_vars(["time", "surface"]).rename(
+            {"longitude": "lon", "latitude": "lat", "valid_time": "time"})) for ds in dss_cumul]
+
+        # Compute the concatenated result using Dask
+        ds_cumul = xr.concat(dask.compute(*dask_dss_cumul), dim="time")
+
+        # Sort the result
         ds_cumul = ds_cumul.sortby('time')
-        return ds_cumul
+        return ds_cumul.xoa.decode()
 
-    elif model_type == 'atmfrc/insta':
+    if model_type == 'atmfrc/insta':
         logger.info("atmfrc - insta")
         insta_gribs = path_files
+
+        def open_dataset_for_level(grib, level):
+            return xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": "",
+                                                                          "filter_by_keys": {
+                                                                              "edition": 2,
+                                                                              "level": level
+                                                                              }
+                                                                          },
+                                   drop_variables=["heightAboveGround", "meanSea", "surface"])
+
+        # Use parallel processing to load datasets
         dss_insta = []
         for grib in insta_gribs:
-            dss = []
-            for level in [0, 2, 10]:
-                dss.append(xr.open_dataset(grib, engine="cfgrib", backend_kwargs={"indexpath": "",
-                                                                                  "filter_by_keys": {
-                                                                                      "edition": 2,
-                                                                                      "level": level
-                                                                                      },
-                                                                                  },
-                                           drop_variables=["heightAboveGround", "meanSea",
-                                                           "surface", ], ))
+            dss = [dask.delayed(open_dataset_for_level)(grib, level) for level in [0, 2, 10]]
+            dss_insta.append(dask.compute(*dss))
 
-            dss_insta.append(xr.merge(dss, combine_attrs="override"))
+        # Merge datasets for different levels
+        merged_dss_insta = [xr.merge(ds_list, combine_attrs="override") for ds_list in dss_insta]
 
-        ds_insta = xr.combine_nested(dss_insta, concat_dim="valid_time", combine_attrs="override")
+        # Combine merged datasets along 'valid_time' dimension
+        ds_insta = xr.concat(merged_dss_insta, dim="valid_time")
         ds_insta = ds_insta.drop_vars(["step", "time"])
         ds_insta = ds_insta.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
         ds_insta = ds_insta.sortby('time')
-        return ds_insta
+        return ds_insta.xoa.decode()
 
-    else:
-        logger.info("Basic type")
-        return open_forecaster_basic(path_files)
+    logger.info("Basic type")
+    return open_decode_basic(path_files)
 
 
 ####################### Tools #######################
@@ -959,8 +932,6 @@ def decode_depths_vmadcp(profiler):
     profiler = profiler.rename({'depth': 'z'})
     profiler = profiler.rename({'DEPH': 'depth'})
     profiler = profiler.assign_coords(depth=profiler.depth)
-    plt.pcolormesh(profiler.depth)
-    plt.savefig('depth.png')
     return profiler
 
 
@@ -1000,7 +971,7 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
 
     Returns
     -------
-    ds : xarray.dataset
+    dataset : xarray.dataset
         observation dataset.
     """
     # Define the columns to read and variable names for each type of observation
@@ -1019,40 +990,47 @@ def array2ds(array_series, lon, lat, date, bot_depth, type):
     depth = array_series[:, indexes[4]].astype(float)
 
     da_u = xr.DataArray(data=array_series[:, indexes[0]].astype(float), dims=["depth"],
-                        coords=dict(depth=('depth', depth), time=date, bottom_depth=bot_depth),
-                        attrs=dict(long_name=long_names[0], units="m/s", _FillValue=9999999.), )
+                        coords={'depth': ('depth', depth), 'time': date, 'bottom_depth': bot_depth},
+                        attrs={'long_name': long_names[0], 'units': "m/s", '_FillValue': 9999999.
+                               }, )
     da_v = xr.DataArray(data=array_series[:, indexes[1]].astype(float), dims=["depth"],
-                        coords=dict(depth=('depth', depth), time=date, bottom_depth=bot_depth),
-                        attrs=dict(long_name="Corrected Flow 2D W-E", units="m/s",
-                                   _FillValue=9999999.), )
+                        coords={'depth': ('depth', depth), 'time': date, 'bottom_depth': bot_depth},
+                        attrs={'long_name': "Corrected Flow 2D W-E", 'units': "m/s",
+                               "_FillValue": 9999999.
+                               }, )
 
-    depth = xr.DataArray(data=depth, dims=["depth"], coords=dict(depth=('depth', depth)),
-                         attrs=dict(long_name="Instrument depth", units="m", _FillValue=9999999), )
+    depth = xr.DataArray(data=depth, dims=["depth"], coords={'depth': ('depth', depth)},
+                         attrs={'long_name': "Instrument depth", 'units': "m", '_FillValue': 9999999
+                                }, )
     # Create the dataset and add the data arrays
-    ds = xr.Dataset()
-    ds["lon"], ds["lat"], ds["depth"] = lon, lat, depth
-    ds["V"], ds["U"] = da_u, da_v
+    dataset = xr.Dataset()
+    dataset["lon"], dataset["lat"], dataset["depth"] = lon, lat, depth
+    dataset["V"], dataset["U"] = da_u, da_v
 
     # If current magnitude and direction are included in the data, add them to the dataset
     if type != 'LADCP':
         da_mag = xr.DataArray(data=array_series[:, indexes[2]].astype(float), dims=["depth"],
-                              coords=dict(depth=('depth', depth.data), time=date,
-                                          bottom_depth=bot_depth),
-                              attrs=dict(long_name="Corrected Flow 2D Amplitude", units="m/s",
-                                         _FillValue=9999999.), )
+                              coords={'depth': ('depth', depth.data), 'time': date,
+                                      'bottom_depth': bot_depth
+                                      },
+                              attrs={'long_name': "Corrected Flow 2D Amplitude", 'units': "m/s",
+                                     '_FillValue': 9999999.
+                                     }, )
 
         da_dir = xr.DataArray(data=array_series[:, indexes[3]].astype(float), dims=["depth"],
-                              coords=dict(depth=('depth', depth.data), time=date,
-                                          bottom_depth=bot_depth),
-                              attrs=dict(long_name="Corrected Flow 2D Direction", units="deg T",
-                                         _FillValue=9999999., ), )
+                              coords={'depth': ('depth', depth.data), 'time': date,
+                                      'bottom_depth': bot_depth
+                                      },
+                              attrs={'long_name': "Corrected Flow 2D Direction", 'units': "deg T",
+                                     '_FillValue': 9999999.
+                                     }, )
 
-        ds["Ampl"], ds["Dir"] = da_mag, da_dir
+        dataset["Ampl"], dataset["Dir"] = da_mag, da_dir
 
-    return ds
+    return dataset
 
 
-def convert_lons(ds):
+def convert_lons(dataset):
     """
     Convert latitudes in case they go 0 -> 360°
     Returns
@@ -1060,12 +1038,12 @@ def convert_lons(ds):
     xarray.dataset
         Dataset with homogeneous longitudes
     """
-    if np.nanmax(ds.lon.where(ds.lon < 1e+30).data) > 180:
-        ds = ds.assign_coords({"lon": (((ds.lon + 180) % 360) - 180)})
-    return ds
+    if np.nanmax(dataset.lon.where(dataset.lon < 1e+30).data) > 180:
+        dataset = dataset.assign_coords({"lon": (((dataset.lon + 180) % 360) - 180)})
+    return dataset
 
 
-def convert_depths(ds):
+def convert_depths(dataset):
     """
     Convert depths to have positive values only.
     Returns
@@ -1073,13 +1051,13 @@ def convert_depths(ds):
     xarray.dataset
         Dataset with positive depths.
     """
-    if 'depth' in ds:
-        if np.nanmean(ds.depth.data) < 0:
-            ds["depth"] = -ds.depth
-    return ds
+    if 'depth' in dataset:
+        if np.nanmean(dataset.depth.data) < 0:
+            dataset["depth"] = - dataset.depth
+    return dataset
 
 
-def depth_from_press(ds):
+def depth_from_press(dataset):
     """
     Calculate depth values from pressure.
 
@@ -1089,49 +1067,29 @@ def depth_from_press(ds):
         Formatted dataset.
 
     """
-    alat = ds.lat.broadcast_like(ds.pres)
-    adepth = gsw.z_from_p(ds.pres, alat)
+    alat = dataset.lat.broadcast_like(dataset.pres)
+    adepth = gsw.z_from_p(dataset.pres, alat)
     adepth = adepth.where(adepth.notnull(), adepth.min())
     adepth.attrs.update({"long_name": "Depth", "units": "m"})
-    ds = ds.rename({'depth': 'z'})
+    dataset = dataset.rename({'depth': 'z'})
     adepth = adepth.rename({'depth': 'z'})
-    ds = ds.assign_coords(depth=adepth)
-    return ds
-
-
-def open_forecaster_basic(path_files):
-    """
-     Open netcdf file(s) and store it into a ready-to-use dataset.
-     Parameters
-     ----------
-     path_files : str, list of str
-         Path to the netcdf files.
-     Returns
-     -------
-     xarray.Dataset
-         dataset.
-     """
-    # Open
-    if len(path_files) > 1:
-        logger.info("multiple files from list")
-        ds = xr.open_mfdataset(path_files)
-    else:
-        logger.info("single file")
-        ds = xr.open_dataset(path_files[0])
-
-    # Regrid if necessary
-    ds = xoa.grid.to_rect(ds)
-
-    # Convert depths
-    ds = convert_depths(ds)
-
-    # Convert lons
-    ds = convert_lons(ds)
-
-    return ds
+    dataset = dataset.assign_coords(depth=adepth)
+    return dataset
 
 
 def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
+    """
+    Regrid the observation following the required vertical and horizontal grids for radiales.
+    Parameters
+    ----------
+    obs : xarray.dataset
+    horizontal_step : float
+    vertical_step : float
+
+    Returns
+    -------
+    Regridded observation.
+    """
     # Seasor/scanfish binning (method from SHOM Jupyter Notebook)
     lons = obs.lon
     lats = obs.lat
@@ -1156,15 +1114,15 @@ def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
 
     # Binning
     for it in range(n_time_bin - 1):
-        i0, i1 = i_time_bins[it:it + 2]
-        temp[it] = np.histogram(depth[i0:i1], i_depth_bins, weights=obs['temp'][i0:i1])[0]
-        sal[it] = np.histogram(depth[i0:i1], i_depth_bins, weights=obs['sal'][i0:i1])[0]
-        denom = np.histogram(depth[i0:i1], i_depth_bins)[0]
+        i_0, i_1 = i_time_bins[it:it + 2]
+        temp[it] = np.histogram(depth[i_0:i_1], i_depth_bins, weights=obs['temp'][i_0:i_1])[0]
+        sal[it] = np.histogram(depth[i_0:i_1], i_depth_bins, weights=obs['sal'][i_0:i_1])[0]
+        denom = np.histogram(depth[i_0:i_1], i_depth_bins)[0]
         temp[it] = np.where(denom == 0, np.nan, temp[it] / denom)
         sal[it] = np.where(denom == 0, np.nan, sal[it] / denom)
-        mean_times.append(time[i0:i1].mean().values)
-        mean_lons.append(lons[i0:i1].mean())
-        mean_lats.append(lats[i0:i1].mean())
+        mean_times.append(time[i_0:i_1].mean().values)
+        mean_lons.append(lons[i_0:i_1].mean())
+        mean_lats.append(lats[i_0:i_1].mean())
 
     # Create xarray dataset
     da_temp = xr.DataArray(data=temp, dims=["time", "depth"])
@@ -1180,6 +1138,19 @@ def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
 
 
 def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', method_z='linear'):
+    """
+    Regrid the observation following the required vertical and horizontal grids.
+    Parameters
+    ----------
+    obs : xarray.dataset
+    horizontal_step : float
+    vertical_step : float
+    method : str
+    method_z : str
+    Returns
+    -------
+    Regridded observation.
+    """
     # Horizontal gridding
     horizontal_step = obs.meta.km_to_deg(horizontal_step)
 

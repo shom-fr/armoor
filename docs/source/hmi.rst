@@ -125,7 +125,7 @@ Here are the different possible attributes and their purpose:
 
 * ``rarification`` : rarification factor to reduce quivers density. It is used in the functions *visu_current* and *visu_windforcing*.
 
-* ``multiprocess`` : used for acceleration purposes by parallelization on all model's time steps. Its default value is *True* and it is only set to *False* with the function *visu_mixedlayer_clim*.
+* ``multiprocess`` : used for acceleration purposes by parallelization on all model's time steps. Its default value is *True*.
 
 
 Example
@@ -195,7 +195,6 @@ Example of configuration file::
                 func = visu_mixedlayer_clim
                 var = temp
                 forcing_model = woa18
-                multiprocess = False
             [[[param_3]]]
                 name = Champ de flux solaire ayant forcé le modèle
                 func = visu_solarflux
@@ -356,7 +355,7 @@ and add the following line by replacing ``/path/to/output/tests/P3/`` with your 
 
 To run tests for all the different parameters, use the following command::
 
-    pytest your_path_to/tests/uni/hmi/test_forecaster_script.py
+    pytest your_path_to/tests/int/hmi/test_forecaster_script.py
 
 In the ``path_p3`` folder, you must have the ``data`` folder containing ``hycom3d_med_20220310``, ``hycom3d_indien_20220310`` and
 ``hycom3d_manga_20220310`` from ``/home/shom_simurep/public_no_ftp/Noveltis_19AC22/Developpement/InterfacePrevisionnistes``.

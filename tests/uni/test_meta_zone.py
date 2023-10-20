@@ -93,10 +93,8 @@ class TestMetaZone:
     def test_sel_time_interval(self):  # OK
         logger.info('test_sel_time_interval')
         interval = '24h'
-
         ds_meta = ds_lon_lat_depth.meta.time_selection_interval(interval=interval)
-
-        assert len(ds_meta.interval) == 2
+        assert len(ds_meta.interval) == 3
 
     def test_time_selection_list(self):  # OK
         logger.info('test_time_selection_list')
@@ -125,10 +123,10 @@ class TestMetaZone:
     def test_vertical_selection_slice(self):
         logger.info('test_vertical_selection_slice')
 
-        slice = '3'
+        slice = [0, 5, 10, 30]
 
-        ds_meta = ds_lon_lat_depth.meta.vertical_selection_slice(slice=slice, var_slice='depth')
-        assert len(ds_meta.slice) == 5
+        ds_meta = ds_lon_lat_depth.meta.vertical_selection_slice(slices=slice, var_slice='depth')
+        assert len(ds_meta.slice) == 3
 
     def test_sel_qc(self):
         logger.info('test_sel_QC')

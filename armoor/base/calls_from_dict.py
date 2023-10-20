@@ -1,9 +1,12 @@
 """Decode the config file to plot the required outputs"""
 
-import xarray as xr
-from armoor import base
-import numpy as np
 import logging
+import xarray as xr
+from armoor.base import feature_sst, feature_prof_hydro_vessel, feature_prof_hydro_mooring, \
+    feature_section_hydro, feature_clim_hydro, feature_currents_hfr, feature_currents_ADCP, \
+    feature_currents_VMADCP, feature_drifters
+from armoor.base.open_decode import open_decode
+from armoor.base.colocation import colocate_all
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +23,20 @@ def dict2call(config_obj: dict):
 
     """
     config_obj = get_observation_models_meta(config_obj)
-    features = {"sst": base.feature_sst, "prof_hydro_vessel": base.feature_prof_hydro_vessel,
-                "prof_hydro_mooring": base.feature_prof_hydro_mooring,
-                "section_hydro": base.feature_section_hydro, "clim_hydro": base.feature_clim_hydro,
-                "currents_hfr": base.feature_currents_hfr,
-                "currents_ADCP": base.feature_currents_ADCP,
-                "currents_VMADCP": base.feature_currents_VMADCP, "drifters": base.feature_drifters
+    features = {"sst": feature_sst, "prof_hydro_vessel": feature_prof_hydro_vessel,
+                "prof_hydro_mooring": feature_prof_hydro_mooring,
+                "section_hydro": feature_section_hydro, "clim_hydro": feature_clim_hydro,
+                "currents_hfr": feature_currents_hfr, "currents_ADCP": feature_currents_ADCP,
+                "currents_VMADCP": feature_currents_VMADCP, "drifters": feature_drifters
                 }
 
     selected_feature = config_obj["functionality"]
 
     if selected_feature in features:
-        logger.info(f'Feature selected :: {selected_feature}')
+        logger.info('Feature selected :: %s', selected_feature)
         features[config_obj["functionality"]].plot(config_obj)
     else:
-        logger.debug(f'Feature {selected_feature} not found')
+        logger.debug('Feature %s not found', selected_feature)
 
 
 def get_observation_models_meta(config_obj: dict):
@@ -57,7 +59,7 @@ def get_observation_models_meta(config_obj: dict):
     observation = config_obj["observation"]
     models = config_obj["models"]
 
-    logger.info(f"Using functionality : {config_obj['functionality']}")
+    logger.info("Using functionality : %s", config_obj['functionality'])
 
     logger.info("Reading observation files")
 
@@ -65,55 +67,56 @@ def get_observation_models_meta(config_obj: dict):
     logger.info("Opening observation from file(s)")
     obs_type = config_obj['observation'].get('type')
     steps = config_obj.get('horizontal_step'), config_obj.get('vertical_step')
-    observation.update({"xarray": base.open_decode(observation.pop("path"),
-                                                   config_obj['functionality'], obs_type,
-                                                   steps=steps)
+    observation.update({"xarray": open_decode(observation.pop("path"), config_obj['functionality'],
+                                              obs_type, steps=steps)
                         })
+    observation['xarray'] = observation['xarray'].assign_attrs({'name': observation.get("name")})
     logger.info("Applying : decode and meta zone on observation")
     observation.update({"xarray_meta": apply_metas2dataset(observation["xarray"], config_obj,
                                                            get_method(observation))
                         })
+
     logger.info("File(s) read for observation")
 
     # Open model dataset from path then decode dataset and apply meta-zone
     for imod, model in enumerate(models):
-        logger.info(f"Reading model : {imod}")
+        logger.info("Reading model : %s", imod)
 
         # Get type of model (in case HYCOM)
         mod_type = model.get('type')
 
         logger.info("Opening model from file(s)")
         model.update(
-            {"xarray": base.open_decode(model.pop("path"), config_obj['functionality'], mod_type)})
+            {"xarray": open_decode(model.pop("path"), config_obj['functionality'], mod_type)})
+        model['xarray'] = model['xarray'].assign_attrs({'name': model.get("name")})
         logger.info("Applying : decode and meta zone on model")
         model.update({"xarray_meta": apply_metas2dataset(model["xarray"], config_obj,
                                                          get_method(model), mod_obs='mod')
                       })
 
-        logger.info(f"File(s) read for model {imod}")
+        logger.info("File(s) read for model %s", imod)
 
     # Set colocation flags
     flags = set_coloc_flags(config_obj)
-    temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag = flags
+    _, horizontal_colocation_flag, vertical_colocation_flag = flags
 
     # Colocate
     observation.update({"xarray_meta_coloc": []})
     logger.info("Collocating model(s) and observation")
     for index_model, model in enumerate(models):
         # Colocation per model
-        obs_coloc, mod_coloc = base.colocate_all(observation["xarray_meta"], model["xarray_meta"],
-                                                 flags, tgt_grid=config_obj["colocate"],
-                                                 coloc_method=get_method(model),
-                                                 coloc_method_z=get_method(model, z=True))
-
+        obs_coloc, mod_coloc = colocate_all(observation["xarray_meta"], model["xarray_meta"], flags,
+                                            tgt_grid=config_obj["colocate"],
+                                            coloc_method=get_method(model),
+                                            coloc_method_z=get_method(model, z_dim=True))
         observation["xarray_meta_coloc"].append(obs_coloc)
         model.update({"xarray_meta_coloc": mod_coloc})
 
-        logger.info(f"Collocation done for model {index_model}")
+        logger.info("Collocation done for model %s", index_model)
 
         # Interval temporels successifs
         if 'interval' in config_obj["meta_zones"]:
-            logger.info('Découpage par intervalles temporels...')
+            logger.info('Temporal interval segmentation...')
             if horizontal_colocation_flag or vertical_colocation_flag:
                 interval = config_obj["meta_zones"]["interval"]
                 model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval)
@@ -133,32 +136,48 @@ def get_observation_models_meta(config_obj: dict):
                 var_slice = 'depth'
             elif 'dens' in config_obj["meta_zones"]:
                 var_slice = 'dens'
-
-            logger.info(f'Découpage par tranches verticales sur la variable {var_slice}...')
-            if horizontal_colocation_flag or vertical_colocation_flag:
-                slice = config_obj["meta_zones"]["slice"]
-                model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(slice,
-                                                                                          var_slice)
-                model["xarray_meta_coloc"] = model[
-                    "xarray_meta_coloc"].meta.vertical_selection_slice(slice, var_slice)
-                observation["xarray_meta"] = observation[
-                    "xarray_meta"].meta.vertical_selection_slice(slice, var_slice)
-                observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
-                    index_model].meta.vertical_selection_slice(slice, var_slice)
             else:
-                slice = config_obj["meta_zones"]["slice"]
-                model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(slice,
-                                                                                          var_slice)
+                var_slice = 'depth'
+
+            logger.info('Vertical slicing on variable %s', var_slice)
+            if horizontal_colocation_flag or vertical_colocation_flag:
+                vert_slice = config_obj["meta_zones"]["slice"]
+                model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(
+                    vert_slice, var_slice)
+                model["xarray_meta_coloc"] = model[
+                    "xarray_meta_coloc"].meta.vertical_selection_slice(vert_slice, var_slice)
+                observation["xarray_meta"] = observation[
+                    "xarray_meta"].meta.vertical_selection_slice(vert_slice, var_slice)
+                observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
+                    index_model].meta.vertical_selection_slice(vert_slice, var_slice)
+            else:
+                vert_slice = config_obj["meta_zones"]["slice"]
+                model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(
+                    vert_slice, var_slice)
 
     if 'interval' in config_obj["meta_zones"].keys():
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
             interval)
-
     return config_obj
 
 
 def set_coloc_flags(config_obj):
+    """
+    Set the colocation flags from the config obj that indicate if the dimension on which to colocate
+    the model and observation .
+    Parameters
+    ----------
+    config_obj : dict
+        Dictionary specifying the observation, models, functionality, output etc.
+        Can be formatted out of a json file using cli.command_line_interface.
+
+    Returns
+    -------
+    flags : list of bools
+        time, vertical and horizontal colocation flags.
+
+    """
     # Set initial colocation flags
     temporal_colocation_flag = True
     vertical_colocation_flag = True
@@ -201,10 +220,12 @@ def set_coloc_flags(config_obj):
         temporal_colocation_flag = True
         vertical_colocation_flag = True
         horizontal_colocation_flag = True
+        if 'tide' in config_obj['outputs'][0]["plot"]:
+            temporal_colocation_flag = False
 
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
-        temporal_colocation_flag = False
+        temporal_colocation_flag = True
         vertical_colocation_flag = False
         horizontal_colocation_flag = True
 
@@ -213,27 +234,28 @@ def set_coloc_flags(config_obj):
     return flags
 
 
-def get_method(data, z=False) -> str:
+def get_method(data, z_dim=False) -> str:
     """
     Get the method to use.
     Parameters
     ----------
     data : dict
         Parser.
+    z_dim : bool
+        If True, the vertical method is retrieved.
     Returns
     -------
         str
         Method to use.
     """
-    if z:
+    if z_dim:
         method = data.get('method_z')
-        if method is None:
-            method = data.get('method')
+
     else:
         method = data.get('method')
 
     if method is None:
-        logger.warning(f'No method provided for {data.get("name")}')
+        logger.warning('No method provided for %s', data.get("name"))
 
     return method
 
@@ -269,7 +291,11 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
 
     filters = {"quality": lambda obj: obj.meta.quality_filter,
                "depth": lambda obj: obj.meta.vertical_selection_depth,
+               "min_depth": lambda obj: obj.meta.vertical_selection_min_depth,
+               "max_depth": lambda obj: obj.meta.vertical_selection_max_depth,
                "dens": lambda obj: obj.meta.vertical_selection_dens,
+               "min_dens": lambda obj: obj.meta.vertical_selection_min_dens,
+               "max_dens": lambda obj: obj.meta.vertical_selection_max_dens,
                "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
                "start": lambda obj: obj.meta.time_selection_start,
                "end": lambda obj: obj.meta.time_selection_end,
@@ -302,16 +328,17 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
 
                 xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath,
                                                                         maximum=max_bath)
+            else:
+                logger.warning("Caution ! No bathymetry variable was found in the product.")
 
         # Radius for ADCP feature
         if "radius" in config_obj["meta_zones"] and mod_obs == 'mod' and config_obj[
             "functionality"] in ['ADCP']:
             xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
-
         # Other meta-zones, one by one
-        for name, filter in filters.items():
+        for name, meta_filter in filters.items():
             if name in config_obj["meta_zones"]:
-                logger.info(f"Applying : {name}")
-                xarray_obj = filter(xarray_obj)(config_obj["meta_zones"][name])
+                logger.info("Applying : %s", name)
+                xarray_obj = meta_filter(xarray_obj)(config_obj["meta_zones"][name])
 
     return xarray_obj
