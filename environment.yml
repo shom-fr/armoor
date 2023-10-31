@@ -17,9 +17,10 @@ dependencies:
   - python-gitlab
   - cartopy
   - matplotlib
-  - xesmf
-  - xoa
-  - dask
+  - xesmf=0.8.1
+  - xarray=2023.8.0
+  - xoa=0.6.1
+  - dask=2022.12.1
   - geojson
   - configobj=5.0.6
   - opendrift=1.10.5
