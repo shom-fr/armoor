@@ -12,6 +12,7 @@ import numpy as np
 from xoa.regrid import regrid1d
 from matplotlib import path
 
+R_terre = 6371
 logger = logging.getLogger(__name__)
 xr.set_options(keep_attrs=True)
 
@@ -223,7 +224,8 @@ class MetazoneAccessor:
 
         if distance > radius_km:
             logger.info('Oops, the model does not contain a point that meets the radius criteria. '
-                        'The nearest point is used at position %s N %s E.', self._obj.lat.data, self._obj.lon.data)
+                        'The nearest point is used at position %s N %s E.', self._obj.lat.data,
+                        self._obj.lon.data)
 
         return self._obj
 
@@ -330,8 +332,7 @@ class MetazoneAccessor:
             Radius converted into degrees.
         """
         lat_mean = float(self._obj.lat.mean().data)
-        r_terre = 6371
-        r_lat = r_terre * np.cos(lat_mean * np.pi / 180)
+        r_lat = R_terre * np.cos(lat_mean * np.pi / 180)
         rad_lat_deg = radius_km * 360 / (2 * np.pi * r_lat)
 
         return rad_lat_deg
@@ -465,11 +466,10 @@ class MetazoneAccessor:
         elif 'depth' in self._obj.dims:
             indice_min_densite = difference_densite.argmin(dim='depth')
             self._obj = self._obj.isel(depth=indice_min_densite)
-        self._obj = self._obj.drop('pdens').assign_coords({'pdens':pdens})
+        self._obj = self._obj.drop('pdens').assign_coords({'pdens': pdens})
         if 'depth' in self._obj.coords:
             self._obj = self._obj.reset_coords('depth')
         return self._obj
-
 
     def vertical_selection_ponct(self, depth: float, var_vert: str = 'depth') -> xr.Dataset:
         """
@@ -751,7 +751,7 @@ class MetazoneAccessor:
         dataset = dataset.rename({var_slice + '_value': var_slice})
         dataset['slice'] = dataset['slice_label']
         if "depth" in dataset:
-            dataset = dataset.assign_coords({"depth":dataset.depth})
+            dataset = dataset.assign_coords({"depth": dataset.depth})
         return dataset
 
     def time_selection_start(self, start=None) -> xr.Dataset:
@@ -984,7 +984,7 @@ class MetazoneAccessor:
         dataset = dataset.rename({'date_time': 'time'})
         dataset['interval'] = dataset['interval_label']
         dataset = dataset.drop_vars('interval_label')
-        dataset = dataset.assign_coords({'time':dataset.time})
+        dataset = dataset.assign_coords({'time': dataset.time})
 
         return dataset
 

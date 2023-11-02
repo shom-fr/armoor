@@ -12,6 +12,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cmocean
 from armoor.algo import calculation
+from xoa.geo import haversine
 import armoor.base.tools_features as ft
 
 logger = logging.getLogger(__name__)
@@ -1324,48 +1325,38 @@ def plot_difference_trajectory(obs, mod, output_path=None):
                 f'the model and observation trajectories')
     angles = []
     distances = []
+    duree = []
 
-    for i_time, _ in enumerate(mod.time):
-        if i_time == 0:
-            angles.append(0)
-            distances.append(0)
-        else:
-            obs_base = obs.isel(time=i_time - 1)
-            mod_time_mean = mod.isel(time=i_time).mean('trajectory', skipna=True)
-            obs_time = obs.isel(time=i_time)
+    obs_ini = obs.isel(time=0)
+    for i_time, time in enumerate(mod.time):
+        duree.append((time.data - obs_ini.time.data).astype('timedelta64[h]'))
+        mod_time_mean = mod.isel(time=i_time).mean('trajectory', skipna=True)
+        obs_time = obs.sel(time=time, method='nearest')
 
-            # Calculate angles
-            # Difference entre le point obs initial et le point obs suivant
-            diff_obs_lon = obs_time.lon - obs_base.lon
-            # Difference entre le point obs initial et le point obs suivant
-            diff_obs_lat = obs_time.lat - obs_base.lat
-            # Difference entre le point obs initial et le point mod moyen
-            diff_mod = mod_time_mean - obs_base
-            angle = np.arctan(diff_mod.lat / diff_mod.lon) - np.arctan(diff_obs_lat / diff_obs_lon)
-            angles.append(angle * 180 / np.pi)
-
-            # Calculate distances
-            # Difference entre le point obs  et le point mod moyen
-            diff_mod_obs_lon = obs_time.lon - mod_time_mean.lon
-            # Difference entre le point obs  et le point mod moyen
-            diff_mod_obs_lat = obs_time.lat - mod_time_mean.lat
-            distance = np.sqrt(diff_mod_obs_lon ** 2 + diff_mod_obs_lat ** 2)
-            distances.append(distance.values)
+        # Calculate angles
+        angle = ft.angle_between_vectors(obs_ini, obs_time, mod_time_mean)
+        angles.append(angle)
+        # Calculate distances
+        distance = haversine(obs_time.lon, obs_time.lat, mod_time_mean.lon,
+                                     mod_time_mean.lat)/1000
+        distances.append(distance)
 
     # Get title and fignames
     title, figname = get_title_figname('Difference trajectory', obs, mod.attrs['name'],
                                        obs.attrs['name'])
     # Plot
-    f = plt.figure(figsize=(10, 10))
-    f.suptitle(title, x=0.3, fontsize=15, fontweight='bold')
+    f = plt.figure(figsize=(11, 10))
+    f.suptitle(title, x=0.35, fontsize=15, fontweight='bold')
     ax0 = plt.subplot2grid((2, 1), (0, 0))
     ax1 = plt.subplot2grid((2, 1), (1, 0))
-    ax0.plot(mod.time, distances)
+    ax0.plot(duree, distances)
     ax0.set_title('Mean distance difference [m]', fontsize=15)
     ax0.set_ylabel(f'm', fontsize=12)
-    ax1.plot(mod.time, angles)
+    ax0.set_xlabel(f'Duration (h)', fontsize=12)
+    ax1.plot(duree, angles)
     ax1.set_title('Mean direction difference [°]', fontsize=15)
     ax1.set_ylabel(f'°', fontsize=12)
+    ax1.set_xlabel(f'Duration (h)', fontsize=12)
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs)

@@ -4,6 +4,7 @@ import logging
 import copy
 import calendar
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,46 @@ def remove_missing_values_ds(models, observation, i, vars_mod, vars_obs):
             models[i]["xarray_meta_coloc"][vars_mod[i_var]] = mod
 
     return models, observation
+
+
+def angle_between_vectors(pointA, pointB, pointC):
+    """
+    Calculate the angle in degrees between vectors AB and AC.
+    Parameters
+    ----------
+    Args:
+        pointA : xarray.dataset
+            Coordinates of point A as a tuple (lon, lat).
+        pointB : xarray.dataset
+            Coordinates of point B as a tuple (lon, lat).
+        pointC : xarray.dataset
+            Coordinates of point C as a tuple (lon, lat).
+
+    Returns:
+        float: The angle in degrees between vectors AB and AC.
+
+    """
+    # Calculate vectors AB and AC
+    vectorAB = (pointB.lon.data - pointA.lon.data, pointB.lat.data - pointA.lat.data)
+    vectorAC = (pointC.lon.data - pointA.lon.data, pointC.lat.data - pointA.lat.data)
+
+    # Calculate the dot product of vectors AB and AC
+    dot_product = vectorAB[0] * vectorAC[0] + vectorAB[1] * vectorAC[1]
+
+    # Calculate the magnitudes of vectors AB and AC
+    magnitude_AB = math.sqrt(vectorAB[0] ** 2 + vectorAB[1] ** 2)
+    magnitude_AC = math.sqrt(vectorAC[0] ** 2 + vectorAC[1] ** 2)
+
+    # Calculate the angle in radians between vectors AB and AC using the dot product formula
+    cosine_theta = dot_product / (magnitude_AB * magnitude_AC)
+    if cosine_theta > 1:
+        cosine_theta = 1
+    theta_rad = math.acos(cosine_theta)
+
+    # Convert the angle to degrees
+    theta_deg = math.degrees(theta_rad)
+
+    return theta_deg
 
 
 def remove_missing_values(model, obs):
@@ -159,7 +200,7 @@ def sel_default_vars(config_obj):
     elif feature == "prof_hydro_vessel":  # F2
         default_vars_mod = ['ptemp', 'sal', 'pdens']
         default_vars_obs = ['temp', 'sal', 'pdens']
-        for var in ['temp', 'ptemp',  'pdens']:
+        for var in ['temp', 'ptemp', 'pdens']:
             if var in additional_vars:
                 additional_vars.remove(var)
 
