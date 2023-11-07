@@ -3,28 +3,29 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python
-  - uvicorn
-  - pycryptodome
-  - sphinx
-  - sphinx_rtd_theme
-  - jinja2
-  - PyPDF2
-  - weasyprint
-  - pydantic
-  - ldap3
-  - fastapi
-  - python-gitlab
-  - cartopy
-  - matplotlib
-  - xesmf
-  - xoa
-  - dask
-  - geojson
+  - python=3.11.6
+  - uvicorn=0.23.2
+  - pycryptodome=3.19.0
+  - sphinx=7.2.6
+  - sphinx_rtd_theme=1.3.0
+  - jinja2=3.1.2
+  - PyPDF2=2.11.1
+  - weasyprint=60.1
+  - pydantic=2.4.2
+  - ldap3=2.9.1
+  - fastapi=0.104.1
+  - python-gitlab=3.15.0
+  - cartopy=0.22.0
+  - matplotlib=3.8.0
+  - xesmf=0.8.1
+  - xarray=2023.8.0
+  - xoa=0.6.1
+  - dask=2022.12.1
+  - geojson=2.5.0
   - configobj=5.0.6
   - opendrift=1.10.5
-  - cfgrib
-  - pip
+  - cfgrib=0.9.10.4
+  - pip=23.3.1
   - pip:
     - pylint
     - xoa-999-py3-none-any.whl
