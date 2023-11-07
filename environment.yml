@@ -27,8 +27,8 @@ dependencies:
   - cfgrib=0.9.10.4
   - pip=23.3.1
   - pip:
-    - pylint=3.0.2
+    - pylint
     - xoa-999-py3-none-any.whl
-    - pytest=7.4.3
-    - setuptools=68.2.2
-    - build=1.0.3
+    - pytest
+    - setuptools
+    - build
