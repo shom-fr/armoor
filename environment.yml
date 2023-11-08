@@ -25,10 +25,18 @@ dependencies:
   - configobj=5.0.6
   - opendrift=1.10.5
   - cfgrib=0.9.10.4
-  - pip=23.3.1
+  - scipy=1.11.3
+  - numpy=1.24.4
+  - pandas=1.5.3
+  - shapely=2.0.2
+  - gsw=3.6.17
+  - cmocean=2.0
+  - pytz=2023.3.post1
+  - requests=2.31.0
+  - pytest=7.4.3
+  - pylint=3.0.2
+  - pip
   - pip:
-    - pylint
-    - xoa-999-py3-none-any.whl
-    - pytest
-    - setuptools
     - build
+    - setuptools
+    - xoa-999-py3-none-any.whl
