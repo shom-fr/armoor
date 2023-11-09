@@ -40,3 +40,4 @@ dependencies:
     - build
     - setuptools
     - xoa-999-py3-none-any.whl
+    - ttide-0.3.dev1-py3-none-any.whl
