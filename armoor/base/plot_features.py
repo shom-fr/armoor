@@ -1338,7 +1338,7 @@ def plot_difference_trajectory(obs, mod, output_path=None):
         angles.append(angle)
         # Calculate distances
         distance = haversine(obs_time.lon, obs_time.lat, mod_time_mean.lon,
-                                     mod_time_mean.lat)/1000
+                             mod_time_mean.lat) / 1000
         distances.append(distance)
 
     # Get title and fignames
@@ -1379,102 +1379,111 @@ def plot_map_harm(models, observations, output_path=None):
 
     """
     logger.info('Map of amplitude, phase and norm of each tidal harmonic.')
+    for i_wave, wave in enumerate(observations.wave.data):
+        if wave in models.wave.data:
+            # Get the variables of interest
+            observation = observations.sel(wave=wave).squeeze()
+            model = models.sel(wave=wave).squeeze()
 
-    for i_wave, _ in enumerate(observations.wave):
-        # Get the variables of interest
-        wave_name = str(observations.waveNames[i_wave].values).split('\'')[1]
-        observation = observations.isel(wave=i_wave).drop('waveNames').squeeze()
-        model = models.isel(wave=i_wave).drop('waveNames').squeeze()
-        observation['norm'] = np.sqrt(observation['u_a'] ** 2 + observation['v_a'] ** 2)
-        model['norm'] = np.sqrt(model['u_a'] ** 2 + model['v_a'] ** 2)
-        diff = model - observation
+            # Clean dim order
+            model, observation = clean_dim_order(model), clean_dim_order(observation)
 
-        # Plot current constituents
-        for var in ['U', 'V']:
-            if var == 'U':
-                ampl, phase = 'u_a', 'u_G'
-            elif var == 'V':
-                ampl, phase = 'v_a', 'v_G'
+            observation['norm'] = np.sqrt(observation['u_a'] ** 2 + observation['v_a'] ** 2)
+            model['norm'] = np.sqrt(model['u_a'] ** 2 + model['v_a'] ** 2)
 
-            # Get the min and max values
-            vmax = model[ampl].max()
-            vmin = 0
-            vmin_diff = -np.nanmax(np.abs(model[ampl]))
-            vmax_diff = -vmin_diff
+            # Plot current constituents
+            for var in ['U', 'V']:
+                if var == 'U':
+                    ampl, phase = 'u_a', 'u_g'
+                elif var == 'V':
+                    ampl, phase = 'v_a', 'v_g'
+                diff_ampl = model[ampl] - observation[ampl]
+                diff_phase = model[phase] - observation[phase]
 
-            # Plot the amplitudes and phases
-            f, axs = figure_6_maps(model)
+                # Get the min and max values
+                vmax = model[ampl].max()
+                vmin = 0
+                vmin_diff = -np.nanmax(np.abs(model[ampl]))
+                vmax_diff = -vmin_diff
 
-            a_mod = axs[0].pcolormesh(model.lon, model.lat, np.abs(model[ampl]), vmin=vmin,
-                                      vmax=vmax, cmap='jet', transform=ccrs.PlateCarree())
-            g_mod = axs[1].pcolormesh(model.lon, model.lat, model[phase], vmin=-180, vmax=+180,
-                                      cmap=cmocean.cm.phase, transform=ccrs.PlateCarree())
-            a_obs = axs[2].pcolormesh(observation.lon, observation.lat, np.abs(observation[ampl]),
-                                      vmin=vmin, vmax=vmax, cmap='jet',
-                                      transform=ccrs.PlateCarree())
-            g_obs = axs[3].pcolormesh(observation.lon, observation.lat, observation[phase],
-                                      vmin=-180, vmax=+180, cmap=cmocean.cm.phase,
-                                      transform=ccrs.PlateCarree())
-            a_diff = axs[4].pcolormesh(diff.lon, diff.lat, diff[ampl], vmin=vmin_diff,
-                                       vmax=vmax_diff, cmap=cmocean.cm.balance,
-                                       transform=ccrs.PlateCarree())
-            g_diff = axs[5].pcolormesh(diff.lon, diff.lat, diff[phase], vmin=-180, vmax=+180,
-                                       cmap=cmocean.cm.balance, transform=ccrs.PlateCarree())
+                # Plot the amplitudes and phases
+                f, axs = figure_6_maps(model)
 
-            # Add the colorbar, titles etc.
-            title, figname = get_title_figname(f'{wave_name} tidal wave {var}', observation,
-                                               model.attrs['name'], observation.attrs['name'])
-            f.suptitle(title, fontsize=15, fontweight='bold')
+                a_mod = axs[0].pcolormesh(model.lon, model.lat, np.abs(model[ampl]), vmin=vmin,
+                                          vmax=vmax, cmap='jet', transform=ccrs.PlateCarree(),
+                                          shading='nearest')
+                g_mod = axs[1].pcolormesh(model.lon, model.lat, model[phase], vmin=-180, vmax=+180,
+                                          cmap=cmocean.cm.phase, transform=ccrs.PlateCarree(),
+                                          shading='nearest')
+                a_obs = axs[2].pcolormesh(observation.lon, observation.lat,
+                                          np.abs(observation[ampl]), vmin=vmin, vmax=vmax,
+                                          cmap='jet', transform=ccrs.PlateCarree(),
+                                          shading='nearest')
+                g_obs = axs[3].pcolormesh(observation.lon, observation.lat, observation[phase],
+                                          vmin=-180, vmax=+180, cmap=cmocean.cm.phase,
+                                          transform=ccrs.PlateCarree(), shading='nearest')
+                a_diff = axs[4].pcolormesh(diff_ampl.lon, diff_ampl.lat, diff_ampl, vmin=vmin_diff,
+                                           vmax=vmax_diff, cmap=cmocean.cm.balance,
+                                           transform=ccrs.PlateCarree(), shading='nearest')
+                g_diff = axs[5].pcolormesh(diff_phase.lon, diff_phase.lat, diff_phase, vmin=-180,
+                                           vmax=+180, cmap=cmocean.cm.balance,
+                                           transform=ccrs.PlateCarree(), shading='nearest')
 
-            # colorbar_am
-            f.colorbar(a_mod, ax=axs[0], orientation='horizontal', fraction=0.046, pad=0.1)
-            # colorbar_ao
-            f.colorbar(a_obs, ax=axs[2], orientation='horizontal', fraction=0.046, pad=0.1)
-            # colorbar_ad
-            f.colorbar(a_diff, ax=axs[4], orientation='horizontal', fraction=0.046, pad=0.1)
-            # colorbar_gm
-            f.colorbar(g_mod, ax=axs[1], orientation='horizontal', fraction=0.046, pad=0.1)
-            # colorbar_go
-            f.colorbar(g_obs, ax=axs[3], orientation='horizontal', fraction=0.046, pad=0.1)
-            # colorbar_gd
-            f.colorbar(g_diff, ax=axs[5], orientation='horizontal', fraction=0.046, pad=0.1)
+                # Add the colorbar, titles etc.
+                title, figname = get_title_figname(f'{wave} tidal wave {var}', observation,
+                                                   model.attrs['name'], observation.attrs['name'])
+                f.suptitle(title, fontsize=15, fontweight='bold')
 
-            ft.manage_output(figname, output_path)
+                # colorbar_am
+                f.colorbar(a_mod, ax=axs[0], orientation='horizontal', fraction=0.046, pad=0.1)
+                # colorbar_ao
+                f.colorbar(a_obs, ax=axs[2], orientation='horizontal', fraction=0.046, pad=0.1)
+                # colorbar_ad
+                f.colorbar(a_diff, ax=axs[4], orientation='horizontal', fraction=0.046, pad=0.1)
+                # colorbar_gm
+                f.colorbar(g_mod, ax=axs[1], orientation='horizontal', fraction=0.046, pad=0.1)
+                # colorbar_go
+                f.colorbar(g_obs, ax=axs[3], orientation='horizontal', fraction=0.046, pad=0.1)
+                # colorbar_gd
+                f.colorbar(g_diff, ax=axs[5], orientation='horizontal', fraction=0.046, pad=0.1)
 
-        for var in ['Norm']:
-            ampl = 'norm'
+                ft.manage_output(figname, output_path)
 
-            # Get the min and max values
-            vmin = 0
-            vmax = model[ampl].max()
-            vmin_diff = -np.nanmax(np.abs(model['u_a']))
-            vmax_diff = -vmin_diff
+            for var in ['Norm']:
+                ampl = 'norm'
+                diff_norm = model[ampl] - observation[ampl]
 
-            # Plot the amplitudes and phases
-            f, axs = figure_3_maps(model, 'harm')
+                # Get the min and max values
+                vmin = 0
+                vmax = model[ampl].max()
+                vmin_diff = -np.nanmax(np.abs(model['u_a']))
+                vmax_diff = -vmin_diff
 
-            a_mod = axs[0].pcolormesh(model.lon, model.lat, model[ampl], vmin=vmin, vmax=vmax,
-                                      cmap='jet', transform=ccrs.PlateCarree())
-            a_obs = axs[1].pcolormesh(observation.lon, observation.lat, observation[ampl],
-                                      vmin=vmin, vmax=vmax, cmap='jet',
-                                      transform=ccrs.PlateCarree())
-            a_diff = axs[2].pcolormesh(diff.lon, diff.lat, diff[ampl], vmin=vmin_diff,
-                                       vmax=vmax_diff, cmap=cmocean.cm.balance,
-                                       transform=ccrs.PlateCarree())
+                # Plot the amplitudes and phases
+                f, axs = figure_3_maps(model, 'harm')
 
-            # Add the colorbar, titles etc.
-            title, figname = get_title_figname(f'{wave_name} tidal wave', observation,
-                                               model.attrs['name'], observation.attrs['name'])
-            f.suptitle(title, fontsize=15, fontweight='bold')
+                a_mod = axs[0].pcolormesh(model.lon, model.lat, model[ampl], vmin=vmin, vmax=vmax,
+                                          cmap='jet', transform=ccrs.PlateCarree())
+                a_obs = axs[1].pcolormesh(observation.lon, observation.lat, observation[ampl],
+                                          vmin=vmin, vmax=vmax, cmap='jet',
+                                          transform=ccrs.PlateCarree())
+                a_diff = axs[2].pcolormesh(diff_norm.lon, diff_norm.lat, diff_norm, vmin=vmin_diff,
+                                           vmax=vmax_diff, cmap=cmocean.cm.balance,
+                                           transform=ccrs.PlateCarree())
 
-            # colorbar_am
-            f.colorbar(a_mod, ax=axs[0], orientation='horizontal', fraction=0.046, pad=0.1)
-            # colorbar_ao
-            f.colorbar(a_obs, ax=axs[1], orientation='horizontal', fraction=0.046, pad=0.1)
-            # colorbar_ad
-            f.colorbar(a_diff, ax=axs[2], orientation='horizontal', fraction=0.046, pad=0.05)
+                # Add the colorbar, titles etc.
+                title, figname = get_title_figname(f'{wave} tidal wave', observation,
+                                                   model.attrs['name'], observation.attrs['name'])
+                f.suptitle(title, fontsize=15, fontweight='bold')
 
-            ft.manage_output(figname, output_path)
+                # colorbar_am
+                f.colorbar(a_mod, ax=axs[0], orientation='horizontal', fraction=0.046, pad=0.1)
+                # colorbar_ao
+                f.colorbar(a_obs, ax=axs[1], orientation='horizontal', fraction=0.046, pad=0.1)
+                # colorbar_ad
+                f.colorbar(a_diff, ax=axs[2], orientation='horizontal', fraction=0.046, pad=0.05)
+
+                ft.manage_output(figname, output_path)
 
 
 def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None):
@@ -1494,36 +1503,35 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
     """
     logger.info('Map with the tidal current ellipses.')
     # One plot per tidal wave
-    for i_wave, _ in enumerate(observations.wave):
-        freq = observations.wave[i_wave].values
+    for i_wave, wave in enumerate(observations.wave.data):
+        freq = observations.isel(wave=i_wave).freq.data
         if freq > 0:
             # If vertical immersions : on plot per immersion (depth)
             if 'depth' in observations.dims:
                 for i_depth, _ in enumerate(observations.depth):
-                    plot_ellipses_tide_current_generic(observations, models, i_wave, scale,
+                    plot_ellipses_tide_current_generic(observations, models, wave, scale,
                                                        output_path, i_depth=i_depth)
 
             # If vertical immersions : on plot per immersion (density)
             elif 'dens' in observations.dims:
                 for i_dens, _ in enumerate(observations.dens):
-                    plot_ellipses_tide_current_generic(observations, models, i_wave, scale,
+                    plot_ellipses_tide_current_generic(observations, models, wave, scale,
                                                        output_path, i_dens=i_dens)
             # If vertical slices : one plot per slice
             elif 'slice' in observations.dims:
                 for i_slice, _ in enumerate(observations.slice):
-                    plot_ellipses_tide_current_generic(observations, models, i_wave, scale,
+                    plot_ellipses_tide_current_generic(observations, models, wave, scale,
                                                        output_path, i_slice=i_slice)
             else:
                 # Get the variables of interest
-                plot_ellipses_tide_current_generic(observations, models, i_wave, scale, output_path)
+                plot_ellipses_tide_current_generic(observations, models, wave, scale, output_path)
 
 
-def plot_ellipses_tide_current_generic(observation, models, i_wave, scale, output_path, i_dens=None,
-                                       i_depth=None, i_slice=None):
-    wave_name = str(observation.waveNames[i_wave].values).split('\'')[1]
-    freq = observation.wave[i_wave].values
-    observation = observation.isel(wave=i_wave)
-    models = [mod.isel(wave=i_wave) for mod in models]
+def plot_ellipses_tide_current_generic(observation, models, wave_name, scale, output_path,
+                                       i_dens=None, i_depth=None, i_slice=None):
+    freq = observation.sel(wave=wave_name).freq.data
+    observation = observation.sel(wave=wave_name)
+    models = [mod.sel(wave=wave_name) for mod in models if wave_name in mod.wave.data]
     if i_dens is not None:
         observation = observation.isel(dens=i_dens)
         models = [mod.isel(dens=i_dens) for mod in models]
@@ -1533,7 +1541,7 @@ def plot_ellipses_tide_current_generic(observation, models, i_wave, scale, outpu
     elif i_slice is not None:
         observation = observation.isel(slice=i_slice)
         models = [mod.isel(slice=i_slice) for mod in models]
-    observation = observation.drop('waveNames').squeeze()
+    observation = observation.squeeze()
 
     f, ax = figure_1_map(observation)
     if np.size(observation.lon) > 1:
@@ -1587,8 +1595,8 @@ def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
     logger.info('Figure of the tidal current ellipsis.')
     # Retrieve the variables
     ds_name = ds.name
-    u_a, u_g = ds.u_a.values, ds.u_G.values
-    v_a, v_g = ds.v_a.values, ds.v_G.values
+    u_a, u_g = ds.u_a.values, ds.u_g.values
+    v_a, v_g = ds.v_a.values, ds.v_g.values
 
     if np.size(ds.u_a.values) > 1:
         u_a, u_g = u_a[0], u_g[0]
@@ -1611,7 +1619,6 @@ def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
     if not isinstance(u_1[0], np.float64):
         u_1 = u_1[0]
         v_1 = v_1[0]
-
     # Create the figure
     ax.plot(u_1, v_1, color, transform=ccrs.PlateCarree(), label=f'{ds_name}')
     ax.plot([lon, u_1[0]], [lat, v_1[0]], 'grey', linewidth=0.8, transform=ccrs.PlateCarree())
@@ -2213,45 +2220,51 @@ def create_harmonic_table(models, observations, output_path):
     logger.info('Create a table per tidal wave and per current constituent(u & v) with, for each ')
     logger.info(
         'depth, the amplitude and phase of the observation and the model and their differences')
-    for i_wave, _ in enumerate(observations.wave):
-        # Get the variables of interest
-        wave_name = str(observations.waveNames[i_wave].values).split('\'')[1]
-        observation = observations.isel(wave=i_wave).drop('waveNames').squeeze()
-        model = models.isel(wave=i_wave).drop('waveNames').squeeze()
-        diff = model - observation
+    for i_wave, wave_name in enumerate(observations.wave):
+        wave_name = wave_name.data
+        if wave_name in list(models.wave):
+            # Get the variables of interest
+            obs = observations.sel(wave=wave_name)
+            mod = models.sel(wave=wave_name)
+            diff = mod - obs
 
-        # Plot current constituents
-        for var in ['U', 'V']:
-            if var == 'U':
-                ampl, phase = 'u_a', 'u_G'
-            elif var == 'V':
-                ampl, phase = 'v_a', 'v_G'
-            harmonic_table_file = open(
-                os.path.join(output_path, f'{wave_name}_{var}_harm_table.csv'), 'a')
-            harmonic_table_file.write(f'{wave_name} tidal wave - {var} current constituent \n')
-            harmonic_table_file.write(
-                f'Model : {model.name} ; Analysis period : {model.analysis_period}\n')
-            harmonic_table_file.write(f'Observation : {observation.name} ; '
-                                      f'Analysis period : {observation.analysis_period}\n')
+            # Plot current constituents
+            for var in ['U', 'V']:
+                if var == 'U':
+                    ampl, phase = 'u_a', 'u_g'
+                elif var == 'V':
+                    ampl, phase = 'v_a', 'v_g'
+                filename = f'{wave_name}_{var}_harm_table_{obs.lon.data[0]}_{obs.lat.data[0]}.csv'
+                harmonic_table_file = open(os.path.join(output_path, filename), 'a')
+                harmonic_table_file.write(f'{wave_name} tidal wave - {var} current constituent \n')
+                harmonic_table_file.write(
+                    f'Model : {mod.name} ; Analysis period : {mod.analysis_period}\n')
+                harmonic_table_file.write(f'Observation : {obs.name} ; '
+                                          f'Analysis period : {obs.analysis_period}\n')
 
-            if 'depth' in observation.dims:
-                harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
-                                          f'Phase obs ; Phase mod ; Phase diff \n')
-                for i_depth, depth in enumerate(observation.depth):
-                    harmonic_table_file.write(
-                        f'{depth.values}m ; {observation[ampl][i_depth].values} ;'
-                        f' {model[ampl][i_depth].values} ;'
-                        f'{diff[ampl][i_depth].values}; {observation[phase][i_depth].values} ;'
-                        f' {model[phase][i_depth].values} ; {diff[phase][i_depth].values} \n')
-            elif 'slice' in observation.dims:
-                harmonic_table_file.write(f'Slice ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
-                                          f'Phase obs ; Phase mod ; Phase diff \n')
-                for i_slice, slice in enumerate(observation.slice):
-                    harmonic_table_file.write(
-                        f'{slice.values}m ; {observation[ampl][i_slice].values} ; '
-                        f'{model[ampl][i_slice].values} ;'
-                        f'{diff[ampl][i_slice].values} ; {observation[phase][i_slice].values} ; '
-                        f'{model[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
+                if 'depth' in obs.dims:
+                    harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
+                                              f'Phase obs ; Phase mod ; Phase diff \n')
+                    for i_depth, depth in enumerate(obs.depth):
+                        obs_depth = obs.sel(depth=depth, method='nearest')
+                        mod_depth = mod.sel(depth=depth, method='nearest')
+                        diff_depth = diff.sel(depth=depth, method='nearest')
+                        harmonic_table_file.write(f'{depth.values}m ;'
+                                                  f'{obs_depth[ampl].values} ;'
+                                                  f'{mod_depth[ampl].values} ;'
+                                                  f'{diff_depth[ampl].values} ;'
+                                                  f'{obs_depth[phase].values} ;'
+                                                  f'{mod_depth[phase].values} ; '
+                                                  f'{diff_depth[phase].values} \n')
+                elif 'slice' in obs.dims:
+                    harmonic_table_file.write(f'Slice ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
+                                              f'Phase obs ; Phase mod ; Phase diff \n')
+                    for i_slice, slice in enumerate(obs.slice):
+                        harmonic_table_file.write(
+                            f'{slice.values}m ; {obs[ampl][i_slice].values} ; '
+                            f'{mod[ampl][i_slice].values} ;'
+                            f'{diff[ampl][i_slice].values} ; {obs[phase][i_slice].values} ; '
+                            f'{mod[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
 
 
 def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, plg=None):

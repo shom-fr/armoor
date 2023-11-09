@@ -566,7 +566,6 @@ class MetazoneAccessor:
         else:
             depth = np.array(depth)
         tgt_depth = xr.DataArray(depth, dims="depth", name="depth")
-
         # Select depth(s)
         tgt_ds = dataset
         for var in dataset.variables:

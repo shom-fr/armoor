@@ -220,14 +220,15 @@ def set_coloc_flags(config_obj):
         temporal_colocation_flag = True
         vertical_colocation_flag = True
         horizontal_colocation_flag = True
-        if 'tide' in config_obj['outputs'][0]["plot"]:
-            temporal_colocation_flag = False
 
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
         temporal_colocation_flag = True
         vertical_colocation_flag = False
         horizontal_colocation_flag = True
+
+    if 'tide' in config_obj['outputs'][0]["plot"] or 'harm' in config_obj['outputs'][0]["plot"]:
+        temporal_colocation_flag = False
 
     flags = temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag
 
