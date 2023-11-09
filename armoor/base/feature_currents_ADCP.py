@@ -63,7 +63,6 @@ def plot(config_obj):
         else:
             scale = 0.1
 
-
         # PLOTS
         ############################################################################################
         # HOVMOLLER CURRENTS
@@ -89,9 +88,6 @@ def plot(config_obj):
                     observation['xarray_meta_coloc'][i_mod], attribute)
 
                 models[i_mod] = mod
-                # Remove missing values
-                models, observation = remove_missing_values_ds(models, observation, i_mod,
-                                                               [attribute], [attribute])
 
             # Select variables to plot
             observation['xarray_meta'] = observation['xarray_meta'].to_array()
