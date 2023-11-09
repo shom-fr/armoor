@@ -4,7 +4,7 @@ import os
 import copy
 import numpy as np
 from armoor.base.tools_features import remove_missing_values_ds
-from armoor.base import plot_features, comodo_tide_feature
+from armoor.base import plot_features, ttide_tide_feature
 from armoor.base.colocation import colocate_all
 import armoor.hmi.script_tools as st
 
@@ -26,7 +26,6 @@ def plot(config_obj):
         Path to the generated figures.
 
     """
-    coloc_product = config_obj["colocate"]
     outputs = config_obj["outputs"]
     output_path = config_obj.get("output_path")
 
@@ -61,131 +60,37 @@ def plot(config_obj):
         else:
             scale = 0.1
 
-        if "env_comodo" in output:
-            env_comodo = output["env_comodo"]
-        else:
-            env_comodo = ''
-
-        # Get names
-        models_name = [m['name'] for m in models]
-        obs_name = observation['name']
-
         # PLOTS
         ############################################################################################
         # MAP TIDAL CURRENTS
         plot_map_amplitude = {"plot_map_current_harmonic": 'plot_map_current_harmonic'}
         if output["plot"] in plot_map_amplitude:
-            # Check if all the required data are in the configObj
-            # List of tidal waves to calculate
-            if "tidal_waves" in output:
-                list_waves = output["tidal_waves"]
-            else:
-                raise ValueError("Oops, to perform harmonic analysis, you should specify the tidal "
-                                 "waves to calculate...")
 
-            # Path where to get the comodo tool
-            if 'path_comodo' in output:
-                path_tools = output["path_comodo"]
-            else:
-                raise ValueError("Oops, to perform harmonic analysis, you should "
-                                 "specify the path to the Comodo tools to use...")
-
-            # Path where to save the results
-            if 'path_results' in output:
-                path_results = output["path_results"]
-                path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
-            else:
-                raise ValueError("Oops, to perform harmonic analysis, you should "
-                                 "specify the path where to save the result files...")
-
-            # Definition of the period for the harmonic analysis
-            if 'analysis_start' in output and 'analysis_end' in output:
-                analysis_start = np.datetime64(output["analysis_start"])
-                analysis_end = np.datetime64(output["analysis_end"])
-                observation["xarray_meta"] = observation["xarray_meta"].sel(
-                    time=slice(analysis_start, analysis_end))
-                for i_mod, mod in enumerate(models):
-                    mod['xarray_meta'] = mod['xarray_meta'].sel(
-                        time=slice(analysis_start, analysis_end))
-            else:
-                logger.info("Oops, to perform harmonic analysis, you should specify the period "
-                            "over which to calculate the harmonic analysis. "
-                            "The calculation will be done over the entire "
-                            "period of the input files.")
-
-            # Proceed harmonic analysis on obs
-            ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
-                                                           path_nc, path_results, path_tools,
-                                                           list_waves, env_comodo=env_comodo)
             for i_mod, mod in enumerate(models):
+                # Proceed harmonic analysis on obs
+                logger.info(f'Computing harmonic analysis for the observation...')
+                ds_obs = ttide_tide_feature.run_harmonic_analysis_map(
+                    observation["xarray_meta_coloc"][i_mod], output)
                 # Proceed harmonic analysis on mod
-                path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
-                ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc,
-                                                               path_results, path_tools, list_waves,
-                                                               env_comodo=env_comodo)
-                flags = False, True, False
-                tgt_grid = coloc_product
-                obs_coloc, mod_coloc = colocate_all(ds_obs, ds_mod, flags, tgt_grid,
-                                                    coloc_method='nearest')
+                logger.info(f'Computing harmonic analysis for model {i_mod}...')
+                ds_mod = ttide_tide_feature.run_harmonic_analysis_map(mod['xarray_meta_coloc'],
+                                                                      output)
 
                 # Plot the maps
-                plot_features.plot_map_harm(mod_coloc, obs_coloc,
-                                            output_path=sub_func_output_folder)
+                plot_features.plot_map_harm(ds_mod, ds_obs, output_path=sub_func_output_folder)
 
         ############################################################################################
         # ELLIPSES TIDAL CURRENTS
         plot_tide_current_ellipses = {"plot_tide_current_ellipses": 'plot_tide_current_ellipses'}
         if output["plot"] in plot_tide_current_ellipses:
-            # Process observation
-            # List of tidal waves to calculate
-            if "tidal_waves" in output:
-                list_waves = output["tidal_waves"]
-            else:
-                raise ValueError("Oops, to perform harmonic analysis,"
-                                 " you should specify the waves to calculate...")
-
-            # Path where to get the comodo tool
-            if 'path_comodo' in output:
-                path_tools = output["path_comodo"]
-            else:
-                raise ValueError("Oops, to perform harmonic analysis,"
-                                 " you should specify the path to the Comodo tools to use...")
-
-            # Path where to save the results
-            if 'path_results' in output:
-                path_results = output["path_results"]
-                path_nc = os.path.join(path_results, 'obs_tide_uv.nc')
-            else:
-                raise ValueError("Oops, to perform harmonic analysis, you should"
-                                 " specify the path where to save the result files...")
-
-            # Definition of the period for the harmonic analysis
-            if 'analysis_start' in output and 'analysis_end' in output:
-                analysis_start = np.datetime64(output["analysis_start"])
-                analysis_end = np.datetime64(output["analysis_end"])
-                observation["xarray_meta"] = observation["xarray_meta"].sel(
-                    time=slice(analysis_start, analysis_end))
-                for i_mod, mod in enumerate(models):
-                    mod['xarray_meta'] = mod['xarray_meta'].sel(
-                        time=slice(analysis_start, analysis_end))
-            else:
-                logger.info("Oops, to perform harmonic analysis, you should specify the period"
-                            " over which to calculate the harmonic analysis."
-                            " The calculation will be done over"
-                            " the entire period of the input files.")
-
             # Proceed harmonic analysis on obs
-            ds_obs = comodo_tide_feature.harmonic_analysis(observation["xarray_meta"], 'u v',
-                                                           path_nc, path_results, path_tools,
-                                                           list_waves, env_comodo=env_comodo)
+            logger.info(f'Computing harmonic analysis for the observation...')
+            ds_obs = ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
 
             ds_models = []
             for i_mod, mod in enumerate(models):
-                # Proceed harmonic analysis on mod
-                path_nc = os.path.join(path_results, 'mod_tide_uv.nc')
-                ds_mod = comodo_tide_feature.harmonic_analysis(mod['xarray_meta'], 'u v', path_nc,
-                                                               path_results, path_tools, list_waves,
-                                                               env_comodo=env_comodo)
+                logger.info(f'Computing harmonic analysis for model {i_mod}...')
+                ds_mod = ttide_tide_feature.run_harmonic_analysis(mod['xarray_meta_coloc'], output)
                 ds_models.append(ds_mod)
             # Plot the maps
             plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale,
