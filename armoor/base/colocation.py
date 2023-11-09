@@ -70,15 +70,12 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
                 # Temporal colocation
                 if time_flag:
                     mod_coloc = temporal_colocation(mod_coloc, obs, coloc_method)
-
                 # Horizontal colocation
                 if hor_flag:
                     mod_coloc = horizontal_colocation(mod_coloc, obs, coloc_method)
-
                 # Vertical colocation
                 if ver_flag:
                     mod_coloc = vertical_colocation(mod_coloc, obs, coloc_method_z)
-
         # Colocate on the model grid
         elif tgt_grid == 'model':
             logger.info('Colocating the observation on the model grid')
