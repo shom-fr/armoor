@@ -226,12 +226,6 @@ In the folder where you will run ``pytest``, please create a file named ``tests.
     The harmonic analyses are run in this tool thanks to the ttide librairy available at https://github.com/moflaher/ttide_py and described in::
         Pawlowicz, R., B. Beardsley, and S. Lentz, "Classical Tidal "Harmonic Analysis Including Error Estimates in MATLAB using T_TIDE", Computers and Geosciences, 28, 929-937 (2002).
 
-    To do so, you need to specify specify
-    You can do so by adding them to your ``tests.cfg`` file like this::
-
-        path_comodo = '/path/to/comodo/'
-        env_comodo = 'your commandline'
-
-    For more information on ``path_comodo`` and ``env_comodo``, refer to section **5. Outputs** above.
+    To do so, you need to specify specify the ``tidal_waves`` to compute. For more information refer to section **5. Outputs** above.
 
 
