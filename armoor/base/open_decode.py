@@ -440,6 +440,10 @@ def open_decode_mouillages(path_file):
 
     # Convert lons
     mouillage = convert_lons(mouillage)
+    if len(np.unique(mouillage.lon)) == 1 and len(np.unique(mouillage.lat)) == 1:
+        lon = np.unique(mouillage.lon.data)
+        lat = np.unique(mouillage.lat.data)
+        mouillage = mouillage.drop(['lon', 'lat']).assign_coords({'lon': lon, 'lat': lat})
 
     return mouillage
 
@@ -822,8 +826,7 @@ def open_forecaster(path_files, model_type=None) -> xr.Dataset:
     if model_type == 'woa18':
         logger.info("woa18")
         data_set_temp = xr.open_mfdataset(path_files, decode_times=False)
-        variables_to_drop = ['depth_bnds',
-                             's_oa', 's_ma', 's_dd', 's_sd', 's_gp', 's_mn', 's_se',
+        variables_to_drop = ['depth_bnds', 's_oa', 's_ma', 's_dd', 's_sd', 's_gp', 's_mn', 's_se',
                              't_oa', 't_ma', 't_dd', 't_sd', 't_gp', 't_mn', 't_se']
         for var in variables_to_drop:
             if var in data_set_temp:
@@ -949,85 +952,6 @@ def convert_trajectory(profiler):
     profiler = profiler.assign_coords({'lon': da_lon})
     profiler = profiler.assign_coords({'lat': da_lat})
     return profiler
-
-
-def array2ds(array_series, lon, lat, date, bot_depth, type):
-    """
-    Convert np.array from the reading of ADCP txt observation data into datarray 7.
-    Parameters
-    ----------
-    array_series : np.array
-        array from the txt file.
-    lon : float
-        longitude of the measure.
-    lat : float
-        latitude of the measure.
-    date : np.datetime64
-        time of the measure.
-    bot_depth : float
-        bottom depth of the measure.
-    type : str
-        type of ADCP data. can be 'mouillages', 'VMADCP' or 'LADCP'.
-
-    Returns
-    -------
-    dataset : xarray.dataset
-        observation dataset.
-    """
-    # Define the columns to read and variable names for each type of observation
-    if type == 'mouillages':
-        long_names = ["Corrected Flow 2D S-N", "Corrected Flow 2D W-E",
-                      "Corrected Flow 2D Amplitude", "Corrected Flow 2D Direction"]
-        indexes = [2, 1, 3, 4, 0]  # indexes in array for U,V,mag,dir,depth
-    elif type == 'VMADCP':
-        long_names = ['V', 'U', 'Mag', "Dir"]
-        indexes = [11, 12, 14, 15, 8]  # indexes in array for U,V,mag,dir,depth
-    elif type == 'LADCP':
-        long_names = ['ud', 'vd']
-        indexes = [10, 11, 0, 0, 6]  # indexes in array for U,V,mag,dir,depth
-
-    # Create the u & v data arrays
-    depth = array_series[:, indexes[4]].astype(float)
-
-    da_u = xr.DataArray(data=array_series[:, indexes[0]].astype(float), dims=["depth"],
-                        coords={'depth': ('depth', depth), 'time': date, 'bottom_depth': bot_depth},
-                        attrs={'long_name': long_names[0], 'units': "m/s", '_FillValue': 9999999.
-                               }, )
-    da_v = xr.DataArray(data=array_series[:, indexes[1]].astype(float), dims=["depth"],
-                        coords={'depth': ('depth', depth), 'time': date, 'bottom_depth': bot_depth},
-                        attrs={'long_name': "Corrected Flow 2D W-E", 'units': "m/s",
-                               "_FillValue": 9999999.
-                               }, )
-
-    depth = xr.DataArray(data=depth, dims=["depth"], coords={'depth': ('depth', depth)},
-                         attrs={'long_name': "Instrument depth", 'units': "m", '_FillValue': 9999999
-                                }, )
-    # Create the dataset and add the data arrays
-    dataset = xr.Dataset()
-    dataset["lon"], dataset["lat"], dataset["depth"] = lon, lat, depth
-    dataset["V"], dataset["U"] = da_u, da_v
-
-    # If current magnitude and direction are included in the data, add them to the dataset
-    if type != 'LADCP':
-        da_mag = xr.DataArray(data=array_series[:, indexes[2]].astype(float), dims=["depth"],
-                              coords={'depth': ('depth', depth.data), 'time': date,
-                                      'bottom_depth': bot_depth
-                                      },
-                              attrs={'long_name': "Corrected Flow 2D Amplitude", 'units': "m/s",
-                                     '_FillValue': 9999999.
-                                     }, )
-
-        da_dir = xr.DataArray(data=array_series[:, indexes[3]].astype(float), dims=["depth"],
-                              coords={'depth': ('depth', depth.data), 'time': date,
-                                      'bottom_depth': bot_depth
-                                      },
-                              attrs={'long_name': "Corrected Flow 2D Direction", 'units': "deg T",
-                                     '_FillValue': 9999999.
-                                     }, )
-
-        dataset["Ampl"], dataset["Dir"] = da_mag, da_dir
-
-    return dataset
 
 
 def convert_lons(dataset):

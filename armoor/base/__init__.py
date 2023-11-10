@@ -12,6 +12,7 @@ from .feature_currents_ADCP import *
 from .feature_currents_VMADCP import *
 from .feature_drifters import *
 from .comodo_tide_feature import *
+from .ttide_tide_feature import *
 from .opendrift_trajectory import *
 from .colocation import *
 from .plot_features import *
