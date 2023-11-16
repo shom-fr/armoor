@@ -108,8 +108,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]}\n"
             time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
     elif 'analysis_period' in obs.attrs:
-        title_time = f"Obs analysis period : {obs.analysis_period.replace(':00', '')}\n"
-        time = f"analysis_{obs.analysis_period.replace(':00', '')}"
+        title_time = f"Obs analysis period : {obs.analysis_period.replace(':00', '')} with {obs.attrs['tide_tool']}\n"
+        time = f"analysis_{obs.attrs['tide_tool']}_{obs.analysis_period.replace(':00', '')}"
+
     else:
         if 'time' in obs.coords and np.size(obs.time.data) == 1:
             if 'U' in str(obs.time.data.dtype):  # Check if times are months names
@@ -2220,6 +2221,7 @@ def create_harmonic_table(models, observations, output_path):
     logger.info('Create a table per tidal wave and per current constituent(u & v) with, for each ')
     logger.info(
         'depth, the amplitude and phase of the observation and the model and their differences')
+    tide_tool = observations.attrs['tide_tool']
     for i_wave, wave_name in enumerate(observations.wave):
         wave_name = wave_name.data
         if wave_name in list(models.wave):
@@ -2234,9 +2236,10 @@ def create_harmonic_table(models, observations, output_path):
                     ampl, phase = 'u_a', 'u_g'
                 elif var == 'V':
                     ampl, phase = 'v_a', 'v_g'
-                filename = f'{wave_name}_{var}_harm_table_{obs.lon.data[0]}_{obs.lat.data[0]}.csv'
+                filename = f'{wave_name}_{var}_harm_table_{tide_tool}_{obs.lon.data[0]}_{obs.lat.data[0]}.csv'
                 harmonic_table_file = open(os.path.join(output_path, filename), 'a')
-                harmonic_table_file.write(f'{wave_name} tidal wave - {var} current constituent \n')
+                harmonic_table_file.write(
+                    f'{wave_name} tidal wave - {var} current constituent - {tide_tool} librairy\n')
                 harmonic_table_file.write(
                     f'Model : {mod.name} ; Analysis period : {mod.analysis_period}\n')
                 harmonic_table_file.write(f'Observation : {obs.name} ; '
