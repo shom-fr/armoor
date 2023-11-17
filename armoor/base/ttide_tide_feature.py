@@ -115,13 +115,17 @@ def run_harmonic_analysis_map(ds, output):
             f'Tidal wave(s) {waves} could not be retrieved from the harmonic analysis in {ds.attrs["name"]}. '
             f'Try with a longer time series.')
 
+    # Convert phase to -180 180
+    if ds_res.u_g.max() > 180 or ds_res.v_g.max() > 180:
+        ds_res['u_g'] = xr.where(ds_res['u_g'] > 180, ds_res['u_g'] - 360, ds_res['u_g'])
+        ds_res['v_g'] = xr.where(ds_res['v_g'] > 180, ds_res['v_g'] - 360, ds_res['v_g'])
+
     # Add attributes
     ds_res = ds_res.assign_attrs({'name': ds.attrs['name']})
     time_min = np.datetime_as_string(ds_to_anal.time.min(skipna=True).values, unit='s')
     time_max = np.datetime_as_string(ds_to_anal.time.max(skipna=True).values, unit='s')
     title_time = f'{time_min} to {time_max}'
     ds_res = ds_res.assign_attrs({'analysis_period': title_time, 'tide_tool': tide_tool})
-    ds_res.to_netcdf('res_utide.nc')
     return ds_res
 
 
@@ -261,7 +265,6 @@ def harmonic_analysis(ds_to_anal, list_waves, tide_tool):
             v = ds_to_anal.v.data
             lat = ds_to_anal.lat.data
             coef_u = utide.solve(time, u, lat=lat, method="ols", conf_int="MC")
-            print(coef_u)
             coef_v = utide.solve(time, v, lat=lat)
 
             wave_names = np.array(coef_u['name']).astype(str)
