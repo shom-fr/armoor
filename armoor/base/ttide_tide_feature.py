@@ -168,7 +168,6 @@ def run_harmonic_analysis(ds, output):
             ds_res_i = harmonic_analysis_depth_slice(ds_to_anal, list_waves, tide_tool)
             ds_res_i = ds_res_i.assign_coords(
                 {'lon': ds_to_anal.lon.data, 'lat': ds_to_anal.lat.data})
-            print(ds_res_i)
             ds_res.append(ds_res_i)
             freq = ds_res_i.freq
         ds_res = xr.concat(ds_res, dim='lon')
@@ -190,7 +189,6 @@ def run_harmonic_analysis(ds, output):
             f'Tidal wave(s) {waves} could not be retrieved from the harmonic analysis in '
             f'{ds_res.attrs["name"]}. '
             f'Try with a longer time series.')
-    print('!!!',ds_res)
     return ds_res
 
 
