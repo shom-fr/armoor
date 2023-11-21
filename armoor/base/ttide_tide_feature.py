@@ -126,6 +126,7 @@ def run_harmonic_analysis_map(ds, output):
     time_max = np.datetime_as_string(ds_to_anal.time.max(skipna=True).values, unit='s')
     title_time = f'{time_min} to {time_max}'
     ds_res = ds_res.assign_attrs({'analysis_period': title_time, 'tide_tool': tide_tool})
+
     return ds_res
 
 
@@ -161,12 +162,20 @@ def run_harmonic_analysis(ds, output):
         raise ValueError("Oops, to perform harmonic analysis, you should specify the tidal "
                          "waves to calculate...")
     if 'lon' in ds.dims and len(ds.lon) > 1:
+        ds_res = []
         for i_lon, lon in enumerate(ds.lon.data):
             ds_to_anal = ds.isel(lon=i_lon, lat=i_lon)
-            ds_res = harmonic_analysis_depth_slice(ds_to_anal, list_waves, tide_tool)
+            ds_res_i = harmonic_analysis_depth_slice(ds_to_anal, list_waves, tide_tool)
+            ds_res_i = ds_res_i.assign_coords(
+                {'lon': ds_to_anal.lon.data, 'lat': ds_to_anal.lat.data})
+            print(ds_res_i)
+            ds_res.append(ds_res_i)
+            freq = ds_res_i.freq
+        ds_res = xr.concat(ds_res, dim='lon')
+        ds_res = ds_res.drop('freq')
+        ds_res['freq'] = freq
     else:
         ds_res = harmonic_analysis_depth_slice(ds, list_waves, tide_tool)
-
     # Assign attributes
     ds_res = ds_res.assign_attrs({'name': ds.attrs['name'], 'tide_tool': tide_tool})
 
@@ -181,7 +190,7 @@ def run_harmonic_analysis(ds, output):
             f'Tidal wave(s) {waves} could not be retrieved from the harmonic analysis in '
             f'{ds_res.attrs["name"]}. '
             f'Try with a longer time series.')
-
+    print('!!!',ds_res)
     return ds_res
 
 

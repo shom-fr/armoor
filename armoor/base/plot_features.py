@@ -1547,10 +1547,10 @@ def plot_ellipses_tide_current_generic(observation, models, wave_name, scale, ou
     f, ax = figure_1_map(observation)
     if np.size(observation.lon) > 1:
         for i_lon, _ in enumerate(observation.lon):
-            obs = observation.isel(lon=[i_lon], lat=[i_lon])
+            obs = observation.isel(lon=[i_lon])
             ax = plot_ellipses_tide_current_figure(freq, ax, obs, 'k', scale)
             for i_mod, mod in enumerate(models):
-                mod = mod.isel(lon=[i_lon], lat=[i_lon])
+                mod = mod.isel(lon=[i_lon])
                 ax = plot_ellipses_tide_current_figure(freq, ax, mod, COLORS[i_mod], scale)
     else:
         ax = plot_ellipses_tide_current_figure(freq, ax, observation, 'k', scale)
