@@ -9,11 +9,20 @@ copy_test_files(folder_test)
 
 class TestBulletins:
 
-    def test_ellipse_courant(self):  # OK
+    def test_ellipse_courant_ttide(self):  # OK
         out_path, logger = change_path(folder_test)
-        logger.info('test_ellipse_courant')
+        logger.info('test_ellipse_courant_ttide')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_ttide.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_ellipse_courant_utide(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_ellipse_courant_utide')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_utide.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
