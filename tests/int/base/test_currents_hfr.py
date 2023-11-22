@@ -14,7 +14,6 @@ class TestBulletins:
         logger.info('test_ellipse_courant_et_periode')
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_et_periode.ini"])
         parser.update({'output_path': out_path})
-        create_folder(f'results_comodo')
         parser = update_comodo(parser)
         dict2call(parser)
         assert True
@@ -64,7 +63,6 @@ class TestBulletins:
         logger.info('test_map_harm_courant')
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_harm_courant.ini"])
         parser.update({'output_path': out_path})
-        create_folder(f'results_comodo')
         parser = update_comodo(parser)
         dict2call(parser)
         assert True
