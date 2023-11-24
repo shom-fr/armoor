@@ -155,9 +155,7 @@ For each output here is the list of possible options (with their associated desc
     * ``analysis_start`` : Date to start the harmonic analysis
     * ``analysis_end`` : Date to end the harmonic analysis
     * ``tidal_waves`` : List of the tidal waves to compute. At least 1 tidal wave must be given, a good start is M2 S2 K1 O1 P1 Q1.
-    * ``path_results`` : Path where to save the detided result files
-    * ``path_comodo`` : Path of the comodo-detidor executable
-    * ``env_comodo`` : Commandline needed to load the comodo environment : "module load sirocco". For more information, read ~dallain/softs/LISEZMOI.rst
+    * ``tide_tool`` : Name of the tide library to use to compute harmonic analysis, either utide or ttide. By default, utide will be used.
 
 
 
@@ -224,12 +222,10 @@ In the folder where you will run ``pytest``, please create a file named ``tests.
 
 .. NOTE::
 
-    Note that for ``test_currents_hfr`` and ``test_currents_ADCP`` tests, you will need to specify the parameters : ``path_comodo`` and ``env_comodo``.
-    You can do so by adding them to your ``tests.cfg`` file like this::
+    Note that for ``test_currents_hfr`` and ``test_currents_ADCP`` tests, some outputs require harmonic analyses to retrieve the tidal constituents.
+    The harmonic analyses are run in this tool thanks to the ttide librairy available at https://github.com/moflaher/ttide_py and described in::
+        Pawlowicz, R., B. Beardsley, and S. Lentz, "Classical Tidal "Harmonic Analysis Including Error Estimates in MATLAB using T_TIDE", Computers and Geosciences, 28, 929-937 (2002).
 
-        path_comodo = '/path/to/comodo/'
-        env_comodo = 'your commandline'
-
-    For more information on ``path_comodo`` and ``env_comodo``, refer to section **5. Outputs** above.
+    To do so, you need to specify specify the ``tidal_waves`` to compute. For more information refer to section **5. Outputs** above.
 
 
