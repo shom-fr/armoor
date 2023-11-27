@@ -7,13 +7,15 @@ def main(functionality :str = None):
     setup_logging()
     logger = logging.getLogger(__name__)
 
-    logger.info('Retrieving parameter')
     parser = command_line_interface()
 
     if functionality:
-        parser.update({"functionality" : functionality})
+        parser.update({"functionality": functionality})
+        logger.info(f'Script socle : {functionality}')
+    else:
+        logger.info('Script principal : Bulletin de validation')
 
-    print(f'{ parser = }')
+    logger.info(f'{ parser = }')
     logger.info('Applying configuration to generate plots')
     dict2call(parser)
 
