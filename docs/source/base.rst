@@ -238,7 +238,7 @@ In the folder where you will run ``pytest``, please create a file named ``tests.
 
     Note that for ``test_currents_hfr`` and ``test_currents_ADCP`` tests, some outputs require harmonic analyses to retrieve the tidal constituents.
     The harmonic analyses are run in this tool thanks to the ttide librairy available at https://github.com/moflaher/ttide_py and described in::
-        Pawlowicz, R., B. Beardsley, and S. Lentz, "Classical Tidal "Harmonic Analysis Including Error Estimates in MATLAB using T_TIDE", Computers and Geosciences, 28, 929-937 (2002).
+    Pawlowicz, R., B. Beardsley, and S. Lentz, "Classical Tidal "Harmonic Analysis Including Error Estimates in MATLAB using T_TIDE", Computers and Geosciences, 28, 929-937 (2002).
 
     To do so, you need to specify specify the ``tidal_waves`` to compute. For more information refer to section **5. Outputs** above.
 
