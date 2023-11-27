@@ -1,10 +1,10 @@
 import logging
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
-import armoor.cli.logger_tools as log
+from armoor.cli.logger_tools import setup_logging
 
 def main(functionality :str = None):
-    log.setup_logging()
+    setup_logging()
     logger = logging.getLogger(__name__)
 
     logger.info('Retrieving parameter')
