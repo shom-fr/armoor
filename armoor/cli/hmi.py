@@ -11,7 +11,7 @@ from xoa import cfgm
 from armoor.hmi.script import create_images
 from armoor.cli.cli_tools import directory_type
 
-import armoor.cli.logger_tools as log
+from armoor.cli.logger_tools import setup_logging
 
 
 def read_args(argv):
@@ -60,7 +60,7 @@ def main(argv=None):
     -------
     None
     """
-    log.setup_logging()
+    setup_logging()
     logger = logging.getLogger(__name__)
     start_time = time.time()
 

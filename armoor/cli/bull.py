@@ -12,7 +12,7 @@ from armoor.cli.cli_tools import directory_type
 from armoor.bull.misc import create_reports
 from armoor.bull.report import Report
 
-import armoor.cli.logger_tools as log
+from armoor.cli.logger_tools import setup_logging
 
 def read_args(argv):
     """
@@ -51,7 +51,7 @@ def main(argv=None):
     -------
     None
     """
-    log.setup_logging()
+    setup_logging()
     logger = logging.getLogger(__name__)
 
     start_time = time.time()
@@ -85,7 +85,7 @@ def only_report(argv=None):
     -------
     None
     """
-    log.setup_logging()
+    setup_logging()
     logger = logging.getLogger(__name__)
 
     start_time = time.time()
