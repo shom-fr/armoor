@@ -156,7 +156,7 @@ class MetazoneAccessor:
             selection = self._obj[dim] <= maximum
         else:
             selection = None
-        return self._obj.where(selection, drop=True)
+        return self._obj.where(selection)
 
     def horizontal_selection_coords(self, coordinates: [(float, float)],
                                     method: str = None) -> xr.Dataset:
