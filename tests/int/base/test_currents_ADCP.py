@@ -63,11 +63,29 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_hovmoller_ladcp_res(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_hovmoller_LADCP_res')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP_res.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_hovmoller_datashom_bathyradius(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_hovmoller_datashom_bathyradius')
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom_bathyradius.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_hovmoller_datashom_bathyradius_res(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_hovmoller_datashom_bathyradius_res')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom_bathyradius_res.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
