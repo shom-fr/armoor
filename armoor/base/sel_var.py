@@ -7,6 +7,7 @@ import numpy as np
 import xarray as xr
 import xoa
 import xoa.cf as xcf
+import xoa.filter as xfilter
 import gsw
 from armoor.hmi.script_tools import compute_mixed_layer
 
@@ -42,7 +43,7 @@ class SSTAccessor:
 
         xcf.register_cf_specs(path)
 
-    def selection(self, vars, depth=0):
+    def selection(self, vars, depth=0, filter=None):
         """
         Select the variable.
         Parameters
@@ -70,12 +71,20 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_pdensity()
             elif var == 'current':
                 dataset = self._obj.sel_var.sel_current()
+            elif var == 'current_geo':
+                dataset = self._obj.sel_var.sel_geo_current()
+            elif var == 'current_res':
+                dataset = self._obj.sel_var.sel_current_res(filter)
             elif var == 'mld':
                 dataset = self._obj.sel_var.sel_mixed_layer_depth()
             elif var == 'sound_speed':
                 dataset = self._obj.sel_var.sel_sound_speed()
-            elif var == 'geostrophic_current':
-                dataset = self._obj.sel_var.sel_geo_current()
+            else:
+                if var in self._obj:
+                    dataset = self._obj[var]
+                else:
+                    dataset = None
+
             liste_ds.append(dataset)
 
         # Remove None datasets
@@ -129,6 +138,7 @@ class SSTAccessor:
             current['norm'] = self._obj['HCSP']
         else:
             current['norm'] = (current.u ** 2 + current.v ** 2) ** 0.5
+
         return current
 
     def sel_geo_current(self):
@@ -142,6 +152,29 @@ class SSTAccessor:
         """
         current = self._obj[["ugbt", "vgbt"]]
         return current
+
+    def sel_current_res(self, filter):
+        """
+        Select residual current from the dataset with demerliac, godin or mean filter.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing SST. If several depth temperature,
+            the temperature of the min depth is taken.
+        """
+        if 'u' in self._obj.variables:
+            da_u = self._obj['u']
+            da_v = self._obj['v']
+
+            da_u_res = xfilter.tidal_filter(da_u, filter)
+            da_v_res = xfilter.tidal_filter(da_v, filter)
+
+            current_res = xr.Dataset()
+            current_res['u_res'] = da_u_res
+            current_res['v_res'] = da_v_res
+            current_res['norm_res'] = (current_res.u_res ** 2 + current_res.v_res ** 2) ** 0.5
+            return current_res
 
     def sel_sst(self, depth=0):
         """
@@ -314,7 +347,7 @@ class SSTAccessor:
             if not sal is None and not temp is None:
                 pdens = gsw.sigma0(sal, temp)
                 self._obj['pdens'] = pdens
-                self._obj['pdens'] =self._obj['pdens'].assign_attrs({'units':'kg/m3'})
+                self._obj['pdens'] = self._obj['pdens'].assign_attrs({'units': 'kg/m3'})
                 return self._obj['pdens']
         else:
             return ds_dens

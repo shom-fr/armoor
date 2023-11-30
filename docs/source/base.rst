@@ -156,7 +156,21 @@ For each output here is the list of possible options (with their associated desc
     * ``analysis_end`` : Date to end the harmonic analysis
     * ``tidal_waves`` : List of the tidal waves to compute. At least 1 tidal wave must be given, a good start is M2 S2 K1 O1 P1 Q1.
     * ``tide_tool`` : Name of the tide library to use to compute harmonic analysis, either utide or ttide. By default, utide will be used.
+    * ``low_pass_filter`` : Name of the low-pass filter method to apply to retrieve the residual current. Must be chosen between "demerliac", "godin" and "mean".
 
+You can select the variables to plot among the following ones:
+    * ``SST`` : Sea surface temperature
+    * ``temp`` : Temperature
+    * ``ptemp`` : Potential temperature
+    * ``ssh`` : Sea surface height
+    * ``sal`` : Salinity
+    * ``dens`` : Density
+    * ``pdens`` : Potential density
+    * ``current`` : Current
+    * ``current_res`` : Residual current
+    * ``current_geo`` : Geostrophic current
+    * ``mld`` : Mixed layer depth
+    * ``sound_speed`` : Sound speed
 
 
 Example
