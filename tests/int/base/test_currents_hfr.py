@@ -34,6 +34,14 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_map_current_res_biais(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_map_current_res_biais')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_current_res_biais.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_map_current_croco(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_map_current_croco')
@@ -75,6 +83,14 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_ser_temp_uv_res_ponct(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_ser_temp_uv_res_ponct')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ser_temp_uv_res_ponct.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_ser_temp_uv_ponct_intervalles(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_ser_temp_uv_ponct_intervalles')
@@ -89,6 +105,15 @@ class TestBulletins:
         logger.info('test_ser_temp_uv_stat_intervalles')
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_uv_stat_intervalles.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_ser_temp_uv_res_stat_intervalles(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_ser_temp_uv_res_stat_intervalles')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_uv_res_stat_intervalles.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

@@ -37,15 +37,12 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
-        ['current']).assign_attrs({'name': observation['name']})
+    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
     for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current']).assign_attrs(
-            {'name': mod['name']})
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
-            ['current']).assign_attrs({'name': mod['name']})
+        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
+        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
         observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current']).assign_attrs({'name': observation['name']})
+            i_mod].sel_var.selection(['current'])
 
     for output in outputs:
         if output_path:
@@ -59,6 +56,23 @@ def plot(config_obj):
             scale = output["scale"]
         else:
             scale = 0.1
+
+        # Calculate residual current
+        if 'attribute' in output and 'res' in output['attribute'][0]:
+            if 'low_pass_filter' in output:
+                filter = output['low_pass_filter']
+                observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
+                    ['current_res'], filter=filter)
+                for i_mod, mod in enumerate(models):
+                    mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current_res'],
+                                                                              filter=filter)
+                    mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
+                        ['current_res'], filter=filter)
+                    observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                        i_mod].sel_var.selection(['current_res'], filter=filter)
+            else:
+                logger.warning(
+                    'Caution ! To retrieve residual currents, please specify low_pass_filter with demerliac, godin or mean.')
 
         # PLOTS
         ############################################################################################
@@ -105,33 +119,26 @@ def plot(config_obj):
                               }
         if output["plot"] in plot_ts_metr_point:
             # Select the attributes to plot
-            if 'attribute' in output:
-                attribute = output["attribute"][0].replace('current_', '')
+            if 'attribute' in output and output["attribute"] == ['current_res']:
+                attributes = ['u_res', 'v_res', 'norm_res']
             else:
-                attribute = "norm"
+                attributes = ['u', 'v', 'norm']
 
-            # Remove missing values
-            observation['xarray_meta'] = observation['xarray_meta'][attribute].to_dataset()
-            for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset()
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][attribute].to_dataset()
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][
-                    attribute].to_dataset()
-                models[i_mod] = mod
-                # Remove missing values
-                models, observation = remove_missing_values_ds(models, observation, i_mod,
-                                                               [attribute], [attribute])
-
-            # Select variables to plot
-            observation['xarray_meta'] = observation['xarray_meta'].to_array()
-            for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'].to_array()
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
-                    i_mod].to_array()
-
-            plot_features.plot_ts_metr_point(models, observation, flag_interval, flag_slice,
-                                             output_path=sub_func_output_folder)
+            for attribute in attributes:
+                obs_var, mods_var = copy.deepcopy(observation), copy.deepcopy(models)
+                for i_mod, mod_var in enumerate(mods_var):
+                    # Remove missing values
+                    mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
+                                                                 [attribute], [attribute])
+                    # Select variables to plot
+                    mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
+                    mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
+                    obs_var['xarray_meta_coloc'][i_mod] = obs_var['xarray_meta_coloc'][i_mod][
+                        attribute]
+                obs_var['xarray_meta'] = obs_var['xarray_meta'][attribute]
+                # Plot
+                plot_features.plot_ts_metr_point(mods_var, obs_var, flag_interval, flag_slice,
+                                                 output_path=sub_func_output_folder)
         ############################################################################################
         # STATS TIMES SERIES
         plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
@@ -141,38 +148,28 @@ def plot(config_obj):
                               }
         if output["plot"] in plot_ts_metr_stats:
             # Select the attributes to plot
-            if 'attribute' in output:
-                attribute = output["attribute"][0].replace('current_', '')
+            if 'attribute' in output and output["attribute"] == ['current_res']:
+                attributes = ['u_res', 'v_res', 'norm_res']
             else:
-                attribute = "norm"
+                attributes = ['u', 'v', 'norm']
 
             plg = config_obj["meta_zones"].get("polygon")
 
-            # Remove missing values
-            observation['xarray_meta'] = observation['xarray_meta'][
-                attribute].to_dataset().assign_attrs({'name': observation['name']})
-            for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'][attribute].to_dataset().assign_attrs(
-                    {'name': mod['name']})
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'][
-                    attribute].to_dataset().assign_attrs({'name': mod['name']})
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][i_mod][
-                    attribute].to_dataset().assign_attrs({'name': observation['name']})
-                models[i_mod] = mod
-                # Remove missing values
-                models, observation = remove_missing_values_ds(models, observation, i_mod,
-                                                               [attribute], [attribute])
+            for attribute in attributes:
+                obs_var, mods_var = copy.deepcopy(observation), copy.deepcopy(models)
+                for i_mod, mod_var in enumerate(mods_var):
+                    # Remove missing values
+                    mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
+                                                                 [attribute], [attribute])
+                    # Select variables to plot
+                    mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
+                    mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
+                    obs_var['xarray_meta_coloc'][i_mod] = obs_var['xarray_meta_coloc'][i_mod][
+                        attribute]
+                obs_var['xarray_meta'] = obs_var['xarray_meta'][attribute]
 
-            # Select variables to plot
-            observation['xarray_meta'] = observation['xarray_meta'].to_array()
-            for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'].to_array()
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
-                    i_mod].to_array()
-
-            plot_features.plot_ts_metr_stats(models, observation, flag_interval, flag_slice,
-                                             output_path=sub_func_output_folder, plg=plg)
+                plot_features.plot_ts_metr_stats(mods_var, obs_var, flag_interval, flag_slice,
+                                                 output_path=sub_func_output_folder, plg=plg)
 
         ############################################################################################
         # CURRENT MAP
@@ -187,17 +184,22 @@ def plot(config_obj):
             dvmax = output.get('dvmax')
             cmap = output.get("colormap")
             cmap = cmap if cmap is None else f'cmo.{cmap}'
+            metric = plot_map_metr[output["plot"]]
+
+            # Select the attributes to plot
+            if 'attribute' in output and output["attribute"] == ['current_res']:
+                attribute = 'current_res'
+                attributes = ['u_res', 'v_res', 'norm_res']
+            else:
+                attribute = 'current'
+                attributes = ['u', 'v', 'norm']
 
             for i_mod, mod in enumerate(models):
                 # Remove missing values
                 models, observation = remove_missing_values_ds(models, observation, i_mod,
-                                                               ['u', 'v', 'norm'],
-                                                               ['u', 'v', 'norm'])
+                                                               attributes, attributes)
 
-                plot_features.plot_map_metr_current(flag_interval, flag_slice, mod["xarray_meta"],
-                                                    mod["xarray_meta_coloc"],
-                                                    observation["xarray_meta"],
-                                                    observation["xarray_meta_coloc"][i_mod],
-                                                    plot_map_metr[output["plot"]], cmap, vmin, vmax,
+                plot_features.plot_map_metr_current(flag_interval, flag_slice, models, observation,
+                                                    i_mod, metric, attribute, cmap, vmin, vmax,
                                                     dvmin=dvmin, dvmax=dvmax,
-                                                    output_path=sub_func_output_folder, )
+                                                    output_path=sub_func_output_folder)

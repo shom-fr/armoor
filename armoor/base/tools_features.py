@@ -226,12 +226,12 @@ def sel_default_vars(config_obj):
                 additional_vars.remove(var)
 
     elif feature == "currents_hfr":  # F6
-        default_vars_mod = ['current']
-        default_vars_obs = ['current']
+        default_vars_mod = ['current', 'current_res']
+        default_vars_obs = ['current', 'current_res']
 
     elif feature == "currents_ADCP":  # F7
-        default_vars_mod = ['current']
-        default_vars_obs = ['current']
+        default_vars_mod = ['current', 'current_res']
+        default_vars_obs = ['current', 'current_res']
 
     elif feature == "currents_VMADCP":  # F8
         default_vars_mod = ['current']
