@@ -92,6 +92,7 @@ class MetazoneAccessor:
         logger.info("Applying filter - horizontal_selection_polygon")
         # Create the polygon where to subset
         polygon = path.Path(coords)
+
         # Depending on the coordinate system, flag the points outside the polygon
         if 'lon' in self._obj.dims:  # Check if rect coordinates
             ds_coords = [(lon, lat) for lon in self._obj.lon.data for lat in self._obj.lat.data]
@@ -294,7 +295,6 @@ class MetazoneAccessor:
         radius = self._obj.meta.km_to_deg(radius_km)
         liste_ds = []
         idx_centre = 0
-
         lons, lats = cloud
         for i_lon, _ in enumerate(lons):
             lon, lat = lons[i_lon], lats[i_lon]
@@ -506,7 +506,7 @@ class MetazoneAccessor:
                 dataset['depth'] = depth
                 return dataset
 
-            if list(dataset.dims) == ['time', 'z']:  # CMEMS profilers
+            if list(dataset.dims.keys()) == ['time', 'z']:  # CMEMS profilers
                 return dataset.meta.vertical_selection_ponct_cmems(depth)
 
             if 'z' in dataset.dims or 'level' in dataset.dims or (
