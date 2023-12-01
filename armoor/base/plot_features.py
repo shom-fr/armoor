@@ -2747,16 +2747,17 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
 
                 # "en traits fin les profils modèles des disques définis
                 # et temporellement les plus proches"
-                points = [obs.lon.data], [obs.lat.data]
-                time = obs.time.values[0]
-                mod_buffer = mod["xarray"].sel(time=time, method='nearest')
-
-                mod_buffer = mod_buffer.meta.horizontal_selection_cloud_dots(points, radius)
-                for i_idx_point, _ in enumerate(mod_buffer.idx_point):
-                    mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
-                    sals_mod.append(mod_buffer_idx.sal.values)
-                    ptemps_mod.append(mod_buffer_idx.ptemp.values)
-                    depths_mod.append(mod_buffer_idx.depth.values)
+                if 'instr' in obs.dims:
+                    for i_instr, _ in enumerate(obs.instr):
+                        obs_instr = obs.isel(instr=i_instr)
+                        sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs_instr, mod,
+                                                                                 radius, sals_mod,
+                                                                                 ptemps_mod,
+                                                                                 depths_mod)
+                else:
+                    sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs, mod, radius,
+                                                                             sals_mod, ptemps_mod,
+                                                                             depths_mod)
         else:
             obs = observation.isel(interval=[i_inter])
             im_obs = ax.scatter(obs.sal.values, obs.ptemp.values, 30, obs.depth.values, vmin=vmin,
@@ -2765,16 +2766,15 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
 
             # "en traits fin les profils modèles des disques définis
             # et temporellement les plus proches"
-            points = [obs.lon.data], [obs.lat.data]
-            time = obs.time.values[0]
-            mod_buffer = mod["xarray"].sel(time=time, method='nearest')
-
-            mod_buffer = mod_buffer.meta.horizontal_selection_cloud_dots(points, radius)
-            for i_idx_point, _ in enumerate(mod_buffer.idx_point):
-                mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
-                sals_mod.append(mod_buffer_idx.sal.values)
-                ptemps_mod.append(mod_buffer_idx.ptemp.values)
-                depths_mod.append(mod_buffer_idx.depth.values)
+            if 'instr' in obs.dims:
+                for i_instr, _ in enumerate(obs.instr):
+                    obs_instr = obs.isel(instr=i_instr)
+                    sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs_instr, mod, radius,
+                                                                             sals_mod, ptemps_mod,
+                                                                             depths_mod)
+            else:
+                sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs, mod, radius, sals_mod,
+                                                                         ptemps_mod, depths_mod)
     im_mod = ax.scatter(sals_mod, ptemps_mod, 25, depths_mod, vmin=vmin, vmax=vmax, marker="o",
                         zorder=1, label=f'{mod["name"]}', alpha=0.4, cmap='summer')
 
@@ -2802,6 +2802,19 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
     # Add the plot features
     plt.legend(handles=[im_obs, im_obs_mean, im_mod, im_mod_mean])
     diag_ts_plot_features(f, ax, im_mod_mean, im_obs_mean, mod, observation, output_path)
+
+
+def get_sals_temps_depths(obs, mod, radius, sals_mod, ptemps_mod, depths_mod):
+    points = [obs.lon.data], [obs.lat.data]
+    time = obs.time.values[0]
+    mod_buffer = mod["xarray"].sel(time=time, method='nearest')
+    mod_buffer = mod_buffer.meta.horizontal_selection_cloud_dots(points, radius)
+    for i_idx_point, _ in enumerate(mod_buffer.idx_point):
+        mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
+        sals_mod.append(mod_buffer_idx.sal.values)
+        ptemps_mod.append(mod_buffer_idx.ptemp.values)
+        depths_mod.append(mod_buffer_idx.depth.values)
+    return sals_mod, ptemps_mod, depths_mod
 
 
 def plot_diag_ts_unique(models, observation, output_path=None):
