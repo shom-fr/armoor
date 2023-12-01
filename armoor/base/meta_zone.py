@@ -92,7 +92,6 @@ class MetazoneAccessor:
         logger.info("Applying filter - horizontal_selection_polygon")
         # Create the polygon where to subset
         polygon = path.Path(coords)
-
         # Depending on the coordinate system, flag the points outside the polygon
         if 'lon' in self._obj.dims:  # Check if rect coordinates
             ds_coords = [(lon, lat) for lon in self._obj.lon.data for lat in self._obj.lat.data]
@@ -190,7 +189,7 @@ class MetazoneAccessor:
 
         if 'lon' in self._obj.dims:  # Regular grid
             if method in ["linear"] or method is None:
-                return self._obj.interp(lon=lon_target, lat=lat_target, method='linear')
+                return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
             return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
 
         if 'x' in self._obj.dims:  # Curvilinear grid
