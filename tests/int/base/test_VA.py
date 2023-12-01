@@ -279,3 +279,15 @@ class TestBulletins:
         create_folder(f'tmp')
         dict2call(parser)
         assert True
+
+    def test_121_diag_disp(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_121_diag_disp.ini")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/121_diag_disp.ini"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+

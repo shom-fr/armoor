@@ -64,6 +64,7 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_ssh()
             elif var == 'sal':
                 dataset = self._obj.sel_var.sel_sal()
+                dataset = dataset.rename('sal') if dataset is not None else dataset
             elif var == 'dens':
                 dataset = self._obj.sel_var.sel_density()
             elif var == 'pdens':
@@ -192,6 +193,8 @@ class SSTAccessor:
         try:  # dataset
             if "sal" in self._obj.variables:
                 return self._obj.sal
+            elif "psal" in self._obj.variables:
+                return self._obj.psal
         except:
             return self._obj.xoa.sal
 
