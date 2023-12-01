@@ -43,10 +43,6 @@ def plot(config_obj):
         models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
                                                        vars_obs)
 
-    # Get names
-    models_name = [m['name'] for m in models]
-    obs_name = observation['name']
-
     # Plot the outputs
     for output in outputs:
         logger.info('Generating plot :: %s ', output["plot"])
@@ -101,8 +97,8 @@ def plot(config_obj):
             # MAP METRIC
             plot_map_metr = {"plot_map_metr_ecart_interval": 'difference',
                              "plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
-                             "plot_map_metr_RMSEc": 'RMSEc',
-                             "plot_map_metr_RMSEcentree": 'RMSEcentree'
+                             "plot_map_metr_RMSE": 'RMSE',
+                             "plot_map_metr_RMSEc": 'RMSEc'
                              }
             if output["plot"] in plot_map_metr:
                 for i, mod in enumerate(models_var):
