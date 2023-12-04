@@ -35,6 +35,8 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
     """
     # Read the colocation flags
     time_flag, hor_flag, ver_flag = flags
+    if ver_flag and coloc_method_z is None:
+        coloc_method_z = 'nearest'
 
     # Colocate
     if tgt_grid == 'auto':
@@ -240,6 +242,10 @@ def vertical_colocation(ds_to_coloc, tgt, coloc_method):
             elif 'depth' in depth_tgt.dims and 'depth' not in depth_ds.dims:
                 ds_coloc = ds_to_coloc.meta.vertical_seletion_croco_hycom(depth_tgt)
 
+            # Case
+            elif 'depth' not in depth_tgt.dims and 'depth' not in depth_ds.dims:
+                print('ben oui c ca')
+
             return ds_coloc
     return ds_to_coloc
 
@@ -370,6 +376,7 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
                                                kwargs={"fill_value": "extrapolate"}).squeeze()
             elif 'x' in mod_interp.dims:  # For curv. grids
                 mod_interp = mod_interp.meta.sel_closest(lon, lat)
+
         # Colocate depth
         if method_z:
             if 'depth' in obs.dims:
