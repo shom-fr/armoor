@@ -576,7 +576,11 @@ def open_decode_croco(path_file):
             croco = croco.drop_vars(var)
 
     # Regrid if necessary
-    croco = xoa.grid.to_rect(croco)
+    test_regrid = xoa.grid.to_rect(croco)
+    if 'lon' in test_regrid.dims and 'lat' in test_regrid.dims:
+        croco = test_regrid
+    elif 'x' in test_regrid.dims and 'y' in test_regrid.dims:
+        croco = test_regrid
 
     # Convert lons
     croco = convert_lons(croco)
