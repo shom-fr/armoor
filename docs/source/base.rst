@@ -137,8 +137,8 @@ For each output here is the list of possible options (with their associated desc
         #. ``diag_disp_g``: Global scatter plot dispersion diagram
         #. ``plot_map_metr_ecart``: 2D map with deviation metric
         #. ``plot_map_metr_biais``: 2D map with bias metric
-        #. ``plot_map_metr_RMSEc``: Plot RMSE map
-        #. ``plot_map_metr_RMSEcentree``: Plot centered RMSE map
+        #. ``plot_map_metr_RMSE``: Plot RMSE map
+        #. ``plot_map_metr_RMSEc``: Plot centered RMSE map
         #. ``plot_profile_u``: Create unique vertical profiles figures of a variable
         #. ``plot_profile_multi``: Create multi vertical profiles figures of a variable
 
