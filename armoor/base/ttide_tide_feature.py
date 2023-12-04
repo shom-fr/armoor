@@ -71,7 +71,7 @@ def run_harmonic_analysis_map(ds, output):
                     wave_names_v = np.char.strip(wave_names_v)
 
                     for i_wave, wave in enumerate(list_waves):
-                        if wave in wave_names:
+                        if wave in wave_names_u:
                             idx_wave_u = int(np.where(wave_names_u == wave)[0])
                             idx_wave_v = int(np.where(wave_names_v == wave)[0])
                             res_ua[i_lon, i_lat, i_wave] = (xout_u['tidecon'][idx_wave_u][0])
@@ -94,7 +94,7 @@ def run_harmonic_analysis_map(ds, output):
                     wave_names_v = np.char.strip(wave_names_v)
 
                     for i_wave, wave in enumerate(list_waves):
-                        if wave in wave_names:
+                        if wave in wave_names_u:
                             idx_wave_u = int(np.where(wave_names_u == wave)[0])
                             idx_wave_v = int(np.where(wave_names_v == wave)[0])
                             res_ua[i_lon, i_lat, i_wave] = (coef_u['A'][idx_wave_u])
