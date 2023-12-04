@@ -137,8 +137,8 @@ For each output here is the list of possible options (with their associated desc
         #. ``diag_disp_g``: Global scatter plot dispersion diagram
         #. ``plot_map_metr_ecart``: 2D map with deviation metric
         #. ``plot_map_metr_biais``: 2D map with bias metric
-        #. ``plot_map_metr_RMSEc``: Plot RMSE map
-        #. ``plot_map_metr_RMSEcentree``: Plot centered RMSE map
+        #. ``plot_map_metr_RMSE``: Plot RMSE map
+        #. ``plot_map_metr_RMSEc``: Plot centered RMSE map
         #. ``plot_profile_u``: Create unique vertical profiles figures of a variable
         #. ``plot_profile_multi``: Create multi vertical profiles figures of a variable
 
@@ -155,7 +155,7 @@ For each output here is the list of possible options (with their associated desc
     * ``analysis_start`` : Date to start the harmonic analysis
     * ``analysis_end`` : Date to end the harmonic analysis
     * ``tidal_waves`` : List of the tidal waves to compute. At least 1 tidal wave must be given, a good start is M2 S2 K1 O1 P1 Q1.
-    * ``tide_tool`` : Name of the tide library to use to compute harmonic analysis, either utide or ttide. By default, utide will be used.
+    * ``tide_tool`` : Name of the tide library to use to compute harmonic analysis, either utide or ttide. By default, utide will be used. Be aware that if the time step of one of the input file is not constant, the harmonic analysis results may be inaccurate.
 
 
 
