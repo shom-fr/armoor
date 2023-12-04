@@ -92,7 +92,6 @@ class MetazoneAccessor:
         logger.info("Applying filter - horizontal_selection_polygon")
         # Create the polygon where to subset
         polygon = path.Path(coords)
-
         # Depending on the coordinate system, flag the points outside the polygon
         if 'lon' in self._obj.dims:  # Check if rect coordinates
             ds_coords = [(lon, lat) for lon in self._obj.lon.data for lat in self._obj.lat.data]
@@ -118,9 +117,15 @@ class MetazoneAccessor:
             if True not in mask_poly:
                 raise ValueError('The polygon you have defined is not included in the data grid. '
                                  'The horizontal selection does not work.')
+        # Profilers/drifter
+        elif 'lon' in self._obj.coords and 'time' in self._obj.lon.dims:
+            ds_coords = [(self._obj.lon.data[i], self._obj.lat.data[i]) for i in range(len(self._obj.time))]
+            flags = polygon.contains_points(ds_coords)
+            mask_poly = xr.DataArray(data=flags, dims=['time'])
 
         # Remove points outside the polygon
         self._obj = self._obj.where(mask_poly, drop=True)
+
         return self._obj
 
     def data_selection(self, dim: str, minimum: float = None, maximum: float = None,
