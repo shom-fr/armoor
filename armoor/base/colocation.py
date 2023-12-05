@@ -242,10 +242,6 @@ def vertical_colocation(ds_to_coloc, tgt, coloc_method):
             elif 'depth' in depth_tgt.dims and 'depth' not in depth_ds.dims:
                 ds_coloc = ds_to_coloc.meta.vertical_seletion_croco_hycom(depth_tgt)
 
-            # Case
-            elif 'depth' not in depth_tgt.dims and 'depth' not in depth_ds.dims:
-                print('ben oui c ca')
-
             return ds_coloc
     return ds_to_coloc
 
