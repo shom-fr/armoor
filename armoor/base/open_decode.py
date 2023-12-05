@@ -412,7 +412,8 @@ def open_decode_mouillages(path_file):
         unwanted_prefixes = ['Cruise', 'Station', 'Type', 'yyyy', 'Lon', 'Lat', 'Bot', 'Unnamed']
         columns_to_drop = measur.columns[measur.columns.str.startswith(tuple(unwanted_prefixes))]
         measur_ds = measur.drop(columns=columns_to_drop).astype(float).to_xarray()
-        measur_ds = measur_ds.assign_coords(lon=lon, lat=lat, time=date, bottom_depth=bottom_depth)
+        measur_ds = measur_ds.expand_dims(lon=[lon], lat=[lat])
+        measur_ds = measur_ds.assign_coords(time=date, bottom_depth=bottom_depth)
         list_ds.append(measur_ds.reset_coords())
 
     # Merge datasets
