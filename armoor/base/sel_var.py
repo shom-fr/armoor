@@ -91,6 +91,7 @@ class SSTAccessor:
         liste_ds = [dataset for dataset in liste_ds if dataset is not None]
 
         # Merge
+        print(liste_ds)
         if len(liste_ds) == 1:
             ds_all = liste_ds[0]
         elif len(liste_ds) > 1:
@@ -163,12 +164,31 @@ class SSTAccessor:
             Data array containing SST. If several depth temperature,
             the temperature of the min depth is taken.
         """
-        if 'u' in self._obj.variables:
-            da_u = self._obj['u']
-            da_v = self._obj['v']
+        if 'u_res' in self._obj:
+            current_res = self._obj[['u_res', 'v_res', 'norm_res']]
+            return current_res
 
-            da_u_res = xfilter.tidal_filter(da_u, filter)
-            da_v_res = xfilter.tidal_filter(da_v, filter)
+        if 'u' in self._obj.variables:
+            try:
+                # Filter
+                da_u = self._obj['u']
+                da_v = self._obj['v']
+                da_u_res = xfilter.tidal_filter(da_u, filter)
+                da_v_res = xfilter.tidal_filter(da_v, filter)
+            except:
+                logger.info(
+                    f'The time step of the data is not constant, it will be resampled on hourly dates.')
+                # Resample the data on hourly dates
+                min_date = self._obj['time'].min().data.astype('datetime64[h]')
+                max_date = self._obj['time'].max().data.astype('datetime64[h]')
+                time_hor = np.arange(min_date, max_date, dtype='datetime64[h]')
+                self._obj = self._obj.interp(time=time_hor, method='linear',
+                                             kwargs={"fill_value": "extrapolate"})
+                # Filter
+                da_u = self._obj['u']
+                da_v = self._obj['v']
+                da_u_res = xfilter.tidal_filter(da_u, filter)
+                da_v_res = xfilter.tidal_filter(da_v, filter)
 
             current_res = xr.Dataset()
             current_res['u_res'] = da_u_res
