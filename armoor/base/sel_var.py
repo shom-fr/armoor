@@ -91,6 +91,7 @@ class SSTAccessor:
         liste_ds = [dataset for dataset in liste_ds if dataset is not None]
 
         # Merge
+        print(liste_ds)
         if len(liste_ds) == 1:
             ds_all = liste_ds[0]
         elif len(liste_ds) > 1:
