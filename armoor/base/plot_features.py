@@ -1158,7 +1158,6 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
                                                                                        comparison,
                                                                                        metric,
                                                                                        dvmin, dvmax)
-
     # Squeeze
     obs_meta, obs_coloc = clean_dim_order(obs_meta), clean_dim_order(obs_coloc)
     mod_meta, mod_coloc = clean_dim_order(mod_meta), clean_dim_order(mod_coloc)
@@ -3158,11 +3157,7 @@ def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None,
         vmin = ds.min().values
         vmax = ds.max().values
 
-    if dvmin and dvmax:
-        comparison_vmin = dvmin
-        comparison_vmax = dvmax
-        comparison_cmap = None
-    else:
+    if dvmin is None and dvmax is None:
         if metric in ["difference", "bias"]:
             comparison_vmin = -abs(np.nanmax(comparison))
             comparison_vmax = abs(np.nanmax(comparison))
@@ -3175,6 +3170,15 @@ def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None,
             comparison_vmin = None
             comparison_vmax = None
             comparison_cmap = None
+    else:
+        comparison_vmin = None
+        comparison_vmax = None
+        comparison_cmap = cmocean.cm.amp
+        if dvmax is not None:
+            comparison_vmax = dvmax
+        if dvmin is not None:
+            comparison_vmin = dvmin
+
     return vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap
 
 
