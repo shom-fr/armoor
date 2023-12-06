@@ -232,6 +232,8 @@ def set_coloc_flags(config_obj):
 
     if 'depth' in config_obj['meta_zones']:
         vertical_colocation_flag = False
+    if 'cloud' in config_obj['meta_zones']:
+        horizontal_colocation_flag = False
 
     flags = temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag
 
