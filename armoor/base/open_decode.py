@@ -547,7 +547,7 @@ def open_decode_croco(path_file):
     croco = xr.open_dataset(path_file).decode_sigma()
 
     # Remove variables that are never used in the features. May need to be completed.
-    list_to_keep = ['temp', 'salt', 'u', 'v', 'h']
+    list_to_keep = ['temp', 'salt', 'u', 'v', 'h', 'angle']
     for var in list(croco.keys()):
         if var not in list_to_keep:
             croco = croco.drop_vars(var)
@@ -564,7 +564,16 @@ def open_decode_croco(path_file):
         da_v = da_v.sel(eta=croco.eta_rho, method='nearest')
         croco['v'] = da_v
 
-    # Remove duplicate coords
+        # Rotate currents
+        if 'angle' in croco:
+            angle = croco['angle']
+            da_u = croco['u'] * np.cos(angle) - croco['v'] * np.sin(angle)
+            da_v = croco['u'] * np.sin(angle) + croco['v'] * np.cos(angle)
+            croco = croco.drop(['u', 'v', 'angle'])
+            croco['uz'] = da_u
+            croco['v'] = da_v
+
+            # Remove duplicate coords
     if 'lon' in croco and 'lon_rho' in croco:
         croco = croco.drop_vars(['lon', 'lat'])
 
