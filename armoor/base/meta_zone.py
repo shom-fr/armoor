@@ -506,7 +506,7 @@ class MetazoneAccessor:
                 dataset['depth'] = depth
                 return dataset
 
-            if list(dataset.dims.keys()) == ['time', 'z']:  # CMEMS profilers
+            if list(dataset.dims) == ['time', 'z']:  # CMEMS profilers
                 return dataset.meta.vertical_selection_ponct_cmems(depth)
 
             if 'z' in dataset.dims or 'level' in dataset.dims or (

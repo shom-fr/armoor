@@ -250,12 +250,16 @@ def sel_default_vars(config_obj):
         for i_mod, mod in enumerate(config_obj['models']):
             mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby(
                 "time.month").mean("time").rename({'month': 'time'})
+
+            # Get month names
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod).groupby(
-                "time.month").mean("time").rename({'month': 'time'}).assign_coords(
-                {'time': calendar.month_name[1:13]})
+                "time.month").mean("time").rename({'month': 'time'})
+            months = [calendar.month_name[i] for i in mod["xarray_meta_coloc"].time.data]
+            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].assign_coords({'time': months})
+
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
                 config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(
-                    vars_obs).assign_coords({'time': calendar.month_name[1:13]})
+                    vars_obs).assign_coords({'time': months})
     else:
         config_obj['observation']["xarray_meta"] = config_obj['observation'][
             "xarray_meta"].sel_var.selection(vars_obs)
@@ -264,6 +268,7 @@ def sel_default_vars(config_obj):
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod)
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
                 config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars_obs)
+
     return config_obj
 
 
