@@ -119,7 +119,8 @@ class MetazoneAccessor:
                                  'The horizontal selection does not work.')
         # Profilers/drifter
         elif 'lon' in self._obj.coords and 'time' in self._obj.lon.dims:
-            ds_coords = [(self._obj.lon.data[i], self._obj.lat.data[i]) for i in range(len(self._obj.time))]
+            ds_coords = [(self._obj.lon.data[i], self._obj.lat.data[i]) for i in
+                         range(len(self._obj.time))]
             flags = polygon.contains_points(ds_coords)
             mask_poly = xr.DataArray(data=flags, dims=['time'])
 
@@ -295,6 +296,7 @@ class MetazoneAccessor:
         radius = self._obj.meta.km_to_deg(radius_km)
         liste_ds = []
         idx_centre = 0
+
         lons, lats = cloud
         for i_lon, _ in enumerate(lons):
             lon, lat = lons[i_lon], lats[i_lon]
@@ -734,21 +736,28 @@ class MetazoneAccessor:
             same Dataset averaged over the vertical slice.
         """
         logger.info("Applying filter - vertical_selection_slice")
-        ds_group = self._obj.groupby_bins(var_slice, slices)
+
+        # Initialise dataset
         liste_ds = []
 
-        for label, dataset in ds_group:
-            label = str(label)[1:-1].replace(", ", " to ") + ' '
-            dataset['slice_label'] = label
-            liste_ds.append(dataset)
+        # Separate slices
+        mins = [min for min, max in slices]
+        maxs = [max for min, max in slices]
 
-        for i_ds, dataset in enumerate(liste_ds):
-            dataset = dataset.assign_coords(
+        for i_slice, _ in enumerate(mins):
+            min_slice, max_slice = mins[i_slice], maxs[i_slice]
+            ds_slice = self._obj.meta.vertical_selection_range([min_slice, max_slice], var_slice)
+            label = f'{min_slice} to {max_slice}'
+            ds_slice['slice_label'] = label
+            liste_ds.append(ds_slice)
+
+        for i_ds, ds_slice in enumerate(liste_ds):
+            ds_slice = ds_slice.assign_coords(
                 slice=i_ds)  # ajoute une dimension de date moyenne sur l'intervalle
-            dataset[var_slice + "_value"] = dataset[var_slice]
-            dataset = dataset.assign_coords(
-                depth=np.arange(len(dataset[var_slice])))  # change les profondeurs en indices
-            liste_ds[i_ds] = dataset
+            ds_slice[var_slice + "_value"] = ds_slice[var_slice]
+            ds_slice = ds_slice.assign_coords(
+                depth=np.arange(len(ds_slice[var_slice])))  # change les profondeurs en indices
+            liste_ds[i_ds] = ds_slice
 
         dataset = xr.concat(liste_ds, 'slice')
         dataset = dataset.rename({var_slice: 'idx_' + var_slice})
@@ -756,6 +765,7 @@ class MetazoneAccessor:
         dataset['slice'] = dataset['slice_label']
         if "depth" in dataset:
             dataset = dataset.assign_coords({"depth": dataset.depth})
+
         return dataset
 
     def time_selection_start(self, start=None) -> xr.Dataset:
