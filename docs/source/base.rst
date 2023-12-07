@@ -30,7 +30,7 @@ In the header there are 5 attributes:
     * ``functionality`` : There are 9 functionalities : *sst*, *prof_hydro_vessel*, *prof_hydro_mooring*, *section_hydro*, *clim_hydro*, *currents_hfr*, *currents_ADCP*, *currents_VMADCP* and *drifters*. For more information refer to the :doc:`functionalities` chapter.
     * ``colocate`` : Put the model and observation dataset on the same grid defined according to the selected target: model's, observation's or auto (less dense grid, default).
     * ``output_path`` : Directory path to store the outputs. If no path is provided the plots will pop up.
-    * ``horizontal_step`` : The products can be projected on a grid with the horizontal resolution, in meters, you set.
+    * ``horizontal_step`` : The products can be projected on a grid with the horizontal resolution, in kilometers, you set.
     * ``vertical_step`` : The products can be projected on a grid with the vertical resolution, in meters, you set. If you intend to colocate the products on an HYCOM product grid, this option is required.
 
 
