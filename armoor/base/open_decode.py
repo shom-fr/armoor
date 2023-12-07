@@ -1119,4 +1119,12 @@ def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', meth
     else:
         obs_grid = obs_grid.interp(depth=depths, method=method_z)
 
+    # Warning if steps too large
+    if len(obs_grid.depth) == 1:
+        logger.warning(
+            'Caution! The vertical_step requested is too large, the targetted grid has only one depth value. The code may fail.')
+
+    if len(obs_grid.time) == 1:
+        logger.warning(
+            'Caution! The horizontal_step requested is too large, the targetted grid has only one time value. The code may fail.')
     return obs_grid
