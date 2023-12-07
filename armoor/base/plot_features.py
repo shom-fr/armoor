@@ -589,8 +589,6 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
         Path where to save the figures.
 
     """
-    # Set the titles
-
     # Plot the diagrams
     if diag_type == "diag_disp_g":
         title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
@@ -609,6 +607,14 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                                                            mod.attrs['name'], obs.attrs['name'])
                         diag_disp_figure(mod_inter, obs_inter, title)
                         ft.manage_output(figname, output_path)
+                elif 'depth' in mod.dims and len(mod.depth)>1:
+                    for index_depth, _ in enumerate(mod['depth']):
+                        mod_depth = mod.isel(depth=[index_depth])
+                        obs_depth = obs.isel(depth=[index_depth])
+                        title, figname = get_title_figname('Dispersion diagram', obs_depth,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_depth, obs_depth, title)
+                        ft.manage_output(figname, output_path)
                 else:
                     mod_inter = mod.isel(interval=[index_interval])
                     obs_inter = obs.isel(interval=[index_interval])
@@ -624,6 +630,14 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                     title, figname = get_title_figname('Dispersion diagram', obs_inter,
                                                        mod.attrs['name'], obs.attrs['name'])
                     diag_disp_figure(mod_inter, obs_inter, title)
+                    ft.manage_output(figname, output_path)
+            elif 'depth' in mod.dims and len(mod.depth) > 1:
+                for index_depth, _ in enumerate(mod['depth']):
+                    mod_depth = mod.isel(depth=[index_depth])
+                    obs_depth = obs.isel(depth=[index_depth])
+                    title, figname = get_title_figname('Dispersion diagram', obs_depth,
+                                                       mod.attrs['name'], obs.attrs['name'])
+                    diag_disp_figure(mod_depth, obs_depth, title)
                     ft.manage_output(figname, output_path)
             else:
                 title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
