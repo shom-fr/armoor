@@ -94,7 +94,7 @@ Relative to vertical restriction:
     * ``dens_min`` : Minimum authorized density value.
     * ``dens_max`` : Maximum authorized density value.
 
-    * ``slice`` : To group into vertical slices between the specified depth or density levels specified.
+    * ``slice`` : To group into vertical slices between the specified values of depth or density levels (e.g. --slice 0,150 500,1000 will define two vertical slices).
 
 Other restrictions :
 
