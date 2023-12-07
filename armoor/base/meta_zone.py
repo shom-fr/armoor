@@ -513,7 +513,7 @@ class MetazoneAccessor:
 
             if 'z' in dataset.dims or 'level' in dataset.dims or (
                     depth in dataset.dims and len(dataset.depth.dims) == 2):  # CROCO or HYCOM
-                return dataset.meta.vertical_seletion_croco_hycom(depth)
+                return dataset.meta.vertical_selection_croco_hycom(depth)
 
             return dataset
         if var_vert == 'dens':
@@ -546,7 +546,7 @@ class MetazoneAccessor:
         tgt_ds = tgt_ds.drop('depth').assign_coords(depth=depth)
         return tgt_ds
 
-    def vertical_seletion_croco_hycom(self, depth):
+    def vertical_selection_croco_hycom(self, depth):
         """
         Vertical selection of one level in a Croco or Hycom product.
         Parameters
@@ -569,7 +569,7 @@ class MetazoneAccessor:
 
         # Create target depth(s) dataset
         if np.size(depth) == 1:
-            depth = [depth]
+            depth = [float(depth)]
         else:
             depth = np.array(depth)
         tgt_depth = xr.DataArray(depth, dims="depth", name="depth")
@@ -718,7 +718,7 @@ class MetazoneAccessor:
             return xr.concat(list_ds_z, dim='depth')
 
         if 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
-            return self._obj.meta.vertical_seletion_croco_hycom(depths)
+            return self._obj.meta.vertical_selection_croco_hycom(depths)
 
     def vertical_selection_slice(self, slices: list = None, var_slice: str = None) -> xr.Dataset:
         """Return a new Dataset whose data is sorted per depth slice.

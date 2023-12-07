@@ -240,7 +240,7 @@ def vertical_colocation(ds_to_coloc, tgt, coloc_method):
 
             # Case ds has depth(lon/lat/time) dimension and tgt has depth(depth) dimension
             elif 'depth' in depth_tgt.dims and 'depth' not in depth_ds.dims:
-                ds_coloc = ds_to_coloc.meta.vertical_seletion_croco_hycom(depth_tgt)
+                ds_coloc = ds_to_coloc.meta.vertical_selection_croco_hycom(depth_tgt)
 
             return ds_coloc
     return ds_to_coloc
@@ -354,6 +354,13 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
     mod_coloc : xarray.Dataset
         Colocated model.
     """
+
+    # Simplify vertical colocation
+    if 'depth' in obs.dims and len(obs.depth.data) == 1:
+        mod = mod.meta.vertical_selection_depth(obs.depth.data)
+        mod = mod.expand_dims('depth')
+        method_z = None
+
     list_ds = []
     for i, time in enumerate(obs.time.values):
         # Colocation time
@@ -369,7 +376,8 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
             lat = obs.lat.isel(time=[i]).values
             if 'lon' in mod_interp.dims:  # For rect. grids
                 mod_interp = mod_interp.interp(lon=lon, lat=lat, method=method,
-                                               kwargs={"fill_value": "extrapolate"}).squeeze()
+                                               kwargs={"fill_value": "extrapolate"}).squeeze(
+                    ['lon', 'lat'])
             elif 'x' in mod_interp.dims:  # For curv. grids
                 mod_interp = mod_interp.meta.sel_closest(lon, lat)
 
@@ -390,13 +398,13 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
                                                    kwargs={"fill_value": "extrapolate"
                                                            })
                 elif 'level' in mod_interp.dims or 'z' in mod_interp.dims:  # Croco or hycom
-                    mod_interp = mod_interp.meta.vertical_seletion_croco_hycom(depth)
+                    mod_interp = mod_interp.meta.vertical_selection_croco_hycom(depth)
                 mod_interp = mod_interp.assign_coords(depth=obs.depth)
 
             elif 'z' in obs.dims:
                 depths = obs.depth.isel(time=i)
                 if 'level' in mod_interp.dims or 'z' in mod_interp.dims:  # Croco or hycom
-                    mod_interp = mod_interp.meta.vertical_seletion_croco_hycom(depths)
+                    mod_interp = mod_interp.meta.vertical_selection_croco_hycom(depths)
                     mod_interp = mod_interp.swap_dims({"depth": 'z'})
                     mod_interp = mod_interp.assign_coords(z=obs.z)
                 else:
