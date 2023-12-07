@@ -117,18 +117,12 @@ def get_observation_models_meta(config_obj: dict):
         # Interval temporels successifs
         if 'interval' in config_obj["meta_zones"]:
             logger.info('Temporal interval segmentation...')
-            if horizontal_colocation_flag or vertical_colocation_flag:
-                interval = config_obj["meta_zones"]["interval"]
-                model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval)
-                model["xarray_meta_coloc"] = model[
-                    "xarray_meta_coloc"].meta.time_selection_interval(interval)
-                observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
-                    index_model].meta.time_selection_interval(interval)
-            else:
-                interval = config_obj["meta_zones"]["interval"]
-                model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval)
-        else:  # no interval
-            model.update({"xarray_meta_coloc": mod_coloc})
+            interval = config_obj["meta_zones"]["interval"]
+            model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval)
+            model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.time_selection_interval(
+                interval)
+            observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
+                index_model].meta.time_selection_interval(interval)
 
         # Tranches verticales
         if 'slice' in config_obj["meta_zones"]:
@@ -140,20 +134,16 @@ def get_observation_models_meta(config_obj: dict):
                 var_slice = 'depth'
 
             logger.info('Vertical slicing on variable %s', var_slice)
-            if horizontal_colocation_flag or vertical_colocation_flag:
-                vert_slice = config_obj["meta_zones"]["slice"]
-                model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(
-                    vert_slice, var_slice)
-                model["xarray_meta_coloc"] = model[
-                    "xarray_meta_coloc"].meta.vertical_selection_slice(vert_slice, var_slice)
-                observation["xarray_meta"] = observation[
-                    "xarray_meta"].meta.vertical_selection_slice(vert_slice, var_slice)
-                observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
-                    index_model].meta.vertical_selection_slice(vert_slice, var_slice)
-            else:
-                vert_slice = config_obj["meta_zones"]["slice"]
-                model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(
-                    vert_slice, var_slice)
+
+            vert_slice = config_obj["meta_zones"]["slice"]
+            model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(vert_slice,
+                var_slice)
+            model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.vertical_selection_slice(
+                vert_slice, var_slice)
+            observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
+                vert_slice, var_slice)
+            observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
+                index_model].meta.vertical_selection_slice(vert_slice, var_slice)
 
     if 'interval' in config_obj["meta_zones"].keys():
         interval = config_obj["meta_zones"]["interval"]

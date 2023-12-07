@@ -75,7 +75,6 @@ def plot(config_obj):
                                   "plot_ts_metr_RMSE_point": 'RMSEc_point',
                                   "plot_ts_metr_point": 'all_metrics'
                                   }
-
             if output["plot"] in plot_ts_metr_point:
                 plot_features.plot_ts_metr_point(models_var, observation_var, flag_interval,
                                                  flag_slice, output_path=sub_func_output_folder)
@@ -89,6 +88,7 @@ def plot(config_obj):
                                   }
             if output["plot"] in plot_ts_metr_stats:
                 plg = config_obj["meta_zones"].get("polygon")
+
                 plot_features.plot_ts_metr_stats(models_var, observation_var, flag_interval,
                                                  flag_slice, output_path=sub_func_output_folder,
                                                  plg=plg)
@@ -97,8 +97,7 @@ def plot(config_obj):
             # MAP METRIC
             plot_map_metr = {"plot_map_metr_ecart_interval": 'difference',
                              "plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
-                             "plot_map_metr_RMSE": 'RMSE',
-                             "plot_map_metr_RMSEc": 'RMSEc'
+                             "plot_map_metr_RMSE": 'RMSE', "plot_map_metr_RMSEc": 'RMSEc'
                              }
             if output["plot"] in plot_map_metr:
                 for i, mod in enumerate(models_var):
