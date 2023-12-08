@@ -213,10 +213,10 @@ def sel_default_vars(config_obj):
 
     elif feature == "section_hydro":  # F4
         default_vars_mod = ['ptemp', 'sal']
-        default_vars_obs = ['temp', 'sal']
-        for var in ['temp', 'ptemp', 'dens', 'pdens']:
-            if var in additional_vars:
-                additional_vars.remove(var)
+        default_vars_obs = ['ptemp', 'sal']
+        # for var in ['temp', 'ptemp', 'dens', 'pdens']:
+        #     if var in additional_vars:
+        #         additional_vars.remove(var)
 
     elif feature == "clim_hydro":  # F5
         default_vars_mod = ['ptemp', 'sal']
@@ -286,7 +286,7 @@ def sel_one_var(observation, models, var):
     models_var = copy.deepcopy(models)
     if var in ['temp', 'ptemp']:
         var_mod = 'ptemp'
-        var_obs = 'temp'
+        var_obs = 'ptemp'
     else:
         var_mod = var
         var_obs = var
