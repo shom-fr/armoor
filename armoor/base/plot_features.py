@@ -2741,7 +2741,7 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
             for i_idx_time, _ in enumerate(observation.idx_time):
                 obs = observation.isel(idx_time=[i_idx_time], interval=[i_inter])
                 if not np.isnan(obs.sal.max(skipna=True).values):
-                    im_obs = ax.scatter(obs.sal.values, obs.temp.values, 30, obs.depth.values,
+                    im_obs = ax.scatter(obs.sal.values, obs.ptemp.values, 30, obs.depth.values,
                                         vmin=vmin, vmax=vmax, marker="^", zorder=2,
                                         label=f'{obs.attrs["name"]}', alpha=0.3, cmap='autumn')
 
@@ -2759,7 +2759,7 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
                     depths_mod.append(mod_buffer_idx.depth.values)
         else:
             obs = observation.isel(interval=[i_inter])
-            im_obs = ax.scatter(obs.sal.values, obs.temp.values, 30, obs.depth.values, vmin=vmin,
+            im_obs = ax.scatter(obs.sal.values, obs.ptemp.values, 30, obs.depth.values, vmin=vmin,
                                 vmax=vmax, marker="^", zorder=2, label=f'{obs.attrs["name"]}',
                                 alpha=0.3, cmap='autumn')
 
@@ -2794,7 +2794,7 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
         obs_mean = observation.mean(["idx_time", 'interval'])
     else:
         obs_mean = observation.mean(['interval'])
-    im_obs_mean = ax.scatter(obs_mean.sal.values, obs_mean.temp.values, 40, obs_mean.depth.values,
+    im_obs_mean = ax.scatter(obs_mean.sal.values, obs_mean.ptemp.values, 40, obs_mean.depth.values,
                              vmin=vmin, vmax=vmax, marker="^", zorder=4, edgecolors="black",
                              linewidth=0.6, label=f'Mean {observation.attrs["name"]}',
                              cmap='autumn')
@@ -2826,7 +2826,7 @@ def plot_diag_ts_unique(models, observation, output_path=None):
 
             # Plot the profile
             f, ax = figure_1_profile()
-            im_obs = ax.scatter(obs.sal, obs.temp, 30, obs.depth, marker="^", edgecolors="black",
+            im_obs = ax.scatter(obs.sal, obs.ptemp, 30, obs.depth, marker="^", edgecolors="black",
                                 linewidth=0.1, label=f'{obs.attrs["name"]}', cmap='autumn',
                                 vmin=vmin, vmax=vmax)
             mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, depth=obs.depth,
