@@ -18,8 +18,8 @@ def run_harmonic_analysis_map(ds, output):
             tide_tool = 'utide'
         if tide_tool == 'ttide':
             logger.warning("The ttide librairy will be used. "
-                        "Be aware that if the time step of one of your input file is not constant, "
-                        "the harmonic analysis results may be inaccurate.")
+                           "Be aware that if the time step of one of your input file is not constant, "
+                           "the harmonic analysis results may be inaccurate.")
     else:
         tide_tool = 'utide'
 
@@ -52,7 +52,9 @@ def run_harmonic_analysis_map(ds, output):
     for i_lon, lon in enumerate(ds.lon):
         for i_lat, lat in enumerate(ds.lat):
             ds_to_anal = ds.sel(lon=lon, lat=lat)
-            if np.sum(np.isnan(ds_to_anal.u.data)) < np.sum(~np.isnan(ds_to_anal.u.data)):
+            if np.sum(np.isnan(ds_to_anal.u.data)) < np.sum(
+                    ~np.isnan(ds_to_anal.u.data)) and np.sum(np.isnan(ds_to_anal.v.data)) < np.sum(
+                    ~np.isnan(ds_to_anal.v.data)):
 
                 # Ttide
                 if tide_tool == 'ttide':
@@ -122,7 +124,7 @@ def run_harmonic_analysis_map(ds, output):
             f'Try with a longer time series.')
 
     # Convert phase to -180 180
-    if ds_res.u_g.max() > 180 or ds_res.v_g.max() > 180:
+    if np.nanmax(ds_res.u_g.data) > 180 or np.nanmax(ds_res.v_g.data) > 180:
         ds_res['u_g'] = xr.where(ds_res['u_g'] > 180, ds_res['u_g'] - 360, ds_res['u_g'])
         ds_res['v_g'] = xr.where(ds_res['v_g'] > 180, ds_res['v_g'] - 360, ds_res['v_g'])
 
@@ -146,8 +148,8 @@ def run_harmonic_analysis(ds, output):
             tide_tool = 'utide'
         if tide_tool == 'ttide':
             logger.warning("The ttide librairy will be used. "
-                        "Be aware that if the time step of one of your input file is not constant, "
-                        "the harmonic analysis results may be inaccurate.")
+                           "Be aware that if the time step of one of your input file is not constant, "
+                           "the harmonic analysis results may be inaccurate.")
     else:
         tide_tool = 'utide'
 
