@@ -199,31 +199,22 @@ def sel_default_vars(config_obj):
 
     elif feature == "prof_hydro_vessel":  # F2
         default_vars_mod = ['ptemp', 'sal', 'pdens']
-        default_vars_obs = ['temp', 'sal', 'pdens']
-        for var in ['temp', 'ptemp', 'pdens']:
-            if var in additional_vars:
-                additional_vars.remove(var)
+        default_vars_obs = ['ptemp', 'sal', 'pdens']
+
 
     elif feature == "prof_hydro_mooring":  # F3
         default_vars_mod = ['ptemp', 'sal', 'pdens']
-        default_vars_obs = ['temp', 'sal', 'pdens']
-        for var in ['temp', 'ptemp', 'dens', 'pdens']:
-            if var in additional_vars:
-                additional_vars.remove(var)
+        default_vars_obs = ['ptemp', 'sal', 'pdens']
+
 
     elif feature == "section_hydro":  # F4
         default_vars_mod = ['ptemp', 'sal']
         default_vars_obs = ['ptemp', 'sal']
-        # for var in ['temp', 'ptemp', 'dens', 'pdens']:
-        #     if var in additional_vars:
-        #         additional_vars.remove(var)
+
 
     elif feature == "clim_hydro":  # F5
         default_vars_mod = ['ptemp', 'sal']
-        default_vars_obs = ['temp', 'sal']
-        for var in ['temp', 'ptemp', 'dens', 'pdens']:
-            if var in additional_vars:
-                additional_vars.remove(var)
+        default_vars_obs = ['ptemp', 'sal']
 
     elif feature == "currents_hfr":  # F6
         default_vars_mod = ['current', 'current_res']

@@ -609,6 +609,10 @@ def open_decode_croco(path_file):
     # Assign croco attrs
     croco = croco.assign_attrs({'type': 'CROCO'})
 
+    # Rename ptemp
+    if 'temp' in croco:
+        croco = croco.rename({'temp':'ptemp'})
+
     return croco
 
 
@@ -801,6 +805,9 @@ def open_decode_basic(path_files):
     dataset = dataset.xoa.decode()
     if "lon_longitude" in dataset:
         dataset = dataset.drop_vars(["lon_longitude", 'lat_latitude'])
+
+    if 'temp' in dataset and 'potential' in dataset.temp.attrs['standard_name']:
+        dataset = dataset.rename({'temp' : 'ptemp'})
 
     # Regrid if necessary
     dataset = xoa.grid.to_rect(dataset)
