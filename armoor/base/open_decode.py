@@ -708,6 +708,8 @@ def open_decode_hycom_3d(path_files):
 
     # Rename
     hycom = hycom.rename({'level': 'z'})
+    if 'temp' in hycom:
+        hycom = hycom.rename({'temp': 'ptemp'})
 
     # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)

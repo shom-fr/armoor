@@ -242,13 +242,13 @@ class SSTAccessor:
             Data array containing salinity.
         """
 
-        try:  # dataset
-            if "sal" in self._obj.variables:
-                return self._obj.sal
-            elif 'psal' in self._obj:
-                return self._obj.psal
-        except:
-            return self._obj.xoa.sal
+        if "sal" in self._obj.variables:
+            return self._obj.sal
+        elif 'psal' in self._obj:
+            if "pres" in self._obj:
+                sal = gsw.conversions.SA_from_SP(self._obj.psal, self._obj.pres, self._obj.lon,
+                                                 self._obj.lat)
+                return sal
 
     def sel_temp(self):
         """
@@ -277,13 +277,14 @@ class SSTAccessor:
             return self._obj['ptemp'].sel_var.convert_K_C()
         if 'temp' in self._obj:
             # verify salinity and pressure are also included
-            if 'sal' in self._obj and 'pres' in self._obj:
-                ptemp = gsw.conversions.pt0_from_t(self._obj.sal, self._obj.temp, self._obj.pres)
+            if ('sal' in self._obj or 'psal' in self._obj) and 'pres' in self._obj:
+                sal = self._obj.sel_var.sel_sal()
+                ptemp = gsw.conversions.pt0_from_t(sal, self._obj.temp, self._obj.pres)
                 ptemp.attrs['standard_name'] = "sea_water_potential_temperature"
                 ptemp.attrs['units'] = "degrees_celsius"
                 ptemp.attrs['long_name'] = "Potential temperature"
                 self._obj['ptemp'] = ptemp
-                return self._obj
+                return self._obj['ptemp'].sel_var.convert_K_C()
 
             logging.warning(
                 'The potential temperature could not be calculated, sea temperature will be used')
