@@ -607,7 +607,7 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                                                            mod.attrs['name'], obs.attrs['name'])
                         diag_disp_figure(mod_inter, obs_inter, title)
                         ft.manage_output(figname, output_path)
-                elif 'depth' in mod.dims and len(mod.depth)>1:
+                elif 'depth' in mod.dims and len(mod.depth) > 1:
                     for index_depth, _ in enumerate(mod['depth']):
                         mod_depth = mod.isel(depth=[index_depth])
                         obs_depth = obs.isel(depth=[index_depth])
@@ -2354,8 +2354,10 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 time_coloc = obs_mean.interval.values
             else:
                 time_coloc = obs_mean.time.values
-            axs[0].plot(time_coloc, obs_mean, '-o', c='k', label=f'Mean {observation["name"]} ')
-            axs[2].plot(time_coloc, obs_std, '-o', c='k', label=f'Std {observation["name"]} ')
+            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2,
+                        label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2,
+                        label=f'{observation["name"]} ')
             for i, mod in enumerate(models):
                 mod_coloc = mod["xarray_meta_coloc"].isel(slice=[idx_slice]).assign_attrs(
                     {'name': mod['name']})
@@ -2390,8 +2392,8 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         f, axs = figure_5lin_ts()
         f.autofmt_xdate(rotation=5)
 
-        axs[0].plot(time_coloc, obs_mean, '-o', c='k', label=f'Mean {observation["name"]} ')
-        axs[2].plot(time_coloc, obs_std, '-o', c='k', label=f'Std {observation["name"]} ')
+        axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
+        axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"].assign_attrs({'name': mod['name']})
@@ -2441,27 +2443,27 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     # MOYENNES
     mod_mean = mod_coloc.mean(list_dims_mean, skipna=True).squeeze()
     obs_mean = obs_coloc.mean(list_dims_mean, skipna=True).squeeze()
-    axs[0].plot(time_coloc, mod_mean, '-o', label=f'Mean {mod_name} ')
+    axs[0].plot(time_coloc, mod_mean, '-o', ms=0.2, label=f'{mod_name}')
 
     # BIAIS
     biais = (mod_mean - obs_mean).squeeze()
-    axs[1].plot(time_coloc, biais, '-o', label=f'Bias : Mean ({mod_name} - {obs_name}) ')
+    axs[1].plot(time_coloc, biais, '-o', ms=0.2, label=f'{mod_name}')
 
     # ECART-TYPE
     mod_std = mod_coloc.std(list_dims_mean, skipna=True).squeeze()
-    axs[2].plot(time_coloc, mod_std, '-o', label=f'Std {mod_name} ')
+    axs[2].plot(time_coloc, mod_std, '-o', ms=0.2, label=f'{mod_name}')
 
     # RMSE
     rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
-    axs[3].plot(time_coloc, rmse, '-o', label=f'RMSE : {obs_name}  {mod_name} ')
+    axs[3].plot(time_coloc, rmse, '-o', ms=0.2, label=f'{mod_name}')
 
     # RMSE CENTREE
     rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
-    axs[4].plot(time_coloc, rmse_centree, '-o',
-                label=f'Mean Centered RMSE : {obs_name}  {mod_name} ')
+    axs[4].plot(time_coloc, rmse_centree, '-o', ms=0.2, label=f'{mod_name}')
 
+    axs[0].legend(loc=0)  # Demande de Morgan
     for ax in axs:
-        ax.legend(loc=5)
+        # ax.legend(loc=0)
         _, var_unit = find_var_title(obs_coloc)
         ax.set_ylabel(f'{var_unit}')
 
