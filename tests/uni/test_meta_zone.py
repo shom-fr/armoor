@@ -16,7 +16,8 @@ path_ds_xy = ["../data/test_uni/meta_zone/model_x_y.nc"]
 ds_xy = open_decode(path_ds_xy)
 
 path_ds_QC = ["../data/test_uni/meta_zone/GL_PR_GL_64556_sub.nc"]
-ds_QC = open_decode(path_ds_QC,type='CMEMS')
+ds_QC = open_decode(path_ds_QC, type='CMEMS')
+
 
 class TestMetaZone:
 
@@ -27,8 +28,10 @@ class TestMetaZone:
         point_a_tester = [-9.166667, 45]
         ds_meta = ds_lon_lat_depth.meta.horizontal_selection_polygon(plg)
 
-        before = point_a_tester[0] in ds_lon_lat_depth.lon.values and point_a_tester[1] in ds_lon_lat_depth.lat.values
-        after = point_a_tester[0] not in ds_meta.lon.values and point_a_tester[1] not in ds_meta.lat.values
+        before = point_a_tester[0] in ds_lon_lat_depth.lon.values and point_a_tester[
+            1] in ds_lon_lat_depth.lat.values
+        after = point_a_tester[0] not in ds_meta.lon.values and point_a_tester[
+            1] not in ds_meta.lat.values
 
         assert before and after
 
@@ -66,7 +69,8 @@ class TestMetaZone:
         point = [-9.536], [45.625]
         radius = 35
 
-        ds_meta = ds_lon_lat_depth.meta.horizontal_selection_cloud_dots(point, radius, method='nearest')
+        ds_meta = ds_lon_lat_depth.meta.horizontal_selection_cloud_dots(point, radius,
+                                                                        method='nearest')
 
         point_in = [-9.583333, 45.416668]
         test_in = point_in[0] in ds_meta.lon.values and point_in[1] in ds_meta.lat.values
@@ -98,7 +102,8 @@ class TestMetaZone:
 
     def test_time_selection_list(self):  # OK
         logger.info('test_time_selection_list')
-        time_list = [np.datetime64('2022-01-03T00'), np.datetime64('2022-01-04T00'), np.datetime64('2022-01-05T00')]
+        time_list = [np.datetime64('2022-01-03T00'), np.datetime64('2022-01-04T00'),
+                     np.datetime64('2022-01-05T00')]
 
         ds_meta = ds_lon_lat_depth.meta.time_selection_list(times=time_list)
 
@@ -108,7 +113,8 @@ class TestMetaZone:
         logger.info('test_vertical_selection_range')
         depth_min, depth_max = 2, 5
 
-        ds_meta = ds_lon_lat_depth.meta.vertical_selection_range([depth_min, depth_max], var_vert='depth')
+        ds_meta = ds_lon_lat_depth.meta.vertical_selection_range([depth_min, depth_max],
+                                                                 var_vert='depth')
 
         assert ds_meta.depth.min() > depth_min and ds_meta.depth.max() < depth_max
 
@@ -123,13 +129,13 @@ class TestMetaZone:
     def test_vertical_selection_slice(self):
         logger.info('test_vertical_selection_slice')
 
-        slice = [0, 5, 10, 30]
+        slice = [[0, 5], [5, 10], [10, 30]]
 
         ds_meta = ds_lon_lat_depth.meta.vertical_selection_slice(slices=slice, var_slice='depth')
         assert len(ds_meta.slice) == 3
 
     def test_sel_qc(self):
         logger.info('test_sel_QC')
-        quality = ['TEMP_QC','0','1']
+        quality = ['TEMP_QC', '0', '1']
         ds_meta = ds_QC.meta.quality_filter(quality)
         assert len(ds_meta.time) < len(ds_QC.time)
