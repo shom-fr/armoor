@@ -188,10 +188,8 @@ class MetazoneAccessor:
         lat_target = [lat for lon, lat in coordinates]
 
         if 'lon' in self._obj.dims:  # Regular grid
-            if method in ["linear"]:
+            if method in ["linear"] or method is None:
                 return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
-            if method is None:
-                method = 'nearest'
             return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
 
         if 'x' in self._obj.dims:  # Curvilinear grid
@@ -223,7 +221,7 @@ class MetazoneAccessor:
         if obs_lon.size > 1:
             obs_lon, obs_lat = obs_lon[0], obs_lat[0]
 
-        self._obj = self._obj.sel(lon=obs_lon, lat=obs_lat, method='nearest')
+        self._obj = self._obj.interp(lon=obs_lon, lat=obs_lat, method='linear')
         distance = np.sqrt(
             (self._obj.lon.values - obs_lon) ** 2 + (self._obj.lat.values - obs_lat) ** 2)
         radius_km = self._obj.meta.km_to_deg(radius)
@@ -504,7 +502,7 @@ class MetazoneAccessor:
 
         if var_vert == 'depth':
             if 'depth' in dataset.dims and len(dataset.depth.dims) == 1:  # NEMO or TOPAZ
-                dataset = dataset.sel(depth=depth, method='nearest')
+                dataset = dataset.interp(depth=depth, method='linear')
                 dataset['depth'] = depth
                 return dataset
 
@@ -518,7 +516,7 @@ class MetazoneAccessor:
             return dataset
         if var_vert == 'dens':
             if 'pdens' in dataset.dims:
-                return dataset.sel(pdens=depth, method='nearest')
+                return dataset.interp(pdens=depth, method='linear')
             elif 'pdens' not in dataset:
                 dataset["pdens"] = dataset.sel_var.sel_pdensity()
             return dataset.meta.vertical_selection_dens_from_depth(pdens=depth)
@@ -711,11 +709,10 @@ class MetazoneAccessor:
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
         if 'depth' in self._obj.dims:  # Selection for NEMO or TOPAZ
-            return self._obj.sel(depth=depths, method='nearest')
+            return self._obj.interp(depth=depths, method='linear')
 
         if list(self._obj.dims.keys()) == ['time', 'z']:  # CMEMS profilers
-            list_ds_z = [self._obj.meta.vertical_selection_ponct_cmems(depth) for depth in depths]
-            return xr.concat(list_ds_z, dim='depth')
+            return self._obj.meta.vertical_selection_croco_hycom(depths)
 
         if 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
             return self._obj.meta.vertical_selection_croco_hycom(depths)
@@ -828,7 +825,7 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - time_selection_absolute")
         if start == end:
-            return self._obj.sel(time=start, method='nearest')
+            return self._obj.interp(time=start, method='linear')
         return self._obj.sel(time=slice(start, end))
 
     def time_selection_relative(self, start: int = None, end: int = None) -> xr.Dataset:
@@ -863,7 +860,7 @@ class MetazoneAccessor:
         return self._obj.sel(time=slice(start, end))
 
     # Overload time_selection
-    def time_selection_list(self, times: list, method: str = 'nearest') -> xr.Dataset:
+    def time_selection_list(self, times: list, method: str = 'linear') -> xr.Dataset:
         """
         Subset dataset filtering elements along time dimension, selecting dates from a
         specified list.

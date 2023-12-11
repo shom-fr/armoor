@@ -14,6 +14,7 @@ import numpy as np
 import gsw
 import pandas as pd
 import dask
+from pyproj import Geod
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +185,7 @@ def open_decode_cmems(path_files, steps):
 
     # Variables to drop/rename to prevent random behaviours
     for var in list(cmems.keys()):
-        if "POSITION" in var or 'LOCATION' in var:
+        if "POSITION" in var or 'LOCATION' in var or '_DM' in var:
             cmems = cmems.drop_vars(var)
         elif var[-3:] == "_QC":
             cmems = cmems.rename({var: f"QC_{var[:-3]}"})
@@ -195,6 +196,9 @@ def open_decode_cmems(path_files, steps):
                 cmems = cmems.drop_vars(f"{var}_ADJUSTED_ERROR")
             if f"{var}_CNDC" in cmems:
                 cmems = cmems.drop_vars(f"{var}_CNDC")
+        # Remove otherwise interp won't work
+        if var in ['DATA_MODE', 'DIRECTION', 'VERTICAL_SAMPLING_SCHEME']:
+            cmems = cmems.drop_vars(var)
 
     # Decode
     cmems = cmems.xoa.decode()
@@ -611,7 +615,7 @@ def open_decode_croco(path_file):
 
     # Rename ptemp
     if 'temp' in croco:
-        croco = croco.rename({'temp':'ptemp'})
+        croco = croco.rename({'temp': 'ptemp'})
 
     return croco
 
@@ -807,7 +811,7 @@ def open_decode_basic(path_files):
         dataset = dataset.drop_vars(["lon_longitude", 'lat_latitude'])
 
     if 'temp' in dataset and 'potential' in dataset.temp.attrs['standard_name']:
-        dataset = dataset.rename({'temp' : 'ptemp'})
+        dataset = dataset.rename({'temp': 'ptemp'})
 
     # Regrid if necessary
     dataset = xoa.grid.to_rect(dataset)
@@ -1099,20 +1103,17 @@ def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', meth
     Regridded observation.
     """
     # Horizontal gridding
-    horizontal_step = obs.meta.km_to_deg(horizontal_step)
+    # horizontal_step = obs.meta.km_to_deg(horizontal_step)
 
     obs_deb, obs_end = obs.isel(time=0), obs.isel(time=-1)
-    total_distance_obs = np.sqrt(
-        (obs_deb.lon - obs_end.lon) ** 2 + (obs_deb.lat - obs_end.lat) ** 2)
+    geod = Geod(ellps='WGS84')
+    total_distance_obs = geod.line_length(obs.lon.data, obs.lat.data) / 1000
     total_duration_obs = obs_end.time - obs_deb.time
-
     time_step_grid = horizontal_step * total_duration_obs / total_distance_obs
-
     time_step_grid = time_step_grid.data.astype('timedelta64[s]')
     time_step_grid = str(time_step_grid).split()[0] + 'S'
     time_min, time_max = obs_deb.time.values, obs_end.time.values
     time_min, time_max = np.datetime64(time_min), np.datetime64(time_max)
-
     # Create the new times array to select to retrieve the horizontal resolution
     tgt_time = pd.date_range(time_min, time_max, freq=time_step_grid)
 
@@ -1127,7 +1128,6 @@ def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', meth
         obs_grid = obs_grid.meta.vertical_selection_list(depths)
     else:
         obs_grid = obs_grid.interp(depth=depths, method=method_z)
-
     # Warning if steps too large
     if len(obs_grid.depth) == 1:
         logger.warning(
