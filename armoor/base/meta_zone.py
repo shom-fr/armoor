@@ -189,7 +189,7 @@ class MetazoneAccessor:
 
         if 'lon' in self._obj.dims:  # Regular grid
             if method in ["linear"] or method is None:
-                return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
+                return self._obj.interp(lon=lon_target, lat=lat_target, method='linear')
             return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
 
         if 'x' in self._obj.dims:  # Curvilinear grid
