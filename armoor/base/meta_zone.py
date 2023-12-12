@@ -190,7 +190,7 @@ class MetazoneAccessor:
 
         if 'lon' in self._obj.dims:  # Regular grid
             if method in ["linear"] or method is None:
-                return self._obj.interp(lon=lon_target, lat=lat_target, method='linear')
+                return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
             return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
 
         if 'x' in self._obj.dims:  # Curvilinear grid
@@ -398,7 +398,6 @@ class MetazoneAccessor:
         if len(depth) == 1 and 'depth' in self._obj.dims:
             return self._obj.squeeze('depth')
         return self._obj
-
 
     def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
         """

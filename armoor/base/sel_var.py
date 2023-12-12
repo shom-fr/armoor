@@ -139,7 +139,6 @@ class SSTAccessor:
             current['norm'] = self._obj['HCSP']
         else:
             current['norm'] = (current.u ** 2 + current.v ** 2) ** 0.5
-
         return current
 
     def sel_geo_current(self):
