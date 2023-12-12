@@ -450,7 +450,6 @@ def open_decode_mouillages(path_file):
         lon = np.unique(mouillage.lon.data)
         lat = np.unique(mouillage.lat.data)
         mouillage = mouillage.drop(['lon', 'lat']).assign_coords({'lon': lon, 'lat': lat})
-
     return mouillage
 
 
