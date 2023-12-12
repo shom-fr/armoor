@@ -2331,10 +2331,14 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
     if 'lon' in observation["xarray_meta_coloc"][0].dims:
         list_dims_mean.append('lon')
         list_dims_mean.append('lat')
+    if 'instr' in observation["xarray_meta_coloc"][0].dims:
+        list_dims_mean.append('instr')
     if 'depth' in obs_coloc_base.dims and len(obs_coloc_base.depth) > 1:
         list_dims_mean.append('depth')
     elif 'dens' in obs_coloc_base.dims and len(obs_coloc_base.dens) > 1:
         list_dims_mean.append('dens')
+    elif 'z' in obs_coloc_base.dims and len(obs_coloc_base.z) > 1:
+        list_dims_mean.append('z')
 
     logger.info('The statistics are calculated on the following dimensions:')
     logger.info(f'{list_dims_mean}')
@@ -2354,10 +2358,8 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 time_coloc = obs_mean.interval.values
             else:
                 time_coloc = obs_mean.time.values
-            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2,
-                        label=f'{observation["name"]} ')
-            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2,
-                        label=f'{observation["name"]} ')
+            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
             for i, mod in enumerate(models):
                 mod_coloc = mod["xarray_meta_coloc"].isel(slice=[idx_slice]).assign_attrs(
                     {'name': mod['name']})
@@ -2438,7 +2440,6 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
 
     # Get product names
     mod_name = mod_coloc.attrs['name']
-    obs_name = obs_coloc.attrs['name']
 
     # MOYENNES
     mod_mean = mod_coloc.mean(list_dims_mean, skipna=True).squeeze()
@@ -2499,6 +2500,8 @@ def plot_profile_unique(models, observation, radius, output_path=None):
     for _, time in enumerate(observation.time):
         # Select the profile
         obs = observation.sel(time=time).squeeze()
+        if np.isnan(obs.max(skipna=True)):
+            continue
 
         # Plot the observation profile
         f, ax = figure_1_profile()
@@ -2592,31 +2595,41 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
 
     mod_buffer_all_points = []
     #  "en traits fins, tous les profils observés"
-    for i_inter, _ in enumerate(observation.interval):
-        for i_idx_time, _ in enumerate(observation.idx_time):
-            obs = observation.isel(idx_time=i_idx_time, interval=i_inter).squeeze()
-            ax.plot(obs.values, -1 * obs.depth, c="k", linewidth=linewidth,
-                    label=f'{obs.attrs["name"]}')
+    # Flatten data to cover cases with instr or not
+    dims = list(observation.dims)
+    for dim in ['z', 'depth', 'dens']:
+        if dim in dims:
+            dims.remove(dim)
 
-            # "en traits fins les profils modèles des disques définis
-            # et temporellement les plus proches"
+    observation = observation.stack(idx_point=dims)
 
-            points = [obs.lon.data], [obs.lat.data]
-            var = mod["xarray_meta"].name
-            time = obs.time.values
+    for i_pt, _ in enumerate(observation.idx_point):
+        obs = observation.isel(idx_point=i_pt).squeeze()
+        ax.plot(obs.values, -1 * obs.depth, c="k", linewidth=linewidth,
+                label=f'{obs.attrs["name"]}')
 
-            mod_sel = mod["xarray"].sel(time=time, method='nearest')[var]
+        # "en traits fins les profils modèles des disques définis
+        # et temporellement les plus proches"
+        points = [obs.lon.data], [obs.lat.data]
+        var = mod["xarray_meta"].name
+        time = obs.time.values
 
-            mod_buffer = mod_sel.meta.horizontal_selection_cloud_dots(points, radius)
-            if len(mod_buffer.idx_point) > 0:
-                mod_buffer_all_points.append(mod_buffer)
-            for i_idx_point, _ in enumerate(mod_buffer.idx_point):
-                mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
-                ax.plot(mod_buffer_idx.values, -1 * mod_buffer_idx.depth.values, c="tab:blue",
-                        linewidth=linewidth, label=f'{mod["name"]}')
+        mod_sel = mod["xarray"].sel(time=time, method='nearest')[var]
 
+        mod_buffer = mod_sel.meta.horizontal_selection_cloud_dots(points, radius)
+        if len(mod_buffer.idx_point) > 0:
+            mod_buffer_all_points.append(mod_buffer)
+        for i_idx_point, _ in enumerate(mod_buffer.idx_point):
+            mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
+            ax.plot(mod_buffer_idx.values, -1 * mod_buffer_idx.depth.values, c="tab:blue",
+                    linewidth=linewidth, label=f'{mod["name"]}')
+
+    if 'idx_point' in observation.depth.dims:
+        depth = observation.depth.mean('idx_point')
+    else:
+        depth = observation.depth
     # "en trait épais le profil moyen des observations" + "zone grisée observation"
-    add_std_profile(ax, observation, observation.depth, '.3', f'{observation.attrs["name"]} - mean')
+    add_std_profile(ax, observation, depth, '.3', f'{observation.attrs["name"]} - mean')
 
     # "en trait épais, le profil moyen modèle (moyenne sur les disques)" + "zone grisée modele"
     # (rapport v4, stephanie demande le plus proche)
@@ -2667,15 +2680,8 @@ def add_std_profile(ax, data, depth, color, name):
 
     """
     if len(data) > 0:
-        if 'idx_point' in data.dims:
-            mean = data.mean('idx_point').squeeze()
-            std = data.std('idx_point').squeeze()
-        elif 'interval' in data.dims:
-            mean = data.mean(["idx_time", 'interval']).squeeze()
-            std = data.std(["idx_time", 'interval']).squeeze()
-        else:
-            mean = np.nanmean(np.array(data), 0)
-            std = np.nanstd(np.array(data), 0)
+        mean = data.mean('idx_point').squeeze()
+        std = data.std('idx_point').squeeze()
 
         ax.plot(mean, -1 * depth, c=color, marker='o', linewidth=1.5, label=name)
         ax.fill_betweenx(-1 * depth, mean - std, mean + std, color=color, alpha=0.3, linewidth=0.01,
