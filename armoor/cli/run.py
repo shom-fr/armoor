@@ -1,19 +1,21 @@
 import logging
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
-import armoor.cli.logger_tools as log
+from armoor.cli.logger_tools import setup_logging
 
 def main(functionality :str = None):
-    log.setup_logging()
+    setup_logging()
     logger = logging.getLogger(__name__)
 
-    logger.info('Retrieving parameter')
     parser = command_line_interface()
 
     if functionality:
-        parser.update({"functionality" : functionality})
+        parser.update({"functionality": functionality})
+        logger.info(f'Script socle : {functionality}')
+    else:
+        logger.info('Script principal : Bulletin de validation')
 
-    print(f'{ parser = }')
+    logger.info(f'{ parser = }')
     logger.info('Applying configuration to generate plots')
     dict2call(parser)
 
