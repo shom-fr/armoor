@@ -17,9 +17,9 @@ def run_harmonic_analysis_map(ds, output):
                            f"Please select utide or ttide. By default, utide will be used.")
             tide_tool = 'utide'
         if tide_tool == 'ttide':
-            logger.info("The ttide librairy will be used. "
-                        "Be aware that if the time step of one of your input file is not constant, "
-                        "the harmonic analysis results may be incorrect.")
+            logger.warning("The ttide librairy will be used. "
+                           "Be aware that if the time step of one of your input file is not constant, "
+                           "the harmonic analysis results may be inaccurate.")
     else:
         tide_tool = 'utide'
 
@@ -52,7 +52,9 @@ def run_harmonic_analysis_map(ds, output):
     for i_lon, lon in enumerate(ds.lon):
         for i_lat, lat in enumerate(ds.lat):
             ds_to_anal = ds.sel(lon=lon, lat=lat)
-            if np.sum(np.isnan(ds_to_anal.u.data)) < np.sum(~np.isnan(ds_to_anal.u.data)):
+            if np.sum(np.isnan(ds_to_anal.u.data)) < np.sum(
+                    ~np.isnan(ds_to_anal.u.data)) and np.sum(np.isnan(ds_to_anal.v.data)) < np.sum(
+                    ~np.isnan(ds_to_anal.v.data)):
 
                 # Ttide
                 if tide_tool == 'ttide':
@@ -65,16 +67,19 @@ def run_harmonic_analysis_map(ds, output):
                     xout_u = tt.t_tide(ds_to_anal.squeeze().u.data, dt=dt, out_style=None)
                     xout_v = tt.t_tide(ds_to_anal.squeeze().v.data, dt=dt, out_style=None)
 
-                    wave_names = np.array(xout_u['nameu']).astype(str)
-                    wave_names = np.char.strip(wave_names)
+                    wave_names_u = np.array(xout_u['nameu']).astype(str)
+                    wave_names_u = np.char.strip(wave_names_u)
+                    wave_names_v = np.array(xout_v['nameu']).astype(str)
+                    wave_names_v = np.char.strip(wave_names_v)
 
                     for i_wave, wave in enumerate(list_waves):
-                        if wave in wave_names:
-                            idx_wave = int(np.where(wave_names == wave)[0])
-                            res_ua[i_lon, i_lat, i_wave] = (xout_u['tidecon'][idx_wave][0])
-                            res_va[i_lon, i_lat, i_wave] = (xout_v['tidecon'][idx_wave][0])
-                            res_ug[i_lon, i_lat, i_wave] = (xout_u['tidecon'][idx_wave][2])
-                            res_vg[i_lon, i_lat, i_wave] = (xout_v['tidecon'][idx_wave][2])
+                        if wave in wave_names_u:
+                            idx_wave_u = int(np.where(wave_names_u == wave)[0])
+                            idx_wave_v = int(np.where(wave_names_v == wave)[0])
+                            res_ua[i_lon, i_lat, i_wave] = (xout_u['tidecon'][idx_wave_u][0])
+                            res_va[i_lon, i_lat, i_wave] = (xout_v['tidecon'][idx_wave_v][0])
+                            res_ug[i_lon, i_lat, i_wave] = (xout_u['tidecon'][idx_wave_u][2])
+                            res_vg[i_lon, i_lat, i_wave] = (xout_v['tidecon'][idx_wave_v][2])
 
                 # Utide
                 elif tide_tool == 'utide':
@@ -85,16 +90,19 @@ def run_harmonic_analysis_map(ds, output):
                     coef_u = utide.solve(time, u, lat=lat)
                     coef_v = utide.solve(time, v, lat=lat)
 
-                    wave_names = np.array(coef_u['name']).astype(str)
-                    wave_names = np.char.strip(wave_names)
+                    wave_names_u = np.array(coef_u['name']).astype(str)
+                    wave_names_u = np.char.strip(wave_names_u)
+                    wave_names_v = np.array(coef_v['name']).astype(str)
+                    wave_names_v = np.char.strip(wave_names_v)
 
                     for i_wave, wave in enumerate(list_waves):
-                        if wave in wave_names:
-                            idx_wave = int(np.where(wave_names == wave)[0])
-                            res_ua[i_lon, i_lat, i_wave] = (coef_u['A'][idx_wave])
-                            res_va[i_lon, i_lat, i_wave] = (coef_v['A'][idx_wave])
-                            res_ug[i_lon, i_lat, i_wave] = (coef_u['g'][idx_wave])
-                            res_vg[i_lon, i_lat, i_wave] = (coef_v['g'][idx_wave])
+                        if wave in wave_names_u:
+                            idx_wave_u = int(np.where(wave_names_u == wave)[0])
+                            idx_wave_v = int(np.where(wave_names_v == wave)[0])
+                            res_ua[i_lon, i_lat, i_wave] = (coef_u['A'][idx_wave_u])
+                            res_va[i_lon, i_lat, i_wave] = (coef_v['A'][idx_wave_v])
+                            res_ug[i_lon, i_lat, i_wave] = (coef_u['g'][idx_wave_u])
+                            res_vg[i_lon, i_lat, i_wave] = (coef_v['g'][idx_wave_v])
     ds_res = xr.Dataset(
         dict(u_a=(['lon', 'lat', 'wave'], res_ua), v_a=(['lon', 'lat', 'wave'], res_va),
              u_g=(['lon', 'lat', 'wave'], res_ug), v_g=(['lon', 'lat', 'wave'], res_vg)))
@@ -116,7 +124,7 @@ def run_harmonic_analysis_map(ds, output):
             f'Try with a longer time series.')
 
     # Convert phase to -180 180
-    if ds_res.u_g.max() > 180 or ds_res.v_g.max() > 180:
+    if np.nanmax(ds_res.u_g.data) > 180 or np.nanmax(ds_res.v_g.data) > 180:
         ds_res['u_g'] = xr.where(ds_res['u_g'] > 180, ds_res['u_g'] - 360, ds_res['u_g'])
         ds_res['v_g'] = xr.where(ds_res['v_g'] > 180, ds_res['v_g'] - 360, ds_res['v_g'])
 
@@ -139,9 +147,9 @@ def run_harmonic_analysis(ds, output):
                            f"Please select utide or ttide. By default, utide will be used.")
             tide_tool = 'utide'
         if tide_tool == 'ttide':
-            logger.info("The ttide librairy will be used. "
-                        "Be aware that if the time step of one of your input file is not constant, "
-                        "the harmonic analysis results may be incorrect.")
+            logger.warning("The ttide librairy will be used. "
+                           "Be aware that if the time step of one of your input file is not constant, "
+                           "the harmonic analysis results may be inaccurate.")
     else:
         tide_tool = 'utide'
 
@@ -161,6 +169,8 @@ def run_harmonic_analysis(ds, output):
     else:
         raise ValueError("Oops, to perform harmonic analysis, you should specify the tidal "
                          "waves to calculate...")
+
+    # Compute analysis
     if 'lon' in ds.dims and len(ds.lon) > 1:
         ds_res = []
         for i_lon, lon in enumerate(ds.lon.data):
@@ -248,22 +258,27 @@ def harmonic_analysis(ds_to_anal, list_waves, tide_tool):
             xout_u = tt.t_tide(ds_to_anal.squeeze().u.data, dt=dt, out_style=None)
             xout_v = tt.t_tide(ds_to_anal.squeeze().v.data, dt=dt, out_style=None)
 
-            wave_names = np.array(xout_u['nameu']).astype(str)
-            wave_names = np.char.strip(wave_names)
+            wave_names_u = np.array(xout_u['nameu']).astype(str)
+            wave_names_u = np.char.strip(wave_names_u)
+            wave_names_v = np.array(xout_v['nameu']).astype(str)
+            wave_names_v = np.char.strip(wave_names_v)
             for wave in list_waves:
-                if wave in wave_names:
-                    idx_wave = int(np.where(wave_names == wave)[0])
-                    a_u.append(xout_u['tidecon'][idx_wave][0])
-                    g_u.append(xout_u['tidecon'][idx_wave][2])
-                    a_v.append(xout_v['tidecon'][idx_wave][0])
-                    g_v.append(xout_v['tidecon'][idx_wave][2])
-                    freq.append(xout_u['fu'][idx_wave])
+                if wave in wave_names_u:
+                    idx_wave_u = int(np.where(wave_names_u == wave)[0])
+                    a_u.append(xout_u['tidecon'][idx_wave_u][0])
+                    g_u.append(xout_u['tidecon'][idx_wave_u][2])
+                    freq.append(xout_u['fu'][idx_wave_u])
                 else:
                     a_u.append(np.nan)
                     g_u.append(np.nan)
+                    freq.append(np.nan)
+                if wave in wave_names_v:
+                    idx_wave_v = int(np.where(wave_names_v == wave)[0])
+                    a_v.append(xout_v['tidecon'][idx_wave_v][0])
+                    g_v.append(xout_v['tidecon'][idx_wave_v][2])
+                else:
                     a_v.append(np.nan)
                     g_v.append(np.nan)
-                    freq.append(np.nan)
 
         elif tide_tool == 'utide':
             # Compute tidal analysis
@@ -271,26 +286,31 @@ def harmonic_analysis(ds_to_anal, list_waves, tide_tool):
             u = ds_to_anal.u.data
             v = ds_to_anal.v.data
             lat = ds_to_anal.lat.data
-            coef_u = utide.solve(time, u, lat=lat, method="ols", conf_int="MC")
+            coef_u = utide.solve(time, u, lat=lat)
             coef_v = utide.solve(time, v, lat=lat)
 
-            wave_names = np.array(coef_u['name']).astype(str)
-            wave_names = np.char.strip(wave_names)
+            wave_names_u = np.array(coef_u['name']).astype(str)
+            wave_names_u = np.char.strip(wave_names_u)
+            wave_names_v = np.array(coef_v['name']).astype(str)
+            wave_names_v = np.char.strip(wave_names_v)
 
             for wave in list_waves:
-                if wave in wave_names:
-                    idx_wave = int(np.where(wave_names == wave)[0])
-                    a_u.append(coef_u['A'][idx_wave])
-                    g_u.append(coef_u['g'][idx_wave])
-                    a_v.append(coef_v['A'][idx_wave])
-                    g_v.append(coef_v['g'][idx_wave])
-                    freq.append(coef_v['aux']['frq'][idx_wave])
+                if wave in wave_names_u:
+                    idx_wave_u = int(np.where(wave_names_u == wave)[0])
+                    a_u.append(coef_u['A'][idx_wave_u])
+                    g_u.append(coef_u['g'][idx_wave_u])
+                    freq.append(coef_v['aux']['frq'][idx_wave_u])
                 else:
                     a_u.append(np.nan)
                     g_u.append(np.nan)
+                    freq.append(np.nan)
+                if wave in wave_names_v:
+                    idx_wave_v = int(np.where(wave_names_v == wave)[0])
+                    a_v.append(coef_v['A'][idx_wave_v])
+                    g_v.append(coef_v['g'][idx_wave_v])
+                else:
                     a_v.append(np.nan)
                     g_v.append(np.nan)
-                    freq.append(np.nan)
 
         ds_res = xr.Dataset(
             data_vars=dict(u_a=(["wave"], a_u), u_g=(["wave"], g_u), v_a=(["wave"], a_v),

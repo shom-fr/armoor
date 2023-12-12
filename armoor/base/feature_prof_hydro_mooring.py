@@ -67,7 +67,8 @@ def plot(config_obj):
                                   }
             if output["plot"] in plot_ts_metr_stats:
                 plg = config_obj["meta_zones"].get("polygon")
-                if 'depth' not in models[0]["xarray_meta_coloc"].dims:
+                if 'depth' not in models[0]["xarray_meta_coloc"].dims or len(
+                        models[0]["xarray_meta_coloc"].depth) == 1:
                     models_depth, observation_depth = models_var, observation_var
                     plot_features.plot_ts_metr_stats(models_depth, observation_depth, flag_interval,
                                                      flag_slice, output_path=sub_func_output_folder,

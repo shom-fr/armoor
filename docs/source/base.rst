@@ -30,7 +30,7 @@ In the header there are 5 attributes:
     * ``functionality`` : There are 9 functionalities : *sst*, *prof_hydro_vessel*, *prof_hydro_mooring*, *section_hydro*, *clim_hydro*, *currents_hfr*, *currents_ADCP*, *currents_VMADCP* and *drifters*. For more information refer to the :doc:`functionalities` chapter.
     * ``colocate`` : Put the model and observation dataset on the same grid defined according to the selected target: model's, observation's or auto (less dense grid, default).
     * ``output_path`` : Directory path to store the outputs. If no path is provided the plots will pop up.
-    * ``horizontal_step`` : The products can be projected on a grid with the horizontal resolution, in meters, you set.
+    * ``horizontal_step`` : The products can be projected on a grid with the horizontal resolution, in kilometers, you set.
     * ``vertical_step`` : The products can be projected on a grid with the vertical resolution, in meters, you set. If you intend to colocate the products on an HYCOM product grid, this option is required.
 
 
@@ -94,7 +94,7 @@ Relative to vertical restriction:
     * ``dens_min`` : Minimum authorized density value.
     * ``dens_max`` : Maximum authorized density value.
 
-    * ``slice`` : To group into vertical slices between the specified depth or density levels specified.
+    * ``slice`` : To group into vertical slices between the specified values of depth or density levels (e.g. --slice 0,150 500,1000 will define two vertical slices).
 
 Other restrictions :
 
@@ -137,8 +137,8 @@ For each output here is the list of possible options (with their associated desc
         #. ``diag_disp_g``: Global scatter plot dispersion diagram
         #. ``plot_map_metr_ecart``: 2D map with deviation metric
         #. ``plot_map_metr_biais``: 2D map with bias metric
-        #. ``plot_map_metr_RMSEc``: Plot RMSE map
-        #. ``plot_map_metr_RMSEcentree``: Plot centered RMSE map
+        #. ``plot_map_metr_RMSE``: Plot RMSE map
+        #. ``plot_map_metr_RMSEc``: Plot centered RMSE map
         #. ``plot_profile_u``: Create unique vertical profiles figures of a variable
         #. ``plot_profile_multi``: Create multi vertical profiles figures of a variable
 
@@ -156,7 +156,21 @@ For each output here is the list of possible options (with their associated desc
     * ``analysis_end`` : Date to end the harmonic analysis
     * ``tidal_waves`` : List of the tidal waves to compute. At least 1 tidal wave must be given, a good start is M2 S2 K1 O1 P1 Q1.
     * ``tide_tool`` : Name of the tide library to use to compute harmonic analysis, either utide or ttide. By default, utide will be used.
+    * ``low_pass_filter`` : Name of the low-pass filter method to apply to retrieve the residual current. Must be chosen between "demerliac", "godin" and "mean".
 
+You can select the variables to plot among the following ones:
+    * ``SST`` : Sea surface temperature
+    * ``temp`` : Temperature
+    * ``ptemp`` : Potential temperature
+    * ``ssh`` : Sea surface height
+    * ``sal`` : Salinity
+    * ``dens`` : Density
+    * ``pdens`` : Potential density
+    * ``current`` : Current
+    * ``current_res`` : Residual current
+    * ``current_geo`` : Geostrophic current
+    * ``mld`` : Mixed layer depth
+    * ``sound_speed`` : Sound speed
 
 
 Example

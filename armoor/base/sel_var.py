@@ -7,6 +7,7 @@ import numpy as np
 import xarray as xr
 import xoa
 import xoa.cf as xcf
+import xoa.filter as xfilter
 import gsw
 from armoor.hmi.script_tools import compute_mixed_layer
 
@@ -42,7 +43,7 @@ class SSTAccessor:
 
         xcf.register_cf_specs(path)
 
-    def selection(self, vars, depth=0):
+    def selection(self, vars, depth=0, filter=None):
         """
         Select the variable.
         Parameters
@@ -64,18 +65,27 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_ssh()
             elif var == 'sal':
                 dataset = self._obj.sel_var.sel_sal()
+                dataset = dataset.rename('sal') if dataset is not None else dataset
             elif var == 'dens':
                 dataset = self._obj.sel_var.sel_density()
             elif var == 'pdens':
                 dataset = self._obj.sel_var.sel_pdensity()
             elif var == 'current':
                 dataset = self._obj.sel_var.sel_current()
+            elif var == 'current_geo':
+                dataset = self._obj.sel_var.sel_geo_current()
+            elif var == 'current_res':
+                dataset = self._obj.sel_var.sel_current_res(filter)
             elif var == 'mld':
                 dataset = self._obj.sel_var.sel_mixed_layer_depth()
             elif var == 'sound_speed':
                 dataset = self._obj.sel_var.sel_sound_speed()
-            elif var == 'geostrophic_current':
-                dataset = self._obj.sel_var.sel_geo_current()
+            else:
+                if var in self._obj:
+                    dataset = self._obj[var]
+                else:
+                    dataset = None
+
             liste_ds.append(dataset)
 
         # Remove None datasets
@@ -129,6 +139,7 @@ class SSTAccessor:
             current['norm'] = self._obj['HCSP']
         else:
             current['norm'] = (current.u ** 2 + current.v ** 2) ** 0.5
+
         return current
 
     def sel_geo_current(self):
@@ -142,6 +153,48 @@ class SSTAccessor:
         """
         current = self._obj[["ugbt", "vgbt"]]
         return current
+
+    def sel_current_res(self, filter):
+        """
+        Select residual current from the dataset with demerliac, godin or mean filter.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing SST. If several depth temperature,
+            the temperature of the min depth is taken.
+        """
+        if 'u_res' in self._obj:
+            current_res = self._obj[['u_res', 'v_res', 'norm_res']]
+            return current_res
+
+        if 'u' in self._obj.variables:
+            try:
+                # Filter
+                da_u = self._obj['u']
+                da_v = self._obj['v']
+                da_u_res = xfilter.tidal_filter(da_u, filter)
+                da_v_res = xfilter.tidal_filter(da_v, filter)
+            except:
+                logger.info(
+                    f'The time step of the data is not constant, it will be resampled on hourly dates.')
+                # Resample the data on hourly dates
+                min_date = self._obj['time'].min().data.astype('datetime64[h]')
+                max_date = self._obj['time'].max().data.astype('datetime64[h]')
+                time_hor = np.arange(min_date, max_date, dtype='datetime64[h]')
+                self._obj = self._obj.interp(time=time_hor, method='linear',
+                                             kwargs={"fill_value": "extrapolate"})
+                # Filter
+                da_u = self._obj['u']
+                da_v = self._obj['v']
+                da_u_res = xfilter.tidal_filter(da_u, filter)
+                da_v_res = xfilter.tidal_filter(da_v, filter)
+
+            current_res = xr.Dataset()
+            current_res['u_res'] = da_u_res
+            current_res['v_res'] = da_v_res
+            current_res['norm_res'] = (current_res.u_res ** 2 + current_res.v_res ** 2) ** 0.5
+            return current_res
 
     def sel_sst(self, depth=0):
         """
@@ -189,11 +242,13 @@ class SSTAccessor:
             Data array containing salinity.
         """
 
-        try:  # dataset
-            if "sal" in self._obj.variables:
-                return self._obj.sal
-        except:
-            return self._obj.xoa.sal
+        if "sal" in self._obj.variables:
+            return self._obj.sal
+        elif 'psal' in self._obj:
+            if "pres" in self._obj:
+                sal = gsw.conversions.SA_from_SP(self._obj.psal, self._obj.pres, self._obj.lon,
+                                                 self._obj.lat)
+                return sal
 
     def sel_temp(self):
         """
@@ -222,13 +277,14 @@ class SSTAccessor:
             return self._obj['ptemp'].sel_var.convert_K_C()
         if 'temp' in self._obj:
             # verify salinity and pressure are also included
-            if 'sal' in self._obj and 'pres' in self._obj:
-                ptemp = gsw.conversions.pt0_from_t(self._obj.sal, self._obj.temp, self._obj.pres)
+            if ('sal' in self._obj or 'psal' in self._obj) and 'pres' in self._obj:
+                sal = self._obj.sel_var.sel_sal()
+                ptemp = gsw.conversions.pt0_from_t(sal, self._obj.temp, self._obj.pres)
                 ptemp.attrs['standard_name'] = "sea_water_potential_temperature"
                 ptemp.attrs['units'] = "degrees_celsius"
                 ptemp.attrs['long_name'] = "Potential temperature"
                 self._obj['ptemp'] = ptemp
-                return self._obj
+                return self._obj['ptemp'].sel_var.convert_K_C()
 
             logging.warning(
                 'The potential temperature could not be calculated, sea temperature will be used')
@@ -314,7 +370,7 @@ class SSTAccessor:
             if not sal is None and not temp is None:
                 pdens = gsw.sigma0(sal, temp)
                 self._obj['pdens'] = pdens
-                self._obj['pdens'] =self._obj['pdens'].assign_attrs({'units':'kg/m3'})
+                self._obj['pdens'] = self._obj['pdens'].assign_attrs({'units': 'kg/m3'})
                 return self._obj['pdens']
         else:
             return ds_dens

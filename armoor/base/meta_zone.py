@@ -92,7 +92,6 @@ class MetazoneAccessor:
         logger.info("Applying filter - horizontal_selection_polygon")
         # Create the polygon where to subset
         polygon = path.Path(coords)
-
         # Depending on the coordinate system, flag the points outside the polygon
         if 'lon' in self._obj.dims:  # Check if rect coordinates
             ds_coords = [(lon, lat) for lon in self._obj.lon.data for lat in self._obj.lat.data]
@@ -118,9 +117,16 @@ class MetazoneAccessor:
             if True not in mask_poly:
                 raise ValueError('The polygon you have defined is not included in the data grid. '
                                  'The horizontal selection does not work.')
+        # Profilers/drifter
+        elif 'lon' in self._obj.coords and 'time' in self._obj.lon.dims:
+            ds_coords = [(self._obj.lon.data[i], self._obj.lat.data[i]) for i in
+                         range(len(self._obj.time))]
+            flags = polygon.contains_points(ds_coords)
+            mask_poly = xr.DataArray(data=flags, dims=['time'])
 
         # Remove points outside the polygon
         self._obj = self._obj.where(mask_poly, drop=True)
+
         return self._obj
 
     def data_selection(self, dim: str, minimum: float = None, maximum: float = None,
@@ -156,7 +162,7 @@ class MetazoneAccessor:
             selection = self._obj[dim] <= maximum
         else:
             selection = None
-        return self._obj.where(selection, drop=True)
+        return self._obj.where(selection)
 
     def horizontal_selection_coords(self, coordinates: [(float, float)],
                                     method: str = None) -> xr.Dataset:
@@ -182,10 +188,8 @@ class MetazoneAccessor:
         lat_target = [lat for lon, lat in coordinates]
 
         if 'lon' in self._obj.dims:  # Regular grid
-            if method in ["linear"]:
-                return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
-            if method is None:
-                method = 'nearest'
+            if method in ["linear"] or method is None:
+                return self._obj.interp(lon=lon_target, lat=lat_target, method='linear')
             return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
 
         if 'x' in self._obj.dims:  # Curvilinear grid
@@ -217,7 +221,7 @@ class MetazoneAccessor:
         if obs_lon.size > 1:
             obs_lon, obs_lat = obs_lon[0], obs_lat[0]
 
-        self._obj = self._obj.sel(lon=obs_lon, lat=obs_lat, method='nearest')
+        self._obj = self._obj.interp(lon=obs_lon, lat=obs_lat, method='linear')
         distance = np.sqrt(
             (self._obj.lon.values - obs_lon) ** 2 + (self._obj.lat.values - obs_lat) ** 2)
         radius_km = self._obj.meta.km_to_deg(radius)
@@ -290,6 +294,7 @@ class MetazoneAccessor:
         radius = self._obj.meta.km_to_deg(radius_km)
         liste_ds = []
         idx_centre = 0
+
         lons, lats = cloud
         for i_lon, _ in enumerate(lons):
             lon, lat = lons[i_lon], lats[i_lon]
@@ -376,9 +381,24 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_depth")
         depth = np.array(depth, dtype=float)
-        if len(depth) == 1:
-            return self.vertical_selection_ponct(depth[0], 'depth')
-        return self.vertical_selection_list(depth)
+        if 'depth' in self._obj and np.size(self._obj.depth) > 1:
+            if 'instr' in self._obj.dims:
+                if len(depth) == 1:
+                    list_ds = [
+                        self._obj.isel(instr=i).meta.vertical_selection_ponct(depth[0], 'depth') for
+                        i in range(len(self._obj.instr))]
+                    return xr.concat(list_ds, dim='instr')
+                list_ds = [self._obj.isel(instr=i).meta.vertical_selection_list(depth) for i in
+                           range(len(self._obj.instr))]
+                return xr.concat(list_ds, dim='instr')
+            else:
+                if len(depth) == 1:
+                    return self.vertical_selection_ponct(depth[0], 'depth')
+                return self.vertical_selection_list(depth)
+        if len(depth) == 1 and 'depth' in self._obj.dims:
+            return self._obj.squeeze('depth')
+        return self._obj
+
 
     def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
         """
@@ -497,21 +517,21 @@ class MetazoneAccessor:
 
         if var_vert == 'depth':
             if 'depth' in dataset.dims and len(dataset.depth.dims) == 1:  # NEMO or TOPAZ
-                dataset = dataset.sel(depth=depth, method='nearest')
+                dataset = dataset.interp(depth=depth, method='linear')
                 dataset['depth'] = depth
                 return dataset
 
-            if list(dataset.dims.keys()) == ['time', 'z']:  # CMEMS profilers
+            if list(dataset.dims) == ['time', 'z']:  # CMEMS profilers
                 return dataset.meta.vertical_selection_ponct_cmems(depth)
 
             if 'z' in dataset.dims or 'level' in dataset.dims or (
                     depth in dataset.dims and len(dataset.depth.dims) == 2):  # CROCO or HYCOM
-                return dataset.meta.vertical_seletion_croco_hycom(depth)
+                return dataset.meta.vertical_selection_croco_hycom(depth)
 
             return dataset
         if var_vert == 'dens':
             if 'pdens' in dataset.dims:
-                return dataset.sel(pdens=depth, method='nearest')
+                return dataset.interp(pdens=depth, method='linear')
             elif 'pdens' not in dataset:
                 dataset["pdens"] = dataset.sel_var.sel_pdensity()
             return dataset.meta.vertical_selection_dens_from_depth(pdens=depth)
@@ -539,7 +559,7 @@ class MetazoneAccessor:
         tgt_ds = tgt_ds.drop('depth').assign_coords(depth=depth)
         return tgt_ds
 
-    def vertical_seletion_croco_hycom(self, depth):
+    def vertical_selection_croco_hycom(self, depth):
         """
         Vertical selection of one level in a Croco or Hycom product.
         Parameters
@@ -562,7 +582,7 @@ class MetazoneAccessor:
 
         # Create target depth(s) dataset
         if np.size(depth) == 1:
-            depth = [depth]
+            depth = [float(depth)]
         else:
             depth = np.array(depth)
         tgt_depth = xr.DataArray(depth, dims="depth", name="depth")
@@ -704,14 +724,13 @@ class MetazoneAccessor:
         cli.base.meta_zone.MetazoneAccessor.data_selection
         """
         if 'depth' in self._obj.dims:  # Selection for NEMO or TOPAZ
-            return self._obj.sel(depth=depths, method='nearest')
+            return self._obj.interp(depth=depths, method='linear')
 
         if list(self._obj.dims.keys()) == ['time', 'z']:  # CMEMS profilers
-            list_ds_z = [self._obj.meta.vertical_selection_ponct_cmems(depth) for depth in depths]
-            return xr.concat(list_ds_z, dim='depth')
+            return self._obj.meta.vertical_selection_croco_hycom(depths)
 
         if 'z' in self._obj.dims or 'level' in self._obj.dims:  # Selection for CROCO or HYCOM
-            return self._obj.meta.vertical_seletion_croco_hycom(depths)
+            return self._obj.meta.vertical_selection_croco_hycom(depths)
 
     def vertical_selection_slice(self, slices: list = None, var_slice: str = None) -> xr.Dataset:
         """Return a new Dataset whose data is sorted per depth slice.
@@ -729,21 +748,28 @@ class MetazoneAccessor:
             same Dataset averaged over the vertical slice.
         """
         logger.info("Applying filter - vertical_selection_slice")
-        ds_group = self._obj.groupby_bins(var_slice, slices)
+
+        # Initialise dataset
         liste_ds = []
 
-        for label, dataset in ds_group:
-            label = str(label)[1:-1].replace(", ", " to ") + ' '
-            dataset['slice_label'] = label
-            liste_ds.append(dataset)
+        # Separate slices
+        mins = [min for min, max in slices]
+        maxs = [max for min, max in slices]
 
-        for i_ds, dataset in enumerate(liste_ds):
-            dataset = dataset.assign_coords(
+        for i_slice, _ in enumerate(mins):
+            min_slice, max_slice = mins[i_slice], maxs[i_slice]
+            ds_slice = self._obj.meta.vertical_selection_range([min_slice, max_slice], var_slice)
+            label = f'{min_slice} to {max_slice}'
+            ds_slice['slice_label'] = label
+            liste_ds.append(ds_slice)
+
+        for i_ds, ds_slice in enumerate(liste_ds):
+            ds_slice = ds_slice.assign_coords(
                 slice=i_ds)  # ajoute une dimension de date moyenne sur l'intervalle
-            dataset[var_slice + "_value"] = dataset[var_slice]
-            dataset = dataset.assign_coords(
-                depth=np.arange(len(dataset[var_slice])))  # change les profondeurs en indices
-            liste_ds[i_ds] = dataset
+            ds_slice[var_slice + "_value"] = ds_slice[var_slice]
+            ds_slice = ds_slice.assign_coords(
+                depth=np.arange(len(ds_slice[var_slice])))  # change les profondeurs en indices
+            liste_ds[i_ds] = ds_slice
 
         dataset = xr.concat(liste_ds, 'slice')
         dataset = dataset.rename({var_slice: 'idx_' + var_slice})
@@ -751,6 +777,7 @@ class MetazoneAccessor:
         dataset['slice'] = dataset['slice_label']
         if "depth" in dataset:
             dataset = dataset.assign_coords({"depth": dataset.depth})
+
         return dataset
 
     def time_selection_start(self, start=None) -> xr.Dataset:
@@ -813,7 +840,7 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - time_selection_absolute")
         if start == end:
-            return self._obj.sel(time=start, method='nearest')
+            return self._obj.interp(time=start, method='linear')
         return self._obj.sel(time=slice(start, end))
 
     def time_selection_relative(self, start: int = None, end: int = None) -> xr.Dataset:
@@ -848,7 +875,7 @@ class MetazoneAccessor:
         return self._obj.sel(time=slice(start, end))
 
     # Overload time_selection
-    def time_selection_list(self, times: list, method: str = 'nearest') -> xr.Dataset:
+    def time_selection_list(self, times: list, method: str = 'linear') -> xr.Dataset:
         """
         Subset dataset filtering elements along time dimension, selecting dates from a
         specified list.
