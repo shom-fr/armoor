@@ -54,7 +54,7 @@ def run_harmonic_analysis_map(ds, output):
             ds_to_anal = ds.sel(lon=lon, lat=lat)
             if np.sum(np.isnan(ds_to_anal.u.data)) < np.sum(
                     ~np.isnan(ds_to_anal.u.data)) and np.sum(np.isnan(ds_to_anal.v.data)) < np.sum(
-                    ~np.isnan(ds_to_anal.v.data)):
+                ~np.isnan(ds_to_anal.v.data)):
 
                 # Ttide
                 if tide_tool == 'ttide':
