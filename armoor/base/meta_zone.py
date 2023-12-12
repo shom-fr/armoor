@@ -381,9 +381,18 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_depth")
         depth = np.array(depth, dtype=float)
-        if len(depth) == 1:
-            return self.vertical_selection_ponct(depth[0], 'depth')
-        return self.vertical_selection_list(depth)
+        if 'instr' in self._obj.dims:
+            if len(depth) == 1:
+                list_ds = [self._obj.isel(instr=i).meta.vertical_selection_ponct(depth[0], 'depth')
+                           for i in range(len(self._obj.instr))]
+                return xr.concat(list_ds, dim='instr')
+            list_ds = [self._obj.isel(instr=i).meta.vertical_selection_list(depth) for i in
+                       range(len(self._obj.instr))]
+            return xr.concat(list_ds, dim='instr')
+        else:
+            if len(depth) == 1:
+                return self.vertical_selection_ponct(depth[0], 'depth')
+            return self.vertical_selection_list(depth)
 
     def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
         """
@@ -534,6 +543,7 @@ class MetazoneAccessor:
         CMEMS product at the required depth.
 
         """
+
         depth_diff = np.abs(self._obj['depth'] - depth)
         nearest_depth_index = [np.nanargmin(depth_diff.isel(time=i_time).data) for i_time, time in
                                enumerate(self._obj.time)]
