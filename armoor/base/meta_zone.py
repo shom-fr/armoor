@@ -92,6 +92,7 @@ class MetazoneAccessor:
         logger.info("Applying filter - horizontal_selection_polygon")
         # Create the polygon where to subset
         polygon = path.Path(coords)
+
         # Depending on the coordinate system, flag the points outside the polygon
         if 'lon' in self._obj.dims:  # Check if rect coordinates
             ds_coords = [(lon, lat) for lon in self._obj.lon.data for lat in self._obj.lat.data]
@@ -294,7 +295,6 @@ class MetazoneAccessor:
         radius = self._obj.meta.km_to_deg(radius_km)
         liste_ds = []
         idx_centre = 0
-
         lons, lats = cloud
         for i_lon, _ in enumerate(lons):
             lon, lat = lons[i_lon], lats[i_lon]
@@ -381,9 +381,22 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_depth")
         depth = np.array(depth, dtype=float)
-        if len(depth) == 1:
-            return self.vertical_selection_ponct(depth[0], 'depth')
-        return self.vertical_selection_list(depth)
+        if 'depth' in self._obj and np.size(self._obj.depth)>1:
+            if 'instr' in self._obj.dims:
+                if len(depth) == 1:
+                    list_ds = [self._obj.isel(instr=i).meta.vertical_selection_ponct(depth[0], 'depth')
+                               for i in range(len(self._obj.instr))]
+                    return xr.concat(list_ds, dim='instr')
+                list_ds = [self._obj.isel(instr=i).meta.vertical_selection_list(depth) for i in
+                           range(len(self._obj.instr))]
+                return xr.concat(list_ds, dim='instr')
+            else:
+                if len(depth) == 1:
+                    return self.vertical_selection_ponct(depth[0], 'depth')
+                return self.vertical_selection_list(depth)
+        if len(depth) == 1 and 'depth' in self._obj.dims:
+            return self._obj.squeeze('depth')
+        return self._obj
 
     def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
         """
@@ -506,7 +519,7 @@ class MetazoneAccessor:
                 dataset['depth'] = depth
                 return dataset
 
-            if list(dataset.dims) == ['time', 'z']:  # CMEMS profilers
+            if list(dataset.dims.keys()) == ['time', 'z'] or list(dataset.dims.keys()) == ['instr', 'time', 'z']:  # CMEMS profilers
                 return dataset.meta.vertical_selection_ponct_cmems(depth)
 
             if 'z' in dataset.dims or 'level' in dataset.dims or (
@@ -534,6 +547,7 @@ class MetazoneAccessor:
         CMEMS product at the required depth.
 
         """
+
         depth_diff = np.abs(self._obj['depth'] - depth)
         nearest_depth_index = [np.nanargmin(depth_diff.isel(time=i_time).data) for i_time, time in
                                enumerate(self._obj.time)]
