@@ -549,6 +549,7 @@ class MetazoneAccessor:
         CMEMS product at the required depth.
 
         """
+
         depth_diff = np.abs(self._obj['depth'] - depth)
         nearest_depth_index = [np.nanargmin(depth_diff.isel(time=i_time).data) for i_time, time in
                                enumerate(self._obj.time)]
