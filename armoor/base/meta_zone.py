@@ -521,7 +521,9 @@ class MetazoneAccessor:
                 dataset['depth'] = depth
                 return dataset
 
-            if list(dataset.dims.keys()) == ['time', 'z'] or list(dataset.dims.keys()) == ['instr', 'time', 'z']:  # CMEMS profilers
+            if list(dataset.dims.keys()) == ['time', 'z'] or list(dataset.dims.keys()) == ['instr',
+                                                                                           'time',
+                                                                                           'z']:  # CMEMS profilers
                 return dataset.meta.vertical_selection_ponct_cmems(depth)
 
             if 'z' in dataset.dims or 'level' in dataset.dims or (
@@ -607,7 +609,8 @@ class MetazoneAccessor:
         if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
             tgt_ds['depth'] = -tgt_ds['depth']
 
-        tgt_ds = tgt_ds.squeeze()
+        if len(depth) == 1 and 'depth' in tgt_ds.dims:
+            tgt_ds = tgt_ds.squeeze('depth')
         # Reindex depths if necessary
         if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0] > tgt_ds.depth.data[-1]:
             tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
