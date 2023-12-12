@@ -381,18 +381,22 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_depth")
         depth = np.array(depth, dtype=float)
-        if 'instr' in self._obj.dims:
-            if len(depth) == 1:
-                list_ds = [self._obj.isel(instr=i).meta.vertical_selection_ponct(depth[0], 'depth')
-                           for i in range(len(self._obj.instr))]
+        if 'depth' in self._obj and np.size(self._obj.depth)>1:
+            if 'instr' in self._obj.dims:
+                if len(depth) == 1:
+                    list_ds = [self._obj.isel(instr=i).meta.vertical_selection_ponct(depth[0], 'depth')
+                               for i in range(len(self._obj.instr))]
+                    return xr.concat(list_ds, dim='instr')
+                list_ds = [self._obj.isel(instr=i).meta.vertical_selection_list(depth) for i in
+                           range(len(self._obj.instr))]
                 return xr.concat(list_ds, dim='instr')
-            list_ds = [self._obj.isel(instr=i).meta.vertical_selection_list(depth) for i in
-                       range(len(self._obj.instr))]
-            return xr.concat(list_ds, dim='instr')
-        else:
-            if len(depth) == 1:
-                return self.vertical_selection_ponct(depth[0], 'depth')
-            return self.vertical_selection_list(depth)
+            else:
+                if len(depth) == 1:
+                    return self.vertical_selection_ponct(depth[0], 'depth')
+                return self.vertical_selection_list(depth)
+        if len(depth) == 1 and 'depth' in self._obj.dims:
+            return self._obj.squeeze('depth')
+        return self._obj
 
     def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
         """
