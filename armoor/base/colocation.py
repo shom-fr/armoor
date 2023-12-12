@@ -201,8 +201,9 @@ def horizontal_colocation(ds_to_coloc, tgt, coloc_method):
             ds_coloc = convert_curv_rect(ds_to_coloc, lon_values, lat_values)
 
     else:
-        ds_coloc = ds_to_coloc.interp(lon=lon_values, lat=lat_values, method=coloc_method,
-                                      kwargs={"fill_value": "extrapolate"})
+        # Fill Nans for the interpolation
+        ds_to_coloc = ds_to_coloc.interpolate_na(dim='lon', method=coloc_method)
+        ds_coloc = ds_to_coloc.interp(lon=lon_values, lat=lat_values, method=coloc_method)
 
     return ds_coloc
 
@@ -346,6 +347,7 @@ def colocate_lon_lat_time_instr(mod, obs, method, method_z):
         list_mod_instr.append(mod_i)
     mod_coloc = xr.concat(list_mod_instr, 'instr')
     return mod_coloc
+
 
 def colocate_lon_lat_time(mod, obs, method, method_z):
     """
