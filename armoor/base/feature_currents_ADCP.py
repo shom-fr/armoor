@@ -26,6 +26,7 @@ def plot(config_obj):
         Path to the generated figures.
 
     """
+
     outputs = config_obj["outputs"]
     output_path = config_obj.get("output_path")
 
@@ -63,41 +64,49 @@ def plot(config_obj):
         else:
             scale = 0.1
 
+        # Calculate residual current
+        if 'attribute' in output and 'res' in output['attribute'][0]:
+            if 'low_pass_filter' in output:
+                filter = output['low_pass_filter']
+                observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
+                    ['current_res'], filter=filter)
+                for i_mod, mod in enumerate(models):
+                    mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current_res'],
+                                                                              filter=filter)
+                    mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
+                        ['current_res'], filter=filter)
+                    observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                        i_mod].sel_var.selection(['current_res'], filter=filter)
+            else:
+                logger.warning(
+                    'Caution ! To retrieve residual currents, please specify low_pass_filter with demerliac, godin or mean.')
+
         # PLOTS
         ############################################################################################
         # HOVMOLLER CURRENTS
         plot_hovmoller = {"plot_hovmoller": 'plot_hovmoller'}
         if output["plot"] in plot_hovmoller:
-            if 'attribute' in output:
-                attribute = output["attribute"][0].replace('current_', '')
+            # Select the attributes to plot
+            if 'attribute' in output and output["attribute"] == ['current_res']:
+                attributes = ['u_res', 'v_res', 'norm_res']
             else:
-                attribute = "norm"
+                attributes = ['u', 'v', 'norm']
 
-            # Select attribute in good format
-            def to_ds_with_coords(dataset, attribute):
-                dataset_coords = dataset[attribute].to_dataset().assign_coords(dataset.coords)
-                dataset_coords = dataset_coords.assign_attrs(dataset.attrs)
-                dataset_coords = dataset_coords.assign_attrs(dataset[attribute].attrs)
-                return dataset_coords
+            for attribute in attributes:
+                obs_var, mods_var = copy.deepcopy(observation), copy.deepcopy(models)
+                for i_mod, mod_var in enumerate(mods_var):
+                    # Remove missing values
+                    mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
+                                                                 [attribute], [attribute])
+                    # Select variables to plot
+                    mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
+                    mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
+                    obs_var['xarray_meta_coloc'][i_mod] = obs_var['xarray_meta_coloc'][i_mod][
+                        attribute]
+                obs_var['xarray_meta'] = obs_var['xarray_meta'][attribute]
 
-            observation['xarray_meta'] = to_ds_with_coords(observation['xarray_meta'], attribute)
-            for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = to_ds_with_coords(mod['xarray_meta'], attribute)
-                mod['xarray_meta_coloc'] = to_ds_with_coords(mod['xarray_meta_coloc'], attribute)
-                observation['xarray_meta_coloc'][i_mod] = to_ds_with_coords(
-                    observation['xarray_meta_coloc'][i_mod], attribute)
-
-                models[i_mod] = mod
-
-            # Select variables to plot
-            observation['xarray_meta'] = observation['xarray_meta'].to_array()
-            for i_mod, mod in enumerate(models):
-                mod['xarray_meta'] = mod['xarray_meta'].to_array()
-                mod['xarray_meta_coloc'] = mod['xarray_meta_coloc'].to_array()
-                observation['xarray_meta_coloc'][i_mod] = observation['xarray_meta_coloc'][
-                    i_mod].to_array()
-            plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax, dvmin, dvmax,
-                                           output_path=sub_func_output_folder)
+                plot_features.plot_variable_3d(mods_var, obs_var, cmap, vmin, vmax, dvmin, dvmax,
+                                               output_path=sub_func_output_folder)
 
         ############################################################################################
         # HARMONIC TABLES

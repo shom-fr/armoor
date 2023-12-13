@@ -14,6 +14,7 @@ import numpy as np
 import gsw
 import pandas as pd
 import dask
+from pyproj import Geod
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +185,7 @@ def open_decode_cmems(path_files, steps):
 
     # Variables to drop/rename to prevent random behaviours
     for var in list(cmems.keys()):
-        if "POSITION" in var or 'LOCATION' in var:
+        if "POSITION" in var or 'LOCATION' in var or '_DM' in var:
             cmems = cmems.drop_vars(var)
         elif var[-3:] == "_QC":
             cmems = cmems.rename({var: f"QC_{var[:-3]}"})
@@ -195,6 +196,9 @@ def open_decode_cmems(path_files, steps):
                 cmems = cmems.drop_vars(f"{var}_ADJUSTED_ERROR")
             if f"{var}_CNDC" in cmems:
                 cmems = cmems.drop_vars(f"{var}_CNDC")
+        # Remove otherwise interp won't work
+        if var in ['DATA_MODE', 'DIRECTION', 'VERTICAL_SAMPLING_SCHEME']:
+            cmems = cmems.drop_vars(var)
 
     # Decode
     cmems = cmems.xoa.decode()
@@ -412,7 +416,8 @@ def open_decode_mouillages(path_file):
         unwanted_prefixes = ['Cruise', 'Station', 'Type', 'yyyy', 'Lon', 'Lat', 'Bot', 'Unnamed']
         columns_to_drop = measur.columns[measur.columns.str.startswith(tuple(unwanted_prefixes))]
         measur_ds = measur.drop(columns=columns_to_drop).astype(float).to_xarray()
-        measur_ds = measur_ds.assign_coords(lon=lon, lat=lat, time=date, bottom_depth=bottom_depth)
+        measur_ds = measur_ds.expand_dims(lon=[lon], lat=[lat])
+        measur_ds = measur_ds.assign_coords(time=date, bottom_depth=bottom_depth)
         list_ds.append(measur_ds.reset_coords())
 
     # Merge datasets
@@ -546,7 +551,7 @@ def open_decode_croco(path_file):
     croco = xr.open_dataset(path_file).decode_sigma()
 
     # Remove variables that are never used in the features. May need to be completed.
-    list_to_keep = ['temp', 'salt', 'u', 'v', 'h']
+    list_to_keep = ['temp', 'salt', 'u', 'v', 'h', 'angle']
     for var in list(croco.keys()):
         if var not in list_to_keep:
             croco = croco.drop_vars(var)
@@ -563,7 +568,16 @@ def open_decode_croco(path_file):
         da_v = da_v.sel(eta=croco.eta_rho, method='nearest')
         croco['v'] = da_v
 
-    # Remove duplicate coords
+        # Rotate currents
+        if 'angle' in croco:
+            angle = croco['angle']
+            da_u = croco['u'] * np.cos(angle) - croco['v'] * np.sin(angle)
+            da_v = croco['u'] * np.sin(angle) + croco['v'] * np.cos(angle)
+            croco = croco.drop(['u', 'v', 'angle'])
+            croco['uz'] = da_u
+            croco['v'] = da_v
+
+            # Remove duplicate coords
     if 'lon' in croco and 'lon_rho' in croco:
         croco = croco.drop_vars(['lon', 'lat'])
 
@@ -576,7 +590,11 @@ def open_decode_croco(path_file):
             croco = croco.drop_vars(var)
 
     # Regrid if necessary
-    croco = xoa.grid.to_rect(croco)
+    test_regrid = xoa.grid.to_rect(croco)
+    if 'lon' in test_regrid.dims and 'lat' in test_regrid.dims:
+        croco = test_regrid
+    elif 'x' in test_regrid.dims and 'y' in test_regrid.dims:
+        croco = test_regrid
 
     # Convert lons
     croco = convert_lons(croco)
@@ -594,6 +612,10 @@ def open_decode_croco(path_file):
 
     # Assign croco attrs
     croco = croco.assign_attrs({'type': 'CROCO'})
+
+    # Rename ptemp
+    if 'temp' in croco:
+        croco = croco.rename({'temp': 'ptemp'})
 
     return croco
 
@@ -694,6 +716,8 @@ def open_decode_hycom_3d(path_files):
 
     # Rename
     hycom = hycom.rename({'level': 'z'})
+    if 'temp' in hycom:
+        hycom = hycom.rename({'temp': 'ptemp'})
 
     # Regrid if necessary
     hycom = xoa.grid.to_rect(hycom)
@@ -785,6 +809,9 @@ def open_decode_basic(path_files):
     dataset = dataset.xoa.decode()
     if "lon_longitude" in dataset:
         dataset = dataset.drop_vars(["lon_longitude", 'lat_latitude'])
+
+    if 'temp' in dataset and 'potential' in dataset.temp.attrs['standard_name']:
+        dataset = dataset.rename({'temp': 'ptemp'})
 
     # Regrid if necessary
     dataset = xoa.grid.to_rect(dataset)
@@ -1076,20 +1103,17 @@ def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', meth
     Regridded observation.
     """
     # Horizontal gridding
-    horizontal_step = obs.meta.km_to_deg(horizontal_step)
+    # horizontal_step = obs.meta.km_to_deg(horizontal_step)
 
     obs_deb, obs_end = obs.isel(time=0), obs.isel(time=-1)
-    total_distance_obs = np.sqrt(
-        (obs_deb.lon - obs_end.lon) ** 2 + (obs_deb.lat - obs_end.lat) ** 2)
+    geod = Geod(ellps='WGS84')
+    total_distance_obs = geod.line_length(obs.lon.data, obs.lat.data) / 1000
     total_duration_obs = obs_end.time - obs_deb.time
-
     time_step_grid = horizontal_step * total_duration_obs / total_distance_obs
-
     time_step_grid = time_step_grid.data.astype('timedelta64[s]')
     time_step_grid = str(time_step_grid).split()[0] + 'S'
     time_min, time_max = obs_deb.time.values, obs_end.time.values
     time_min, time_max = np.datetime64(time_min), np.datetime64(time_max)
-
     # Create the new times array to select to retrieve the horizontal resolution
     tgt_time = pd.date_range(time_min, time_max, freq=time_step_grid)
 
@@ -1104,5 +1128,12 @@ def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', meth
         obs_grid = obs_grid.meta.vertical_selection_list(depths)
     else:
         obs_grid = obs_grid.interp(depth=depths, method=method_z)
+    # Warning if steps too large
+    if len(obs_grid.depth) == 1:
+        logger.warning(
+            'Caution! The vertical_step requested is too large, the targetted grid has only one depth value. The code may fail.')
 
+    if len(obs_grid.time) == 1:
+        logger.warning(
+            'Caution! The horizontal_step requested is too large, the targetted grid has only one time value. The code may fail.')
     return obs_grid

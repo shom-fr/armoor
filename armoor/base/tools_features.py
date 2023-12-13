@@ -199,39 +199,30 @@ def sel_default_vars(config_obj):
 
     elif feature == "prof_hydro_vessel":  # F2
         default_vars_mod = ['ptemp', 'sal', 'pdens']
-        default_vars_obs = ['temp', 'sal', 'pdens']
-        for var in ['temp', 'ptemp', 'pdens']:
-            if var in additional_vars:
-                additional_vars.remove(var)
+        default_vars_obs = ['ptemp', 'sal', 'pdens']
+
 
     elif feature == "prof_hydro_mooring":  # F3
         default_vars_mod = ['ptemp', 'sal', 'pdens']
-        default_vars_obs = ['temp', 'sal', 'pdens']
-        for var in ['temp', 'ptemp', 'dens', 'pdens']:
-            if var in additional_vars:
-                additional_vars.remove(var)
+        default_vars_obs = ['ptemp', 'sal', 'pdens']
+
 
     elif feature == "section_hydro":  # F4
         default_vars_mod = ['ptemp', 'sal']
-        default_vars_obs = ['temp', 'sal']
-        for var in ['temp', 'ptemp', 'dens', 'pdens']:
-            if var in additional_vars:
-                additional_vars.remove(var)
+        default_vars_obs = ['ptemp', 'sal']
+
 
     elif feature == "clim_hydro":  # F5
         default_vars_mod = ['ptemp', 'sal']
-        default_vars_obs = ['temp', 'sal']
-        for var in ['temp', 'ptemp', 'dens', 'pdens']:
-            if var in additional_vars:
-                additional_vars.remove(var)
+        default_vars_obs = ['ptemp', 'sal']
 
     elif feature == "currents_hfr":  # F6
-        default_vars_mod = ['current']
-        default_vars_obs = ['current']
+        default_vars_mod = ['current', 'current_res']
+        default_vars_obs = ['current', 'current_res']
 
     elif feature == "currents_ADCP":  # F7
-        default_vars_mod = ['current']
-        default_vars_obs = ['current']
+        default_vars_mod = ['current', 'current_res']
+        default_vars_obs = ['current', 'current_res']
 
     elif feature == "currents_VMADCP":  # F8
         default_vars_mod = ['current']
@@ -250,12 +241,16 @@ def sel_default_vars(config_obj):
         for i_mod, mod in enumerate(config_obj['models']):
             mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby(
                 "time.month").mean("time").rename({'month': 'time'})
+
+            # Get month names
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod).groupby(
-                "time.month").mean("time").rename({'month': 'time'}).assign_coords(
-                {'time': calendar.month_name[1:13]})
+                "time.month").mean("time").rename({'month': 'time'})
+            months = [calendar.month_name[i] for i in mod["xarray_meta_coloc"].time.data]
+            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].assign_coords({'time': months})
+
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
                 config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(
-                    vars_obs).assign_coords({'time': calendar.month_name[1:13]})
+                    vars_obs).assign_coords({'time': months})
     else:
         config_obj['observation']["xarray_meta"] = config_obj['observation'][
             "xarray_meta"].sel_var.selection(vars_obs)
@@ -264,6 +259,7 @@ def sel_default_vars(config_obj):
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod)
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
                 config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars_obs)
+
     return config_obj
 
 
@@ -281,7 +277,7 @@ def sel_one_var(observation, models, var):
     models_var = copy.deepcopy(models)
     if var in ['temp', 'ptemp']:
         var_mod = 'ptemp'
-        var_obs = 'temp'
+        var_obs = 'ptemp'
     else:
         var_mod = var
         var_obs = var
