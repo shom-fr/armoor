@@ -278,9 +278,11 @@ def sel_one_var(observation, models, var):
 
     models_var = [dict() for _ in models]
     for key in ['name', 'method', 'xarray']:
-        observation_var[key] = observation[key]
+        if key in list(observation.keys()):
+            observation_var[key] = observation[key]
         for i_mod, mod in enumerate(models):
-            models_var[i_mod][key] = mod[key]
+            if key in list(mod.keys()):
+                models_var[i_mod][key] = mod[key]
 
     # Adjust potential / insitu variables for models and obs
     if var in ['temp', 'ptemp']:
