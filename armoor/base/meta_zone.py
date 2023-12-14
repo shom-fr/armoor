@@ -67,7 +67,7 @@ class MetazoneAccessor:
                 selection = self._obj[var] <= max_q
             else:
                 selection = None
-            return self._obj.where(selection, drop=True)
+            return self._obj.where(selection)
 
         return self._obj
 
@@ -397,6 +397,9 @@ class MetazoneAccessor:
                 return self.vertical_selection_list(depth)
         if len(depth) == 1 and 'depth' in self._obj.dims:
             return self._obj.squeeze('depth')
+        for dim in ['level', 'z']:
+            if dim in self._obj.dims and len(self._obj[dim])==1:
+                return self._obj.squeeze(dim)
         return self._obj
 
     def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
@@ -597,7 +600,7 @@ class MetazoneAccessor:
                 for var_depth in ['level', 'z', 'DEPTH', 'sig']:
                     if var_depth in dataset[var].dims and len(dataset[var][var_depth]) > 1:
                         da_var = dataset[var]
-                        da_tgt = regrid1d(da_var, tgt_depth)
+                        da_tgt = regrid1d(da_var, tgt_depth)  # extrap for depth=0 : does not work
                         tgt_ds = tgt_ds.assign({var: da_tgt})
 
         # Assign depth coordinates values
