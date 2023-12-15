@@ -75,7 +75,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         var_name = ''
     elif "Stick plot" in figtitle:
         title_type = f"{figtitle}"
-        var_name = 'current'
+        var_name, var_unit = find_var_title(obs)
     elif "rajector" in figtitle:  # for trajectories
         title_type = f"{figtitle}"
         var_name = ''
@@ -1560,10 +1560,10 @@ def plot_ellipses_tide_current_generic(observation, models, wave_name, scale, ou
     f, ax = figure_1_map(observation)
     if np.size(observation.lon) > 1:
         for i_lon, _ in enumerate(observation.lon):
-            obs = observation.isel(lon=[i_lon],lat=[i_lon])
+            obs = observation.isel(lon=[i_lon], lat=[i_lon])
             ax = plot_ellipses_tide_current_figure(freq, ax, obs, 'k', scale)
             for i_mod, mod in enumerate(models):
-                mod = mod.isel(lon=[i_lon],lat=[i_lon])
+                mod = mod.isel(lon=[i_lon], lat=[i_lon])
                 ax = plot_ellipses_tide_current_figure(freq, ax, mod, COLORS[i_mod], scale)
     else:
         ax = plot_ellipses_tide_current_figure(freq, ax, observation, 'k', scale)
@@ -2923,16 +2923,29 @@ def plot_stick_plots(models, observation, output_path=None):
     """
     logger.info('Stick plots for current data')
 
+
+
     obs_base = observation['xarray_meta_coloc'][0]
+
+    # Retrieve current to plot
+    if 'u_bc' in obs_base:
+        var_u = 'u_bc'
+        var_v = 'v_bc'
+        var_norm = 'norm_bc'
+    elif 'u' in obs_base:
+        var_u = 'u'
+        var_v = 'v'
+        var_norm = 'norm'
+
     if "depth" not in obs_base.dims and "dens" not in obs_base.dims:
         f, ax = figure_1_stickplot()
         obs = observation['xarray_meta_coloc'][0]
-        ax.quiver(obs.time, [[0] * len(obs.time)], obs.u, obs.v, angles='uv', width=0.001,
+        ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
                   headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
                   label=observation['name'])
         for i_mod, mod in enumerate(models):
             mod = mod['xarray_meta_coloc'].squeeze()
-            ax.quiver(mod.time, [[0] * len(mod.time)], mod.u, mod.v, angles='uv', width=0.001,
+            ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv', width=0.001,
                       headwidth=0.001, headlength=0.001, headaxislength=0.001, color=COLORS[i_mod],
                       label=f'{mod.attrs["name"]}')
         # Add legend
@@ -2949,7 +2962,7 @@ def plot_stick_plots(models, observation, output_path=None):
         add_second_x_axis(f, ax, obs)
 
         # Set title
-        title, figname = get_title_figname('Stick plot', obs.norm, [mod['name'] for mod in models],
+        title, figname = get_title_figname('Stick plot', obs[var_norm], [mod['name'] for mod in models],
                                            observation['name'])
 
         f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
@@ -2960,12 +2973,12 @@ def plot_stick_plots(models, observation, output_path=None):
             for i_depth, _ in enumerate(observation['xarray_meta_coloc'][0].depth):
                 f, ax = figure_1_stickplot()
                 obs = observation['xarray_meta_coloc'][0].isel(depth=i_depth)
-                ax.quiver(obs.time, [[0] * len(obs.time)], obs.u, obs.v, angles='uv', width=0.001,
+                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
                           headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
                           label=observation['name'])
                 for i_mod, mod in enumerate(models):
                     mod = mod['xarray_meta_coloc'].isel(depth=i_depth).squeeze()
-                    ax.quiver(mod.time, [[0] * len(mod.time)], mod.u, mod.v, angles='uv',
+                    ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
                               width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
                               color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
                 # Add legend
@@ -2994,13 +3007,13 @@ def plot_stick_plots(models, observation, output_path=None):
             for i_dens, _ in enumerate(observation['xarray_meta_coloc'][0].dens):
                 f, ax = figure_1_stickplot()
                 obs = observation['xarray_meta_coloc'][0].isel(dens=i_dens)
-                ax.quiver(obs.time, [[0] * len(obs.time)], obs.u, obs.v, angles='uv', width=0.001,
+                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
                           headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
                           label=observation['name'])
                 for i_mod, mod in enumerate(models):
                     mod_name = mod.name
                     mod = mod['xarray_meta_coloc'].isel(dens=i_dens).squeeze()
-                    ax.quiver(mod.time, [[0] * len(mod.time)], mod.u, mod.v, angles='uv',
+                    ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
                               width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
                               color=COLORS[i_mod], label=f'{mod_name}')
                 # Add legend
@@ -3053,6 +3066,12 @@ def find_var_title(da):
         var_name = 'Temperature'
     if 'sst' in var_name:
         var_name = 'SST'
+    if 'res' in var_name:
+        var_name = f"Residual current {var_name.split('_')[0]}"
+    if 'bc' in var_name:
+        var_name = f"Baroclinic current {var_name.split('_')[0]}"
+    if 'geo' in var_name:
+        var_name = f"Geostrophic current {var_name.split('_')[0]}"
 
     if "units" in da.attrs:
         var_unit = da.attrs['units']

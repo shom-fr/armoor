@@ -230,7 +230,7 @@ Variables to plot
 
 * Total current : ``attribute = current``
 * Residual current : ``attribute = current_res``
-* Baroclinic current : ``attribute = current_barocline``
+* Baroclinic current : ``attribute = current_bc``
 * Tidal current harmonic consituents : ``plot = plot_map_current_harmonic`` or ``plot = plot_tide_current_ellipses``
 
 
@@ -260,7 +260,7 @@ Variables to plot
 ~~~~~~~~~~~~~~~~~
 
 * Total current : ``attribute = current``
-* Baroclinic current : ``attribute = current_barocline``
+* Baroclinic current : ``attribute = current_bc``
 
 
 Available outputs

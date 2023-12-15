@@ -303,6 +303,12 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                }
 
     if "meta_zones" in config_obj:
+        # Calculate vars before meta-zone
+        outputs = config_obj['outputs']
+        vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
+        if 'current_bc' in vars_to_plot:
+            xarray_obj = xr.merge([xarray_obj,xarray_obj.sel_var.sel_current_barocline()])
+
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
             radius = config_obj["meta_zones"]["radius"] if "radius" in config_obj[
