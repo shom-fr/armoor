@@ -656,8 +656,8 @@ def open_decode_hycom_currents(path_files):
     da_u = ds_u.u
     da_v = ds_v.v
 
-    ut_hycom = shift(da_u, {"x": "left", "y": "left"}).xoa.reloc(u=False)
-    vt_hycom = shift(da_v, {"x": "left", "y": "left"}).xoa.reloc(v=False)
+    ut_hycom = shift(da_u, {"x": "right"}).xoa.reloc(u=False)
+    vt_hycom = shift(da_v, {"y": "top"}).xoa.reloc(v=False)
     hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
     hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
 
