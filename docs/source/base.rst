@@ -169,7 +169,7 @@ You can select the variables to plot among the following ones with the parameter
     * ``current`` : Current
     * ``current_res`` : Residual current
     * ``current_geo`` : Geostrophic current
-    * ``current_barocline`` : Baroclinic current
+    * ``current_bc`` : Baroclinic current
     * ``mld`` : Mixed layer depth
     * ``sound_speed`` : Sound speed
 
