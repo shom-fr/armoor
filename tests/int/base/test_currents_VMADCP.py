@@ -16,11 +16,28 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_graph2d_steps_bc(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_graph2d_steps_bc')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/graph2d_steps_bc.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_stick_plot_vmadcp_hycom_1depth(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_stick_plot_vmadcp_hycom_1depth')
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_hycom_1depth.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_stick_plot_vmadcp_hycom_1depth_bc(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_stick_plot_vmadcp_hycom_1depth_bc')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_hycom_1depth_bc.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

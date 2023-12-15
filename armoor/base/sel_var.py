@@ -76,6 +76,8 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_geo_current()
             elif var == 'current_res':
                 dataset = self._obj.sel_var.sel_current_res(filter)
+            elif var == 'current_bc':
+                dataset = self._obj.sel_var.sel_current_barocline()
             elif var == 'mld':
                 dataset = self._obj.sel_var.sel_mixed_layer_depth()
             elif var == 'sound_speed':
@@ -160,8 +162,7 @@ class SSTAccessor:
         Returns
         -------
         xarray.DataArray
-            Data array containing SST. If several depth temperature,
-            the temperature of the min depth is taken.
+            Data array containing residual current.
         """
         if 'u_res' in self._obj:
             current_res = self._obj[['u_res', 'v_res', 'norm_res']]
@@ -194,6 +195,45 @@ class SSTAccessor:
             current_res['v_res'] = da_v_res
             current_res['norm_res'] = (current_res.u_res ** 2 + current_res.v_res ** 2) ** 0.5
             return current_res
+
+    def sel_current_barocline(self):
+        """
+        Select barocllinic current from the dataset.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing baroclinic current.
+        """
+        if 'u_bc' in self._obj:
+            return self._obj[['u_bc', 'v_bc', 'norm_bc']]
+
+        # Calculate the total current
+        current = self._obj.sel_var.sel_current()
+
+        # Calculate the mean current
+        if 'depth' in self._obj.squeeze().dims:
+            current_mean_depth = current.mean('depth')
+        elif 'z' in self._obj.squeeze().dims:
+            current_mean_depth = current.mean('z')
+
+        # Calculate the baroclinic current
+        current_bc = current['norm'] - current_mean_depth['norm']
+
+        # Calculate the azimuth (in radians)
+        azimut = np.arctan2(current['v'], current['u'])
+
+        # Calculate the zonal and meridional components of the baroclinic current
+        ubc = current_bc * np.cos(azimut)
+        vbc = current_bc * np.sin(azimut)
+
+        current_bc = xr.Dataset()
+        current_bc['u_bc'] = ubc
+        current_bc['v_bc'] = vbc
+        current_bc['norm_bc'] = vbc
+
+        return current_bc
+
 
     def sel_sst(self, depth=0):
         """
