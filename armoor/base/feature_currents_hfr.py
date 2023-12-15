@@ -175,7 +175,7 @@ def plot(config_obj):
         # CURRENT MAP
         plot_map_metr = {"plot_map_metr_ecart_interval": 'difference',
                          "plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
-                         "plot_map_metr_RMSEc": 'RMSEc', "plot_map_metr_RMSEcentree": 'RMSEcentree'
+                         "plot_map_metr_RMSE": 'RMSE', "plot_map_metr_RMSEc": 'RMSEc'
                          }
         if output["plot"] in plot_map_metr:
             vmin = output.get('vmin')
