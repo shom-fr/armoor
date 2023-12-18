@@ -20,6 +20,7 @@ import cartopy.feature as cfeature
 import cmocean
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 mpl.rcParams['figure.dpi'] = 300
@@ -59,10 +60,15 @@ def hmi_image(data: xr.Dataset,
     legend.update({"title": title})
     legend.update({"cbar_range": cbar_range})
 
-    rarification, barbs_length, barbs_linewidth = stream_legend
+    rarification, barbs_length, barbs_linewidth, quiver_scale, quiver_width, quiver_headwidth, quiver_headlength = stream_legend
     legend.update({"rarification": int(rarification) if rarification else 1})
     legend.update({"barbs_length": barbs_length})
     legend.update({"barbs_linewidth": barbs_linewidth})
+
+    legend.update({"quiver_scale": quiver_scale})
+    legend.update({"quiver_width": quiver_width})
+    legend.update({"quiver_headwidth": quiver_headwidth})
+    legend.update({"quiver_headlength": quiver_headlength})
 
     func_mapping = {
         "visu_temp": base_map,
@@ -259,6 +265,10 @@ def stream(data: xr.Dataset,
     lon = data['lon']
     lat = data['lat']
     rarification = legend["rarification"]
+    quiver_scale = legend["quiver_scale"]
+    quiver_width = legend["quiver_width"]
+    quiver_headwidth = legend["quiver_headwidth"]
+    quiver_headlength = legend["quiver_headlength"]
 
     axes = base_frame(legend["title"],
                       legend["var_name"],
@@ -274,6 +284,10 @@ def stream(data: xr.Dataset,
                     lat.values[::rarification],
                     data['u'].values[::rarification, ::rarification],
                     data['v'].values[::rarification, ::rarification],
+                    scale=quiver_scale,
+                    width=quiver_width,
+                    headwidth=quiver_headwidth,
+                    headlength=quiver_headlength,
                     transform=ccrs.PlateCarree())
 
     save_plot(path2save)

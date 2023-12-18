@@ -129,6 +129,14 @@ Here are the different possible attributes and their purpose:
 
 * ``barbs_linewidth`` : Width of barbs' lines (default set to 0.3). Applied in the function *visu_windforcing*.
 
+* ``quiver_scale`` : Scales the length of the arrow inversely (c.f. [quiver](https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html) ). Applied in the function *visu_current*.
+
+* ``quiver_width`` : Shaft width in arrow units (c.f. [quiver](https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html) ). Applied in the function *visu_current*.
+
+* ``quiver_headwidth`` : Head width as multiple of shaft width (c.f. [quiver](https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html) ). Applied in the function *visu_current*.
+
+* ``quiver_headlength`` : Head length as multiple of shaft width (c.f. [quiver](https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html) ). Applied in the function *visu_current*.
+
 * ``multiprocess`` : Used for acceleration purposes by parallelization on all model's time steps. Its default value is *True*.
 
 

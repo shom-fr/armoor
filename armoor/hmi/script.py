@@ -228,7 +228,11 @@ def create_param_images(config_reg: str,
     multiprocess = param.get("multiprocess")
     stream_legend = (param.get("rarification"),
                      param.get("barbs_length"),
-                     param.get("barbs_linewidth"))
+                     param.get("barbs_linewidth"),
+                     param.get("quiver_scale"),
+                     param.get("quiver_width"),
+                     param.get("quiver_headwidth"),
+                     param.get("quiver_headlength"))
 
     for reg_time in config_reg_times:
         path2save = get_path2save(reg_time, parameter_mane, output_folder_path, sub_param)
