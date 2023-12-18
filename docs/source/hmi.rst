@@ -127,7 +127,7 @@ Here are the different possible attributes and their purpose:
 
 * ``barbs_length`` : Length of barbs (default set to 4.0). Applied in the function *visu_windforcing*.
 
-* ``barbs_linewidth`` : Width of barbs' lines (default set to 4.0). Applied in the function *visu_windforcing*.
+* ``barbs_linewidth`` : Width of barbs' lines (default set to 0.3). Applied in the function *visu_windforcing*.
 
 * ``multiprocess`` : Used for acceleration purposes by parallelization on all model's time steps. Its default value is *True*.
 
