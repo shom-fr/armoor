@@ -263,7 +263,7 @@ def sel_default_vars(config_obj):
     return config_obj
 
 
-def sel_one_var(observation, models, var):
+def sel_one_var(observation, models, var, depth=None):
     """
     Select a variable in the model and observation
     Parameters
@@ -303,6 +303,18 @@ def sel_one_var(observation, models, var):
         observation_var["xarray_meta_coloc"].append(
             observation["xarray_meta_coloc"][i_mod][var_obs].assign_attrs(
                 {'name': observation['name']}))
+
+    # Select depth if needed
+    if depth:
+        observation_var['xarray_meta'] = observation_var['xarray_meta'].sel(depth=depth,
+                                                                            method='nearest')
+        for i_mod, mod in enumerate(models_var):
+            models_var[i_mod]["xarray_meta"] = models_var[i_mod]["xarray_meta"].sel(depth=depth,
+                                                                                    method='nearest')
+            models_var[i_mod]["xarray_meta_coloc"] = models_var[i_mod]["xarray_meta_coloc"].sel(
+                depth=depth, method='nearest')
+            observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][
+                i_mod].sel(depth=depth, method='nearest')
 
     return observation_var, models_var
 
