@@ -89,7 +89,7 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
         logger.info("Opening HYCOM currents")
         return open_decode_hycom_currents(path_files)
     if type == 'HYCOM_3D':
-        logger.info("Opening HYCOM 3D currents")
+        logger.info("Opening HYCOM 3D")
         return open_decode_hycom_3d(path_files)
     if type == 'CORA':
         logger.info("Opening CORA")
