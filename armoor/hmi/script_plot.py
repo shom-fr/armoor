@@ -33,7 +33,7 @@ def hmi_image(data: xr.Dataset,
               title: str,
               path2save: str,
               cbar_range: (float, float),
-              rarification: int):
+              stream_legend: int):
     """
     Create an image of the plot
     Parameters
@@ -58,7 +58,11 @@ def hmi_image(data: xr.Dataset,
     legend = cfgm_plots_dict.get('legend').get(func)
     legend.update({"title": title})
     legend.update({"cbar_range": cbar_range})
+
+    rarification, barbs_length, barbs_linewidth = stream_legend
     legend.update({"rarification": int(rarification) if rarification else 1})
+    legend.update({"barbs_length": barbs_length})
+    legend.update({"barbs_linewidth": barbs_linewidth})
 
     func_mapping = {
         "visu_temp": base_map,
@@ -208,6 +212,8 @@ def stream_wind(data: xr.Dataset,
     lon = data['lon']
     lat = data['lat']
     rarification = legend["rarification"]
+    barbs_length = legend["barbs_length"]
+    barbs_linewidth = legend["barbs_linewidth"]
 
     axes = base_frame(legend["title"],
                       legend["var_name"],
@@ -224,8 +230,8 @@ def stream_wind(data: xr.Dataset,
                    data['u'].values[::rarification, ::rarification],
                    data['v'].values[::rarification, ::rarification],
                    pivot='middle',
-                   length=3,
-                   linewidth=0.5,
+                   length=barbs_length,
+                   linewidth=barbs_linewidth,
                    transform=ccrs.PlateCarree())
 
     save_plot(path2save)

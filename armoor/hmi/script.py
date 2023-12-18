@@ -226,7 +226,9 @@ def create_param_images(config_reg: str,
     param_title = param["name"]
     data = []
     multiprocess = param.get("multiprocess")
-    rarification = param.get("rarification")
+    stream_legend = (param.get("rarification"),
+                     param.get("barbs_length"),
+                     param.get("barbs_linewidth"))
 
     for reg_time in config_reg_times:
         path2save = get_path2save(reg_time, parameter_mane, output_folder_path, sub_param)
@@ -259,7 +261,7 @@ def create_param_images(config_reg: str,
                          param_title,
                          path2save,
                          cbar_range,
-                         rarification])
+                         stream_legend])
 
         else:
             hmi_image(data2plot,
@@ -267,7 +269,7 @@ def create_param_images(config_reg: str,
                       param_title,
                       path2save,
                       cbar_range,
-                      rarification=rarification)
+                      stream_legend=stream_legend)
 
     if multiprocess:
         logger.info(f'Multiprocess')
@@ -298,13 +300,13 @@ def work_process(data: list):
     param_title = data[2]
     path2save = data[3]
     cbar_range = data[4]
-    rarification = data[5]
+    stream_legend = data[5]
     hmi_image(data2plot,
               func,
               param_title,
               path2save,
               cbar_range,
-              rarification=rarification)
+              stream_legend=stream_legend)
 
 
 def get_obs_xr(param: dict,

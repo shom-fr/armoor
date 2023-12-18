@@ -123,9 +123,13 @@ Here are the different possible attributes and their purpose:
 
 * ``forcing_model`` : Relative path to forcing model observation for the following functions : *visu_mixedlayer_clim*, *visu_windforcing*, *visu_solarflux*, *visu_runoff* and *visu_precip*.
 
-* ``rarification`` : rarification factor to reduce quivers density. It is used in the functions *visu_current* and *visu_windforcing*.
+* ``rarification`` : Rarification factor used to decrease quiver and barb density. Utilized in the functions *visu_current* and *visu_windforcing*.
 
-* ``multiprocess`` : used for acceleration purposes by parallelization on all model's time steps. Its default value is *True*.
+* ``barbs_length`` : Length of barbs (default set to 4.0). Applied in the function *visu_windforcing*.
+
+* ``barbs_linewidth`` : Width of barbs' lines (default set to 4.0). Applied in the function *visu_windforcing*.
+
+* ``multiprocess`` : Used for acceleration purposes by parallelization on all model's time steps. Its default value is *True*.
 
 
 Example
