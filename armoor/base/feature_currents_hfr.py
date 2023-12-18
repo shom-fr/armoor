@@ -37,13 +37,6 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current'])
-
     for output in outputs:
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
@@ -73,6 +66,13 @@ def plot(config_obj):
             else:
                 logger.warning(
                     'Caution ! To retrieve residual currents, please specify low_pass_filter with demerliac, godin or mean.')
+        else:
+            observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
+            for i_mod, mod in enumerate(models):
+                mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
+                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                    i_mod].sel_var.selection(['current'])
 
         # PLOTS
         ############################################################################################
