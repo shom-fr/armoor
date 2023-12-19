@@ -15,6 +15,7 @@ The command to use this script is ``armoor-script``, which comes with three mand
 * *output-folder* : Folder path to store outputs created by the script for the web interface.
 * *input-folder* : Root folder path from which the data is collected to create images for the forecaster web interface.
 * *input-configuration* : Configuration file for image generation
+* (optional) *legend-configuration* : Modify settings by using a configuration file to override internal defaults.
 
 This command generates a **.tgz** file containing all the created images and files with the right tree structure for the forecaster web interface.
 
@@ -50,6 +51,59 @@ The input folder should contain and be structured as follows ::
     │       └── woa18_decav_t03_04.nc
 
 Where ``config_reg`` is the composition of the **model** and the **config** given in the configuration file (see below), and **YYYYMMDD** the date of production of the data.
+
+Details on legend configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For each visualization functions below. Customize the Y-axis legend effortlessly by personalizing it with variable names and units, while also having the flexibility to select your preferred colormap for an enhanced visual representation.
+
+The internal configuration file is structured as the example provided below::
+
+    [legend]
+        [[visu_temp]]
+            var_name = 'Temperature'
+            var_unit = '(°C)'
+            cmap = 'cmo.thermal'
+        [[visu_sal]]
+            var_name = 'Salinity'
+            var_unit = '(1e-3)'
+            cmap = 'cmo.haline'
+        [[visu_current]]
+            var_name = 'Current'
+            var_unit = '(m/s)'
+            cmap = 'cmo.speed'
+        [[visu_windforcing]]
+            var_name = 'Wind 10m'
+            var_unit = '(m/s)'
+            cmap = 'cmo.matter'
+        [[visu_diff_sss]]
+            var_name = 'SSS difference (model - climatology)'
+            var_unit = '(1e-3)'
+            cmap = 'PiYG'
+        [[visu_diff_sst]]
+            var_name = 'SST difference (model - satellite)'
+            var_unit = '(°C)'
+            cmap = 'RdBu_r'
+        [[visu_solarflux]]
+             var_name = 'Solar sensible heat flux (1h cumul)'
+             var_unit = '(J/m²)'
+             cmap = 'cmo.solar'
+        [[visu_precip]]
+            var_name = 'Total precipitation (1h cumul)'
+            var_unit = '(kg/m²)'
+            cmap = 'cmo.rain'
+        [[visu_mixedlayer_clim]]
+            var_name = 'Mixed layer thickness at standard depth levels'
+            var_unit = '(m)'
+            cmap = 'cmo.deep'
+        [[visu_mixedlayer]]
+            var_name = 'Mixed layer thickness at 10 m'
+            var_unit = '(m)'
+            cmap = 'cmo.deep'
+        [[visu_runoff]]
+            var_name = 'River runoff'
+            var_unit = 'm³/s'
+            cmap = 'cmo.deep'
+
 
 Details on configuration file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -129,13 +183,13 @@ Here are the different possible attributes and their purpose:
 
 * ``barbs_linewidth`` : Width of barbs' lines (default set to 0.3). Applied in the function *visu_windforcing*.
 
-* ``quiver_scale`` : Scales the length of the arrow inversely (c.f. [quiver](https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html) ). Applied in the function *visu_current*.
+* ``quiver_scale`` : Scales the length of the arrow inversely (c.f. `quiver <https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html>`_ ). Applied in the function *visu_current*.
 
-* ``quiver_width`` : Shaft width in arrow units (c.f. [quiver](https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html) ). Applied in the function *visu_current*.
+* ``quiver_width`` : Shaft width in arrow units (c.f. `quiver <https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html>`_ ). Applied in the function *visu_current*.
 
-* ``quiver_headwidth`` : Head width as multiple of shaft width (c.f. [quiver](https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html) ). Applied in the function *visu_current*.
+* ``quiver_headwidth`` : Head width as multiple of shaft width (c.f. `quiver <https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html>`_ ). Applied in the function *visu_current*.
 
-* ``quiver_headlength`` : Head length as multiple of shaft width (c.f. [quiver](https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html) ). Applied in the function *visu_current*.
+* ``quiver_headlength`` : Head length as multiple of shaft width (c.f. `quiver <https://matplotlib.org/stable/api/\_as_gen/matplotlib.quiver.Quiver.html>`_ ). Applied in the function *visu_current*.
 
 * ``multiprocess`` : Used for acceleration purposes by parallelization on all model's time steps. Its default value is *True*.
 

@@ -6,6 +6,8 @@ import shutil
 import sys
 import tarfile
 
+from xoa import cfgm
+
 import gc
 from multiprocessing import Pool
 import multiprocessing
@@ -29,7 +31,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def create_images(config_obj: dict, input_folder_path: str, output_folder_path: str):
+def create_images(config_obj: dict,
+                  input_folder_path: str,
+                  output_folder_path: str,
+                  legend_configuration: str):
     """
     Create images and zip them
     Parameters
@@ -87,7 +92,8 @@ def create_images(config_obj: dict, input_folder_path: str, output_folder_path: 
                                     parameter,
                                     sub_param,
                                     input_folder_path,
-                                    os.path.join(output_folder_path, f'{config_reg}_{production_day}'))
+                                    os.path.join(output_folder_path, f'{config_reg}_{production_day}'),
+                                    legend_configuration)
             except FileNotFoundError:
                 # Handle the error when files are not found
                 logger.error("Error: Files not found.")
@@ -177,7 +183,8 @@ def create_param_images(config_reg: str,
                         parameter_mane: str,
                         sub_param: str,
                         input_folder_path: str,
-                        output_folder_path: str):
+                        output_folder_path: str,
+                        legend_configuration: str):
     """
 
     Parameters
@@ -265,6 +272,7 @@ def create_param_images(config_reg: str,
                          param_title,
                          path2save,
                          cbar_range,
+                         legend_configuration,
                          stream_legend])
 
         else:
@@ -273,6 +281,7 @@ def create_param_images(config_reg: str,
                       param_title,
                       path2save,
                       cbar_range,
+                      legend_configuration,
                       stream_legend=stream_legend)
 
     if multiprocess:
@@ -304,12 +313,14 @@ def work_process(data: list):
     param_title = data[2]
     path2save = data[3]
     cbar_range = data[4]
-    stream_legend = data[5]
+    legend_configuration = data[5]
+    stream_legend = data[6]
     hmi_image(data2plot,
               func,
               param_title,
               path2save,
               cbar_range,
+              legend_configuration,
               stream_legend=stream_legend)
 
 

@@ -7,7 +7,7 @@ from datetime import datetime
 
 import xarray as xr
 import xoa
-from xoa import cfgm
+
 import numpy as np
 
 from matplotlib import colors
@@ -34,7 +34,8 @@ def hmi_image(data: xr.Dataset,
               title: str,
               path2save: str,
               cbar_range: (float, float),
-              stream_legend: int):
+              legend_configuration: dict,
+              stream_legend):
     """
     Create an image of the plot
     Parameters
@@ -50,13 +51,8 @@ def hmi_image(data: xr.Dataset,
     -------
 
     """
-    rootdir = os.path.abspath(os.path.dirname(__file__))
-    with open(os.path.join(rootdir, "hmi_plot.ini"), "r", encoding="utf-8") as hmi_plot_spec:
-        cfgm_plots = cfgm.ConfigManager(hmi_plot_spec)
-    with open(os.path.join(rootdir, '..', '..', 'config', 'hmi_plot.cfg'), "r", encoding="utf-8") as hmi_plot_config:
-        cfgm_plots_dict = cfgm_plots.load(hmi_plot_config)
 
-    legend = cfgm_plots_dict.get('legend').get(func)
+    legend = legend_configuration.get('legend').get(func)
     legend.update({"title": title})
     legend.update({"cbar_range": cbar_range})
 

@@ -40,13 +40,17 @@ def read_args(argv):
                         type=argparse.FileType('r'),
                         help='File with details on the models and configurations'
                              ' to be generate')
+    parser.add_argument('-l', '--legend-configuration',
+                        type=argparse.FileType('r'),
+                        help='File to overwrite internal legend configuration file')
     paths = vars(parser.parse_args(argv))
 
     output_folder_path = paths['output_folder']
     input_folder_path = paths['input_folder']
     input_configuration_path = paths['input_configuration']
+    legend_configuration_path = paths.get('legend_configuration')
 
-    return output_folder_path, input_folder_path, input_configuration_path
+    return output_folder_path, input_folder_path, input_configuration_path, legend_configuration_path
 
 
 def main(argv=None):
@@ -62,7 +66,7 @@ def main(argv=None):
 
     if not argv:
         argv = sys.argv[1:]
-    output_folder_path, input_folder_path, input_configuration_path = read_args(argv)
+    output_folder_path, input_folder_path, input_configuration_path, legend_configuration_path = read_args(argv)
 
     logger.info(f'details of configuration from file : {input_configuration_path}')
 
@@ -70,19 +74,26 @@ def main(argv=None):
     cfgm_hmi_script = cfgm.ConfigManager(os.path.join(rootdir, "..", "hmi", "hmi.ini"))
 
     dict_configuration = cfgm_hmi_script.load(input_configuration_path)
-
     dict_configuration = format_hmi_dict(dict_configuration)
+
+    with open(os.path.join(rootdir, "..", "hmi", "hmi_plot.ini"), "r", encoding="utf-8") as hmi_plot_spec:
+        cfgm_plots = cfgm.ConfigManager(hmi_plot_spec)
+    if legend_configuration_path:
+        logger.info(f'Using custom configuration file for legends : {legend_configuration_path}')
+        legend_configuration = cfgm_plots.load(legend_configuration_path)
+    else:
+        logger.info(f'Using internal configuration file for legends')
+        with open(os.path.join(rootdir, '..', '..', 'config', 'hmi_plot.cfg'), "r", encoding="utf-8") as hmi_plot_config:
+            legend_configuration = cfgm_plots.load(hmi_plot_config)
 
     logger.info(f'saved in folder : {output_folder_path}')
     logger.info(f'data comes from : {input_folder_path}')
 
-    create_images(dict_configuration, input_folder_path, output_folder_path)
+    create_images(dict_configuration, input_folder_path, output_folder_path, legend_configuration)
     logger.info(f"--- {time.time() - start_time} seconds ---")
 
 
-
 def format_hmi_dict(dict_configuration: dict) -> dict:
-
     for parameter in dict_configuration['parameters']:
         extent = dict_configuration['parameters'][parameter]['extent']
 
@@ -90,6 +101,5 @@ def format_hmi_dict(dict_configuration: dict) -> dict:
             dict_configuration['parameters'][parameter].pop('extent')
         elif any(value is None for value in extent.values()):
             raise ValueError(f'Extent value error : {extent}')
-
 
     return dict_configuration
