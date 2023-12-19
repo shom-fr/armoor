@@ -202,6 +202,7 @@ def horizontal_colocation(ds_to_coloc, tgt, coloc_method):
 
     else:
         # Fill Nans for the interpolation
+        ds_to_coloc = ds_to_coloc.sortby('lon')
         ds_to_coloc = ds_to_coloc.interpolate_na(dim='lon', method=coloc_method)
         ds_coloc = ds_to_coloc.interp(lon=lon_values, lat=lat_values, method=coloc_method)
 
