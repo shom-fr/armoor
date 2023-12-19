@@ -2848,8 +2848,12 @@ def plot_diag_ts_unique(models, observation, output_path=None):
             im_obs = ax.scatter(obs.sal, obs.ptemp, 30, obs.depth, marker="^", edgecolors="black",
                                 linewidth=0.1, label=f'{obs.attrs["name"]}', cmap='autumn',
                                 vmin=vmin, vmax=vmax)
-            mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, depth=obs.depth,
-                                                 time=time, method='nearest').squeeze()
+            if 'depth' in mod["xarray_meta"].dims:
+                mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, depth=obs.depth,
+                                                     time=time, method='nearest').squeeze()
+            elif 'z' in mod["xarray_meta"].dims:
+                mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, z=obs.z, time=time,
+                                                     method='nearest').squeeze()
             im_mod = ax.scatter(mod_nearest.sal, mod_nearest.ptemp, 30, mod_nearest.depth,
                                 edgecolors="black", linewidth=0.1, label=f'{mod["name"]}',
                                 cmap='summer', vmin=vmin, vmax=vmax)
