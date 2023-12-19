@@ -57,6 +57,15 @@ class TestForecasterScripts:
         main(['-o', out_path, '-i', '../../data/', '-c', f'../../config/{test_name}.cfg'])
         assert True
 
+    def test_med_12_custom(self):
+        test_name = 'hycom3d_med_12'
+        out_path, logger = change_path(f'test_{test_name}_custom')
+        main(['-o', out_path,
+              '-i', '../../data/',
+              '-c', f'../../config/{test_name}.cfg',
+              '-l', f'../../config/hmi_plot_custom.cfg'])
+        assert True
+
     #  Please note that the next tests take approximately 1 hour each.
     #
     # def test_med(self):
