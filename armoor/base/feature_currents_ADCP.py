@@ -100,13 +100,13 @@ def plot(config_obj):
             # Select the attributes to plot
             if 'attribute' in output:
                 if output["attribute"] == ['current_res']:
-                    attributes = ['u_res', 'v_res', 'norm_res']
+                    attributes = ['u_res', 'v_res', 'norm_res', 'dir_res']
                 elif output["attribute"] == ['current_bc']:
-                    attributes = ['u_bc', 'v_bc', 'norm_bc']
+                    attributes = ['u_bc', 'v_bc', 'norm_bc', 'dir_bc']
                 else:
-                    attributes = ['u', 'v', 'norm']
+                    attributes = ['u', 'v', 'norm', 'dir']
             else:
-                attributes = ['u', 'v', 'norm']
+                attributes = ['u', 'v', 'norm', 'dir']
 
             for attribute in attributes:
                 obs_var, mods_var = copy.deepcopy(observation), copy.deepcopy(models)

@@ -934,11 +934,13 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
         Path where to save the figures.
     """
     # Get min/max colobar values
-    vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap = get_min_max_values(vmin, vmax,
-                                                                                       obs_coloc,
-                                                                                       comparison,
-                                                                                       metric,
-                                                                                       dvmin, dvmax)
+    vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap, _ = get_min_max_values(vmin,
+                                                                                          vmax,
+                                                                                          obs_coloc,
+                                                                                          comparison,
+                                                                                          metric,
+                                                                                          dvmin,
+                                                                                          dvmax)
 
     # Squeeze
     mod_coloc, obs_coloc = mod_coloc.squeeze(), obs_coloc.squeeze()
@@ -1167,11 +1169,13 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
     """
     logger.info('map figures with comparison metric')
     # Get min/max colobar values
-    vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap = get_min_max_values(vmin, vmax,
-                                                                                       obs_meta,
-                                                                                       comparison,
-                                                                                       metric,
-                                                                                       dvmin, dvmax)
+    vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap, _ = get_min_max_values(vmin,
+                                                                                          vmax,
+                                                                                          obs_meta,
+                                                                                          comparison,
+                                                                                          metric,
+                                                                                          dvmin,
+                                                                                          dvmax)
     # Squeeze
     obs_meta, obs_coloc = clean_dim_order(obs_meta), clean_dim_order(obs_coloc)
     mod_meta, mod_coloc = clean_dim_order(mod_meta), clean_dim_order(mod_coloc)
@@ -2100,13 +2104,9 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     # Select the variables to plot
     diff = mod_meta_coloc.transpose().values - obs_meta_coloc.transpose().values
 
-    # Get min/max values
-    if vmin is None and vmax is None:
-        vmin = obs_meta_coloc.min().values
-        vmax = obs_meta_coloc.max().values
-    if dvmin is None and dvmax is None:
-        dvmin = -np.nanmax(np.abs(diff))
-        dvmax = -dvmin
+    # Get min/max colobar values
+    vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values(vmin, vmax, obs_meta_coloc, diff,
+                                                           'difference', dvmin, dvmax, cmap)
 
     # Plot the graphs
     im_obs = axs[0].pcolormesh(obs_meta_coloc.time, obs_meta_coloc.depth,
@@ -2358,6 +2358,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 time_coloc = obs_mean.interval.values
             else:
                 time_coloc = obs_mean.time.values
+
             axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
             axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
             for i, mod in enumerate(models):
@@ -2385,7 +2386,6 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         # Plot mean and std for observation (plotted only once)
         obs_mean = obs_coloc_base.mean(list_dims_mean, skipna=True).squeeze()
         obs_std = obs_coloc_base.std(list_dims_mean, skipna=True).squeeze()
-
         if flag_interval:
             time_coloc = obs_mean.interval.values
         else:
@@ -2923,8 +2923,6 @@ def plot_stick_plots(models, observation, output_path=None):
     """
     logger.info('Stick plots for current data')
 
-
-
     obs_base = observation['xarray_meta_coloc'][0]
 
     # Retrieve current to plot
@@ -2945,9 +2943,9 @@ def plot_stick_plots(models, observation, output_path=None):
                   label=observation['name'])
         for i_mod, mod in enumerate(models):
             mod = mod['xarray_meta_coloc'].squeeze()
-            ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv', width=0.001,
-                      headwidth=0.001, headlength=0.001, headaxislength=0.001, color=COLORS[i_mod],
-                      label=f'{mod.attrs["name"]}')
+            ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+                      width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                      color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
         # Add legend
         ax.set_ylabel('Current(m/s)')
         handles, labels = plt.gca().get_legend_handles_labels()
@@ -2962,8 +2960,8 @@ def plot_stick_plots(models, observation, output_path=None):
         add_second_x_axis(f, ax, obs)
 
         # Set title
-        title, figname = get_title_figname('Stick plot', obs[var_norm], [mod['name'] for mod in models],
-                                           observation['name'])
+        title, figname = get_title_figname('Stick plot', obs[var_norm],
+                                           [mod['name'] for mod in models], observation['name'])
 
         f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
         # Save figure
@@ -2973,9 +2971,9 @@ def plot_stick_plots(models, observation, output_path=None):
             for i_depth, _ in enumerate(observation['xarray_meta_coloc'][0].depth):
                 f, ax = figure_1_stickplot()
                 obs = observation['xarray_meta_coloc'][0].isel(depth=i_depth)
-                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
-                          headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
-                          label=observation['name'])
+                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
+                          width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                          color='k', label=observation['name'])
                 for i_mod, mod in enumerate(models):
                     mod = mod['xarray_meta_coloc'].isel(depth=i_depth).squeeze()
                     ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
@@ -3007,9 +3005,9 @@ def plot_stick_plots(models, observation, output_path=None):
             for i_dens, _ in enumerate(observation['xarray_meta_coloc'][0].dens):
                 f, ax = figure_1_stickplot()
                 obs = observation['xarray_meta_coloc'][0].isel(dens=i_dens)
-                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
-                          headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
-                          label=observation['name'])
+                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
+                          width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                          color='k', label=observation['name'])
                 for i_mod, mod in enumerate(models):
                     mod_name = mod.name
                     mod = mod['xarray_meta_coloc'].isel(dens=i_dens).squeeze()
@@ -3077,35 +3075,12 @@ def find_var_title(da):
         var_unit = da.attrs['units']
     elif var_name in ['u', 'v', 'norm']:
         var_unit = 'm/s'
+    elif 'dir' in var_name:
+        var_unit = '°'
     else:
         var_unit = "N/A"
+
     return var_name, var_unit
-
-
-def find_unit(obs_name):
-    """
-    return the string corresponding to the variable unit in the DaraArray
-    Parameters
-    ----------
-    obs_name : str
-        Name of the variable to get the units from.
-
-    Returns
-    -------
-    unit : str
-        Units of the variable.
-    """
-    if obs_name in ['temp', 'ptemp', 'sst', 'temperature', 'thetao', 'Temperature', 't_an']:
-        unit = '[°C]'
-    elif obs_name in ['salinity', 'sal', 'sss', 'Salinity']:
-        unit = '[g/kg]'
-    elif obs_name in ['TS']:
-        unit = "T in [°C] and S in [g/kg]"
-    elif obs_name in ['u', 'v', 'norm']:
-        unit = "[m/s]"
-    else:
-        unit = ''
-    return unit
 
 
 def interval_str_to_date(da_interval):
@@ -3174,7 +3149,8 @@ def add_second_x_axis(f, ax, mod):
     ax2.set_xlabel('Lon, Lat')
 
 
-def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None, dvmax=None):
+def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None, dvmax=None,
+                       cmap=None):
     """
     Give the appropriate values for the colorbar.
     Parameters
@@ -3207,33 +3183,34 @@ def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None,
     comparison_cmap : float
         Colormap to use for the comparison
     """
-    if vmin is None and vmax is None:
+    # vmin / vmax
+    if vmin is None:
         vmin = ds.min().values
+    if vmax is None:
         vmax = ds.max().values
 
-    if dvmin is None and dvmax is None:
-        if metric in ["difference", "bias"]:
-            comparison_vmin = -abs(np.nanmax(comparison))
-            comparison_vmax = abs(np.nanmax(comparison))
-            comparison_cmap = cmocean.cm.balance
-        elif metric in ['RMSE', 'RMSEc']:
-            comparison_vmin = 0
-            comparison_vmax = np.nanmax(comparison)
-            comparison_cmap = cmocean.cm.amp
-        else:
-            comparison_vmin = None
-            comparison_vmax = None
-            comparison_cmap = None
+    # dvmin / dvmax / cmap
+    if metric in ["difference", "bias"]:
+        if dvmin is None:
+            dvmin = -abs(np.nanmax(comparison))
+        if dvmax is None:
+            dvmax = abs(np.nanmax(comparison))
+        dcmap = cmocean.cm.balance
+    elif metric in ['RMSE', 'RMSEc']:
+        if dvmin is None:
+            dvmin = 0
+        if dvmax is None:
+            dvmax = np.nanmax(comparison)
+        dcmap = cmocean.cm.amp
     else:
-        comparison_vmin = None
-        comparison_vmax = None
-        comparison_cmap = cmocean.cm.amp
-        if dvmax is not None:
-            comparison_vmax = dvmax
-        if dvmin is not None:
-            comparison_vmin = dvmin
+        dvmin = None
+        dvmax = None
+        dcmap = None
 
-    return vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap
+    if 'dir' in ds.name:
+        cmap = cmocean.cm.phase
+
+    return vmin, vmax, dvmin, dvmax, cmap, dcmap
 
 
 def add_scale(ax, scale):

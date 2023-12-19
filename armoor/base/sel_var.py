@@ -132,16 +132,22 @@ class SSTAccessor:
             Data array containing current.
 
         """
+        # Retrieve u & v
         if 'u' in self._obj.variables:
             current = self._obj[['u', 'v']]
             current = current.assign_coords(self._obj.coords)
         else:
             current = self._obj.sel_var.convert_current()
+
+        # Retrieve norm
         if 'HCSP' in self._obj.variables:
             current['norm'] = self._obj['HCSP']
         else:
             current['norm'] = (current.u ** 2 + current.v ** 2) ** 0.5
 
+        # Retrieve direction
+        current['dir'] = np.arctan2(current['v'], current['u']) * 180 / np.pi
+        current['dir'] = current['dir'].assign_attrs({'units':'°'})
         return current
 
     def sel_geo_current(self):
@@ -166,7 +172,7 @@ class SSTAccessor:
             Data array containing residual current.
         """
         if 'u_res' in self._obj:
-            current_res = self._obj[['u_res', 'v_res', 'norm_res']]
+            current_res = self._obj[['u_res', 'v_res', 'norm_res', 'dir_res']]
             return current_res
 
         if 'u' in self._obj.variables:
@@ -195,6 +201,9 @@ class SSTAccessor:
             current_res['u_res'] = da_u_res
             current_res['v_res'] = da_v_res
             current_res['norm_res'] = (current_res.u_res ** 2 + current_res.v_res ** 2) ** 0.5
+            current_res['dir_res'] = np.arctan2(current_res['v_res'],
+                                            current_res['u_res']) * 180 / np.pi
+            current_res['dir_res'] = current_res['dir_res'].assign_attrs({'units':'°'})
             return current_res
 
     def sel_current_barocline(self):
@@ -207,7 +216,7 @@ class SSTAccessor:
             Data array containing baroclinic current.
         """
         if 'u_bc' in self._obj:
-            return self._obj[['u_bc', 'v_bc', 'norm_bc']]
+            return self._obj[['u_bc', 'v_bc', 'norm_bc', 'dir_bc']]
 
         # Calculate the total current
         current = self._obj.sel_var.sel_current()
@@ -232,9 +241,9 @@ class SSTAccessor:
         current_bc['u_bc'] = ubc
         current_bc['v_bc'] = vbc
         current_bc['norm_bc'] = vbc
-
+        current_bc['dir_bc'] = np.arctan2(current_bc['v_bc'], current_bc['u_bc']) * 180 / np.pi
+        current_bc['dir_bc'] = current_bc['dir_bc'].assign_attrs({'units':'°'})
         return current_bc
-
 
     def sel_sst(self, depth=0):
         """

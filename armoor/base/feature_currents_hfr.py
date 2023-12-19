@@ -120,9 +120,9 @@ def plot(config_obj):
         if output["plot"] in plot_ts_metr_point:
             # Select the attributes to plot
             if 'attribute' in output and output["attribute"] == ['current_res']:
-                attributes = ['u_res', 'v_res', 'norm_res']
+                attributes = ['u_res', 'v_res', 'norm_res', 'dir_res']
             else:
-                attributes = ['u', 'v', 'norm']
+                attributes = ['u', 'v', 'norm', 'dir']
 
             for attribute in attributes:
                 obs_var, mods_var = copy.deepcopy(observation), copy.deepcopy(models)
@@ -149,9 +149,9 @@ def plot(config_obj):
         if output["plot"] in plot_ts_metr_stats:
             # Select the attributes to plot
             if 'attribute' in output and output["attribute"] == ['current_res']:
-                attributes = ['u_res', 'v_res', 'norm_res']
+                attributes = ['u_res', 'v_res', 'norm_res', 'dir_res']
             else:
-                attributes = ['u', 'v', 'norm']
+                attributes = ['u', 'v', 'norm', 'dir']
 
             plg = config_obj["meta_zones"].get("polygon")
 
