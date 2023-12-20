@@ -7,7 +7,7 @@ from datetime import datetime
 
 import xarray as xr
 import xoa
-from xoa import cfgm
+
 import numpy as np
 
 from matplotlib import colors
@@ -20,6 +20,7 @@ import cartopy.feature as cfeature
 import cmocean
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 mpl.rcParams['figure.dpi'] = 300
@@ -33,7 +34,8 @@ def hmi_image(data: xr.Dataset,
               title: str,
               path2save: str,
               cbar_range: (float, float),
-              rarification: int):
+              legend_configuration: dict,
+              stream_legend):
     """
     Create an image of the plot
     Parameters
@@ -49,16 +51,20 @@ def hmi_image(data: xr.Dataset,
     -------
 
     """
-    rootdir = os.path.abspath(os.path.dirname(__file__))
-    with open(os.path.join(rootdir, "hmi_plot.ini"), "r", encoding="utf-8") as hmi_plot_spec:
-        cfgm_plots = cfgm.ConfigManager(hmi_plot_spec)
-    with open(os.path.join(rootdir, '..', '..', 'config', 'hmi_plot.cfg'), "r", encoding="utf-8") as hmi_plot_config:
-        cfgm_plots_dict = cfgm_plots.load(hmi_plot_config)
 
-    legend = cfgm_plots_dict.get('legend').get(func)
+    legend = legend_configuration.get('legend').get(func)
     legend.update({"title": title})
     legend.update({"cbar_range": cbar_range})
+
+    rarification, barbs_length, barbs_linewidth, quiver_scale, quiver_width, quiver_headwidth, quiver_headlength = stream_legend
     legend.update({"rarification": int(rarification) if rarification else 1})
+    legend.update({"barbs_length": barbs_length})
+    legend.update({"barbs_linewidth": barbs_linewidth})
+
+    legend.update({"quiver_scale": quiver_scale})
+    legend.update({"quiver_width": quiver_width})
+    legend.update({"quiver_headwidth": quiver_headwidth})
+    legend.update({"quiver_headlength": quiver_headlength})
 
     func_mapping = {
         "visu_temp": base_map,
@@ -208,6 +214,8 @@ def stream_wind(data: xr.Dataset,
     lon = data['lon']
     lat = data['lat']
     rarification = legend["rarification"]
+    barbs_length = legend["barbs_length"]
+    barbs_linewidth = legend["barbs_linewidth"]
 
     axes = base_frame(legend["title"],
                       legend["var_name"],
@@ -224,8 +232,8 @@ def stream_wind(data: xr.Dataset,
                    data['u'].values[::rarification, ::rarification],
                    data['v'].values[::rarification, ::rarification],
                    pivot='middle',
-                   length=3,
-                   linewidth=0.5,
+                   length=barbs_length,
+                   linewidth=barbs_linewidth,
                    transform=ccrs.PlateCarree())
 
     save_plot(path2save)
@@ -253,6 +261,10 @@ def stream(data: xr.Dataset,
     lon = data['lon']
     lat = data['lat']
     rarification = legend["rarification"]
+    quiver_scale = legend["quiver_scale"]
+    quiver_width = legend["quiver_width"]
+    quiver_headwidth = legend["quiver_headwidth"]
+    quiver_headlength = legend["quiver_headlength"]
 
     axes = base_frame(legend["title"],
                       legend["var_name"],
@@ -268,6 +280,10 @@ def stream(data: xr.Dataset,
                     lat.values[::rarification],
                     data['u'].values[::rarification, ::rarification],
                     data['v'].values[::rarification, ::rarification],
+                    scale=quiver_scale,
+                    width=quiver_width,
+                    headwidth=quiver_headwidth,
+                    headlength=quiver_headlength,
                     transform=ccrs.PlateCarree())
 
     save_plot(path2save)
