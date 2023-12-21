@@ -167,15 +167,16 @@
         </header>
 
         <div class="body">
-            <h5 class="hidden-title">{{functionalities_desc[functionality.functionality]}}</h5>
+            <h4 class="hidden-title">{{functionalities_desc[functionality.functionality]}}</h4>
             {% for output in functionality.outputs %}
+                <h5 class="hidden-title">{{sub_functionalities_desc[output.plot]}}</h5>
                 {% if loop.index != 1 %}
                     <div style="break-before: always;">
                 {% else %}
                     <div>
                 {% endif %}
                     {% for file in output.files %}
-                    <h6 class="hidden-title">{{sub_functionalities_desc[output.plot]}}</h6>
+                    <h6 class="hidden-title">{{file.replace(".png", "").replace("_", " ")}}</h6>
                     <div class="output-img">
                         <img src="{{functionality.output_path + '/' + output.folder_name + '/' + file}}" class="property-image">
                     </div>
