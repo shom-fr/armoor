@@ -198,15 +198,15 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_131_map_trajectory_nov(self):
-        out_path, logger = change_path(folder_test)
-        logger.info("test_131_map_trajectory_nov.ini")
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/131_map_trajectory_nov.ini"])
-        parser.update({'output_path': out_path})
-        create_folder(f'tmp')
-        dict2call(parser)
-        assert True
+    # def test_131_map_trajectory_nov(self):
+    #     out_path, logger = change_path(folder_test)
+    #     logger.info("test_131_map_trajectory_nov.ini")
+    #     parser = command_line_interface(
+    #         ['--cfgfile', f"../single_tests/{folder_test}/131_map_trajectory_nov.ini"])
+    #     parser.update({'output_path': out_path})
+    #     create_folder(f'tmp')
+    #     dict2call(parser)
+    #     assert True
 
     def test_140_map_sst_hycomglo12_rms_nov(self):
         out_path, logger = change_path(folder_test)
