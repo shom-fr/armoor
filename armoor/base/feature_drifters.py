@@ -34,15 +34,12 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
-        ['current']).assign_attrs({'name': observation['name']})
+    # Currents not always necessary in obs
     for i_mod, mod in enumerate(models):
         mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current']).assign_attrs(
             {'name': mod['name']})
         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
             ['current']).assign_attrs({'name': mod['name']})
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current']).assign_attrs({'name': observation['name']})
 
     # PLOT
     for output in outputs:
@@ -57,7 +54,14 @@ def plot(config_obj):
         # MAP CURRENTS TRAJECTORY
         plot_map_current_traj = {"map_current_trajectroy": 'map_current_trajectroy'}
         if output["plot"] in plot_map_current_traj:
+            # Select current in obs
+            observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
+                ['current']).assign_attrs({'name': observation['name']})
             for i_mod, mod in enumerate(models):
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                    i_mod].sel_var.selection(['current']).assign_attrs(
+                    {'name': observation['name']})
+                # Plot
                 plot_features.plot_map_current_trajectory(observation, mod,
                                                           output_path=sub_func_output_folder)
 

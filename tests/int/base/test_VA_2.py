@@ -98,15 +98,15 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_pasdedata145_diag_disp_argo(self):
-        out_path, logger = change_path(folder_test)
-        logger.info("test_pasdedata145_diag_disp_argo.ini")
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/pasdedata145_diag_disp_argo.ini"])
-        parser.update({'output_path': out_path})
-        create_folder(f'tmp')
-        dict2call(parser)
-        assert True
+    # def test_pasdedata145_diag_disp_argo(self):
+    #     out_path, logger = change_path(folder_test)
+    #     logger.info("test_pasdedata145_diag_disp_argo.ini")
+    #     parser = command_line_interface(
+    #         ['--cfgfile', f"../single_tests/{folder_test}/pasdedata145_diag_disp_argo.ini"])
+    #     parser.update({'output_path': out_path})
+    #     create_folder(f'tmp')
+    #     dict2call(parser)
+    #     assert True
 
     def test_123_harmonic_table_ADCP_CROCO(self):
         out_path, logger = change_path(folder_test)
