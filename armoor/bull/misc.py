@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
 from armoor.hmi.script_tools import create_folder
+import armoor.base.meta_zone
+import armoor.base.sel_var
 
 import logging
 logger = logging.getLogger(__name__)

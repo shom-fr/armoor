@@ -9,7 +9,7 @@ import xoa
 import xoa.cf as xcf
 import xoa.filter as xfilter
 import gsw
-from armoor.hmi.script_tools import compute_mixed_layer
+from xoa.thermdyn import mixed_layer_depth
 
 logger = logging.getLogger(__name__)
 
@@ -375,9 +375,9 @@ class SSTAccessor:
             Data array containing the mixed layer depth.
         """
         if "temp" in self._obj:
-            self._obj = compute_mixed_layer(self._obj['temp'])
+            self._obj = mixed_layer_depth(self._obj['temp'])
         elif "ptemp" in self._obj:
-            self._obj = compute_mixed_layer(self._obj['ptemp'])
+            self._obj = mixed_layer_depth(self._obj['ptemp'])
         return self._obj
 
     def sel_density(self):
