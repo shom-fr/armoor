@@ -3,7 +3,7 @@ import os
 import copy
 from armoor.base.tools_features import remove_missing_values_ds
 from armoor.base import plot_features
-import armoor.hmi.script_tools as st
+from armoor.hmi.script_tools import create_folder
 
 
 def plot(config_obj):
@@ -33,7 +33,7 @@ def plot(config_obj):
     for output in outputs:
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
-            st.create_folder(sub_func_output_folder)
+            create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
 

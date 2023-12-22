@@ -6,10 +6,9 @@ import datetime
 import concurrent.futures
 import xarray as xr
 import xoa
-import xoa.grid
 import xoa.cf as xcf
 import xoa.geo as xgeo
-from xoa.grid import dz2depth, shift
+from xoa.grid import dz2depth, shift, to_rect
 import numpy as np
 import gsw
 import pandas as pd
@@ -590,7 +589,7 @@ def open_decode_croco(path_file):
             croco = croco.drop_vars(var)
 
     # Regrid if necessary
-    test_regrid = xoa.grid.to_rect(croco)
+    test_regrid = to_rect(croco)
     if 'lon' in test_regrid.dims and 'lat' in test_regrid.dims:
         croco = test_regrid
     elif 'x' in test_regrid.dims and 'y' in test_regrid.dims:
@@ -666,7 +665,7 @@ def open_decode_hycom_currents(path_files):
         hycom = hycom.rename({'level': 'z'})
 
     # Regrid if necessary
-    hycom = xoa.grid.to_rect(hycom)
+    hycom = to_rect(hycom)
 
     # Convert lons
     hycom = convert_lons(hycom)
@@ -720,7 +719,7 @@ def open_decode_hycom_3d(path_files):
         hycom = hycom.rename({'temp': 'ptemp'})
 
     # Regrid if necessary
-    hycom = xoa.grid.to_rect(hycom)
+    hycom = to_rect(hycom)
 
     # Convert lons
     hycom = convert_lons(hycom)
@@ -814,7 +813,7 @@ def open_decode_basic(path_files):
         dataset = dataset.rename({'temp': 'ptemp'})
 
     # Regrid if necessary
-    dataset = xoa.grid.to_rect(dataset)
+    dataset = to_rect(dataset)
 
     # Convert depths
     dataset = convert_depths(dataset)

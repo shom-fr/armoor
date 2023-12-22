@@ -13,7 +13,7 @@ import cartopy.feature as cfeature
 import cmocean
 from armoor.algo import calculation
 from xoa.geo import haversine
-import armoor.base.tools_features as ft
+from armoor.base.tools_features import manage_output, angle_between_vectors
 
 logger = logging.getLogger(__name__)
 
@@ -594,7 +594,7 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
         title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
                                            obs.attrs['name'])
         diag_disp_figure(mod, obs, title)
-        ft.manage_output(figname, output_path)
+        manage_output(figname, output_path)
 
     elif diag_type == "diag_disp":
         if flag_interval:
@@ -606,7 +606,7 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                         title, figname = get_title_figname('Dispersion diagram', obs_inter,
                                                            mod.attrs['name'], obs.attrs['name'])
                         diag_disp_figure(mod_inter, obs_inter, title)
-                        ft.manage_output(figname, output_path)
+                        manage_output(figname, output_path)
                 elif 'depth' in mod.dims and len(mod.depth) > 1:
                     for index_depth, _ in enumerate(mod['depth']):
                         mod_depth = mod.isel(depth=[index_depth])
@@ -614,14 +614,14 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                         title, figname = get_title_figname('Dispersion diagram', obs_depth,
                                                            mod.attrs['name'], obs.attrs['name'])
                         diag_disp_figure(mod_depth, obs_depth, title)
-                        ft.manage_output(figname, output_path)
+                        manage_output(figname, output_path)
                 else:
                     mod_inter = mod.isel(interval=[index_interval])
                     obs_inter = obs.isel(interval=[index_interval])
                     title, figname = get_title_figname('Dispersion diagram', obs_inter,
                                                        mod.attrs['name'], obs.attrs['name'])
                     diag_disp_figure(mod_inter, obs_inter, title)
-                    ft.manage_output(figname, output_path)
+                    manage_output(figname, output_path)
         else:
             if flag_slice:
                 for index_slice, _ in enumerate(mod['slice']):
@@ -630,7 +630,7 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                     title, figname = get_title_figname('Dispersion diagram', obs_inter,
                                                        mod.attrs['name'], obs.attrs['name'])
                     diag_disp_figure(mod_inter, obs_inter, title)
-                    ft.manage_output(figname, output_path)
+                    manage_output(figname, output_path)
             elif 'depth' in mod.dims and len(mod.depth) > 1:
                 for index_depth, _ in enumerate(mod['depth']):
                     mod_depth = mod.isel(depth=[index_depth])
@@ -638,12 +638,12 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                     title, figname = get_title_figname('Dispersion diagram', obs_depth,
                                                        mod.attrs['name'], obs.attrs['name'])
                     diag_disp_figure(mod_depth, obs_depth, title)
-                    ft.manage_output(figname, output_path)
+                    manage_output(figname, output_path)
             else:
                 title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
                                                    obs.attrs['name'])
                 diag_disp_figure(mod, obs, title)
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
 
 def diag_disp_figure(mod, obs, title):
@@ -806,7 +806,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                                                   comparison_inter, title, vmin, vmax, metric, cmap,
                                                   dvmin=dvmin, dvmax=dvmax)
                     # Save figure
-                    ft.manage_output(figname, output_path)
+                    manage_output(figname, output_path)
 
             elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
                 for index_depth, _ in enumerate(obs_coloc.depth):
@@ -821,7 +821,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                                                   comparison_inter, title, vmin, vmax, metric, cmap,
                                                   dvmin=dvmin, dvmax=dvmax)
                     # Save figure
-                    ft.manage_output(figname, output_path)
+                    manage_output(figname, output_path)
 
             elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
                 for index_dens, _ in enumerate(obs_coloc.dens):
@@ -837,7 +837,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                                                   comparison_inter, title, vmin, vmax, metric, cmap,
                                                   dvmin=dvmin, dvmax=dvmax)
                     # Save figure
-                    ft.manage_output(figname, output_path)
+                    manage_output(figname, output_path)
             else:
                 # Select the data to plot
                 obs_coloc_inter = obs_coloc.isel(interval=[index_time])
@@ -849,7 +849,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                                               title, vmin, vmax, metric, cmap, dvmin=dvmin,
                                               dvmax=dvmax)
                 # Save figure
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
     else:
         if flag_slice:
             for index_slice, _ in enumerate(obs_coloc.slice):
@@ -863,7 +863,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                                               title, vmin, vmax, metric, cmap, dvmin=dvmin,
                                               dvmax=dvmax)
                 # Save figure
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
         elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
             for index_depth, _ in enumerate(obs_coloc.depth):
@@ -877,7 +877,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                                               title, vmin, vmax, metric, cmap, dvmin=dvmin,
                                               dvmax=dvmax)
                 # Save figure
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
         elif 'dens' in obs_coloc.dims and len(obs_coloc.dens) > 0:
             for index_dens, _ in enumerate(obs_coloc.dens):
@@ -891,7 +891,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                                               title, vmin, vmax, metric, cmap, dvmin=dvmin,
                                               dvmax=dvmax)
                 # Save figure
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
         else:
             title, figname = get_title_figname(f'Map {metric}', obs_coloc, mod_coloc.attrs['name'],
                                                obs_coloc.attrs['name'])
@@ -899,7 +899,7 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
             plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax,
                                           metric, cmap, dvmin=dvmin, dvmax=dvmax)
             # Save figure
-            ft.manage_output(figname, output_path)
+            manage_output(figname, output_path)
 
 
 def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin, vmax, metric, cmap,
@@ -1067,7 +1067,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
             plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax,
                                  cmap, title, metric, dvmin=dvmin, dvmax=dvmax)
 
-            ft.manage_output(figname, output_path)
+            manage_output(figname, output_path)
 
         else:
             for i_time, time in enumerate(mod_coloc.time):
@@ -1094,7 +1094,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                                          comparison.isel(time=i_time), vmin, vmax, cmap, title,
                                          metric, dvmin=dvmin, dvmax=dvmax)
 
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
     # Other metric than difference
     else:
@@ -1113,7 +1113,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
                                      comparison.isel(interval=i_inter), vmin, vmax, cmap, title,
                                      metric, dvmin=dvmin, dvmax=dvmax)
 
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
         # no interval
         else:
             if obs_coloc.time.size == 1:
@@ -1128,7 +1128,7 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
             plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax,
                                  cmap, title, metric, dvmin=dvmin, dvmax=dvmax)
 
-            ft.manage_output(figname, output_path)
+            manage_output(figname, output_path)
 
 
 def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, vmin, vmax, cmap,
@@ -1279,7 +1279,7 @@ def plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot,
 
     f.suptitle(title, fontsize=15, fontweight='bold')
 
-    ft.manage_output(figname, output_path)
+    manage_output(figname, output_path)
 
 
 def plot_map_current_trajectory(obs, mod, output_path=None):
@@ -1322,7 +1322,7 @@ def plot_map_current_trajectory(obs, mod, output_path=None):
     # Add scale
     add_scale(ax, 1)
 
-    ft.manage_output(figname, output_path)
+    manage_output(figname, output_path)
 
 
 def plot_difference_trajectory(obs, mod, output_path=None):
@@ -1352,7 +1352,7 @@ def plot_difference_trajectory(obs, mod, output_path=None):
         obs_time = obs.sel(time=time, method='nearest')
 
         # Calculate angles
-        angle = ft.angle_between_vectors(obs_ini, obs_time, mod_time_mean)
+        angle = angle_between_vectors(obs_ini, obs_time, mod_time_mean)
         angles.append(angle)
         # Calculate distances
         distance = haversine(obs_time.lon, obs_time.lat, mod_time_mean.lon,
@@ -1380,7 +1380,7 @@ def plot_difference_trajectory(obs, mod, output_path=None):
     ax_mini_map = add_mini_map(f, obs)
     ax_mini_map.plot(obs.lon.values, obs.lat.values, transform=ccrs.PlateCarree())
 
-    ft.manage_output(figname, output_path)
+    manage_output(figname, output_path)
 
 
 def plot_map_harm(models, observations, output_path=None):
@@ -1465,7 +1465,7 @@ def plot_map_harm(models, observations, output_path=None):
                 # colorbar_gd
                 f.colorbar(g_diff, ax=axs[5], orientation='horizontal', fraction=0.046, pad=0.1)
 
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
             for var in ['Norm']:
                 ampl = 'norm'
@@ -1501,7 +1501,7 @@ def plot_map_harm(models, observations, output_path=None):
                 # colorbar_ad
                 f.colorbar(a_diff, ax=axs[2], orientation='horizontal', fraction=0.046, pad=0.05)
 
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
 
 def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None):
@@ -1586,7 +1586,7 @@ def plot_ellipses_tide_current_generic(observation, models, wave_name, scale, ou
 
     f.suptitle(title, fontsize=15, fontweight='bold')
     f.subplots_adjust(top=0.85)
-    ft.manage_output(figname, output_path)
+    manage_output(figname, output_path)
 
 
 def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
@@ -1753,7 +1753,7 @@ def plot_map_metr_current(flag_interval, flag_slice, models, observation, i_mod,
                                           dvmin=dvmin, dvmax=dvmax)
             add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, attribute)
 
-            ft.manage_output(figname, output_path)
+            manage_output(figname, output_path)
 
         else:
             for i_time, time in enumerate(mod_coloc.time):
@@ -1774,7 +1774,7 @@ def plot_map_metr_current(flag_interval, flag_slice, models, observation, i_mod,
                                    mod_meta.sel(time=time, method='nearest'),
                                    mod_coloc.isel(time=i_time), attribute)
 
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
     else:
         if flag_interval:
@@ -1810,7 +1810,7 @@ def plot_map_metr_current(flag_interval, flag_slice, models, observation, i_mod,
                                        mod_meta.isel(interval=i_inter_mod),
                                        mod_coloc.isel(interval=i_inter), attribute)
 
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
         # no interval
         else:
             title, figname = get_title_figname(f'Map {metric}', obs_meta[var_norm],
@@ -1823,7 +1823,7 @@ def plot_map_metr_current(flag_interval, flag_slice, models, observation, i_mod,
             if metric == 'bias':
                 add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, attribute)
             # Save and display
-            ft.manage_output(figname, output_path)
+            manage_output(figname, output_path)
 
 
 def add_current_arrows(axs, obs_meta, obs_coloc, mod_meta, mod_coloc, attribute, nb_vect=50):
@@ -2023,7 +2023,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
         ax_mini_map.scatter(longitude, latitude, 90, marker='*', c='yellow', edgecolors='black',
                             transform=ccrs.PlateCarree())
 
-        ft.manage_output(figname, output_path)
+        manage_output(figname, output_path)
 
 
 def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vmax=None, dvmin=None,
@@ -2144,7 +2144,7 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     if len(np.unique(obs_meta_coloc.lon.values)) > 1:
         add_second_x_axis(f, axs[2], mod_meta_coloc)
 
-    ft.manage_output(figname, output_path)
+    manage_output(figname, output_path)
 
 
 def plot_variable_2d(models, observation, output_path=None):
@@ -2227,7 +2227,7 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
     if len(np.unique(obs_meta_coloc.lon.values)) > 1:
         add_second_x_axis(f, axs[1], mod_meta_coloc)
 
-    ft.manage_output(figname, output_path)
+    manage_output(figname, output_path)
 
 
 def create_harmonic_table(models, observations, output_path):
@@ -2379,7 +2379,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 f'Time series metrics on {list_dims_mean} dimensions', obs_coloc, mod_name,
                 observation['name'])
             f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
-            ft.manage_output(figname, output_path)
+            manage_output(figname, output_path)
 
     # Case no vertical slices
     else:
@@ -2412,7 +2412,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
                                            obs_coloc, mod_name, observation['name'])
         f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
-        ft.manage_output(figname, output_path)
+        manage_output(figname, output_path)
 
 
 def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, plg):
@@ -2540,7 +2540,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
         ax_mini_map = add_mini_map(f, obs)
         ax_mini_map.scatter(obs.lon, obs.lat, 30, 'navy', transform=ccrs.PlateCarree())
 
-        ft.manage_output(figname, output_path)
+        manage_output(figname, output_path)
 
 
 def plot_profile_multi(models, observation, radius, output_path=None):
@@ -2658,7 +2658,7 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
                         transform=ccrs.PlateCarree())
     ax_mini_map.scatter(observation.lon, observation.lat, 30, c="k", transform=ccrs.PlateCarree())
 
-    ft.manage_output(figname, output_path)
+    manage_output(figname, output_path)
 
 
 def add_std_profile(ax, data, depth, color, name):
@@ -2909,7 +2909,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
     ax_mini_map = add_mini_map(f, obs)
     ax_mini_map.scatter(obs.lon, obs.lat, 30, c='navy', transform=ccrs.PlateCarree())
 
-    ft.manage_output(figname, output_path)
+    manage_output(figname, output_path)
 
 
 def plot_stick_plots(models, observation, output_path=None):
@@ -2969,7 +2969,7 @@ def plot_stick_plots(models, observation, output_path=None):
 
         f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
         # Save figure
-        ft.manage_output(figname, output_path)
+        manage_output(figname, output_path)
     else:
         if 'depth' in observation['xarray_meta_coloc'][0].dims:
             for i_depth, _ in enumerate(observation['xarray_meta_coloc'][0].depth):
@@ -3003,7 +3003,7 @@ def plot_stick_plots(models, observation, output_path=None):
 
                 f.suptitle(title, fontsize=12, fontweight='bold')
                 # Save figure
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
         elif 'dens' in observation['xarray_meta_coloc'][0].dims:
             for i_dens, _ in enumerate(observation['xarray_meta_coloc'][0].dens):
@@ -3038,7 +3038,7 @@ def plot_stick_plots(models, observation, output_path=None):
 
                 f.suptitle(title, fontsize=12, fontweight='bold')
                 # Save figure
-                ft.manage_output(figname, output_path)
+                manage_output(figname, output_path)
 
 
 # Useful functions

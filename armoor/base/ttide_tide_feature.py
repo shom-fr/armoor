@@ -3,7 +3,7 @@ import os
 import xarray as xr
 import numpy as np
 import ttide as tt
-import utide
+from utide import solve
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +87,8 @@ def run_harmonic_analysis_map(ds, output):
                     u = ds_to_anal.u.data
                     v = ds_to_anal.v.data
                     lat = ds_to_anal.lat.data
-                    coef_u = utide.solve(time, u, lat=lat)
-                    coef_v = utide.solve(time, v, lat=lat)
+                    coef_u = solve(time, u, lat=lat)
+                    coef_v = solve(time, v, lat=lat)
 
                     wave_names_u = np.array(coef_u['name']).astype(str)
                     wave_names_u = np.char.strip(wave_names_u)
@@ -290,8 +290,8 @@ def harmonic_analysis(ds_to_anal, list_waves, tide_tool):
             v = ds_to_anal.v.squeeze().data
             lat = ds_to_anal.lat.data
 
-            coef_u = utide.solve(time, u, lat=lat)
-            coef_v = utide.solve(time, v, lat=lat)
+            coef_u = solve(time, u, lat=lat)
+            coef_v = solve(time, v, lat=lat)
 
             wave_names_u = np.array(coef_u['name']).astype(str)
             wave_names_u = np.char.strip(wave_names_u)
