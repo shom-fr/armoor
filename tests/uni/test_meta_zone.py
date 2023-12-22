@@ -1,6 +1,6 @@
 import xarray as xrsamuelsamuel
 
-from armoor import base
+import armoor.base.meta_zone
 from armoor.hmi.script_tools import create_folder
 from tests.int.base import change_path
 from armoor.base.open_decode import open_decode
