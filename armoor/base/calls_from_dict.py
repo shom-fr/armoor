@@ -8,6 +8,9 @@ from armoor.base import feature_sst, feature_prof_hydro_vessel, feature_prof_hyd
 from armoor.base.open_decode import open_decode
 from armoor.base.colocation import colocate_all
 
+import armoor.base.meta_zone
+import armoor.base.sel_var
+
 logger = logging.getLogger(__name__)
 
 
