@@ -43,14 +43,18 @@ def read_args(argv):
     parser.add_argument('-l', '--legend-configuration',
                         type=argparse.FileType('r'),
                         help='File to overwrite internal legend configuration file')
+    parser.add_argument('--rundate',
+                       type=str,
+                       help='production date')
     paths = vars(parser.parse_args(argv))
 
     output_folder_path = paths['output_folder']
     input_folder_path = paths['input_folder']
     input_configuration_path = paths['input_configuration']
     legend_configuration_path = paths.get('legend_configuration')
-
-    return output_folder_path, input_folder_path, input_configuration_path, legend_configuration_path
+    rundate = paths.get("rundate")
+    
+    return output_folder_path, input_folder_path, input_configuration_path, legend_configuration_path, rundate
 
 
 def main(argv=None):
@@ -66,7 +70,7 @@ def main(argv=None):
 
     if not argv:
         argv = sys.argv[1:]
-    output_folder_path, input_folder_path, input_configuration_path, legend_configuration_path = read_args(argv)
+    output_folder_path, input_folder_path, input_configuration_path, legend_configuration_path, rundate = read_args(argv)
 
     logger.info(f'details of configuration from file : {input_configuration_path}')
 
@@ -89,7 +93,7 @@ def main(argv=None):
     logger.info(f'saved in folder : {output_folder_path}')
     logger.info(f'data comes from : {input_folder_path}')
 
-    create_images(dict_configuration, input_folder_path, output_folder_path, legend_configuration)
+    create_images(dict_configuration, input_folder_path, output_folder_path, legend_configuration, rundate)
     logger.info(f"--- {time.time() - start_time} seconds ---")
 
 

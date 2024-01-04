@@ -12,11 +12,11 @@ import gc
 from multiprocessing import Pool
 import multiprocessing
 import json
-from datetime import datetime, timezone
 import time
 
 import numpy as np
 import xarray as xr
+import pandas as pd
 import dask.array as da
 
 from armoor.hmi.configuration import get_forcing_model, get_model, get_obs
@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 def create_images(config_obj: dict,
                   input_folder_path: str,
                   output_folder_path: str,
-                  legend_configuration: str):
+                  legend_configuration: str,
+                  rundate: str):
     """
     Create images and zip them
     Parameters
@@ -55,7 +56,8 @@ def create_images(config_obj: dict,
 
     parameters = config_obj["parameters"]
 
-    production_day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    production_day = pd.to_datetime(rundate).strftime("%Y%m%d")
+
     logger.info(f'Production day : {production_day}')
 
     config_reg_t0, config_reg_times, config_reg_extent = get_time_spacial_extent(input_folder_path,
@@ -227,7 +229,9 @@ def create_param_images(config_reg: str,
                                                     model2plot_xr,
                                                     obs2plot_xr,
                                                     paths,
-                                                    param.get("obs"))
+                                                    param.get("obs"),
+                                                    param.get("cbar"))
+    
     logger.info(f'Creating images for all steps : {len(config_reg_times)}')
     # Loop on times to create all images
     param_title = param["name"]
@@ -443,7 +447,60 @@ def get_path2save(reg_time: str,
     return path2save
 
 
-def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names, obs_name):
+def get_cbar_minmax(ds, minmax=False, nstd=None, difference=False, norm=False):
+    """
+    Compute min and max values of colorbar
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        xarray dataset containing a scalar field.
+    minmax : boolean, optional
+        If True, keep min and max values of ds as min and max colorbar values
+        respectively. If False, min and max are compited as the mean plus or 
+        minus nstd times the standard deviation. The default is False.
+    nstd : float, optional
+        The default is 3.0.
+    difference : boolean, optional
+        If True, min and max values of colorbar are centered around 0.
+    norm : boolean, optional
+        If True, min value of colorbar is 0.
+
+    Returns
+    -------
+    float
+        Minimum value of the colorbar.
+    float
+        Maximum value of the colorbar.
+
+    """
+    if minmax == True and nstd == True:
+        logger.error("minmax and nstd cannot be both equal to True")
+        sys.exit(1)
+    elif minmax == True:
+        if difference == True:
+            return -np.nanmax(np.abs(ds)), np.nanmax(np.abs(ds))
+        elif norm == True:
+            return 0.0, np.nanmax(np.abs(ds))
+        else:
+            return np.nanmin(ds), np.nanmax(ds)
+    else:
+        if nstd:
+            if difference == True:
+                return - np.nanstd(ds) * nstd, np.nanstd(ds) * nstd
+            elif norm == True:
+                return 0.0, np.nanmean(ds) + np.nanstd(ds) * nstd
+            else:
+                return np.nanmean(ds) - np.nanstd(ds) * nstd, np.nanmean(ds) + np.nanstd(ds) * nstd
+        else:
+            logger.error(
+                "If minmax is False (that is the default value)," 
+                " nstd has to be a float not None, check your"
+                " the configuration file"
+            )
+            sys.exit(1)
+
+
+def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names, obs_name, param_cbar):
     """
     Retrieve data to plot and colorbar min and max
     Parameters
@@ -462,8 +519,8 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names, obs_name)
     """
     if func in ["visu_temp", "visu_sal"]:
         data2plot_all_times = model2plot_xr.xoa[var_m]
-        cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
-
+        cbar_range = get_cbar_minmax(data2plot_all_times, **param_cbar)
+        
     elif func in ["visu_precip", 'visu_solarflux']:
         logger.info('Decumulate data')
         data2plot_all_times = model2plot_xr.xoa[var_m]
@@ -473,19 +530,27 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names, obs_name)
         result = from_nh_to_1h(result, cumul_time_in_h)
 
         data2plot_all_times[:, :, :] = result[:, :, :]
-        cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
+        cbar_range = get_cbar_minmax(data2plot_all_times, **param_cbar)
 
     elif func in ["visu_current", "visu_windforcing"]:
+        if func == "visu_windforcing":
+            model2plot_xr['u'] = model2plot_xr['u'] * 3600.0 / 1852.0
+            model2plot_xr['v'] = model2plot_xr['v'] * 3600.0 / 1852.0
         model_da_u = model2plot_xr['u']
         model_da_v = model2plot_xr['v']
         model_norm = np.sqrt(model_da_u ** 2 + model_da_v ** 2)
-        cbar_range = np.nanmin(model_norm), np.nanmax(model_norm)
+        cbar_range = get_cbar_minmax(model_norm, **param_cbar)
         data2plot_all_times = model2plot_xr
 
     elif func in ["visu_mixedlayer", 'visu_mixedlayer_clim']:
         logger.info('Computing mixed layer.')
         data2plot_all_times = compute_mixed_layer(model2plot_xr.xoa[var_m].squeeze())
-        cbar_range = np.nanmin(data2plot_all_times), np.nanmax(data2plot_all_times)
+        if func == "visu_mixedlayer":
+            cbar_range = get_cbar_minmax(data2plot_all_times, **param_cbar)
+            global cbar_range_mld
+            cbar_range_mld = cbar_range
+        else:
+            cbar_range = cbar_range_mld
 
     elif func in ["visu_runoff"]:
         data2plot_all_times = model2plot_xr
@@ -508,7 +573,7 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names, obs_name)
         da_obs_coloc, da_model_coloc = colocate_all(obs_da, model_da, flags, "model")
         difference = da_model_coloc - da_obs_coloc.squeeze()
 
-        cbar_range = np.nanmin(difference), np.nanmax(difference)
+        cbar_range = get_cbar_minmax(difference, **param_cbar)
         data2plot_all_times = difference
 
     logger.info('Retrieving colorbar for all times...')
