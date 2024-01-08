@@ -1613,8 +1613,8 @@ def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
     logger.info('Figure of the tidal current ellipsis.')
     # Retrieve the variables
     ds_name = ds.name
-    u_a, u_g = ds.u_a.values, ds.u_g.values
-    v_a, v_g = ds.v_a.values, ds.v_g.values
+    u_a, u_g = ds.u_a.values, ds.u_g.values * np.pi / 180
+    v_a, v_g = ds.v_a.values, ds.v_g.values * np.pi / 180
 
     if np.size(ds.u_a.values) > 1:
         u_a, u_g = u_a[0], u_g[0]
