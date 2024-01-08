@@ -316,6 +316,8 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         if 'current_res' in vars_to_plot:
             filter = outputs[0]['low_pass_filter']
             xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
+        if 'current_geo' in vars_to_plot:
+            xarray_obj = xarray_obj.sel_var.sel_current_geo()
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
             radius = config_obj["meta_zones"]["radius"] if "radius" in config_obj[

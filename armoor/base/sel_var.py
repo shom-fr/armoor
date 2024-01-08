@@ -73,7 +73,7 @@ class SSTAccessor:
             elif var == 'current':
                 dataset = self._obj.sel_var.sel_current()
             elif var == 'current_geo':
-                dataset = self._obj.sel_var.sel_geo_current()
+                dataset = self._obj.sel_var.sel_current_geo()
             elif var == 'current_res':
                 dataset = self._obj.sel_var.sel_current_res(filter)
             elif var == 'current_bc':
@@ -147,10 +147,10 @@ class SSTAccessor:
 
         # Retrieve direction
         current['dir'] = np.arctan2(current['v'], current['u']) * 180 / np.pi
-        current['dir'] = current['dir'].assign_attrs({'units':'°'})
+        current['dir'] = current['dir'].assign_attrs({'units': '°'})
         return current
 
-    def sel_geo_current(self):
+    def sel_current_geo(self):
         """
         Select the u/v current from dataset
         Returns
@@ -159,7 +159,38 @@ class SSTAccessor:
             Data array containing geostrophic current.
 
         """
-        current = self._obj[["ugbt", "vgbt"]]
+        # Get variables
+        SA = self._obj.sel_var.sel_sal()
+        temp = self._obj.sel_var.sel_temp()
+        pres = self._obj.sel_var.sel_pres()
+        CT = gsw.conversions.CT_from_t(SA, temp, pres)
+
+        # Incrinsing along depth
+        if 'depth' in pres.dims:
+            pres = pres.transpose('depth', ...)
+            SA = SA.transpose('depth', ...)
+            CT = CT.transpose('depth', ...)
+
+        # Stream function
+        geo_strf = gsw.geostrophy.geo_strf_dyn_height(SA, CT, pres, p_ref=0, axis=0, max_dp=1.0,
+                                                      interp_method='pchip')
+
+        # Calculate geostrophic current
+        lat = self._obj.lat.values
+        lon = self._obj.lon.values
+        [geo_vel, lon, lat] = gsw.geostrophy.geostrophic_velocity(geo_strf, lon, lat, p=0, axis=0)
+
+        # Create dataset
+        times = self._obj.time.values
+        times = [time.astype('datetime64[s]') for time in times]
+        times = [(times[i].astype(float) + times[i + 1].astype(float)) / 2 for i in
+                 range(len(times) - 1)]
+        times = [np.datetime64(int(time), 's') for time in times]
+        geo_vel = xr.DataArray(data=geo_vel, dims=["depth", 'time'],
+                               coords=dict(lon=(['time'], lon), lat=(['time'], lat), time=times,
+                                           depth=self._obj.depth))
+        current = xr.Dataset()
+        current['current_geo'] = geo_vel
         return current
 
     def sel_current_res(self, filter):
@@ -202,8 +233,8 @@ class SSTAccessor:
             current_res['v_res'] = da_v_res
             current_res['norm_res'] = (current_res.u_res ** 2 + current_res.v_res ** 2) ** 0.5
             current_res['dir_res'] = np.arctan2(current_res['v_res'],
-                                            current_res['u_res']) * 180 / np.pi
-            current_res['dir_res'] = current_res['dir_res'].assign_attrs({'units':'°'})
+                                                current_res['u_res']) * 180 / np.pi
+            current_res['dir_res'] = current_res['dir_res'].assign_attrs({'units': '°'})
             return current_res
 
     def sel_current_barocline(self):
@@ -242,7 +273,7 @@ class SSTAccessor:
         current_bc['v_bc'] = vbc
         current_bc['norm_bc'] = vbc
         current_bc['dir_bc'] = np.arctan2(current_bc['v_bc'], current_bc['u_bc']) * 180 / np.pi
-        current_bc['dir_bc'] = current_bc['dir_bc'].assign_attrs({'units':'°'})
+        current_bc['dir_bc'] = current_bc['dir_bc'].assign_attrs({'units': '°'})
         return current_bc
 
     def sel_sst(self, depth=0):
@@ -380,6 +411,13 @@ class SSTAccessor:
             self._obj = mixed_layer_depth(self._obj['ptemp'])
         return self._obj
 
+    def sel_pres(self):
+        if 'pres' in self._obj:
+            return self._obj['pres']
+        elif 'depth' in self._obj:
+            pres = gsw.conversions.p_from_z(self._obj.depth, self._obj.lat)
+            return pres
+
     def sel_density(self):
         """
         Select density from the dataset.
@@ -394,11 +432,7 @@ class SSTAccessor:
         else:
             temp = self._obj.sel_var.sel_temp()
             sal = self._obj.sel_var.sel_sal()
-            if "pres" in self._obj:
-                pres = self._obj['pres']
-            else:
-                pres = gsw.p_from_z(self._obj.depth, self._obj.lat, geo_strf_dyn_height=0,
-                                    sea_surface_geopotential=0)
+            pres = self._obj.sel_var.sel_pres()
             dens = gsw.density.rho(sal, temp, pres)
             dens.name = 'dens'
             return dens
