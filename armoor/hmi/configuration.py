@@ -10,6 +10,7 @@ import xoa
 from armoor.hmi.path_tools import get_config_reg_path, get_obs_path, get_forcing_model_path
 from armoor.hmi.script_tools import get_t0
 from armoor.base.open_decode import open_decode
+import armoor.base.meta_zone
 
 import logging
 logger = logging.getLogger(__name__)
