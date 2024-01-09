@@ -30,8 +30,8 @@ In the header there are 5 attributes:
     * ``functionality`` : There are 9 functionalities : *sst*, *prof_hydro_vessel*, *prof_hydro_mooring*, *section_hydro*, *clim_hydro*, *currents_hfr*, *currents_ADCP*, *currents_VMADCP* and *drifters*. For more information refer to the :doc:`functionalities` chapter.
     * ``colocate`` : Put the model and observation dataset on the same grid defined according to the selected target: model's, observation's or auto (less dense grid, default).
     * ``output_path`` : Directory path to store the outputs. If no path is provided the plots will pop up.
-    * ``horizontal_step`` : The products can be projected on a grid with the horizontal resolution, in kilometers, you set.
-    * ``vertical_step`` : The products can be projected on a grid with the vertical resolution, in meters, you set. If you intend to colocate the products on an HYCOM product grid, this option is required.
+    * ``horizontal_step`` : The products can be projected on a grid with the horizontal resolution, in kilometers, you set. Only available for functionality *section_hydro* and *currents_VMADCP*.
+    * ``vertical_step`` : The products can be projected on a grid with the vertical resolution, in meters, you set. If you intend to colocate the products on an HYCOM product grid, this option is required. Only available for functionality *section_hydro* and *currents_VMADCP*.
 
 
 2. Observation
@@ -99,7 +99,7 @@ Relative to vertical restriction:
 Other restrictions :
 
     * ``quality`` : To set minimum and maximum quality thresholds on a variable.
-    * ``vars`` : To select the variables of interest.
+    * ``vars`` : To select the variables of interest. See ``attribute`` in output description below.
 
 5. Outputs
 ----------
@@ -158,7 +158,7 @@ For each output here is the list of possible options (with their associated desc
     * ``tide_tool`` : Name of the tide library to use to compute harmonic analysis, either utide or ttide. By default, utide will be used.
     * ``low_pass_filter`` : Name of the low-pass filter method to apply to retrieve the residual current. Must be chosen between "demerliac", "godin" and "mean".
 
-You can select the variables to plot among the following ones:
+You can select the variables to plot among the following ones with the parameter ``attribute``:
     * ``SST`` : Sea surface temperature
     * ``temp`` : Temperature
     * ``ptemp`` : Potential temperature
@@ -169,6 +169,7 @@ You can select the variables to plot among the following ones:
     * ``current`` : Current
     * ``current_res`` : Residual current
     * ``current_geo`` : Geostrophic current
+    * ``current_bc`` : Baroclinic current
     * ``mld`` : Mixed layer depth
     * ``sound_speed`` : Sound speed
 
@@ -238,7 +239,7 @@ In the folder where you will run ``pytest``, please create a file named ``tests.
 
     Note that for ``test_currents_hfr`` and ``test_currents_ADCP`` tests, some outputs require harmonic analyses to retrieve the tidal constituents.
     The harmonic analyses are run in this tool thanks to the ttide librairy available at https://github.com/moflaher/ttide_py and described in::
-        Pawlowicz, R., B. Beardsley, and S. Lentz, "Classical Tidal "Harmonic Analysis Including Error Estimates in MATLAB using T_TIDE", Computers and Geosciences, 28, 929-937 (2002).
+    Pawlowicz, R., B. Beardsley, and S. Lentz, "Classical Tidal "Harmonic Analysis Including Error Estimates in MATLAB using T_TIDE", Computers and Geosciences, 28, 929-937 (2002).
 
     To do so, you need to specify specify the ``tidal_waves`` to compute. For more information refer to section **5. Outputs** above.
 

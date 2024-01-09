@@ -1,6 +1,6 @@
 import xarray as xrsamuelsamuel
 
-from armoor import base
+import armoor.base.meta_zone
 from armoor.hmi.script_tools import create_folder
 from tests.int.base import change_path
 from armoor.base.open_decode import open_decode
@@ -71,6 +71,7 @@ class TestMetaZone:
 
         ds_meta = ds_lon_lat_depth.meta.horizontal_selection_cloud_dots(point, radius,
                                                                         method='nearest')
+        ds_meta = ds_lon_lat_depth.meta.horizontal_selection_cloud_dots_instr(point, radius, method='nearest')
 
         point_in = [-9.583333, 45.416668]
         test_in = point_in[0] in ds_meta.lon.values and point_in[1] in ds_meta.lat.values

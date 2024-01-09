@@ -67,7 +67,7 @@ class MetazoneAccessor:
                 selection = self._obj[var] <= max_q
             else:
                 selection = None
-            return self._obj.where(selection, drop=True)
+            return self._obj.where(selection)
 
         return self._obj
 
@@ -92,6 +92,7 @@ class MetazoneAccessor:
         logger.info("Applying filter - horizontal_selection_polygon")
         # Create the polygon where to subset
         polygon = path.Path(coords)
+
         # Depending on the coordinate system, flag the points outside the polygon
         if 'lon' in self._obj.dims:  # Check if rect coordinates
             ds_coords = [(lon, lat) for lon in self._obj.lon.data for lat in self._obj.lat.data]
@@ -189,7 +190,7 @@ class MetazoneAccessor:
 
         if 'lon' in self._obj.dims:  # Regular grid
             if method in ["linear"] or method is None:
-                return self._obj.interp(lon=lon_target, lat=lat_target, method='linear')
+                return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
             return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
 
         if 'x' in self._obj.dims:  # Curvilinear grid
@@ -294,7 +295,6 @@ class MetazoneAccessor:
         radius = self._obj.meta.km_to_deg(radius_km)
         liste_ds = []
         idx_centre = 0
-
         lons, lats = cloud
         for i_lon, _ in enumerate(lons):
             lon, lat = lons[i_lon], lats[i_lon]
@@ -397,8 +397,10 @@ class MetazoneAccessor:
                 return self.vertical_selection_list(depth)
         if len(depth) == 1 and 'depth' in self._obj.dims:
             return self._obj.squeeze('depth')
+        for dim in ['level', 'z']:
+            if dim in self._obj.dims and len(self._obj[dim])==1:
+                return self._obj.squeeze(dim)
         return self._obj
-
 
     def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
         """
@@ -521,7 +523,9 @@ class MetazoneAccessor:
                 dataset['depth'] = depth
                 return dataset
 
-            if list(dataset.dims) == ['time', 'z']:  # CMEMS profilers
+            if list(dataset.dims.keys()) == ['time', 'z'] or list(dataset.dims.keys()) == ['instr',
+                                                                                           'time',
+                                                                                           'z']:  # CMEMS profilers
                 return dataset.meta.vertical_selection_ponct_cmems(depth)
 
             if 'z' in dataset.dims or 'level' in dataset.dims or (
@@ -549,6 +553,7 @@ class MetazoneAccessor:
         CMEMS product at the required depth.
 
         """
+
         depth_diff = np.abs(self._obj['depth'] - depth)
         nearest_depth_index = [np.nanargmin(depth_diff.isel(time=i_time).data) for i_time, time in
                                enumerate(self._obj.time)]
@@ -595,7 +600,7 @@ class MetazoneAccessor:
                 for var_depth in ['level', 'z', 'DEPTH', 'sig']:
                     if var_depth in dataset[var].dims and len(dataset[var][var_depth]) > 1:
                         da_var = dataset[var]
-                        da_tgt = regrid1d(da_var, tgt_depth)
+                        da_tgt = regrid1d(da_var, tgt_depth)  # extrap for depth=0 : does not work
                         tgt_ds = tgt_ds.assign({var: da_tgt})
 
         # Assign depth coordinates values
@@ -606,7 +611,8 @@ class MetazoneAccessor:
         if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
             tgt_ds['depth'] = -tgt_ds['depth']
 
-        tgt_ds = tgt_ds.squeeze()
+        if len(depth) == 1 and 'depth' in tgt_ds.dims:
+            tgt_ds = tgt_ds.squeeze('depth')
         # Reindex depths if necessary
         if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0] > tgt_ds.depth.data[-1]:
             tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])

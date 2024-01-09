@@ -40,5 +40,5 @@ dependencies:
   - pip:
     - build
     - setuptools
-    - xoa-999-py3-none-any.whl
+    - xoa-0.7.2.dev9+g6253f7d-py3-none-any.whl
     - ttide-0.3.dev1-py3-none-any.whl

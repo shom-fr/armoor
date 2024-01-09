@@ -27,7 +27,7 @@ def command_line_interface(argv=None):
         argv = sys.argv[1:]
 
     logger.info('Retrieving parameter')
-    parser = ArgumentParser(description="Bulletin de validation")
+    parser = ArgumentParser()
     cfg_ticket_lines, _ = cfgm_fields.arg_parse(parser=parser, getargs=True, args=argv)
 
     formatted_data = format_cofig_obj2dict(cfg_ticket_lines)

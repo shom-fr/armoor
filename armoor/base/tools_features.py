@@ -263,7 +263,7 @@ def sel_default_vars(config_obj):
     return config_obj
 
 
-def sel_one_var(observation, models, var):
+def sel_one_var(observation, models, var, depth=None):
     """
     Select a variable in the model and observation
     Parameters
@@ -272,9 +272,19 @@ def sel_one_var(observation, models, var):
     observation : dict of xarray.dataset
     var : str
     """
+    # Avoid deep copy
+    observation_var = dict()
+    observation_var["xarray_meta_coloc"] = []
+
+    models_var = [dict() for _ in models]
+    for key in ['name', 'method', 'xarray']:
+        if key in list(observation.keys()):
+            observation_var[key] = observation[key]
+        for i_mod, mod in enumerate(models):
+            if key in list(mod.keys()):
+                models_var[i_mod][key] = mod[key]
+
     # Adjust potential / insitu variables for models and obs
-    observation_var = copy.deepcopy(observation)
-    models_var = copy.deepcopy(models)
     if var in ['temp', 'ptemp']:
         var_mod = 'ptemp'
         var_obs = 'ptemp'
@@ -283,14 +293,28 @@ def sel_one_var(observation, models, var):
         var_obs = var
 
     # Select variable and add mod/obs name
-    observation_var['xarray_meta'] = observation_var['xarray_meta'][var_obs].assign_attrs(
+    observation_var['xarray_meta'] = observation['xarray_meta'][var_obs].assign_attrs(
         {'name': observation['name']})
-    for i_mod, mod in enumerate(models_var):
-        mod["xarray_meta"] = mod["xarray_meta"][var_mod].assign_attrs({'name': mod['name']})
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod].assign_attrs(
+    for i_mod, mod in enumerate(models):
+        models_var[i_mod]["xarray_meta"] = mod["xarray_meta"][var_mod].assign_attrs(
             {'name': mod['name']})
-        observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][i_mod][
-            var_obs].assign_attrs({'name': observation['name']})
+        models_var[i_mod]["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod].assign_attrs(
+            {'name': mod['name']})
+        observation_var["xarray_meta_coloc"].append(
+            observation["xarray_meta_coloc"][i_mod][var_obs].assign_attrs(
+                {'name': observation['name']}))
+
+    # Select depth if needed
+    if depth:
+        observation_var['xarray_meta'] = observation_var['xarray_meta'].sel(depth=depth,
+                                                                            method='nearest')
+        for i_mod, mod in enumerate(models_var):
+            models_var[i_mod]["xarray_meta"] = models_var[i_mod]["xarray_meta"].sel(depth=depth,
+                                                                                    method='nearest')
+            models_var[i_mod]["xarray_meta_coloc"] = models_var[i_mod]["xarray_meta_coloc"].sel(
+                depth=depth, method='nearest')
+            observation_var["xarray_meta_coloc"][i_mod] = observation_var["xarray_meta_coloc"][
+                i_mod].sel(depth=depth, method='nearest')
 
     return observation_var, models_var
 

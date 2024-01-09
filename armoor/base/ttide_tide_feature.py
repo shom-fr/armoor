@@ -3,7 +3,7 @@ import os
 import xarray as xr
 import numpy as np
 import ttide as tt
-import utide
+from utide import solve
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def run_harmonic_analysis_map(ds, output):
             ds_to_anal = ds.sel(lon=lon, lat=lat)
             if np.sum(np.isnan(ds_to_anal.u.data)) < np.sum(
                     ~np.isnan(ds_to_anal.u.data)) and np.sum(np.isnan(ds_to_anal.v.data)) < np.sum(
-                    ~np.isnan(ds_to_anal.v.data)):
+                ~np.isnan(ds_to_anal.v.data)):
 
                 # Ttide
                 if tide_tool == 'ttide':
@@ -87,8 +87,8 @@ def run_harmonic_analysis_map(ds, output):
                     u = ds_to_anal.u.data
                     v = ds_to_anal.v.data
                     lat = ds_to_anal.lat.data
-                    coef_u = utide.solve(time, u, lat=lat)
-                    coef_v = utide.solve(time, v, lat=lat)
+                    coef_u = solve(time, u, lat=lat)
+                    coef_v = solve(time, v, lat=lat)
 
                     wave_names_u = np.array(coef_u['name']).astype(str)
                     wave_names_u = np.char.strip(wave_names_u)
@@ -199,6 +199,9 @@ def run_harmonic_analysis(ds, output):
             f'Tidal wave(s) {waves} could not be retrieved from the harmonic analysis in '
             f'{ds_res.attrs["name"]}. '
             f'Try with a longer time series.')
+
+    # Assign coords
+    ds_res = ds_res.assign_coords(ds.coords)
     return ds_res
 
 
@@ -283,11 +286,12 @@ def harmonic_analysis(ds_to_anal, list_waves, tide_tool):
         elif tide_tool == 'utide':
             # Compute tidal analysis
             time = ds_to_anal.time.data
-            u = ds_to_anal.u.data
-            v = ds_to_anal.v.data
+            u = ds_to_anal.u.squeeze().data
+            v = ds_to_anal.v.squeeze().data
             lat = ds_to_anal.lat.data
-            coef_u = utide.solve(time, u, lat=lat)
-            coef_v = utide.solve(time, v, lat=lat)
+
+            coef_u = solve(time, u, lat=lat)
+            coef_v = solve(time, v, lat=lat)
 
             wave_names_u = np.array(coef_u['name']).astype(str)
             wave_names_u = np.char.strip(wave_names_u)

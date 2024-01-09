@@ -8,6 +8,9 @@ from armoor.base import feature_sst, feature_prof_hydro_vessel, feature_prof_hyd
 from armoor.base.open_decode import open_decode
 from armoor.base.colocation import colocate_all
 
+import armoor.base.meta_zone
+import armoor.base.sel_var
+
 logger = logging.getLogger(__name__)
 
 
@@ -137,7 +140,7 @@ def get_observation_models_meta(config_obj: dict):
 
             vert_slice = config_obj["meta_zones"]["slice"]
             model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(vert_slice,
-                var_slice)
+                                                                                      var_slice)
             model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.vertical_selection_slice(
                 vert_slice, var_slice)
             observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
@@ -149,6 +152,7 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
             interval)
+
     return config_obj
 
 
@@ -224,6 +228,8 @@ def set_coloc_flags(config_obj):
         vertical_colocation_flag = False
     if 'cloud' in config_obj['meta_zones']:
         horizontal_colocation_flag = False
+    if 'times' in config_obj['meta_zones']:
+        temporal_colocation_flag = False
 
     flags = temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag
 
@@ -302,6 +308,16 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                }
 
     if "meta_zones" in config_obj:
+        # Calculate vars before meta-zone
+        outputs = config_obj['outputs']
+        vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
+        if 'current_bc' in vars_to_plot:
+            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
+        if 'current_res' in vars_to_plot:
+            filter = outputs[0]['low_pass_filter']
+            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
+        if 'current_geo' in vars_to_plot:
+            xarray_obj = xarray_obj.sel_var.sel_current_geo()
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
             radius = config_obj["meta_zones"]["radius"] if "radius" in config_obj[
