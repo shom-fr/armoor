@@ -2104,6 +2104,11 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     # Select the variables to plot
     diff = mod_meta_coloc.transpose().values - obs_meta_coloc.transpose().values
 
+    # Drop nans
+    mod_meta_coloc = mod_meta_coloc.dropna('time', 'all')
+    obs_meta_coloc = obs_meta_coloc.dropna('time', 'all')
+    diff = diff.dropna('time', 'all')
+
     # Get min/max colobar values
     vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values(vmin, vmax, obs_meta_coloc, diff,
                                                            'difference', dvmin, dvmax, cmap)
