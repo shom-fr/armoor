@@ -155,17 +155,14 @@
                 {% endfor %}
             </ul>
 
-            <p class="special-paragraph">
-                Méta-zones
-            </p>
             {% for metazone in report.metazones %}
-            <h3>
+            <p class="special-paragraph">
                 {{metazone.properties.name}}
-            </h3>
+            </p>
             <ul>
                 {% for functionality in metazone.functionalities %}
                 <li>
-                    <h5 class="no-margin">{{functionalities_desc[functionality.functionality]}}</h5>
+                    <p class="no-margin" style="color: #002554; font-size: 16px; font-weight: bold;">{{functionalities_desc[functionality.functionality]}}</p>
                     <ul>
                         {% for output in functionality.outputs %}
                         <li>
