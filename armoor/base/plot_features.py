@@ -2269,6 +2269,7 @@ def create_harmonic_table(models, observations, output_path):
                 elif var == 'V':
                     ampl, phase = 'v_a', 'v_g'
                 filename = f'{wave_name}_{var}_harm_table_{tide_tool}_{obs.lon.data[0]}_{obs.lat.data[0]}.csv'
+                logger.info('Saving :: %s', filename)
                 harmonic_table_file = open(os.path.join(output_path, filename), 'a')
                 harmonic_table_file.write(
                     f'{wave_name} tidal wave - {var} current constituent - {tide_tool} librairy\n')
