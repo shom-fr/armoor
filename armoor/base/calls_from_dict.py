@@ -143,8 +143,6 @@ def get_observation_models_meta(config_obj: dict):
                                                                                       var_slice)
             model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.vertical_selection_slice(
                 vert_slice, var_slice)
-            observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
-                vert_slice, var_slice)
             observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
                 index_model].meta.vertical_selection_slice(vert_slice, var_slice)
 
@@ -152,7 +150,10 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
             interval)
-
+    if 'slice' in config_obj["meta_zones"]:
+        vert_slice = config_obj["meta_zones"]["slice"]
+        observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
+            vert_slice, var_slice)
     return config_obj
 
 

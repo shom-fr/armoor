@@ -771,10 +771,14 @@ class MetazoneAccessor:
 
         for i_ds, ds_slice in enumerate(liste_ds):
             ds_slice = ds_slice.assign_coords(
-                slice=i_ds)  # ajoute une dimension de date moyenne sur l'intervalle
+                slice=i_ds)
             ds_slice[var_slice + "_value"] = ds_slice[var_slice]
-            ds_slice = ds_slice.assign_coords(
-                depth=np.arange(len(ds_slice[var_slice])))  # change les profondeurs en indices
+            if 'depth' in ds_slice.dims:
+                ds_slice = ds_slice.assign_coords(
+                    depth=np.arange(len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
+            elif 'z' in ds_slice.dims:
+                ds_slice = ds_slice.assign_coords(
+                    z=np.arange(len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
             liste_ds[i_ds] = ds_slice
 
         dataset = xr.concat(liste_ds, 'slice')
