@@ -571,9 +571,9 @@ def open_decode_croco(path_file):
         if 'angle' in croco:
             angle = croco['angle']
             da_u = croco['u'] * np.cos(angle) - croco['v'] * np.sin(angle)
-            da_v = croco['u'] * np.sin(angle) + croco['v'] * np.cos(angle)
+            da_v = croco['v'] * np.cos(angle) + croco['u'] * np.sin(angle)
             croco = croco.drop(['u', 'v', 'angle'])
-            croco['uz'] = da_u
+            croco['u'] = da_u
             croco['v'] = da_v
 
             # Remove duplicate coords
