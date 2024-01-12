@@ -178,6 +178,14 @@ class Ticket:
         config = ticket_data.get("config", '')
         production_time = ticket_data.get("production_time", '')
         issue_title = ticket_data.get("title", '')
+        if issue_title == '':
+            logger.warning('The "title" parameter is required and must be provided.')
+        if production_time == '':
+            logger.warning('The "production_time" parameter is essential and needs to be specified.')
+        if config == '':
+            logger.warning('It is mandatory to include the "config" parameter in your input.')
+        if '' in [issue_title, production_time, config]:
+            sys.exit()
 
         title = f'{model}_{config} - '
         title += ' - '.join([production_time, issue_title])
