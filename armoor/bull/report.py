@@ -131,13 +131,8 @@ class Report:
         for meta_zone_name, pdf_list in generated_pdfs_func.items():
             logger.info(meta_zone_name)
             logger.info(pdf_list)
-            first_time = True
             for pdf in pdf_list:
-                if first_time:
-                    merger.append(pdf, outline_item=str(meta_zone_name))
-                    first_time = False
-                else:
-                    merger.append(pdf)
+                merger.append(pdf, outline_item=str(meta_zone_name))
 
         merger.write(os.path.join(self.output_folder_path, '..', 'output.pdf'))
         merger.close()
