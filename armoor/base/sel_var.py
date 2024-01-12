@@ -90,9 +90,9 @@ class SSTAccessor:
 
             liste_ds.append(dataset)
 
-        # Remove None datasets
+        # Remove None datasets and datasets already in coords (pdens)
         liste_ds = [dataset for dataset in liste_ds if dataset is not None]
-
+        liste_ds = [dataset for dataset in liste_ds if dataset.name not in self._obj.coords]
         # Merge
         if len(liste_ds) == 1:
             ds_all = liste_ds[0]
@@ -437,7 +437,7 @@ class SSTAccessor:
             dens.name = 'dens'
             return dens
 
-    def sel_pdensity(self):
+    def sel_pdensity(self, ref_dens=None):
         """
         Select density from the dataset.
 
@@ -451,12 +451,29 @@ class SSTAccessor:
             sal = self._obj.sel_var.sel_sal()
             temp = self._obj.sel_var.sel_temp()
             if not sal is None and not temp is None:
-                pdens = gsw.sigma0(sal, temp)
+                if ref_dens is None or ref_dens not in [0, 1000, 2000, 3000, 4000]:
+                    logger.warning('You did not specify the vertical reference to comute the potential density. '
+                                   'Please define reference_density in the configuration file, with values among 0, 1000, 2000, 3000 and 4000 dbar.'
+                                   'The reference will be 0 dbar here.')
+                    pdens = gsw.sigma0(sal, temp)
+                elif ref_dens == 0:
+                    pdens = gsw.sigma0(sal, temp)
+                elif ref_dens == 1000:
+                    pdens = gsw.sigma1(sal, temp)
+                elif ref_dens == 2000:
+                    pdens = gsw.sigma2(sal, temp)
+                elif ref_dens == 3000:
+                    pdens = gsw.sigma3(sal, temp)
+                elif ref_dens == 4000:
+                    pdens = gsw.sigma4(sal, temp)
+
                 self._obj['pdens'] = pdens
                 self._obj['pdens'] = self._obj['pdens'].assign_attrs({'units': 'kg/m3'})
                 return self._obj['pdens']
-        else:
-            return ds_dens
+            else:
+                logger.warning('Caution, potential density could not be computed, ptemp or sal are missing.')
+
+        return ds_dens
 
     def sel_ssh(self):
         """

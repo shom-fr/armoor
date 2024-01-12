@@ -130,9 +130,14 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
                 time = f"{time_min}_to_{time_max}"
 
     # Depth
-    if 'profile' in figtitle or "Theta-S" in figtitle:
-        title_depth = ""
-        depth = f"{obs.depth.min().data:.1f}m_to_{obs.depth.max().data:.1f}m"
+    if 'profile' in figtitle or 'Theta-S' in figtitle:
+        if 'pdens' in obs.coords and np.size(obs.pdens) > 1:
+            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f}"
+            depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+        else:
+            title_depth = ""
+            depth = f"{obs.depth.min().data:.1f}m_to_{obs.depth.max().data:.1f}m"
+
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data}m"
         depth = f"{obs.slice.data}m"
@@ -142,9 +147,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
         title_depth = f"Depth: {obs.depth.min().values:.1f}m to {obs.depth.max().values:.1f}m"
         depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
-    elif 'dens' in obs.coords and np.size(obs.dens) > 1:
-        title_depth = f"Density: {min(obs.dens.values):.1f} to {max(obs.dens.values):.1f}"
-        depth = f"{min(obs.dens.values):.1f}m_to_{max(obs.dens.values):.1f}m"
+    elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
+        title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f}"
+        depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
         if obs.depth.data.shape == (1,):
             title_depth = f"Depth: {obs.depth.values[0]:.1f}m"
