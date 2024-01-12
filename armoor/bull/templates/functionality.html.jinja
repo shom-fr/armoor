@@ -143,50 +143,51 @@
     </style>
 </head>
 
-<body>
+    {% for functionality in metazone.functionalities %}
+    <body>
 
-    <div class='break'>
-        <header>
-            <div class="logo">
-                <img src="logo_shom.png">
-            </div>
+        <div class='break'>
+            <header>
+                <div class="logo">
+                    <img src="logo_shom.png">
+                </div>
 
-            <div class="title">
+                <div class="title">
 
-                <p class="special-paragraph">
-                    {{metazone.properties.name}}</p>
-                <p style="color: #002554; font-size: 16px; font-weight: bold; margin-bottom: 15px;">
-                    {{functionalities_desc[functionality.functionality]}}
-                </p>
-            </div>
+                    <p class="special-paragraph">
+                        {{metazone.properties.name}}</p>
+                    <p style="color: #002554; font-size: 16px; font-weight: bold; margin-bottom: 15px;">
+                        {{functionalities_desc[functionality.functionality]}}
+                    </p>
+                </div>
 
-            <div class="metazone-img">
-                <img src="{{metazone.properties.path}}" class="meta-zone-header-image">
-            </div>
+                <div class="metazone-img">
+                    <img src="{{metazone.properties.path}}" class="meta-zone-header-image">
+                </div>
 
-        </header>
+            </header>
 
-        <div class="body">
-            <h4 class="hidden-title">{{functionalities_desc[functionality.functionality]}}</h4>
-            {% for output in functionality.outputs %}
-                <h5 class="hidden-title">{{sub_functionalities_desc[output.plot]}}</h5>
-                {% if loop.index != 1 %}
-                    <div style="break-before: always;">
-                {% else %}
-                    <div>
-                {% endif %}
-                    {% for file in output.files %}
-                    <h6 class="hidden-title">{{file.replace(".png", "").replace("_", " ")}}</h6>
-                    <div class="output-img">
-                        <img src="{{functionality.output_path + '/' + output.folder_name + '/' + file}}" class="property-image">
+            <div class="body">
+                <h4 class="hidden-title">{{functionalities_desc[functionality.functionality]}}</h4>
+                {% for output in functionality.outputs %}
+                    <h5 class="hidden-title">{{sub_functionalities_desc[output.plot]}}</h5>
+                    {% if loop.index != 1 %}
+                        <div style="break-before: always;">
+                    {% else %}
+                        <div>
+                    {% endif %}
+                        {% for file in output.files %}
+                        <h6 class="hidden-title">{{file.replace(".png", "").replace("_", " ")}}</h6>
+                        <div class="output-img">
+                            <img src="{{functionality.output_path + '/' + output.folder_name + '/' + file}}" class="property-image">
+                        </div>
+                        {% endfor %}
+                        <br>
                     </div>
                     {% endfor %}
-                    <br>
                 </div>
-                {% endfor %}
             </div>
-        </div>
 
-</body>
-
+    </body>
+    {% endfor %}
 </html>

@@ -108,19 +108,17 @@ class Report:
             generated_pdfs_func.update({meta_zone_name: []})
 
             # Then each functionalities
-            for index_functionality, functionality in enumerate(metazone['functionalities']):
-                template = env.get_template(os.path.join('templates', 'functionality.html.jinja'))
-                render = template.render(self.data_report,
-                                         metazone=metazone,
-                                         functionality=functionality
-                                         )
+            template = env.get_template(os.path.join('templates', 'functionality.html.jinja'))
+            render = template.render(self.data_report,
+                                     metazone=metazone
+                                     )
 
-                base_name = os.path.join(tmp_directory,
-                                         f'metazone{index_metazone}functionality{index_functionality}.pdf')
+            base_name = os.path.join(tmp_directory,
+                                     f'{meta_zone_name}.pdf')
 
-                html = HTML(string=render, base_url=self.output_folder_path)
-                html.write_pdf(target=base_name)
-                generated_pdfs_func[meta_zone_name].append(base_name)
+            html = HTML(string=render, base_url=self.output_folder_path)
+            html.write_pdf(target=base_name)
+            generated_pdfs_func[meta_zone_name].append(base_name)
 
         # Merge the generated pdfs
         logger.info("Merge the generated pdfs")
@@ -136,6 +134,7 @@ class Report:
 
         merger.write(os.path.join(self.output_folder_path, '..', 'output.pdf'))
         merger.close()
+        shutil.rmtree(tmp_directory)
 
     def __generate_html_report(self):
         """
