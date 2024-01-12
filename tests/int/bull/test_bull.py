@@ -18,4 +18,4 @@ class TestBulletins:
         out_path, logger = change_path_bull(test)
         logger.info(f'Test bulletin {test}')
         only_report(['-o', './', '-c', 'Bulletin.cfg'])
-        assert True
+        assert False

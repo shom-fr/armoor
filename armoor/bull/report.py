@@ -12,6 +12,7 @@ from PyPDF2 import PdfMerger
 from weasyprint import HTML
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,6 +81,7 @@ class Report:
 
         # The list of temporary pdf files
         generated_pdfs = []
+        generated_pdfs_func = {}
 
         # Generate the report index
         template = env.get_template(os.path.join('templates', 'index.html.jinja'))
@@ -98,22 +100,12 @@ class Report:
         generated_pdfs.append(output_pdf)
 
         # Generate each metazone
+        logger.info("Generate each metazone")
         for index_metazone, metazone in enumerate(self.data_report['report']['metazones']):
-            # Render the metazone index
-            template = env.get_template(os.path.join('templates', 'metazone.html.jinja'))
-            properties = self.__format_metazone_properties(metazone['properties'],
-                                                           self.data_report['meta_zone_desc']
-                                                           )
-            render = template.render(self.data_report,
-                                     metazone=metazone,
-                                     properties=properties
-                                     )
 
-            # Convert to PDF
-            html = HTML(string=render, base_url=self.output_folder_path)
-            output_pdf = os.path.join(tmp_directory, f'metazone{index_metazone}.pdf')
-            html.write_pdf(target=output_pdf)
-            generated_pdfs.append(output_pdf)
+            meta_zone_name = metazone['properties']['name']
+            logger.info(meta_zone_name)
+            generated_pdfs_func.update({meta_zone_name: []})
 
             # Then each functionalities
             for index_functionality, functionality in enumerate(metazone['functionalities']):
@@ -128,12 +120,25 @@ class Report:
 
                 html = HTML(string=render, base_url=self.output_folder_path)
                 html.write_pdf(target=base_name)
-                generated_pdfs.append(base_name)
+                generated_pdfs_func[meta_zone_name].append(base_name)
 
         # Merge the generated pdfs
+        logger.info("Merge the generated pdfs")
         merger = PdfMerger()
         for pdf in generated_pdfs:
             merger.append(pdf)
+
+        for meta_zone_name, pdf_list in generated_pdfs_func.items():
+            logger.info(meta_zone_name)
+            logger.info(pdf_list)
+            first_time = True
+            for pdf in pdf_list:
+                if first_time:
+                    merger.append(pdf, outline_item=str(meta_zone_name))
+                    first_time = False
+                else:
+                    merger.append(pdf)
+
         merger.write(os.path.join(self.output_folder_path, '..', 'output.pdf'))
         merger.close()
 
@@ -172,4 +177,3 @@ class Report:
             self.__generate_html_report()
         else:
             logger.error('Error: unexpected format')
-
