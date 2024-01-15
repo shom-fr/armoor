@@ -482,11 +482,12 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_dens")
         dens = np.array(dens, dtype=float)
-
-        if dens and np.size(dens) == 1:
+        if dens is not None and np.size(dens) == 1:
             return self.vertical_selection_ponct(dens, 'dens', ref_dens=ref_dens)
-        elif dens:  # if output=profiles, only this option should apply
-            return self.vertical_selection_range(dens, 'dens', ref_dens=ref_dens)
+        elif dens is not None and np.size(dens) > 1:
+            list_ds = [self.vertical_selection_ponct(dens_i, 'dens', ref_dens=ref_dens) for dens_i
+                       in dens]
+            return xr.concat(list_ds, dim='pdens')
         return self._obj
 
     def vertical_selection_dens_from_depth(self, pdens):
@@ -529,8 +530,12 @@ class MetazoneAccessor:
 
         if var_vert == 'depth':
             if 'depth' in dataset.dims and len(dataset.depth.dims) == 1:  # NEMO or TOPAZ
-                dataset = dataset.interp(depth=depth, method='linear')
-                dataset['depth'] = depth
+                if len(dataset.depth) > 2:
+                    dataset = dataset.interp(depth=depth, method='linear',kwargs={"fill_value": "extrapolate"})
+                    dataset['depth'] = depth
+                else:  # Interp returns nans if only 2 values
+                    dataset = dataset.sel(depth=depth, method='nearest')
+                    dataset['depth'] = depth
                 return dataset
 
             if list(dataset.dims.keys()) == ['time', 'z'] or list(dataset.dims.keys()) == ['instr',

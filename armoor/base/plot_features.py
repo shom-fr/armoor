@@ -2177,7 +2177,6 @@ def plot_variable_2d(models, observation, output_path=None):
         for i_mod, mod in enumerate(models):
             obs_meta_coloc = observation["xarray_meta_coloc"][i_mod]
             mod_meta_coloc = mod["xarray_meta_coloc"]
-            var = obs_meta_coloc.name
             plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path)
 
     else:
