@@ -107,6 +107,8 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         else:
             title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]}\n"
             time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
+        if 'interval_duration' in obs.coords:
+            title_time = title_time[:-2]+f" - Interval {obs['interval_duration'].data}\n"
     elif 'analysis_period' in obs.attrs:
         title_time = f"Obs analysis period : {obs.analysis_period.replace(':00', '')} with {obs.attrs['tide_tool']}\n"
         time = f"analysis_{obs.attrs['tide_tool']}_{obs.analysis_period.replace(':00', '')}"

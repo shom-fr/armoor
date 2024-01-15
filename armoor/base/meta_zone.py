@@ -1031,6 +1031,7 @@ class MetazoneAccessor:
         dataset['interval'] = dataset['interval_label']
         dataset = dataset.drop_vars('interval_label')
         dataset = dataset.assign_coords({'time': dataset.time})
+        dataset = dataset.assign_coords({'interval_duration': interval})
 
         return dataset
 
