@@ -1940,9 +1940,9 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 list_dims_mean).squeeze()
             time_coloc = obs_mean.interval
 
-            axs[0].plot(time_coloc, obs_mean, 'k-o', label=f'Mean {observation["name"]} ')
+            axs[0].plot(time_coloc, obs_mean, 'k-o', label=f'{observation["name"]} ')
             f.autofmt_xdate(rotation=5)
-            axs[2].plot(time_coloc, obs_std, 'k-o', label=f'St_d {observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, 'k-o', label=f'{observation["name"]} ')
 
             for i, mod in enumerate(models):
                 mod_coloc = mod["xarray_meta_coloc"].isel(lat=index_lon, lon=index_lon).squeeze()
@@ -1950,32 +1950,25 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                                                                      lon=index_lon).squeeze()
                 # MOYENNES
                 mod_mean = mod_coloc.mean(list_dims_mean)
-                axs[0].plot(time_coloc, mod_mean, '-o', label=f'Mean {mod["name"]} ')
-                axs[0].legend(loc=5)
+                axs[0].plot(time_coloc, mod_mean, '-o', label=f'{mod["name"]}')
 
                 # BIAIS
                 biais = mod_mean - obs_mean
-                axs[1].plot(time_coloc, biais, '-o',
-                            label=f'Bias : Mean({mod["name"]} - {observation["name"]}) ')
-                axs[1].legend(loc=5)
+                axs[1].plot(time_coloc, biais, '-o', label=f'{mod["name"]}')
 
                 # ECART-TYPE
                 mod_std = mod_coloc.std(list_dims_mean)
-                axs[2].plot(time_coloc, mod_std, '-o', label=f'St_d {mod["name"]} ')
-                axs[2].legend(loc=5)
+                axs[2].plot(time_coloc, mod_std, '-o', label=f'{mod["name"]}')
 
                 # RMSE
                 rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean)
-                axs[3].plot(time_coloc, rmse, '-o',
-                            label=f'RMSE : {observation["name"]}  {mod["name"]} ')
-                axs[3].legend(loc=5)
+                axs[3].plot(time_coloc, rmse, '-o', label=f'{mod["name"]}')
 
                 # RMSE CENTREE
                 rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean)
                 axs[4].plot(time_coloc, rmse_centree, '-o',
                             label=f'Centered RMSE : {observation["name"]}  {mod["name"]} ')
-                axs[4].legend(loc=5)
-
+                axs[0].legend(loc=0)  # Demande de Mogan
             # Set labels and titles
             for ax in axs:
                 ax.set_ylabel(f'{var_unit}')
@@ -1999,7 +1992,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
 
             obs_0 = observation["xarray_meta_coloc"][0].isel(lat=index_lon, lon=index_lon).squeeze()
             time_coloc = obs_0.time
-            axs[0].plot(time_coloc, obs_0, 'k', label=f'{observation["name"]} ')
+            axs[0].plot(time_coloc, obs_0, 'k', label=f'{observation["name"]}')
             f.autofmt_xdate(rotation=5)
 
             for i, mod in enumerate(models):
@@ -2010,12 +2003,10 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 # DIFFERENCE
                 comparison = mod_coloc.data - obs_coloc.data
                 axs[0].plot(time_coloc, mod_coloc, label=f'{mod["name"]} ')
-                axs[1].plot(time_coloc, comparison,
-                            label=f'Difference : {mod["name"]} - {observation["name"]}')
+                axs[1].plot(time_coloc, comparison, label=f'{mod["name"]} ')
 
                 # Set title and legend
-                axs[0].legend(loc=5)
-                axs[1].legend(loc=5)
+                axs[0].legend(loc=0)
                 mod_names = [mod['name'] for mod in models]
                 title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
                                                    observation['name'])
@@ -3291,5 +3282,9 @@ def modify_interval_label(ax):
         date_first, date_last = np.datetime64(date_first), np.datetime64(date_last)
         date_center = date_first + (date_last - date_first) / 2
         labels_modif.append(np.datetime_as_string(date_center))
-    ax = ax.set_xticklabels(labels_modif)
+
+    pas = max(1, len(labels_modif) // 15)
+    updated_labels = [""] * len(labels_modif)
+    updated_labels[::pas] = labels_modif[::pas]
+    ax = ax.set_xticklabels(updated_labels)
     return ax
