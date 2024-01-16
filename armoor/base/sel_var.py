@@ -51,6 +51,9 @@ class SSTAccessor:
         vars
         depth
         """
+        # Remove duplicates
+        vars = list(set(vars))
+
         liste_ds = []
         for var in vars:
             if var == 'SST':
@@ -82,6 +85,7 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_mixed_layer_depth()
             elif var == 'sound_speed':
                 dataset = self._obj.sel_var.sel_sound_speed()
+                dataset = dataset.rename('sound_speed') if dataset is not None else dataset
             else:
                 if var in self._obj:
                     dataset = self._obj[var]
@@ -97,7 +101,7 @@ class SSTAccessor:
         if len(liste_ds) == 1:
             ds_all = liste_ds[0]
         elif len(liste_ds) > 1:
-            ds_all = xr.merge(liste_ds)
+            ds_all = xr.merge(liste_ds, compat='minimal')
 
         # Convert to dataset for homogeneous processing
         if not isinstance(ds_all, xr.Dataset):
@@ -339,9 +343,21 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing temperature.
         """
-        if self._obj.xoa.temp is not None:
-            ds_temp = self._obj.xoa.temp.sel_var.convert_K_C()
+        if 'temp' in self._obj:
+            ds_temp = self._obj.temp.sel_var.convert_K_C()
             ds_temp = ds_temp.rename('temp')
+            return ds_temp
+        if 'ptemp' in self._obj:
+            sal = self._obj.sel_var.sel_sal()
+            ptemp = self._obj.sel_var.sel_ptemp()
+            pres = self._obj.sel_var.sel_pres()
+            cons_temp = gsw.CT_from_pt(sal, ptemp)
+            temp = gsw.t_from_CT(sal, cons_temp, pres)
+            ds_temp = temp.rename('temp')
+            if np.isnan(ds_temp.min(skipna=True).data):  # If all nans, try the ptemp
+                logger.warning('Temperature computation returned all nans : pot. temp. will be used.')
+                ds_temp = self._obj.sel_var.sel_ptemp()
+                ds_temp = ds_temp.rename('temp')
             return ds_temp
 
     def sel_ptemp(self):
@@ -381,7 +397,6 @@ class SSTAccessor:
         """
         # Verify all the required variables are included in the dataset
         sal = self._obj.sel_var.sel_sal()
-
         ptemp = self._obj.sel_var.sel_ptemp()
         cons_temp = gsw.CT_from_pt(sal, ptemp)
 
@@ -452,9 +467,10 @@ class SSTAccessor:
             temp = self._obj.sel_var.sel_temp()
             if not sal is None and not temp is None:
                 if ref_dens is None or ref_dens not in [0, 1000, 2000, 3000, 4000]:
-                    logger.warning('You did not specify the vertical reference to comute the potential density. '
-                                   'Please define reference_density in the configuration file, with values among 0, 1000, 2000, 3000 and 4000 dbar.'
-                                   'The reference will be 0 dbar here.')
+                    logger.warning(
+                        'You did not specify the vertical reference to comute the potential density. '
+                        'Please define reference_density in the configuration file, with values among 0, 1000, 2000, 3000 and 4000 dbar.'
+                        'The reference will be 0 dbar here.')
                     pdens = gsw.sigma0(sal, temp)
                 elif ref_dens == 0:
                     pdens = gsw.sigma0(sal, temp)
@@ -471,7 +487,8 @@ class SSTAccessor:
                 self._obj['pdens'] = self._obj['pdens'].assign_attrs({'units': 'kg/m3'})
                 return self._obj['pdens']
             else:
-                logger.warning('Caution, potential density could not be computed, ptemp or sal are missing.')
+                logger.warning(
+                    'Caution, potential density could not be computed, ptemp or sal are missing.')
 
         return ds_dens
 

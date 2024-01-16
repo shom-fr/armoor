@@ -248,3 +248,22 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_160_profil_unique_temp(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_160_profil_unique_temp.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/160_profil_unique_temp.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_160_profil_unique_c(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_160_profil_unique_c.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/160_profil_unique_c.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True

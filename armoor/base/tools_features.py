@@ -191,74 +191,61 @@ def sel_default_vars(config_obj):
         Meta-zone, models and observation from the parser with the selected variables.
     """
     feature = config_obj["functionality"]
-    additional_vars = [config_obj['meta_zones']['var']] if 'var' in config_obj['meta_zones'] else []
+    additional_vars = config_obj['meta_zones']['vars'] if 'vars' in config_obj['meta_zones'] else []
 
     if feature == "sst":  # F1
-        default_vars_mod = ['SST']
-        default_vars_obs = ['SST']
+        default_vars = ['SST']
 
     elif feature == "prof_hydro_vessel":  # F2
-        default_vars_mod = ['ptemp', 'sal', 'pdens']
-        default_vars_obs = ['ptemp', 'sal', 'pdens']
-
+        default_vars = ['ptemp', 'sal', 'pdens']
 
     elif feature == "prof_hydro_mooring":  # F3
-        default_vars_mod = ['ptemp', 'sal', 'pdens']
-        default_vars_obs = ['ptemp', 'sal', 'pdens']
-
+        default_vars = ['ptemp', 'sal', 'pdens']
 
     elif feature == "section_hydro":  # F4
-        default_vars_mod = ['ptemp', 'sal']
-        default_vars_obs = ['ptemp', 'sal']
-
+        default_vars = ['ptemp', 'sal']
 
     elif feature == "clim_hydro":  # F5
-        default_vars_mod = ['ptemp', 'sal']
-        default_vars_obs = ['ptemp', 'sal']
+        default_vars = ['ptemp', 'sal']
 
     elif feature == "currents_hfr":  # F6
-        default_vars_mod = ['current', 'current_res']
-        default_vars_obs = ['current', 'current_res']
+        default_vars = ['current', 'current_res']
 
     elif feature == "currents_ADCP":  # F7
-        default_vars_mod = ['current', 'current_res']
-        default_vars_obs = ['current', 'current_res']
+        default_vars = ['current', 'current_res']
 
     elif feature == "currents_VMADCP":  # F8
-        default_vars_mod = ['current']
-        default_vars_obs = ['current']
+        default_vars = ['current']
 
     elif feature == "drifters":  # F9
-        default_vars_mod = ['current']
-        default_vars_obs = ['current']
+        default_vars = ['current']
 
-    vars_mod = default_vars_mod + additional_vars
-    vars_obs = default_vars_obs + additional_vars
+    vars = default_vars + additional_vars
 
     if feature == "clim_hydro":  # Calculate climatologies
         config_obj['observation']["xarray_meta"] = config_obj['observation'][
-            "xarray_meta"].sel_var.selection(vars_obs)
+            "xarray_meta"].sel_var.selection(vars)
         for i_mod, mod in enumerate(config_obj['models']):
-            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod).groupby(
+            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars).groupby(
                 "time.month").mean("time").rename({'month': 'time'})
 
             # Get month names
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod).groupby(
+            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars).groupby(
                 "time.month").mean("time").rename({'month': 'time'})
             months = [calendar.month_name[i] for i in mod["xarray_meta_coloc"].time.data]
             mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].assign_coords({'time': months})
 
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
                 config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(
-                    vars_obs).assign_coords({'time': months})
+                    vars).assign_coords({'time': months})
     else:
         config_obj['observation']["xarray_meta"] = config_obj['observation'][
-            "xarray_meta"].sel_var.selection(vars_obs)
+            "xarray_meta"].sel_var.selection(vars)
         for i_mod, mod in enumerate(config_obj['models']):
-            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars_mod)
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars_mod)
+            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars)
+            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars)
             config_obj['observation']["xarray_meta_coloc"][i_mod] = \
-                config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars_obs)
+                config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars)
 
     return config_obj
 
@@ -284,24 +271,16 @@ def sel_one_var(observation, models, var, depth=None):
             if key in list(mod.keys()):
                 models_var[i_mod][key] = mod[key]
 
-    # Adjust potential / insitu variables for models and obs
-    if var in ['temp', 'ptemp']:
-        var_mod = 'ptemp'
-        var_obs = 'ptemp'
-    else:
-        var_mod = var
-        var_obs = var
-
     # Select variable and add mod/obs name
-    observation_var['xarray_meta'] = observation['xarray_meta'][var_obs].assign_attrs(
+    observation_var['xarray_meta'] = observation['xarray_meta'][var].assign_attrs(
         {'name': observation['name']})
     for i_mod, mod in enumerate(models):
-        models_var[i_mod]["xarray_meta"] = mod["xarray_meta"][var_mod].assign_attrs(
+        models_var[i_mod]["xarray_meta"] = mod["xarray_meta"][var].assign_attrs(
             {'name': mod['name']})
-        models_var[i_mod]["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var_mod].assign_attrs(
+        models_var[i_mod]["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var].assign_attrs(
             {'name': mod['name']})
         observation_var["xarray_meta_coloc"].append(
-            observation["xarray_meta_coloc"][i_mod][var_obs].assign_attrs(
+            observation["xarray_meta_coloc"][i_mod][var].assign_attrs(
                 {'name': observation['name']}))
 
     # Select depth if needed
