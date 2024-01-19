@@ -53,7 +53,6 @@ class SSTAccessor:
         """
         # Remove duplicates
         vars = list(set(vars))
-
         liste_ds = []
         for var in vars:
             if var == 'SST':
@@ -61,6 +60,7 @@ class SSTAccessor:
                 dataset = dataset.rename('sst') if dataset is not None else dataset
             elif var == 'temp':
                 dataset = self._obj.sel_var.sel_temp()
+                dataset = dataset.rename('temp') if dataset is not None else dataset
             elif var == 'ptemp':
                 dataset = self._obj.sel_var.sel_ptemp()
                 dataset = dataset.rename('ptemp') if dataset is not None else dataset
@@ -278,6 +278,7 @@ class SSTAccessor:
         current_bc['norm_bc'] = vbc
         current_bc['dir_bc'] = np.arctan2(current_bc['v_bc'], current_bc['u_bc']) * 180 / np.pi
         current_bc['dir_bc'] = current_bc['dir_bc'].assign_attrs({'units': '°'})
+        current_bc = current_bc.assign_attrs({'name': self._obj.attrs['name']})
         return current_bc
 
     def sel_sst(self, depth=0):

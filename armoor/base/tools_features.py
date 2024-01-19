@@ -35,7 +35,7 @@ def manage_output(figure_name, folder_path):
         plt.show()
 
 
-def remove_missing_values_ds(models, observation, i, vars_mod, vars_obs):
+def remove_missing_values_ds(models, observation, i, vars):
     """
     Remove the missing values in model and observation to retrieve the two datasets
     on the exact same extents.
@@ -51,25 +51,21 @@ def remove_missing_values_ds(models, observation, i, vars_mod, vars_obs):
         List of the variables to consider in the observation.
 
     """
-    # Adjust variable names
-    if 'temp' in vars_mod:
-        vars_mod[vars_mod.index('temp')] = 'ptemp'
-
     # Remove missing values
-    if len(vars_mod) == 1:
-        obs = observation["xarray_meta_coloc"][i][vars_obs[0]]
-        mod = models[i]["xarray_meta_coloc"][vars_mod[0]]
+    if len(vars) == 1:
+        obs = observation["xarray_meta_coloc"][i][vars[0]]
+        mod = models[i]["xarray_meta_coloc"][vars[0]]
 
         mod, obs = remove_missing_values(mod, obs)
-        observation["xarray_meta_coloc"][i][vars_obs[0]] = obs
-        models[i]["xarray_meta_coloc"][vars_mod[0]] = mod
+        observation["xarray_meta_coloc"][i][vars[0]] = obs
+        models[i]["xarray_meta_coloc"][vars[0]] = mod
     else:
-        for i_var, _ in enumerate(vars_mod):
-            obs = observation["xarray_meta_coloc"][i][vars_obs[i_var]]
-            mod = models[i]["xarray_meta_coloc"][vars_mod[i_var]]
+        for i_var, var in enumerate(vars):
+            obs = observation["xarray_meta_coloc"][i][var]
+            mod = models[i]["xarray_meta_coloc"][var]
             mod, obs = remove_missing_values(mod, obs)
-            observation["xarray_meta_coloc"][i][vars_obs[i_var]] = obs
-            models[i]["xarray_meta_coloc"][vars_mod[i_var]] = mod
+            observation["xarray_meta_coloc"][i][var] = obs
+            models[i]["xarray_meta_coloc"][var] = mod
 
     return models, observation
 

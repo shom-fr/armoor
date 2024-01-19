@@ -114,7 +114,7 @@ def plot(config_obj):
                 for i_mod, mod_var in enumerate(mods_var):
                     # Remove missing values
                     mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
-                                                                 [attribute], [attribute])
+                                                                 [attribute])
                     # Select variables to plot
                     mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
                     mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]

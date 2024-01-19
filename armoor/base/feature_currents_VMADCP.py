@@ -70,8 +70,7 @@ def plot(config_obj):
         if output["plot"] in plot_variable_3d:
             # Remove missing values
             for i_mod, mod in enumerate(models):
-                models, observation = remove_missing_values_ds(models, observation, i_mod, var_norm,
-                                                               var_norm)
+                models, observation = remove_missing_values_ds(models, observation, i_mod, var_norm)
 
             plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax, dvmin, dvmax,
                                            output_path=sub_func_output_folder)

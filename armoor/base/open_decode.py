@@ -795,7 +795,8 @@ def open_decode_basic(path_files):
      """
     # Open
     if len(path_files) > 1:
-        dataset = xr.open_mfdataset(path_files)
+        datasets = [xr.open_dataset(path) for path in path_files]
+        dataset = xr.concat(datasets, dim='time')
     else:
         dataset = xr.open_dataset(path_files[0])
 
@@ -826,6 +827,7 @@ def open_decode_basic(path_files):
         dataset = dataset.drop_duplicates(['lon'])
     if 'lat' in dataset.dims:
         dataset = dataset.drop_duplicates(['lat'])
+
     return dataset
 
 

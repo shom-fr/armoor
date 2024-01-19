@@ -261,7 +261,7 @@ def get_method(data, z_dim=False) -> str:
 
     if method is None:
         logger.warning('No method provided for %s', data.get("name"))
-
+        method = 'linear'
     return method
 
 
@@ -290,7 +290,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
     logger.info("Applying meta zone")
 
     # Add default meta-zone
-    if config_obj['functionality'] in ["sst", "currents_hfr"]:
+    if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
         if 'depth' not in config_obj["meta_zones"]:
             config_obj["meta_zones"]["depth"] = [0]
 
@@ -333,8 +333,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             logger.info("Applying : bathymetry threshold")
             if 'bathy' in xarray_obj:
                 min_bath = config_obj["meta_zones"].get('bathy_min')
-                max_bath = config_obj["meta_zones"]
-                bathy_min["bathy_max"]
+                max_bath = config_obj["meta_zones"].get("bathy_max")
 
                 xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath,
                                                                         maximum=max_bath)

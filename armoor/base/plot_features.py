@@ -108,7 +108,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]}\n"
             time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
         if 'interval_duration' in obs.coords:
-            title_time = title_time[:-2]+f" - Interval {obs['interval_duration'].data}\n"
+            title_time = title_time[:-2] + f" - Interval {obs['interval_duration'].data}\n"
     elif 'analysis_period' in obs.attrs:
         title_time = f"Obs analysis period : {obs.analysis_period.replace(':00', '')} with {obs.attrs['tide_tool']}\n"
         time = f"analysis_{obs.attrs['tide_tool']}_{obs.analysis_period.replace(':00', '')}"
@@ -672,6 +672,7 @@ def diag_disp_figure(mod, obs, title):
         Figure name.
 
     """
+
     logger.info('Dispersion diagram')
     f, axes = plt.subplots(figsize=(10, 10))
     f.suptitle(title, fontsize=12, fontweight='bold')
@@ -2100,12 +2101,13 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     obs_meta_coloc = obs_meta_coloc.transpose('time', 'depth')
 
     # Select the variables to plot
-    diff = mod_meta_coloc.transpose().values - obs_meta_coloc.transpose().values
+    diff = mod_meta_coloc.transpose() - obs_meta_coloc.transpose()
 
-    # Drop nans
-    mod_meta_coloc = mod_meta_coloc.dropna('time', 'all')
-    obs_meta_coloc = obs_meta_coloc.dropna('time', 'all')
-    diff = diff.dropna('time', 'all')
+    # Drop nans if not all nans
+    if not np.isnan(obs_meta_coloc.min(skipna=True).data):
+        mod_meta_coloc = mod_meta_coloc.dropna('time', 'all')
+        obs_meta_coloc = obs_meta_coloc.dropna('time', 'all')
+        diff = diff.dropna('time', 'all')
 
     # Get min/max colobar values
     vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values(vmin, vmax, obs_meta_coloc, diff,
@@ -2617,7 +2619,7 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
         var = mod["xarray_meta"].name
         time = obs.time.values
 
-        mod_sel = mod["xarray"].sel(time=time, method='nearest')[var]
+        mod_sel = mod["xarray"].sel_var.selection([var]).sel(time=time, method='nearest')[var]
 
         mod_buffer = mod_sel.meta.horizontal_selection_cloud_dots(points, radius)
         if len(mod_buffer.idx_point) > 0:

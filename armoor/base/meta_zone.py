@@ -166,7 +166,7 @@ class MetazoneAccessor:
         return self._obj.where(selection)
 
     def horizontal_selection_coords(self, coordinates: [(float, float)],
-                                    method: str = None) -> xr.Dataset:
+                                    method: str = 'linear') -> xr.Dataset:
         """
         Subset dataset selecting elements located in cloud of specified dots plus those
         in a certain radius.
@@ -269,7 +269,7 @@ class MetazoneAccessor:
         return dataset
 
     def horizontal_selection_cloud_dots(self, cloud: [(float, float)], radius_km: float = 0.,
-                                        method: str = None) -> xr.Dataset:
+                                        method: str = 'linear') -> xr.Dataset:
         """
         Subset dataset selecting elements located in cloud of specified dots plus those
         in a certain radius.
@@ -715,7 +715,8 @@ class MetazoneAccessor:
         dmin = float(depth[0])
         dmax = float(depth[1])
 
-        self._obj = copy.copy(self._obj.reset_coords(var_vert))
+        if var_vert == 'dens':
+            self._obj = copy.copy(self._obj.reset_coords(var_vert))
         # Select all depth between min and max
         selection = (self._obj[var_vert] >= dmin) & (self._obj[var_vert] <= dmax)
 
