@@ -571,9 +571,9 @@ def open_decode_croco(path_file):
         if 'angle' in croco:
             angle = croco['angle']
             da_u = croco['u'] * np.cos(angle) - croco['v'] * np.sin(angle)
-            da_v = croco['u'] * np.sin(angle) + croco['v'] * np.cos(angle)
+            da_v = croco['v'] * np.cos(angle) + croco['u'] * np.sin(angle)
             croco = croco.drop(['u', 'v', 'angle'])
-            croco['uz'] = da_u
+            croco['u'] = da_u
             croco['v'] = da_v
 
             # Remove duplicate coords
@@ -795,7 +795,8 @@ def open_decode_basic(path_files):
      """
     # Open
     if len(path_files) > 1:
-        dataset = xr.open_mfdataset(path_files)
+        datasets = [xr.open_dataset(path) for path in path_files]
+        dataset = xr.concat(datasets, dim='time')
     else:
         dataset = xr.open_dataset(path_files[0])
 
@@ -826,6 +827,7 @@ def open_decode_basic(path_files):
         dataset = dataset.drop_duplicates(['lon'])
     if 'lat' in dataset.dims:
         dataset = dataset.drop_duplicates(['lat'])
+
     return dataset
 
 

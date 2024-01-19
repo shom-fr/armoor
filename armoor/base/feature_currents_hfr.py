@@ -129,7 +129,7 @@ def plot(config_obj):
                 for i_mod, mod_var in enumerate(mods_var):
                     # Remove missing values
                     mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
-                                                                 [attribute], [attribute])
+                                                                 [attribute])
                     # Select variables to plot
                     mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
                     mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
@@ -160,7 +160,7 @@ def plot(config_obj):
                 for i_mod, mod_var in enumerate(mods_var):
                     # Remove missing values
                     mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
-                                                                 [attribute], [attribute])
+                                                                 [attribute])
                     # Select variables to plot
                     mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
                     mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
@@ -197,7 +197,7 @@ def plot(config_obj):
             for i_mod, mod in enumerate(models):
                 # Remove missing values
                 models, observation = remove_missing_values_ds(models, observation, i_mod,
-                                                               attributes, attributes)
+                                                               attributes)
 
                 plot_features.plot_map_metr_current(flag_interval, flag_slice, models, observation,
                                                     i_mod, metric, attribute, cmap, vmin, vmax,

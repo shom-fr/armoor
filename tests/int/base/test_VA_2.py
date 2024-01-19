@@ -227,3 +227,43 @@ class TestBulletins:
         create_folder(f'tmp')
         dict2call(parser)
         assert True
+
+    def test_156_map_current_hycom2Det3D(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_156_map_current_hycom2Det3D.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/156_map_current_hycom2Det3D.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_158_ser_temp_uv_ponct_intervalle(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_158_ser_temp_uv_ponct_intervalle.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/158_ser_temp_uv_ponct_intervalle.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_160_profil_unique_temp(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_160_profil_unique_temp.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/160_profil_unique_temp.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_160_profil_unique_c(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_160_profil_unique_c.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/160_profil_unique_c.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True

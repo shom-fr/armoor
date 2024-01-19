@@ -37,13 +37,9 @@ def plot(config_obj):
     models = copy.copy(config_obj["models"])
 
     # Remove missing values
-    vars_obs = [var for var in list(observation["xarray_meta"].keys()) if
-                var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
-    vars_mod = copy.copy(vars_obs)
-
+    vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
     for i_mod, mod in enumerate(models):
-        models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
-                                                       vars_obs)
+        models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
     # PLOT THE OUTPUTS
     for output in outputs:
@@ -84,7 +80,7 @@ def plot(config_obj):
                                                      output_path=sub_func_output_folder)
 
         else:
-            for var in vars_obs:
+            for var in vars:
                 observation_var, models_var = sel_one_var(observation, models, var)
                 ####################################################################################
                 # TIME SERIES STATS

@@ -107,6 +107,8 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         else:
             title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]}\n"
             time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
+        if 'interval_duration' in obs.coords:
+            title_time = title_time[:-2] + f" - Interval {obs['interval_duration'].data}\n"
     elif 'analysis_period' in obs.attrs:
         title_time = f"Obs analysis period : {obs.analysis_period.replace(':00', '')} with {obs.attrs['tide_tool']}\n"
         time = f"analysis_{obs.attrs['tide_tool']}_{obs.analysis_period.replace(':00', '')}"
@@ -130,9 +132,14 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
                 time = f"{time_min}_to_{time_max}"
 
     # Depth
-    if 'profile' in figtitle or "Theta-S" in figtitle:
-        title_depth = ""
-        depth = f"{obs.depth.min().data:.1f}m_to_{obs.depth.max().data:.1f}m"
+    if 'profile' in figtitle or 'Theta-S' in figtitle:
+        if 'pdens' in obs.coords and np.size(obs.pdens) > 1:
+            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f}"
+            depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+        else:
+            title_depth = ""
+            depth = f"{obs.depth.min().data:.1f}m_to_{obs.depth.max().data:.1f}m"
+
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data}m"
         depth = f"{obs.slice.data}m"
@@ -142,9 +149,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
         title_depth = f"Depth: {obs.depth.min().values:.1f}m to {obs.depth.max().values:.1f}m"
         depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
-    elif 'dens' in obs.coords and np.size(obs.dens) > 1:
-        title_depth = f"Density: {min(obs.dens.values):.1f} to {max(obs.dens.values):.1f}"
-        depth = f"{min(obs.dens.values):.1f}m_to_{max(obs.dens.values):.1f}m"
+    elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
+        title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f}"
+        depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
         if obs.depth.data.shape == (1,):
             title_depth = f"Depth: {obs.depth.values[0]:.1f}m"
@@ -665,6 +672,7 @@ def diag_disp_figure(mod, obs, title):
         Figure name.
 
     """
+
     logger.info('Dispersion diagram')
     f, axes = plt.subplots(figsize=(10, 10))
     f.suptitle(title, fontsize=12, fontweight='bold')
@@ -1935,9 +1943,9 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 list_dims_mean).squeeze()
             time_coloc = obs_mean.interval
 
-            axs[0].plot(time_coloc, obs_mean, 'k-o', label=f'Mean {observation["name"]} ')
+            axs[0].plot(time_coloc, obs_mean, 'k-o', label=f'{observation["name"]} ')
             f.autofmt_xdate(rotation=5)
-            axs[2].plot(time_coloc, obs_std, 'k-o', label=f'St_d {observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, 'k-o', label=f'{observation["name"]} ')
 
             for i, mod in enumerate(models):
                 mod_coloc = mod["xarray_meta_coloc"].isel(lat=index_lon, lon=index_lon).squeeze()
@@ -1945,32 +1953,25 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                                                                      lon=index_lon).squeeze()
                 # MOYENNES
                 mod_mean = mod_coloc.mean(list_dims_mean)
-                axs[0].plot(time_coloc, mod_mean, '-o', label=f'Mean {mod["name"]} ')
-                axs[0].legend(loc=5)
+                axs[0].plot(time_coloc, mod_mean, '-o', label=f'{mod["name"]}')
 
                 # BIAIS
                 biais = mod_mean - obs_mean
-                axs[1].plot(time_coloc, biais, '-o',
-                            label=f'Bias : Mean({mod["name"]} - {observation["name"]}) ')
-                axs[1].legend(loc=5)
+                axs[1].plot(time_coloc, biais, '-o', label=f'{mod["name"]}')
 
                 # ECART-TYPE
                 mod_std = mod_coloc.std(list_dims_mean)
-                axs[2].plot(time_coloc, mod_std, '-o', label=f'St_d {mod["name"]} ')
-                axs[2].legend(loc=5)
+                axs[2].plot(time_coloc, mod_std, '-o', label=f'{mod["name"]}')
 
                 # RMSE
                 rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean)
-                axs[3].plot(time_coloc, rmse, '-o',
-                            label=f'RMSE : {observation["name"]}  {mod["name"]} ')
-                axs[3].legend(loc=5)
+                axs[3].plot(time_coloc, rmse, '-o', label=f'{mod["name"]}')
 
                 # RMSE CENTREE
                 rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean)
                 axs[4].plot(time_coloc, rmse_centree, '-o',
                             label=f'Centered RMSE : {observation["name"]}  {mod["name"]} ')
-                axs[4].legend(loc=5)
-
+                axs[0].legend(loc=0)  # Demande de Mogan
             # Set labels and titles
             for ax in axs:
                 ax.set_ylabel(f'{var_unit}')
@@ -1994,7 +1995,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
 
             obs_0 = observation["xarray_meta_coloc"][0].isel(lat=index_lon, lon=index_lon).squeeze()
             time_coloc = obs_0.time
-            axs[0].plot(time_coloc, obs_0, 'k', label=f'{observation["name"]} ')
+            axs[0].plot(time_coloc, obs_0, 'k', label=f'{observation["name"]}')
             f.autofmt_xdate(rotation=5)
 
             for i, mod in enumerate(models):
@@ -2005,12 +2006,10 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 # DIFFERENCE
                 comparison = mod_coloc.data - obs_coloc.data
                 axs[0].plot(time_coloc, mod_coloc, label=f'{mod["name"]} ')
-                axs[1].plot(time_coloc, comparison,
-                            label=f'Difference : {mod["name"]} - {observation["name"]}')
+                axs[1].plot(time_coloc, comparison, label=f'{mod["name"]} ')
 
                 # Set title and legend
-                axs[0].legend(loc=5)
-                axs[1].legend(loc=5)
+                axs[0].legend(loc=0)
                 mod_names = [mod['name'] for mod in models]
                 title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
                                                    observation['name'])
@@ -2102,7 +2101,13 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     obs_meta_coloc = obs_meta_coloc.transpose('time', 'depth')
 
     # Select the variables to plot
-    diff = mod_meta_coloc.transpose().values - obs_meta_coloc.transpose().values
+    diff = mod_meta_coloc.transpose() - obs_meta_coloc.transpose()
+
+    # Drop nans if not all nans
+    if not np.isnan(obs_meta_coloc.min(skipna=True).data):
+        mod_meta_coloc = mod_meta_coloc.dropna('time', 'all')
+        obs_meta_coloc = obs_meta_coloc.dropna('time', 'all')
+        diff = diff.dropna('time', 'all')
 
     # Get min/max colobar values
     vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values(vmin, vmax, obs_meta_coloc, diff,
@@ -2167,7 +2172,6 @@ def plot_variable_2d(models, observation, output_path=None):
         for i_mod, mod in enumerate(models):
             obs_meta_coloc = observation["xarray_meta_coloc"][i_mod]
             mod_meta_coloc = mod["xarray_meta_coloc"]
-            var = obs_meta_coloc.name
             plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path)
 
     else:
@@ -2264,6 +2268,7 @@ def create_harmonic_table(models, observations, output_path):
                 elif var == 'V':
                     ampl, phase = 'v_a', 'v_g'
                 filename = f'{wave_name}_{var}_harm_table_{tide_tool}_{obs.lon.data[0]}_{obs.lat.data[0]}.csv'
+                logger.info('Saving :: %s', filename)
                 harmonic_table_file = open(os.path.join(output_path, filename), 'a')
                 harmonic_table_file.write(
                     f'{wave_name} tidal wave - {var} current constituent - {tide_tool} librairy\n')
@@ -2614,7 +2619,7 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
         var = mod["xarray_meta"].name
         time = obs.time.values
 
-        mod_sel = mod["xarray"].sel(time=time, method='nearest')[var]
+        mod_sel = mod["xarray"].sel_var.selection([var]).sel(time=time, method='nearest')[var]
 
         mod_buffer = mod_sel.meta.horizontal_selection_cloud_dots(points, radius)
         if len(mod_buffer.idx_point) > 0:
@@ -3281,5 +3286,9 @@ def modify_interval_label(ax):
         date_first, date_last = np.datetime64(date_first), np.datetime64(date_last)
         date_center = date_first + (date_last - date_first) / 2
         labels_modif.append(np.datetime_as_string(date_center))
-    ax = ax.set_xticklabels(labels_modif)
+
+    pas = max(1, len(labels_modif) // 15)
+    updated_labels = [""] * len(labels_modif)
+    updated_labels[::pas] = labels_modif[::pas]
+    ax = ax.set_xticklabels(updated_labels)
     return ax
