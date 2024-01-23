@@ -356,7 +356,8 @@ class SSTAccessor:
             temp = gsw.t_from_CT(sal, cons_temp, pres)
             ds_temp = temp.rename('temp')
             if np.isnan(ds_temp.min(skipna=True).data):  # If all nans, try the ptemp
-                logger.warning('Temperature computation returned all nans : pot. temp. will be used.')
+                logger.warning(
+                    'Temperature computation returned all nans : pot. temp. will be used.')
                 ds_temp = self._obj.sel_var.sel_ptemp()
                 ds_temp = ds_temp.rename('temp')
             return ds_temp
@@ -432,6 +433,8 @@ class SSTAccessor:
             return self._obj['pres']
         elif 'depth' in self._obj:
             pres = gsw.conversions.p_from_z(self._obj.depth, self._obj.lat)
+            if pres.mean(skipna=True) < 0:
+                pres = -pres
             return pres
 
     def sel_density(self):
