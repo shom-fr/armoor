@@ -83,6 +83,8 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_current_barocline()
             elif var == 'mld':
                 dataset = self._obj.sel_var.sel_mixed_layer_depth()
+            elif var == 'pres':
+                dataset = self._obj.sel_var.sel_pres()
             elif var == 'sound_speed':
                 dataset = self._obj.sel_var.sel_sound_speed()
                 dataset = dataset.rename('sound_speed') if dataset is not None else dataset
@@ -163,6 +165,9 @@ class SSTAccessor:
             Data array containing geostrophic current.
 
         """
+        if 'current_geo' in self._obj:
+            return self._obj.current_geo
+
         # Get variables
         SA = self._obj.sel_var.sel_sal()
         temp = self._obj.sel_var.sel_temp()
@@ -175,26 +180,60 @@ class SSTAccessor:
             SA = SA.transpose('depth', ...)
             CT = CT.transpose('depth', ...)
 
+        # Increasing along time
+        min = pres.data[0]
+        filter_increase = []
+        if 'depth' not in pres.dims:
+            for i_time, time in enumerate(pres.time.data):
+                if pres.data[i_time] > min:
+                    filter_increase.append(True)
+                    min = pres.data[i_time]
+                else:
+                    filter_increase.append(False)
+            da_filter_increase = xr.DataArray(filter_increase, dims=['time'],
+                                              coords={'time': self._obj.time.data})
+        else:
+            da_filter_increase = ~np.isnan(pres)
+
+        # Delete non increasing points
+        pres_filtered = pres.where(da_filter_increase, drop=True)
+        SA_filtered = SA.where(da_filter_increase, drop=True)
+        CT_filtered = CT.where(da_filter_increase, drop=True)
+        lat = self._obj.where(da_filter_increase, drop=True).lat.values
+        lon = self._obj.where(da_filter_increase, drop=True).lon.values
+        times = self._obj.where(da_filter_increase, drop=True).time.values
+        if 'depth' in pres.dims:
+            depth = self._obj.where(da_filter_increase, drop=True).depth.values
+        else:
+            depth = [self._obj.depth]
         # Stream function
-        geo_strf = gsw.geostrophy.geo_strf_dyn_height(SA, CT, pres, p_ref=0, axis=0, max_dp=1.0,
+        geo_strf = gsw.geostrophy.geo_strf_dyn_height(SA_filtered, CT_filtered, pres_filtered,
+                                                      p_ref=0, axis=0, max_dp=1.0,
                                                       interp_method='pchip')
 
         # Calculate geostrophic current
-        lat = self._obj.lat.values
-        lon = self._obj.lon.values
         [geo_vel, lon, lat] = gsw.geostrophy.geostrophic_velocity(geo_strf, lon, lat, p=0, axis=0)
-
         # Create dataset
-        times = self._obj.time.values
         times = [time.astype('datetime64[s]') for time in times]
         times = [(times[i].astype(float) + times[i + 1].astype(float)) / 2 for i in
                  range(len(times) - 1)]
         times = [np.datetime64(int(time), 's') for time in times]
+        if 'depth' not in pres.dims:
+            geo_vel = [geo_vel]
+
         geo_vel = xr.DataArray(data=geo_vel, dims=["depth", 'time'],
                                coords=dict(lon=(['time'], lon), lat=(['time'], lat), time=times,
-                                           depth=self._obj.depth))
-        current = xr.Dataset()
+                                           depth=depth))
+
+        # Put  back on the times
+        geo_vel = geo_vel.interp(time=self._obj.time.data)
+        if 'depth' in pres.dims:
+            geo_vel = geo_vel.interp(depth=self._obj.depth.data)
+
+        # Convert to dataset
+        current = self._obj
         current['current_geo'] = geo_vel
+
         return current
 
     def sel_current_res(self, filter):
@@ -356,7 +395,8 @@ class SSTAccessor:
             temp = gsw.t_from_CT(sal, cons_temp, pres)
             ds_temp = temp.rename('temp')
             if np.isnan(ds_temp.min(skipna=True).data):  # If all nans, try the ptemp
-                logger.warning('Temperature computation returned all nans : pot. temp. will be used.')
+                logger.warning(
+                    'Temperature computation returned all nans : pot. temp. will be used.')
                 ds_temp = self._obj.sel_var.sel_ptemp()
                 ds_temp = ds_temp.rename('temp')
             return ds_temp
@@ -431,7 +471,7 @@ class SSTAccessor:
         if 'pres' in self._obj:
             return self._obj['pres']
         elif 'depth' in self._obj:
-            pres = gsw.conversions.p_from_z(self._obj.depth, self._obj.lat)
+            pres = gsw.conversions.p_from_z(-self._obj.depth, self._obj.lat)
             return pres
 
     def sel_density(self):

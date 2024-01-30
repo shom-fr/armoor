@@ -199,7 +199,7 @@ def sel_default_vars(config_obj):
         default_vars = ['ptemp', 'sal', 'pdens']
 
     elif feature == "section_hydro":  # F4
-        default_vars = ['ptemp', 'sal']
+        default_vars = ['ptemp', 'temp', 'sal', 'psal', 'pres']
 
     elif feature == "clim_hydro":  # F5
         default_vars = ['ptemp', 'sal']
@@ -267,12 +267,16 @@ def sel_one_var(observation, models, var, depth=None):
             if key in list(mod.keys()):
                 models_var[i_mod][key] = mod[key]
 
-    # Select variable and add mod/obs name
-    observation_var['xarray_meta'] = observation['xarray_meta'][var].assign_attrs(
-        {'name': observation['name']})
+    # Select variable and add mod/obs name, in meta products
+    if var in observation['xarray_meta']:
+        observation_var['xarray_meta'] = observation['xarray_meta'][var].assign_attrs(
+            {'name': observation['name']})
+        for i_mod, mod in enumerate(models):
+            models_var[i_mod]["xarray_meta"] = mod["xarray_meta"][var].assign_attrs(
+                {'name': mod['name']})
+
+    # Select variable and add mod/obs name, in meta coloc products
     for i_mod, mod in enumerate(models):
-        models_var[i_mod]["xarray_meta"] = mod["xarray_meta"][var].assign_attrs(
-            {'name': mod['name']})
         models_var[i_mod]["xarray_meta_coloc"] = mod["xarray_meta_coloc"][var].assign_attrs(
             {'name': mod['name']})
         observation_var["xarray_meta_coloc"].append(

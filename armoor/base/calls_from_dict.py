@@ -316,8 +316,6 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         if 'current_res' in vars_to_plot:
             filter = outputs[0]['low_pass_filter']
             xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
-        if 'current_geo' in vars_to_plot:
-            xarray_obj = xarray_obj.sel_var.sel_current_geo()
 
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
@@ -355,9 +353,11 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             max_dens = config_obj["meta_zones"].get("max_dens")
             ref_dens = config_obj.get("reference_density")
             if min_dens:
-                xarray_obj = xarray_obj.meta.vertical_selection_min_dens(min_dens, ref_dens=ref_dens)
+                xarray_obj = xarray_obj.meta.vertical_selection_min_dens(min_dens,
+                                                                         ref_dens=ref_dens)
             if max_dens:
-                xarray_obj = xarray_obj.meta.vertical_selection_max_dens(max_dens, ref_dens=ref_dens)
+                xarray_obj = xarray_obj.meta.vertical_selection_max_dens(max_dens,
+                                                                         ref_dens=ref_dens)
 
         # Other meta-zones, one by one
         for name, meta_filter in filters.items():
