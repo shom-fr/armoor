@@ -3078,11 +3078,11 @@ def find_var_title(da):
     if 'bc' in var_name:
         var_name = f"Baroclinic current {var_name.split('_')[0]}"
     if 'geo' in var_name:
-        var_name = f"Geostrophic current {var_name.split('_')[0]}"
+        var_name = "Geostrophic current"
 
     if "units" in da.attrs:
         var_unit = da.attrs['units']
-    elif var_name in ['u', 'v', 'norm']:
+    elif var_name in ['u', 'v', 'norm',"Geostrophic current"]:
         var_unit = 'm/s'
     elif 'dir' in var_name:
         var_unit = '°'

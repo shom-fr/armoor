@@ -827,7 +827,6 @@ def open_decode_basic(path_files):
         dataset = dataset.drop_duplicates(['lon'])
     if 'lat' in dataset.dims:
         dataset = dataset.drop_duplicates(['lat'])
-
     return dataset
 
 
