@@ -1256,7 +1256,7 @@ def plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot,
     ax.plot(obs.lon, obs.lat, 'k', transform=ccrs.PlateCarree(), label=observation["name"])
 
     # Convert parameters
-    traj_duration_plot_int = int(traj_duration_plot / time_step)
+    traj_duration_plot_int = max(int(traj_duration_plot / time_step), 1)
     traj_freq_plot_int = int(traj_freq_plot / time_step)
 
     # Plot models
@@ -3082,7 +3082,7 @@ def find_var_title(da):
 
     if "units" in da.attrs:
         var_unit = da.attrs['units']
-    elif var_name in ['u', 'v', 'norm',"Geostrophic current"]:
+    elif var_name in ['u', 'v', 'norm', "Geostrophic current"]:
         var_unit = 'm/s'
     elif 'dir' in var_name:
         var_unit = '°'
