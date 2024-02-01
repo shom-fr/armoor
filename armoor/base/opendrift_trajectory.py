@@ -7,7 +7,6 @@ import cartopy.io.shapereader as shpreader
 import xarray as xr
 import numpy as np
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +33,8 @@ def format_opendrift(mod, path_model):
     if not check_delta_constant(mod):
         mod = regrid_constant_delta(mod)
 
-    mod.squeeze().to_netcdf(path_model)
+    mod.squeeze().to_netcdf(path_model,
+                            encoding={'time': {'units': "seconds since 1900-01-01 00:00:00"}})
 
 
 def check_delta_constant(mod):
@@ -126,7 +126,7 @@ def calculate_trajectory(path_model, lons, lats, times, time_step, nb_step, outp
 
     # Run calculation
     o.seed_elements(lons, lats, time=times)
-    o.run(steps=nb_step, time_step=time_step, outfile=output_file)
+    o.run(steps=nb_step, time_step=int(time_step), outfile=output_file)
 
     # Open file result in dataset
     trajectory = xr.open_dataset(output_file)
