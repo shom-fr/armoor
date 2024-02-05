@@ -67,7 +67,7 @@ class MetazoneAccessor:
                 selection = self._obj[var] <= max_q
             else:
                 selection = None
-            return self._obj.where(selection)
+            return self._obj.where(selection, drop=True)
 
         return self._obj
 
@@ -531,7 +531,8 @@ class MetazoneAccessor:
         if var_vert == 'depth':
             if 'depth' in dataset.dims and len(dataset.depth.dims) == 1:  # NEMO or TOPAZ
                 if len(dataset.depth) > 2:
-                    dataset = dataset.interp(depth=depth, method='linear',kwargs={"fill_value": "extrapolate"})
+                    dataset = dataset.interp(depth=depth, method='linear',
+                                             kwargs={"fill_value": "extrapolate"})
                     dataset['depth'] = depth
                 else:  # Interp returns nans if only 2 values
                     dataset = dataset.sel(depth=depth, method='nearest')

@@ -225,6 +225,7 @@ Integration tests verify the accurate running of the required features. To run t
     pytest your_path_to/tests/int/base/test_currents_VMADCP.py
     pytest your_path_to/tests/int/base/test_drifters.py
     pytest your_path_to/tests/int/base/test_VA.py
+    pytest your_path_to/tests/int/base/test_VA_2.py
 
 For all tests, you will need to have a ``/path/to/output/tests/P1/`` folder with the files from the delivered data archive.
 In the folder where you will run ``pytest``, please create a file named ``tests.cfg`` and include your own ``path_p1`` as follows::
