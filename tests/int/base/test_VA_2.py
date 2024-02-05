@@ -128,11 +128,11 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_137_hovmoller_FROMVEUR(self):
+    def test_138_hovmoller_FROMVEUR(self):
         out_path, logger = change_path(folder_test)
-        logger.info("test_137_hovmoller_FROMVEUR.cfg")
+        logger.info("test_138_hovmoller_FROMVEUR.cfg")
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/137_hovmoller_FROMVEUR.cfg"])
+            ['--cfgfile', f"../single_tests/{folder_test}/138_hovmoller_FROMVEUR.cfg"])
         parser.update({'output_path': out_path})
         create_folder(f'tmp')
         dict2call(parser)
@@ -168,11 +168,11 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_138_harmonic_table_FROMVEUR(self):
+    def test_139_harmonic_table_FROMVEUR(self):
         out_path, logger = change_path(folder_test)
-        logger.info("test_138_harmonic_table_FROMVEUR.cfg")
+        logger.info("test_139_harmonic_table_FROMVEUR.cfg")
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/138_harmonic_table_FROMVEUR.cfg"])
+            ['--cfgfile', f"../single_tests/{folder_test}/139_harmonic_table_FROMVEUR.cfg"])
         parser.update({'output_path': out_path})
         create_folder(f'tmp')
         dict2call(parser)
