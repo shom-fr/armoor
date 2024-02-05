@@ -71,7 +71,6 @@ class TestMetaZone:
 
         ds_meta = ds_lon_lat_depth.meta.horizontal_selection_cloud_dots(point, radius,
                                                                         method='nearest')
-        ds_meta = ds_lon_lat_depth.meta.horizontal_selection_cloud_dots_instr(point, radius, method='nearest')
 
         point_in = [-9.583333, 45.416668]
         test_in = point_in[0] in ds_meta.lon.values and point_in[1] in ds_meta.lat.values
