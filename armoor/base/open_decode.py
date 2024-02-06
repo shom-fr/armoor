@@ -6,10 +6,9 @@ import datetime
 import concurrent.futures
 import xarray as xr
 import xoa
-import xoa.grid
 import xoa.cf as xcf
 import xoa.geo as xgeo
-from xoa.grid import dz2depth, shift
+from xoa.grid import dz2depth, shift, to_rect
 import numpy as np
 import gsw
 import pandas as pd
@@ -89,7 +88,7 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
         logger.info("Opening HYCOM currents")
         return open_decode_hycom_currents(path_files)
     if type == 'HYCOM_3D':
-        logger.info("Opening HYCOM 3D currents")
+        logger.info("Opening HYCOM 3D")
         return open_decode_hycom_3d(path_files)
     if type == 'CORA':
         logger.info("Opening CORA")
@@ -179,7 +178,8 @@ def open_decode_cmems(path_files, steps):
             dataset['LATITUDE'] = lat_ds
             dataset['LONGITUDE'] = lon_ds
             list_ds_cmems.append(dataset)
-        cmems = xr.concat(list_ds_cmems, dim='TIME')
+
+        cmems = concat_cmems(list_ds_cmems)
     else:
         cmems = xr.open_dataset(path_files[0])
 
@@ -449,7 +449,6 @@ def open_decode_mouillages(path_file):
         lon = np.unique(mouillage.lon.data)
         lat = np.unique(mouillage.lat.data)
         mouillage = mouillage.drop(['lon', 'lat']).assign_coords({'lon': lon, 'lat': lat})
-
     return mouillage
 
 
@@ -572,9 +571,9 @@ def open_decode_croco(path_file):
         if 'angle' in croco:
             angle = croco['angle']
             da_u = croco['u'] * np.cos(angle) - croco['v'] * np.sin(angle)
-            da_v = croco['u'] * np.sin(angle) + croco['v'] * np.cos(angle)
+            da_v = croco['v'] * np.cos(angle) + croco['u'] * np.sin(angle)
             croco = croco.drop(['u', 'v', 'angle'])
-            croco['uz'] = da_u
+            croco['u'] = da_u
             croco['v'] = da_v
 
             # Remove duplicate coords
@@ -590,7 +589,7 @@ def open_decode_croco(path_file):
             croco = croco.drop_vars(var)
 
     # Regrid if necessary
-    test_regrid = xoa.grid.to_rect(croco)
+    test_regrid = to_rect(croco)
     if 'lon' in test_regrid.dims and 'lat' in test_regrid.dims:
         croco = test_regrid
     elif 'x' in test_regrid.dims and 'y' in test_regrid.dims:
@@ -656,8 +655,8 @@ def open_decode_hycom_currents(path_files):
     da_u = ds_u.u
     da_v = ds_v.v
 
-    ut_hycom = shift(da_u, {"x": "left", "y": "left"}).xoa.reloc(u=False)
-    vt_hycom = shift(da_v, {"x": "left", "y": "left"}).xoa.reloc(v=False)
+    ut_hycom = shift(da_u, {"x": "right"}).xoa.reloc(u=False)
+    vt_hycom = shift(da_v, {"y": "top"}).xoa.reloc(v=False)
     hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
     hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
 
@@ -666,7 +665,7 @@ def open_decode_hycom_currents(path_files):
         hycom = hycom.rename({'level': 'z'})
 
     # Regrid if necessary
-    hycom = xoa.grid.to_rect(hycom)
+    hycom = to_rect(hycom)
 
     # Convert lons
     hycom = convert_lons(hycom)
@@ -720,7 +719,7 @@ def open_decode_hycom_3d(path_files):
         hycom = hycom.rename({'temp': 'ptemp'})
 
     # Regrid if necessary
-    hycom = xoa.grid.to_rect(hycom)
+    hycom = to_rect(hycom)
 
     # Convert lons
     hycom = convert_lons(hycom)
@@ -796,7 +795,8 @@ def open_decode_basic(path_files):
      """
     # Open
     if len(path_files) > 1:
-        dataset = xr.open_mfdataset(path_files)
+        datasets = [xr.open_dataset(path) for path in path_files]
+        dataset = xr.concat(datasets, dim='time')
     else:
         dataset = xr.open_dataset(path_files[0])
 
@@ -814,7 +814,7 @@ def open_decode_basic(path_files):
         dataset = dataset.rename({'temp': 'ptemp'})
 
     # Regrid if necessary
-    dataset = xoa.grid.to_rect(dataset)
+    dataset = to_rect(dataset)
 
     # Convert depths
     dataset = convert_depths(dataset)
@@ -1137,3 +1137,49 @@ def set_hor_vert_step(obs, horizontal_step, vertical_step, method='linear', meth
         logger.warning(
             'Caution! The horizontal_step requested is too large, the targetted grid has only one time value. The code may fail.')
     return obs_grid
+
+
+def concat_cmems(list_ds):
+    times = np.unique([len(ds.TIME.data) for ds in list_ds])
+    depths = np.unique([len(ds.DEPTH.data) for ds in list_ds])
+
+    # Cas où on concat plusieurs fichiers d'1 instrument, même nombre de depth et time dans tous les fichiers
+    if len(depths) == 1 and len(times) == 1:
+        cmems = xr.concat(list_ds, dim='TIME')
+
+    # Cas où on concat plusieurs instruments
+    else:
+        # Compute same DEPTH
+        nb_depth_max = np.nanmax(depths)
+        common_depths = list(range(nb_depth_max))
+
+        # Compute same TIME
+        common_times = [ds.TIME.data for ds in list_ds]
+        common_times = np.unique(np.concatenate(common_times))
+
+        for i_ds, ds in enumerate(list_ds):
+            if 'POSITION' in ds.dims:
+                ds = ds.drop_dims('POSITION')
+            # Clean lon/lat
+            lon, lat = ds.LONGITUDE, ds.LATITUDE
+
+            # Put all datasets on the same depth
+            depths_in_ds = ds.DEPTH.data
+            ds = ds.assign_coords({'DEPTH': ds.DEPTH.data})
+            ds = ds.sel(DEPTH=common_depths, method='nearest')
+            ds = ds.assign_coords({'DEPTH': common_depths})
+            ds = ds.drop(['LONGITUDE', 'LATITUDE'])
+            ds = ds.where(ds.DEPTH.isin(depths_in_ds))
+            ds = ds.assign_coords({'LONGITUDE': lon, 'LATITUDE': lat})
+            # Put all TIMES on the same values
+            times_in_ds = ds.TIME.data
+            ds = ds.drop_duplicates('TIME')
+            ds = ds.sel(TIME=common_times, method='nearest')
+            ds = ds.assign_coords({'TIME': common_times})
+            ds = ds.where(ds.TIME.isin(times_in_ds))
+
+            list_ds[i_ds] = ds
+        cmems = xr.concat(list_ds, dim='instr')
+        cmems = cmems.drop_vars(names='DEPTH')
+
+    return cmems

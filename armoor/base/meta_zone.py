@@ -92,6 +92,7 @@ class MetazoneAccessor:
         logger.info("Applying filter - horizontal_selection_polygon")
         # Create the polygon where to subset
         polygon = path.Path(coords)
+
         # Depending on the coordinate system, flag the points outside the polygon
         if 'lon' in self._obj.dims:  # Check if rect coordinates
             ds_coords = [(lon, lat) for lon in self._obj.lon.data for lat in self._obj.lat.data]
@@ -165,7 +166,7 @@ class MetazoneAccessor:
         return self._obj.where(selection)
 
     def horizontal_selection_coords(self, coordinates: [(float, float)],
-                                    method: str = None) -> xr.Dataset:
+                                    method: str = 'linear') -> xr.Dataset:
         """
         Subset dataset selecting elements located in cloud of specified dots plus those
         in a certain radius.
@@ -189,7 +190,7 @@ class MetazoneAccessor:
 
         if 'lon' in self._obj.dims:  # Regular grid
             if method in ["linear"] or method is None:
-                return self._obj.interp(lon=lon_target, lat=lat_target, method='linear')
+                return self._obj.interp(lon=lon_target, lat=lat_target, method=method)
             return self._obj.sel(lon=lon_target, lat=lat_target, method=method)
 
         if 'x' in self._obj.dims:  # Curvilinear grid
@@ -268,7 +269,7 @@ class MetazoneAccessor:
         return dataset
 
     def horizontal_selection_cloud_dots(self, cloud: [(float, float)], radius_km: float = 0.,
-                                        method: str = None) -> xr.Dataset:
+                                        method: str = 'linear') -> xr.Dataset:
         """
         Subset dataset selecting elements located in cloud of specified dots plus those
         in a certain radius.
@@ -294,7 +295,6 @@ class MetazoneAccessor:
         radius = self._obj.meta.km_to_deg(radius_km)
         liste_ds = []
         idx_centre = 0
-
         lons, lats = cloud
         for i_lon, _ in enumerate(lons):
             lon, lat = lons[i_lon], lats[i_lon]
@@ -397,8 +397,10 @@ class MetazoneAccessor:
                 return self.vertical_selection_list(depth)
         if len(depth) == 1 and 'depth' in self._obj.dims:
             return self._obj.squeeze('depth')
+        for dim in ['level', 'z']:
+            if dim in self._obj.dims and len(self._obj[dim]) == 1:
+                return self._obj.squeeze(dim)
         return self._obj
-
 
     def vertical_selection_min_depth(self, min_depth: list = None) -> xr.Dataset:
         """
@@ -430,7 +432,7 @@ class MetazoneAccessor:
         min_depth = self._obj.depth.min(skipna=True)
         return self.vertical_selection_range([min_depth, max_depth], 'depth')
 
-    def vertical_selection_min_dens(self, min_dens: list = None) -> xr.Dataset:
+    def vertical_selection_min_dens(self, min_dens: list = None, ref_dens=None) -> xr.Dataset:
         """
 
         Parameters
@@ -441,10 +443,15 @@ class MetazoneAccessor:
         -------
 
         """
-        max_dens = self._obj.pdens.max(skipna=True)
-        return self.vertical_selection_range([min_dens, max_dens], 'dens')
 
-    def vertical_selection_max_dens(self, max_dens: list = None) -> xr.Dataset:
+        if 'pdens' not in self._obj:
+            pdens = self._obj.sel_var.sel_pdensity(ref_dens=ref_dens)
+            self._obj = self._obj.assign_coords(pdens=pdens)
+
+        max_dens = self._obj.pdens.max(skipna=True)
+        return self.vertical_selection_range([min_dens, max_dens], 'pdens')
+
+    def vertical_selection_max_dens(self, max_dens: list = None, ref_dens=None) -> xr.Dataset:
         """
 
         Parameters
@@ -455,10 +462,14 @@ class MetazoneAccessor:
         -------
 
         """
-        min_dens = self._obj.pdens.min(skipna=True)
-        return self.vertical_selection_range([min_dens, max_dens], 'dens')
+        if 'pdens' not in self._obj:
+            pdens = self._obj.sel_var.sel_pdensity(ref_dens=ref_dens)
+            self._obj = self._obj.assign_coords(pdens=pdens)
 
-    def vertical_selection_dens(self, dens: list = None) -> xr.Dataset:
+        min_dens = self._obj.pdens.min(skipna=True)
+        return self.vertical_selection_range([min_dens, max_dens], 'pdens')
+
+    def vertical_selection_dens(self, dens: list = None, ref_dens=None) -> xr.Dataset:
         """
 
         Parameters
@@ -471,11 +482,12 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_dens")
         dens = np.array(dens, dtype=float)
-
-        if dens and np.size(dens) == 1:
-            return self.vertical_selection_ponct(dens, 'dens')
-        if dens:  # if output=profiles, only this option should apply
-            return self.vertical_selection_range(dens, 'dens')
+        if dens is not None and np.size(dens) == 1:
+            return self.vertical_selection_ponct(dens, 'dens', ref_dens=ref_dens)
+        elif dens is not None and np.size(dens) > 1:
+            list_ds = [self.vertical_selection_ponct(dens_i, 'dens', ref_dens=ref_dens) for dens_i
+                       in dens]
+            return xr.concat(list_ds, dim='pdens')
         return self._obj
 
     def vertical_selection_dens_from_depth(self, pdens):
@@ -491,7 +503,8 @@ class MetazoneAccessor:
             self._obj = self._obj.reset_coords('depth')
         return self._obj
 
-    def vertical_selection_ponct(self, depth: float, var_vert: str = 'depth') -> xr.Dataset:
+    def vertical_selection_ponct(self, depth: float, var_vert: str = 'depth',
+                                 ref_dens=None) -> xr.Dataset:
         """
         Subset dataset selecting elements whom depth values are included in the
         specified depth range.
@@ -517,11 +530,18 @@ class MetazoneAccessor:
 
         if var_vert == 'depth':
             if 'depth' in dataset.dims and len(dataset.depth.dims) == 1:  # NEMO or TOPAZ
-                dataset = dataset.interp(depth=depth, method='linear')
-                dataset['depth'] = depth
+                if len(dataset.depth) > 2:
+                    dataset = dataset.interp(depth=depth, method='linear',
+                                             kwargs={"fill_value": "extrapolate"})
+                    dataset['depth'] = depth
+                else:  # Interp returns nans if only 2 values
+                    dataset = dataset.sel(depth=depth, method='nearest')
+                    dataset['depth'] = depth
                 return dataset
 
-            if list(dataset.dims) == ['time', 'z']:  # CMEMS profilers
+            if list(dataset.dims.keys()) == ['time', 'z'] or list(dataset.dims.keys()) == ['instr',
+                                                                                           'time',
+                                                                                           'z']:  # CMEMS profilers
                 return dataset.meta.vertical_selection_ponct_cmems(depth)
 
             if 'z' in dataset.dims or 'level' in dataset.dims or (
@@ -533,7 +553,7 @@ class MetazoneAccessor:
             if 'pdens' in dataset.dims:
                 return dataset.interp(pdens=depth, method='linear')
             elif 'pdens' not in dataset:
-                dataset["pdens"] = dataset.sel_var.sel_pdensity()
+                dataset["pdens"] = dataset.sel_var.sel_pdensity(ref_dens=ref_dens)
             return dataset.meta.vertical_selection_dens_from_depth(pdens=depth)
 
     def vertical_selection_ponct_cmems(self, depth):
@@ -549,6 +569,7 @@ class MetazoneAccessor:
         CMEMS product at the required depth.
 
         """
+
         depth_diff = np.abs(self._obj['depth'] - depth)
         nearest_depth_index = [np.nanargmin(depth_diff.isel(time=i_time).data) for i_time, time in
                                enumerate(self._obj.time)]
@@ -595,7 +616,7 @@ class MetazoneAccessor:
                 for var_depth in ['level', 'z', 'DEPTH', 'sig']:
                     if var_depth in dataset[var].dims and len(dataset[var][var_depth]) > 1:
                         da_var = dataset[var]
-                        da_tgt = regrid1d(da_var, tgt_depth)
+                        da_tgt = regrid1d(da_var, tgt_depth)  # extrap for depth=0 : does not work
                         tgt_ds = tgt_ds.assign({var: da_tgt})
 
         # Assign depth coordinates values
@@ -606,7 +627,8 @@ class MetazoneAccessor:
         if 'type' in dataset.attrs and dataset.attrs['type'] == 'CROCO':  # For croco
             tgt_ds['depth'] = -tgt_ds['depth']
 
-        tgt_ds = tgt_ds.squeeze()
+        if len(depth) == 1 and 'depth' in tgt_ds.dims:
+            tgt_ds = tgt_ds.squeeze('depth')
         # Reindex depths if necessary
         if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0] > tgt_ds.depth.data[-1]:
             tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
@@ -693,16 +715,13 @@ class MetazoneAccessor:
         # Get min and max values
         dmin = float(depth[0])
         dmax = float(depth[1])
-        # Select all depth between min and max
-        if len(depth) == 2:
-            selection = (self._obj[var_vert] >= dmin) & (self._obj[var_vert] <= dmax)
-            return self._obj.where(selection, drop=True)
 
-        # Select between min and max with a specific number of depths between
-        if len(depth) == 3:
-            step = depth[2]
-            depths = np.linspace(dmin, dmax, int(step))
-            return self.vertical_selection_list(depths)
+        if var_vert == 'dens':
+            self._obj = copy.copy(self._obj.reset_coords(var_vert))
+        # Select all depth between min and max
+        selection = (self._obj[var_vert] >= dmin) & (self._obj[var_vert] <= dmax)
+
+        return self._obj.where(selection, drop=True).set_coords(var_vert)
 
     def vertical_selection_list(self, depths: list) -> xr.Dataset:
         """
@@ -764,11 +783,14 @@ class MetazoneAccessor:
             liste_ds.append(ds_slice)
 
         for i_ds, ds_slice in enumerate(liste_ds):
-            ds_slice = ds_slice.assign_coords(
-                slice=i_ds)  # ajoute une dimension de date moyenne sur l'intervalle
+            ds_slice = ds_slice.assign_coords(slice=i_ds)
             ds_slice[var_slice + "_value"] = ds_slice[var_slice]
-            ds_slice = ds_slice.assign_coords(
-                depth=np.arange(len(ds_slice[var_slice])))  # change les profondeurs en indices
+            if 'depth' in ds_slice.dims:
+                ds_slice = ds_slice.assign_coords(depth=np.arange(
+                    len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
+            elif 'z' in ds_slice.dims:
+                ds_slice = ds_slice.assign_coords(z=np.arange(
+                    len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
             liste_ds[i_ds] = ds_slice
 
         dataset = xr.concat(liste_ds, 'slice')
@@ -1011,6 +1033,7 @@ class MetazoneAccessor:
         dataset['interval'] = dataset['interval_label']
         dataset = dataset.drop_vars('interval_label')
         dataset = dataset.assign_coords({'time': dataset.time})
+        dataset = dataset.assign_coords({'interval_duration': interval})
 
         return dataset
 

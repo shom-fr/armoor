@@ -4,7 +4,7 @@ import copy
 import logging
 from armoor.base.tools_features import remove_missing_values_ds, sel_one_var, sel_default_vars
 from armoor.base import plot_features
-import armoor.hmi.script_tools as st
+from armoor.hmi.script_tools import create_folder
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def plot(config_obj):
         list_config_job.append(copy.copy(config_obj))
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
-            st.create_folder(sub_func_output_folder)
+            create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
 
@@ -46,17 +46,14 @@ def plot(config_obj):
         config_obj = sel_default_vars(config_obj)
         observation = copy.copy(config_obj["observation"])
         models = copy.copy(config_obj["models"])
-        # Remove missing values
-        vars_obs = [var for var in list(observation["xarray_meta"].keys()) if
-                    var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
 
-        vars_mod = copy.copy(vars_obs)
-        for i_mod, _ in enumerate(models):
-            models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
-                                                           vars_obs)
+        # Remove missing values
+        vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
+        for i_mod, mod in enumerate(models):
+            models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
         # PLOTS
-        for var in vars_obs:
+        for var in vars:
             observation_var, models_var = sel_one_var(observation, models, var)
             ########################################################################################
             # TIME SERIES STATS

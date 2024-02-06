@@ -4,7 +4,7 @@ import copy
 import logging
 from armoor.base.tools_features import remove_missing_values_ds, sel_one_var, sel_default_vars
 from armoor.base import plot_features
-import armoor.hmi.script_tools as st
+from armoor.hmi.script_tools import create_folder
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +37,9 @@ def plot(config_obj):
     models = copy.copy(config_obj["models"])
 
     # Remove missing values
-    vars_obs = ['sst']
-    vars_mod = ['sst']
+    vars = ['sst']
     for i_mod, mod in enumerate(models):
-        models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
-                                                       vars_obs)
+        models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
     # Plot the outputs
     for output in outputs:
@@ -49,7 +47,7 @@ def plot(config_obj):
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
             logger.info('Storing in folder :: %s', sub_func_output_folder)
-            st.create_folder(sub_func_output_folder)
+            create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
 
@@ -65,7 +63,7 @@ def plot(config_obj):
         cmap = cmap if cmap is None else f'cmo.{cmap}'
 
         # PLOTS
-        for var in vars_obs:
+        for var in vars:
             observation_var, models_var = sel_one_var(observation, models, var)
 
             ########################################################################################

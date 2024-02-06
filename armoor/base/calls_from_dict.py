@@ -8,6 +8,9 @@ from armoor.base import feature_sst, feature_prof_hydro_vessel, feature_prof_hyd
 from armoor.base.open_decode import open_decode
 from armoor.base.colocation import colocate_all
 
+import armoor.base.meta_zone
+import armoor.base.sel_var
+
 logger = logging.getLogger(__name__)
 
 
@@ -137,10 +140,8 @@ def get_observation_models_meta(config_obj: dict):
 
             vert_slice = config_obj["meta_zones"]["slice"]
             model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(vert_slice,
-                var_slice)
+                                                                                      var_slice)
             model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.vertical_selection_slice(
-                vert_slice, var_slice)
-            observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
                 vert_slice, var_slice)
             observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
                 index_model].meta.vertical_selection_slice(vert_slice, var_slice)
@@ -149,6 +150,10 @@ def get_observation_models_meta(config_obj: dict):
         interval = config_obj["meta_zones"]["interval"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
             interval)
+    if 'slice' in config_obj["meta_zones"]:
+        vert_slice = config_obj["meta_zones"]["slice"]
+        observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
+            vert_slice, var_slice)
     return config_obj
 
 
@@ -222,8 +227,12 @@ def set_coloc_flags(config_obj):
 
     if 'depth' in config_obj['meta_zones']:
         vertical_colocation_flag = False
+    if 'dens' in config_obj['meta_zones']:
+        vertical_colocation_flag = False
     if 'cloud' in config_obj['meta_zones']:
         horizontal_colocation_flag = False
+    if 'times' in config_obj['meta_zones']:
+        temporal_colocation_flag = False
 
     flags = temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag
 
@@ -252,7 +261,7 @@ def get_method(data, z_dim=False) -> str:
 
     if method is None:
         logger.warning('No method provided for %s', data.get("name"))
-
+        method = 'linear'
     return method
 
 
@@ -281,7 +290,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
     logger.info("Applying meta zone")
 
     # Add default meta-zone
-    if config_obj['functionality'] in ["sst", "currents_hfr"]:
+    if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
         if 'depth' not in config_obj["meta_zones"]:
             config_obj["meta_zones"]["depth"] = [0]
 
@@ -289,9 +298,6 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                "depth": lambda obj: obj.meta.vertical_selection_depth,
                "min_depth": lambda obj: obj.meta.vertical_selection_min_depth,
                "max_depth": lambda obj: obj.meta.vertical_selection_max_depth,
-               "dens": lambda obj: obj.meta.vertical_selection_dens,
-               "min_dens": lambda obj: obj.meta.vertical_selection_min_dens,
-               "max_dens": lambda obj: obj.meta.vertical_selection_max_dens,
                "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
                "start": lambda obj: obj.meta.time_selection_start,
                "end": lambda obj: obj.meta.time_selection_end,
@@ -302,10 +308,18 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                }
 
     if "meta_zones" in config_obj:
+        # Calculate vars before meta-zone
+        outputs = config_obj['outputs']
+        vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
+        if 'current_bc' in vars_to_plot:
+            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
+        if 'current_res' in vars_to_plot:
+            filter = outputs[0]['low_pass_filter']
+            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
+
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
-            radius = config_obj["meta_zones"]["radius"] if "radius" in config_obj[
-                "meta_zones"] else None
+            radius = config_obj["meta_zones"].get('radius')
             logger.info("Applying : cloud")
             points = config_obj["meta_zones"]["cloud"]
             xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
@@ -313,14 +327,11 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         # Bathymetry threshold
         if 'h' in xarray_obj:
             xarray_obj = xarray_obj.rename({'h': 'bathy'})
-
         if 'bathy_min' in config_obj["meta_zones"] or 'bathy_max' in config_obj["meta_zones"]:
             logger.info("Applying : bathymetry threshold")
             if 'bathy' in xarray_obj:
-                min_bath = config_obj["meta_zones"]["bathy_min"] if "bathy_min" in config_obj[
-                    "meta_zones"] else None
-                max_bath = config_obj["meta_zones"]["bathy_max"] if "bathy_max" in config_obj[
-                    "meta_zones"] else None
+                min_bath = config_obj["meta_zones"].get('bathy_min')
+                max_bath = config_obj["meta_zones"].get("bathy_max")
 
                 xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath,
                                                                         maximum=max_bath)
@@ -331,6 +342,23 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         if "radius" in config_obj["meta_zones"] and mod_obs == 'mod' and config_obj[
             "functionality"] in ['ADCP']:
             xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
+
+        # Density selection
+        if 'dens' in config_obj["meta_zones"]:
+            dens = config_obj["meta_zones"]["dens"]
+            ref_dens = config_obj.get("reference_density")
+            xarray_obj = xarray_obj.meta.vertical_selection_dens(dens, ref_dens)
+        if "min_dens" in config_obj["meta_zones"] or "max_dens" in config_obj["meta_zones"]:
+            min_dens = config_obj["meta_zones"].get("min_dens")
+            max_dens = config_obj["meta_zones"].get("max_dens")
+            ref_dens = config_obj.get("reference_density")
+            if min_dens:
+                xarray_obj = xarray_obj.meta.vertical_selection_min_dens(min_dens,
+                                                                         ref_dens=ref_dens)
+            if max_dens:
+                xarray_obj = xarray_obj.meta.vertical_selection_max_dens(max_dens,
+                                                                         ref_dens=ref_dens)
+
         # Other meta-zones, one by one
         for name, meta_filter in filters.items():
             if name in config_obj["meta_zones"]:

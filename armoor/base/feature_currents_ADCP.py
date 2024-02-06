@@ -36,13 +36,7 @@ def plot(config_obj):
     # SELECT THE VARIABLES
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
 
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current'])
 
     # PLOT
     for output in outputs:
@@ -80,6 +74,24 @@ def plot(config_obj):
             else:
                 logger.warning(
                     'Caution ! To retrieve residual currents, please specify low_pass_filter with demerliac, godin or mean.')
+        # Otherwise select total current
+        else:
+            observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
+            for i_mod, mod in enumerate(models):
+                mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
+                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                    i_mod].sel_var.selection(['current'])
+        # Calculate baroclinic current
+        if 'attribute' in output and 'bc' in output['attribute'][0]:
+            observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
+                ['current_bc'])
+            for i_mod, mod in enumerate(models):
+                mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current_bc'])
+                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
+                    ['current_bc'])
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                    i_mod].sel_var.selection(['current_bc'])
 
         # PLOTS
         ############################################################################################
@@ -87,17 +99,22 @@ def plot(config_obj):
         plot_hovmoller = {"plot_hovmoller": 'plot_hovmoller'}
         if output["plot"] in plot_hovmoller:
             # Select the attributes to plot
-            if 'attribute' in output and output["attribute"] == ['current_res']:
-                attributes = ['u_res', 'v_res', 'norm_res']
+            if 'attribute' in output:
+                if output["attribute"] == ['current_res']:
+                    attributes = ['u_res', 'v_res', 'norm_res', 'dir_res']
+                elif output["attribute"] == ['current_bc']:
+                    attributes = ['u_bc', 'v_bc', 'norm_bc', 'dir_bc']
+                else:
+                    attributes = ['u', 'v', 'norm', 'dir']
             else:
-                attributes = ['u', 'v', 'norm']
+                attributes = ['u', 'v', 'norm', 'dir']
 
             for attribute in attributes:
                 obs_var, mods_var = copy.deepcopy(observation), copy.deepcopy(models)
                 for i_mod, mod_var in enumerate(mods_var):
                     # Remove missing values
                     mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
-                                                                 [attribute], [attribute])
+                                                                 [attribute])
                     # Select variables to plot
                     mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
                     mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]

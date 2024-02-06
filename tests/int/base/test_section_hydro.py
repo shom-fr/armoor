@@ -17,6 +17,15 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_variable_2d_curr_geo(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_2d_curr_geo')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_curr_geo.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_variable_2d_hycom_manga(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_hycom_manga')
@@ -85,6 +94,15 @@ class TestBulletins:
         logger.info('test_variable_3d')
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_3d.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_3d_curr_geo(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_3d_curr_geo')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_curr_geo.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

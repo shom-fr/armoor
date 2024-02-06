@@ -66,7 +66,10 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             # If observation is profiler
             if time_flag and 'time' in obs.lon.dims:
                 logger.info('Profiler type colocation')
-                mod_coloc = colocate_lon_lat_time(mod, obs, coloc_method, coloc_method_z)
+                if 'instr' in obs.dims:
+                    mod_coloc = colocate_lon_lat_time_instr(mod, obs, coloc_method, coloc_method_z)
+                else:
+                    mod_coloc = colocate_lon_lat_time(mod, obs, coloc_method, coloc_method_z)
 
             else:
                 # Temporal colocation
@@ -198,8 +201,10 @@ def horizontal_colocation(ds_to_coloc, tgt, coloc_method):
             ds_coloc = convert_curv_rect(ds_to_coloc, lon_values, lat_values)
 
     else:
-        ds_coloc = ds_to_coloc.interp(lon=lon_values, lat=lat_values, method=coloc_method,
-                                      kwargs={"fill_value": "extrapolate"})
+        # Fill Nans for the interpolation
+        ds_to_coloc = ds_to_coloc.sortby('lon')
+        ds_to_coloc = ds_to_coloc.interpolate_na(dim='lon', method=coloc_method)
+        ds_coloc = ds_to_coloc.interp(lon=lon_values, lat=lat_values, method=coloc_method)
 
     return ds_coloc
 
@@ -333,6 +338,16 @@ def min_dimensions(obs, mod, dims):
                 tgt_dims_values[dim] = obs[dim]
 
     return tgt_dims_values
+
+
+def colocate_lon_lat_time_instr(mod, obs, method, method_z):
+    list_mod_instr = []
+    for i, _ in enumerate(obs.instr.values):
+        obs_i = obs.isel(instr=i)
+        mod_i = colocate_lon_lat_time(mod, obs_i, method, method_z)
+        list_mod_instr.append(mod_i)
+    mod_coloc = xr.concat(list_mod_instr, 'instr')
+    return mod_coloc
 
 
 def colocate_lon_lat_time(mod, obs, method, method_z):

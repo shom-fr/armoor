@@ -4,7 +4,7 @@ import copy
 import logging
 from armoor.base.tools_features import remove_missing_values_ds, sel_one_var, sel_default_vars
 from armoor.base import plot_features
-import armoor.hmi.script_tools as st
+from armoor.hmi.script_tools import create_folder
 
 logger = logging.getLogger(__name__)
 
@@ -37,19 +37,15 @@ def plot(config_obj):
     models = copy.copy(config_obj["models"])
 
     # Remove missing values
-    vars_obs = [var for var in list(observation["xarray_meta"].keys()) if
-                var in models[0]["xarray_meta"] or f"p{var}" in models[0]["xarray_meta"]]
-    vars_mod = copy.copy(vars_obs)
-
+    vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
     for i_mod, mod in enumerate(models):
-        models, observation = remove_missing_values_ds(models, observation, i_mod, vars_mod,
-                                                       vars_obs)
+        models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
     # PLOT THE OUTPUTS
     for output in outputs:
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
-            st.create_folder(sub_func_output_folder)
+            create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
         # get parameters from config obj
@@ -84,19 +80,8 @@ def plot(config_obj):
                                                      output_path=sub_func_output_folder)
 
         else:
-            for var in vars_obs:
+            for var in vars:
                 observation_var, models_var = sel_one_var(observation, models, var)
-                ####################################################################################
-                # TIME SERIES POINT
-                plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point',
-                                      "plot_ts_metr_bias_point": 'bias_point',
-                                      "plot_ts_metr_RMSE_point": 'RMSEc_point',
-                                      "plot_ts_metr_point": 'all_metrics'
-                                      }
-                if output["plot"] in plot_ts_metr_point:
-                    plot_features.plot_ts_metr_point(models_var, observation_var, flag_interval,
-                                                     flag_slice, output_path=sub_func_output_folder)
-
                 ####################################################################################
                 # TIME SERIES STATS
                 plot_ts_metr_stats = {"plot_ts_metr_stats": 'all_metrics'
@@ -110,8 +95,7 @@ def plot(config_obj):
                 ####################################################################################
                 # MAP METRIC
                 plot_map_metr = {"plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
-                                 "plot_map_metr_RMSE": 'RMSE',
-                                 "plot_map_metr_RMSEc": 'RMSEc'
+                                 "plot_map_metr_RMSE": 'RMSE', "plot_map_metr_RMSEc": 'RMSEc'
                                  }
 
                 if output["plot"] in plot_map_metr:
@@ -138,9 +122,17 @@ def plot(config_obj):
                 # COURBE PROFIL UNIQUE
                 plot_profile_u = {"plot_profile_u": 'profile_u'}
                 if output["plot"] in plot_profile_u:
-                    plot_features.plot_profile_unique(models_var, observation_var["xarray_meta"],
-                                                      config_obj["meta_zones"]["radius"],
-                                                      output_path=sub_func_output_folder)
+                    if 'instr' in observation_var["xarray_meta"].dims:
+                        for i_instr, _ in enumerate(observation_var["xarray_meta"].instr):
+                            obs_instr = observation_var["xarray_meta"].isel(instr=i_instr)
+                            plot_features.plot_profile_unique(models_var, obs_instr,
+                                                              config_obj["meta_zones"]["radius"],
+                                                              output_path=sub_func_output_folder)
+                    else:
+                        plot_features.plot_profile_unique(models_var,
+                                                          observation_var["xarray_meta"],
+                                                          config_obj["meta_zones"]["radius"],
+                                                          output_path=sub_func_output_folder)
 
                 ####################################################################################
                 # COURBE MULTI PROFILS

@@ -6,7 +6,7 @@ import numpy as np
 from armoor.base.tools_features import remove_missing_values_ds
 from armoor.base import plot_features, ttide_tide_feature
 from armoor.base.colocation import colocate_all
-import armoor.hmi.script_tools as st
+from armoor.hmi.script_tools import create_folder
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +37,10 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current'])
-
     for output in outputs:
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
-            st.create_folder(sub_func_output_folder)
+            create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
 
@@ -73,6 +66,13 @@ def plot(config_obj):
             else:
                 logger.warning(
                     'Caution ! To retrieve residual currents, please specify low_pass_filter with demerliac, godin or mean.')
+        else:
+            observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
+            for i_mod, mod in enumerate(models):
+                mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
+                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                    i_mod].sel_var.selection(['current'])
 
         # PLOTS
         ############################################################################################
@@ -120,16 +120,16 @@ def plot(config_obj):
         if output["plot"] in plot_ts_metr_point:
             # Select the attributes to plot
             if 'attribute' in output and output["attribute"] == ['current_res']:
-                attributes = ['u_res', 'v_res', 'norm_res']
+                attributes = ['u_res', 'v_res', 'norm_res', 'dir_res']
             else:
-                attributes = ['u', 'v', 'norm']
+                attributes = ['u', 'v', 'norm', 'dir']
 
             for attribute in attributes:
                 obs_var, mods_var = copy.deepcopy(observation), copy.deepcopy(models)
                 for i_mod, mod_var in enumerate(mods_var):
                     # Remove missing values
                     mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
-                                                                 [attribute], [attribute])
+                                                                 [attribute])
                     # Select variables to plot
                     mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
                     mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
@@ -149,9 +149,9 @@ def plot(config_obj):
         if output["plot"] in plot_ts_metr_stats:
             # Select the attributes to plot
             if 'attribute' in output and output["attribute"] == ['current_res']:
-                attributes = ['u_res', 'v_res', 'norm_res']
+                attributes = ['u_res', 'v_res', 'norm_res', 'dir_res']
             else:
-                attributes = ['u', 'v', 'norm']
+                attributes = ['u', 'v', 'norm', 'dir']
 
             plg = config_obj["meta_zones"].get("polygon")
 
@@ -160,7 +160,7 @@ def plot(config_obj):
                 for i_mod, mod_var in enumerate(mods_var):
                     # Remove missing values
                     mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
-                                                                 [attribute], [attribute])
+                                                                 [attribute])
                     # Select variables to plot
                     mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
                     mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
@@ -175,7 +175,7 @@ def plot(config_obj):
         # CURRENT MAP
         plot_map_metr = {"plot_map_metr_ecart_interval": 'difference',
                          "plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
-                         "plot_map_metr_RMSEc": 'RMSEc', "plot_map_metr_RMSEcentree": 'RMSEcentree'
+                         "plot_map_metr_RMSE": 'RMSE', "plot_map_metr_RMSEc": 'RMSEc'
                          }
         if output["plot"] in plot_map_metr:
             vmin = output.get('vmin')
@@ -197,7 +197,7 @@ def plot(config_obj):
             for i_mod, mod in enumerate(models):
                 # Remove missing values
                 models, observation = remove_missing_values_ds(models, observation, i_mod,
-                                                               attributes, attributes)
+                                                               attributes)
 
                 plot_features.plot_map_metr_current(flag_interval, flag_slice, models, observation,
                                                     i_mod, metric, attribute, cmap, vmin, vmax,

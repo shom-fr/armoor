@@ -19,9 +19,11 @@ import xarray as xr
 import pandas as pd
 import dask.array as da
 
+from xoa.thermdyn import mixed_layer_depth
+
 from armoor.hmi.configuration import get_forcing_model, get_model, get_obs
 from armoor.hmi.configuration import get_time_spacial_extent, apply_custom_metazone
-from armoor.hmi.script_tools import format_times, create_folder, compute_mixed_layer, convert_k_c
+from armoor.hmi.script_tools import format_times, create_folder, convert_k_c
 from armoor.hmi.script_tools import decumulate_data, from_nh_to_1h, get_cumul_info
 from armoor.hmi.script_plot import hmi_image
 from armoor.base.colocation import colocate_all
@@ -544,7 +546,7 @@ def get_data2plot(func, var_m, model2plot_xr, obs2plot_xr, file_names, obs_name,
 
     elif func in ["visu_mixedlayer", 'visu_mixedlayer_clim']:
         logger.info('Computing mixed layer.')
-        data2plot_all_times = compute_mixed_layer(model2plot_xr.xoa[var_m].squeeze())
+        data2plot_all_times = mixed_layer_depth(model2plot_xr.xoa[var_m].squeeze())
         if func == "visu_mixedlayer":
             cbar_range = get_cbar_minmax(data2plot_all_times, **param_cbar)
             global cbar_range_mld

@@ -3,7 +3,7 @@ import os
 import copy
 from armoor.base.tools_features import remove_missing_values_ds
 from armoor.base import plot_features
-import armoor.hmi.script_tools as st
+from armoor.hmi.script_tools import create_folder
 
 
 def plot(config_obj):
@@ -29,18 +29,11 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-            i_mod].sel_var.selection(['current'])
-
     # PLOT
     for output in outputs:
         if output_path:
             sub_func_output_folder = os.path.join(output_path, output["folder_name"])
-            st.create_folder(sub_func_output_folder)
+            create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
 
@@ -51,14 +44,33 @@ def plot(config_obj):
         dvmax = output.get('dvmax')
         cmap = output.get("colormap")
 
+        # Calculate baroclinic current
+        if 'attribute' not in output or output['attribute'][0] == 'current':
+            var_norm = ['norm']
+            observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(['current'])
+            for i_mod, mod in enumerate(models):
+                mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current'])
+                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(['current'])
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                    i_mod].sel_var.selection(['current'])
+
+        elif 'attribute' in output and 'bc' in output['attribute'][0]:
+            var_norm = ['norm_bc']
+            observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
+                ['current_bc'])
+            for i_mod, mod in enumerate(models):
+                mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(['current_bc'])
+                mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(
+                    ['current_bc'])
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                    i_mod].sel_var.selection(['current_bc'])
         ############################################################################################
         # VARIABLE 3D SECTION
         plot_variable_3d = {"plot_variable_3d": 'variable_3d'}
         if output["plot"] in plot_variable_3d:
             # Remove missing values
             for i_mod, mod in enumerate(models):
-                models, observation = remove_missing_values_ds(models, observation, i_mod, ['norm'],
-                                                               ['norm'])
+                models, observation = remove_missing_values_ds(models, observation, i_mod, var_norm)
 
             plot_features.plot_variable_3d(models, observation, cmap, vmin, vmax, dvmin, dvmax,
                                            output_path=sub_func_output_folder)

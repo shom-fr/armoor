@@ -11,8 +11,8 @@ from armoor.tick.models import StatusUpdate, TicketData, User
 from armoor.tick.ticket import Ticket
 
 import logging
-import armoor.cli.logger_tools as log
-log.setup_logging()
+from armoor.cli.logger_tools import setup_logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 # api : application to launch with the forecaster web interface
