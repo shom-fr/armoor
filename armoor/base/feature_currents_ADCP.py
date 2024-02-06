@@ -37,7 +37,6 @@ def plot(config_obj):
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-
     # PLOT
     for output in outputs:
         if output_path:
@@ -52,11 +51,6 @@ def plot(config_obj):
         dvmin = output.get('dvmin')
         dvmax = output.get('dvmax')
         cmap = output.get("colormap")
-
-        if 'scale' in output:
-            scale = output["scale"]
-        else:
-            scale = 0.1
 
         # Calculate residual current
         if 'attribute' in output and 'res' in output['attribute'][0]:
@@ -146,8 +140,8 @@ def plot(config_obj):
         ############################################################################################
         # ELLIPSES TIDAL CURRENTS
         plot_tide_current_ellipses = {"plot_tide_current_ellipses": 'plot_tide_current_ellipses'}
-
         if output["plot"] in plot_tide_current_ellipses:
+
             # Calculate harmonic analysis
             logger.info(f'Computing harmonic analysis for the observation...')
             ds_obs = ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
@@ -160,6 +154,13 @@ def plot(config_obj):
                 ds_mod = ttide_tide_feature.run_harmonic_analysis(mod['xarray_meta_coloc'], output)
 
                 ds_models.append(ds_mod)
+
+            scale = output.get("scale")
+            list_waves = output.get("tidal_waves").split()
+            if len(scale) < len(list_waves):
+                logger.warning(
+                    f'You should specify one scale value per required tidal wave. By default, the scale will be {scale[0]} for all tidal waves.')
+                scale = [scale[0]] * len(list_waves)
 
             # Plot the ellipses
             plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale,

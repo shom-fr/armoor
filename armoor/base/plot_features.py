@@ -1512,7 +1512,7 @@ def plot_map_harm(models, observations, output_path=None):
                 manage_output(figname, output_path)
 
 
-def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None):
+def plot_ellipses_tide_current(models, observations, scales, output_path=None):
     """
     Plot the map with the tidal current ellipses.
     Parameters
@@ -1521,8 +1521,8 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
         Model harmonic datasets.
     observations : xarray.dataset
         Observation harmonic dataset.
-    scale : int
-        Scale to adapt the size of the ellipses.
+    scales : list of float
+        Scales to adapt the size of the ellipses, one per constituent.
     output_path : str
         Path where to save the figures.
 
@@ -1531,6 +1531,9 @@ def plot_ellipses_tide_current(models, observations, scale=0.1, output_path=None
     # One plot per tidal wave
     for i_wave, wave in enumerate(observations.wave.data):
         freq = observations.isel(wave=i_wave).freq.data
+        if scales is not None:
+            scale = scales[i_wave]
+
         if freq > 0:
             # If vertical immersions : on plot per immersion (depth)
             if 'depth' in observations.dims:
@@ -1569,7 +1572,12 @@ def plot_ellipses_tide_current_generic(observation, models, wave_name, scale, ou
         models = [mod.isel(slice=i_slice) for mod in models]
     observation = observation.squeeze()
 
+    # Get ellipses scale
+    if scale is None:
+        scale = get_tide_scale(observation)
+
     f, ax = figure_1_map(observation)
+
     if np.size(observation.lon) > 1:
         for i_lon, _ in enumerate(observation.lon):
             obs = observation.isel(lon=[i_lon], lat=[i_lon])
@@ -1595,6 +1603,28 @@ def plot_ellipses_tide_current_generic(observation, models, wave_name, scale, ou
     f.suptitle(title, fontsize=15, fontweight='bold')
     f.subplots_adjust(top=0.85)
     manage_output(figname, output_path)
+
+
+def get_tide_scale(obs):
+    """
+
+    Parameters
+    ----------
+    obs : xarray.dataset
+        Observation tidal current.
+
+    Returns
+    -------
+    scale : float
+        scale factor adapting the ellipses size to the window.
+    """
+    norm = np.sqrt(obs.u_a ** 2 + obs.v_a ** 2)
+    norm = norm.mean()
+
+    indice = 0.15
+
+    scale = float(indice / norm)
+    return scale
 
 
 def plot_ellipses_tide_current_figure(freq, ax, ds, color, scale):
@@ -3235,8 +3265,8 @@ def add_scale(ax, scale):
     lon = extent[0] + (extent[1] - extent[0]) / 10
     lat = extent[2] + (extent[3] - extent[2]) / 15
     lat_txt = extent[2] + (extent[3] - extent[2]) / 25
-    ax.plot([lon, lon + 0.2 * scale], [lat, lat], c='k', transform=ccrs.PlateCarree())
-    ax.text(lon, lat_txt, '0.2 m.s-1', transform=ccrs.PlateCarree())
+    ax.plot([lon, lon + 0.1 * scale], [lat, lat], c='k', transform=ccrs.PlateCarree())
+    ax.text(lon, lat_txt, '0.1 m.s-1', transform=ccrs.PlateCarree())
     ax.set_extent(extent)
     return ax
 
