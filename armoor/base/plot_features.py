@@ -1531,8 +1531,11 @@ def plot_ellipses_tide_current(models, observations, scales, output_path=None):
     # One plot per tidal wave
     for i_wave, wave in enumerate(observations.wave.data):
         freq = observations.isel(wave=i_wave).freq.data
+        # Define scale
         if scales is not None:
             scale = scales[i_wave]
+        else:
+            scale = scales
 
         if freq > 0:
             # If vertical immersions : on plot per immersion (depth)

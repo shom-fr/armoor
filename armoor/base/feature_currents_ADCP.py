@@ -154,7 +154,7 @@ def plot(config_obj):
                 ds_mod = ttide_tide_feature.run_harmonic_analysis(mod['xarray_meta_coloc'], output)
 
                 ds_models.append(ds_mod)
-
+            # Get scale
             scale = output.get("scale")
             list_waves = output.get("tidal_waves").split()
             if len(scale) < len(list_waves):
