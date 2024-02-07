@@ -151,7 +151,7 @@ For each output here is the list of possible options (with their associated desc
     * ``path_results_traj`` : Path to store temporary dataset files
     * ``traj_duration_plot`` : Duration of the simulated trajectory to plot
     * ``traj_freq_plot`` : Frequency at which the trajectories are plotted (ex : one ine 3)
-    * ``scale`` : Scale to adapt the size of the ellipses/vectors
+    * ``scale`` : Scale to adapt the size of the ellipses/vectors. In case of ellipses plot, one scale factor per selected tidal wave must be specified, otherwise the first value will be applied to all.
     * ``analysis_start`` : Date to start the harmonic analysis
     * ``analysis_end`` : Date to end the harmonic analysis
     * ``tidal_waves`` : List of the tidal waves to compute. At least 1 tidal wave must be given, a good start is M2 S2 K1 O1 P1 Q1.
@@ -239,9 +239,8 @@ In the folder where you will run ``pytest``, please create a file named ``tests.
 .. NOTE::
 
     Note that for ``test_currents_hfr`` and ``test_currents_ADCP`` tests, some outputs require harmonic analyses to retrieve the tidal constituents.
-    The harmonic analyses are run in this tool thanks to the ttide librairy available at https://github.com/moflaher/ttide_py and described in::
-    Pawlowicz, R., B. Beardsley, and S. Lentz, "Classical Tidal "Harmonic Analysis Including Error Estimates in MATLAB using T_TIDE", Computers and Geosciences, 28, 929-937 (2002).
+    The harmonic analyses are run in this tool thanks to the ttide and utitde librairies, which you can select from the ``tide_tool`` parameter.
 
-    To do so, you need to specify specify the ``tidal_waves`` to compute. For more information refer to section **5. Outputs** above.
+    You also need to specify specify the ``tidal_waves`` to compute. For more information refer to section **5. Outputs** above.
 
 
