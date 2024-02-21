@@ -88,11 +88,11 @@ Relative to vertical restriction:
     * ``depth`` : Selectiion of listed immersions by depth.
     * ``density`` : Selectiion of listed immersions by depth.
 
-    * ``depth_min`` : Minimum authorized depth value.
-    * ``depth_max`` : Maximum authorized depth value.
+    * ``min_depth`` : Minimum authorized depth value.
+    * ``max_depth`` : Maximum authorized depth value.
 
-    * ``dens_min`` : Minimum authorized density value.
-    * ``dens_max`` : Maximum authorized density value.
+    * ``min_dens`` : Minimum authorized density value.
+    * ``max_dens`` : Maximum authorized density value.
 
     * ``slice`` : To group into vertical slices between the specified values of depth or density levels (e.g. --slice 0,150 500,1000 will define two vertical slices).
 
