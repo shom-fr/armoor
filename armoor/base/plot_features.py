@@ -1177,13 +1177,14 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
     """
     logger.info('map figures with comparison metric')
     # Get min/max colobar values
-    vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap, _ = get_min_max_values(vmin,
+    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values(vmin,
                                                                                           vmax,
                                                                                           obs_meta,
                                                                                           comparison,
                                                                                           metric,
                                                                                           dvmin,
                                                                                           dvmax)
+
     # Squeeze
     obs_meta, obs_coloc = clean_dim_order(obs_meta), clean_dim_order(obs_coloc)
     mod_meta, mod_coloc = clean_dim_order(mod_meta), clean_dim_order(mod_coloc)
