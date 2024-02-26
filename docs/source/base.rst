@@ -119,10 +119,10 @@ For each output here is the list of possible options (with their associated desc
 
     * ``plot`` : Plot options :
 
-        #. ``map_current_trajectroy`` : Plot the current vectors along the trajectories.
+        #. ``map_current_trajectory`` : Plot the current vectors along the trajectories.
         #. ``plot_stick_plot``: Plot stick plots for current data
         #. ``plot_diff_traj_dist``: Plot the difference in terms of distance and direction between the model and observation trajectories.
-        #. ``map_trajectroy``: Plot the modelled and observed trajectories
+        #. ``map_trajectory``: Plot the modelled and observed trajectories
         #. ``plot_map_current_harmonic``: Plot the map of amplitude, phase and norm of each tidal harmonic.
         #. ``plot_tide_current_ellipses``: Plot the map with the tidal current ellipses
         #. ``harmonic_table``: Create a table per tidal wave and per current constituent(u & v) with, for each depth, the amplitude and phase of the observation and the model and their differences
