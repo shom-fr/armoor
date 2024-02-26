@@ -52,7 +52,7 @@ def plot(config_obj):
         # PLOTS
         ############################################################################################
         # MAP CURRENTS TRAJECTORY
-        plot_map_current_traj = {"map_current_trajectroy": 'map_current_trajectroy'}
+        plot_map_current_traj = {"map_current_trajectory": 'map_current_trajectory'}
         if output["plot"] in plot_map_current_traj:
             # Select current in obs
             observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
@@ -67,7 +67,7 @@ def plot(config_obj):
 
         ############################################################################################
         # MAP TRAJECTORY
-        plot_map_traj = {"map_trajectroy": 'map_trajectroy'}
+        plot_map_traj = {"map_trajectory": 'map_trajectory'}
         if output["plot"] in plot_map_traj:
             # Define path where to save the trajectories
             if 'path_results_traj' in output:
