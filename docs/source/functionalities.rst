@@ -150,9 +150,9 @@ Available outputs
 ~~~~~~~~~~~~~~~~~
 
 * 3D variables : ``plot_variable_3d``
-    2D graphs (variable along time and depth) per variable and per section of the statistical metrics : *difference, bias, centered RMSE, RMSE*.
+    2D graphs (variable along time and depth) per variable and per section of the difference between model and observation.
 * 2D variables : ``plot_variable_2d``
-    Time series of the variable statistical metrics : *difference, bias, centered RMSE, RMSE*.
+    Time series of the variable difference between model and observation.
 
 
 5. CLIM_HYDRO
