@@ -457,11 +457,14 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing the mixed layer depth.
         """
-        if "temp" in self._obj:
-            self._obj = mixed_layer_depth(self._obj['temp'])
-        elif "ptemp" in self._obj:
-            self._obj = mixed_layer_depth(self._obj['ptemp'])
-        return self._obj
+        if 'mld' in self._obj:
+            return self._obj.mld
+        ptemp = self._obj.sel_var.sel_ptemp()
+        mld = mixed_layer_depth(ptemp)
+        if np.isnan(mld.max().data):
+            pdens = self._obj.sel_var.sel_pdensity()
+            mld = mixed_layer_depth(pdens)
+        return mld
 
     def sel_pres(self):
         if 'pres' in self._obj:

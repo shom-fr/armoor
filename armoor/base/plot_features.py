@@ -945,7 +945,7 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
         Path where to save the figures.
     """
     # Get min/max colobar values
-    vmin, vmax, comparison_vmin, comparison_vmax, comparison_cmap, _ = get_min_max_values(vmin,
+    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values(vmin,
                                                                                           vmax,
                                                                                           obs_coloc,
                                                                                           comparison,
