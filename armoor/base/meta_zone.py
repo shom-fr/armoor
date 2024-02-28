@@ -594,6 +594,7 @@ class MetazoneAccessor:
         """
         # For surface variables, select layer instead of depth
         if depth == 0:
+            logger.info(f'The first z/level layer will be selected')
             if 'type' in self._obj.attrs and self._obj.attrs['type'] == 'CROCO':  # for croco
                 return self._obj.isel(level=-1)
             else:  # Hycom
