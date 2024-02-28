@@ -592,6 +592,14 @@ class MetazoneAccessor:
         -------
         Croco or Hycom product at the required depth.
         """
+        # For surface variables, select layer instead of depth
+        if depth == 0:
+            logger.info(f'The first z/level layer will be selected')
+            if 'type' in self._obj.attrs and self._obj.attrs['type'] == 'CROCO':  # for croco
+                return self._obj.isel(level=-1)
+            else:  # Hycom
+                return self._obj.isel(z=0)
+
         # Regrid1D only seems to work with negative depths for croco:
         # the following lines adapt the depths values to correctly select the depth defined.
         dataset = copy.copy(self._obj)

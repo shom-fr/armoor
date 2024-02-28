@@ -98,6 +98,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     else:
         title_loc = ''
         loc = ''
+    # Seuil bathy
+    if "bathy_thresh" in obs.attrs:
+        loc += f"_bathythresh_{obs.attrs['bathy_thresh']}"
 
     # Time
     if 'interval' in obs.coords:
@@ -1061,6 +1064,11 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
         mod_coloc = mod_coloc.std(list_dims_mean)
         mod_meta = mod_meta.std(list_dims_mean)
 
+    # Warning if stats calculated on only 1 value
+    if obs_coloc.max() == 0 or obs_meta.max() == 0 or mod_meta.max() == 0 or obs_coloc.max() == 0:
+        logger.warning(
+            f'Caution : the stats calculation returned only 0, probably due to too short intervals/depth slices.')
+
     # Plot the values
     if metric == "difference":
         if np.size(mod_coloc.time) == 1:
@@ -1184,7 +1192,6 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
                                                                                           metric,
                                                                                           dvmin,
                                                                                           dvmax)
-
     # Squeeze
     obs_meta, obs_coloc = clean_dim_order(obs_meta), clean_dim_order(obs_coloc)
     mod_meta, mod_coloc = clean_dim_order(mod_meta), clean_dim_order(mod_coloc)
@@ -3228,9 +3235,9 @@ def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None,
     """
     # vmin / vmax
     if vmin is None:
-        vmin = ds.min().values
+        vmin = ds.min(skipna=True).values
     if vmax is None:
-        vmax = ds.max().values
+        vmax = ds.max(skipna=True).values
 
     # dvmin / dvmax / cmap
     if metric in ["difference", "bias"]:
