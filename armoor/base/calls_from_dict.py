@@ -329,10 +329,11 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             xarray_obj = xarray_obj.rename({'h': 'bathy'})
         if 'bathy_min' in config_obj["meta_zones"] or 'bathy_max' in config_obj["meta_zones"]:
             logger.info("Applying : bathymetry threshold")
-            if 'bathy' in xarray_obj:
-                min_bath = config_obj["meta_zones"].get('bathy_min')
-                max_bath = config_obj["meta_zones"].get("bathy_max")
+            min_bath = config_obj["meta_zones"].get('bathy_min')
+            max_bath = config_obj["meta_zones"].get("bathy_max")
+            xarray_obj = xarray_obj.assign_attrs({"bathy_thresh": f"{min_bath}_to_{max_bath}"})
 
+            if 'bathy' in xarray_obj:
                 xarray_obj = xarray_obj.meta.horizontal_selection_bathy(minimum=min_bath,
                                                                         maximum=max_bath)
             else:

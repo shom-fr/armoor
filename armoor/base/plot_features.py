@@ -98,6 +98,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     else:
         title_loc = ''
         loc = ''
+    # Seuil bathy
+    if "bathy_thresh" in obs.attrs:
+        loc += f"_bathythresh_{obs.attrs['bathy_thresh']}"
 
     # Time
     if 'interval' in obs.coords:
