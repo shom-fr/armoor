@@ -88,11 +88,11 @@ Relative to vertical restriction:
     * ``depth`` : Selectiion of listed immersions by depth.
     * ``density`` : Selectiion of listed immersions by depth.
 
-    * ``depth_min`` : Minimum authorized depth value.
-    * ``depth_max`` : Maximum authorized depth value.
+    * ``min_depth`` : Minimum authorized depth value.
+    * ``max_depth`` : Maximum authorized depth value.
 
-    * ``dens_min`` : Minimum authorized density value.
-    * ``dens_max`` : Maximum authorized density value.
+    * ``min_dens`` : Minimum authorized density value.
+    * ``max_dens`` : Maximum authorized density value.
 
     * ``slice`` : To group into vertical slices between the specified values of depth or density levels (e.g. --slice 0,150 500,1000 will define two vertical slices).
 
@@ -119,10 +119,10 @@ For each output here is the list of possible options (with their associated desc
 
     * ``plot`` : Plot options :
 
-        #. ``map_current_trajectroy`` : Plot the current vectors along the trajectories.
+        #. ``map_current_trajectory`` : Plot the current vectors along the trajectories.
         #. ``plot_stick_plot``: Plot stick plots for current data
         #. ``plot_diff_traj_dist``: Plot the difference in terms of distance and direction between the model and observation trajectories.
-        #. ``map_trajectroy``: Plot the modelled and observed trajectories
+        #. ``map_trajectory``: Plot the modelled and observed trajectories
         #. ``plot_map_current_harmonic``: Plot the map of amplitude, phase and norm of each tidal harmonic.
         #. ``plot_tide_current_ellipses``: Plot the map with the tidal current ellipses
         #. ``harmonic_table``: Create a table per tidal wave and per current constituent(u & v) with, for each depth, the amplitude and phase of the observation and the model and their differences
@@ -151,7 +151,7 @@ For each output here is the list of possible options (with their associated desc
     * ``path_results_traj`` : Path to store temporary dataset files
     * ``traj_duration_plot`` : Duration of the simulated trajectory to plot
     * ``traj_freq_plot`` : Frequency at which the trajectories are plotted (ex : one ine 3)
-    * ``scale`` : Scale to adapt the size of the ellipses/vectors
+    * ``scale`` : Scale to adapt the size of the ellipses/vectors. In case of ellipses plot, one scale factor per selected tidal wave must be specified, otherwise the first value will be applied to all.
     * ``analysis_start`` : Date to start the harmonic analysis
     * ``analysis_end`` : Date to end the harmonic analysis
     * ``tidal_waves`` : List of the tidal waves to compute. At least 1 tidal wave must be given, a good start is M2 S2 K1 O1 P1 Q1.
@@ -239,9 +239,8 @@ In the folder where you will run ``pytest``, please create a file named ``tests.
 .. NOTE::
 
     Note that for ``test_currents_hfr`` and ``test_currents_ADCP`` tests, some outputs require harmonic analyses to retrieve the tidal constituents.
-    The harmonic analyses are run in this tool thanks to the ttide librairy available at https://github.com/moflaher/ttide_py and described in::
-    Pawlowicz, R., B. Beardsley, and S. Lentz, "Classical Tidal "Harmonic Analysis Including Error Estimates in MATLAB using T_TIDE", Computers and Geosciences, 28, 929-937 (2002).
+    The harmonic analyses are run in this tool thanks to the ttide and utitde librairies, which you can select from the ``tide_tool`` parameter.
 
-    To do so, you need to specify specify the ``tidal_waves`` to compute. For more information refer to section **5. Outputs** above.
+    You also need to specify specify the ``tidal_waves`` to compute. For more information refer to section **5. Outputs** above.
 
 

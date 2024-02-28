@@ -44,12 +44,6 @@ def plot(config_obj):
         else:
             sub_func_output_folder = output_path
 
-        # Get the figure parameters from config obj
-        if 'scale' in output:
-            scale = output["scale"]
-        else:
-            scale = 0.1
-
         # Calculate residual current
         if 'attribute' in output and 'res' in output['attribute'][0]:
             if 'low_pass_filter' in output:
@@ -97,6 +91,7 @@ def plot(config_obj):
         # ELLIPSES TIDAL CURRENTS
         plot_tide_current_ellipses = {"plot_tide_current_ellipses": 'plot_tide_current_ellipses'}
         if output["plot"] in plot_tide_current_ellipses:
+
             # Proceed harmonic analysis on obs
             logger.info(f'Computing harmonic analysis for the observation...')
             ds_obs = ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
@@ -106,6 +101,16 @@ def plot(config_obj):
                 logger.info(f'Computing harmonic analysis for model {i_mod}...')
                 ds_mod = ttide_tide_feature.run_harmonic_analysis(mod['xarray_meta_coloc'], output)
                 ds_models.append(ds_mod)
+
+            # Get scale
+            scale = output.get("scale")
+            if scale is not None:
+                list_waves = output.get("tidal_waves").split()
+                if len(scale) < len(list_waves):
+                    logger.warning(
+                        f'You should specify one scale value per required tidal wave. By default, the scale will be {scale[0]} for all tidal waves.')
+                    scale = [scale[0]] * len(list_waves)
+
             # Plot the maps
             plot_features.plot_ellipses_tide_current(ds_models, ds_obs, scale,
                                                      output_path=sub_func_output_folder)
