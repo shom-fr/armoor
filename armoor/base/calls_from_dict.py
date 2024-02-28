@@ -292,7 +292,8 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
     # Add default meta-zone
     if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
         if 'depth' not in config_obj["meta_zones"]:
-            config_obj["meta_zones"]["depth"] = [0]
+            logger.warning(f"For feature {config_obj['functionality']}, no depth can be specified !")
+        config_obj["meta_zones"]["depth"] = [0]
 
     filters = {"quality": lambda obj: obj.meta.quality_filter,
                "depth": lambda obj: obj.meta.vertical_selection_depth,
