@@ -2696,7 +2696,7 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
 
     title, figname = get_title_figname(f'Multi profile radius {radius}km', observation, mod['name'],
                                        obs.attrs['name'])
-    f.suptitle(title, fontsize=17, fontweight='bold')
+    f.suptitle(title, fontsize=17, fontweight='bold', x=0.35)
 
     # Add the mini-map
     ax_mini_map = add_mini_map(f, observation)
