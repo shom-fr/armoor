@@ -330,7 +330,7 @@ def figure_5lin_ts():
     axs : list
         5 axes for observation, model and comparison time series.
     """
-    f = plt.figure(figsize=(10, 15))
+    f = plt.figure(figsize=(12, 10))
     ax0 = plt.subplot2grid((5, 1), (0, 0))
     ax1 = plt.subplot2grid((5, 1), (1, 0))
     ax2 = plt.subplot2grid((5, 1), (2, 0))
@@ -2021,7 +2021,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
             title, figname = get_title_figname('Metric statistics', obs_coloc, mod_names,
                                                observation['name'])
 
-            f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+            f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
 
             # Rotate x labels
             for label in ax.get_xticklabels():
@@ -2055,7 +2055,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
                                                    observation['name'])
 
-                f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+                f.suptitle(title, x=0.25, fontsize=14, fontweight='bold')
 
         # MINI-MAP
         ax_mini_map = add_mini_map(f, obs_coloc_base)
@@ -2424,7 +2424,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             title, figname = get_title_figname(
                 f'Time series metrics on {list_dims_mean} dimensions', obs_coloc, mod_name,
                 observation['name'])
-            f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+            f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
             manage_output(figname, output_path)
 
     # Case no vertical slices
@@ -2457,7 +2457,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         mod_name = [mod['name'] for mod in models]
         title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
                                            obs_coloc, mod_name, observation['name'])
-        f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+        f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
         manage_output(figname, output_path)
 
 
