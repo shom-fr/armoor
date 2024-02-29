@@ -86,13 +86,13 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     # Location
     if 'lon' in obs.coords and np.size(obs.lon.data) == 1:
         if obs.lon.data.shape == (1,):
-            title_loc = f'Longitude : {obs.lon.data[0]:.2f} - Latitude : {obs.lat.data[0]:.2f} -'
+            title_loc = f'Longitude : {obs.lon.data[0]:.2f}° - Latitude : {obs.lat.data[0]:.2f}°'
             loc = f"{obs.lon.data[0]:.2f}_{obs.lat.data[0]:.2f}"
         elif obs.lon.data.shape == (1, 1):
-            title_loc = f'Longitude : {obs.lon.data[0][0]:.2f} - Latitude : {obs.lat.data[0][0]:.2f} -'
+            title_loc = f'Longitude : {obs.lon.data[0][0]:.2f}° - Latitude : {obs.lat.data[0][0]:.2f}°'
             loc = f"{obs.lon.data[0][0]:.2f}_{obs.lat.data[0][0]:.2f}"
         else:
-            title_loc = f'Longitude : {obs.lon.data:.2f} - Latitude : {obs.lat.data:.2f} -'
+            title_loc = f'Longitude : {obs.lon.data:.2f}° - Latitude : {obs.lat.data:.2f}°'
             loc = f"{obs.lon.data:.2f}_{obs.lat.data:.2f}"
 
     else:
@@ -104,18 +104,14 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
 
     # Time
     if 'interval' in obs.coords:
-        if np.size(obs.interval.data) == 1:
-            title_time = f"Interval : {obs.interval.data}\n"
-            time = obs.interval.data
-        else:
-            title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]}\n"
-            time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
-        if 'interval_duration' in obs.coords:
-            title_time = title_time[:-2] + f" - Interval {obs['interval_duration'].data}\n"
+        title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]} - Interval {obs['interval_duration'].data}\n"
+        time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
+        # if 'interval_duration' in obs.coords:
+        #     title_time = title_time[:-2] + f" - Interval {obs['interval_duration'].data}\n"
+
     elif 'analysis_period' in obs.attrs:
         title_time = f"Obs analysis period : {obs.analysis_period.replace(':00', '')} with {obs.attrs['tide_tool']}\n"
         time = f"analysis_{obs.attrs['tide_tool']}_{obs.analysis_period.replace(':00', '')}"
-
     else:
         if 'time' in obs.coords and np.size(obs.time.data) == 1:
             if 'U' in str(obs.time.data.dtype):  # Check if times are months names
@@ -2932,7 +2928,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
     """
     # Add the colorbar, titles etc.
     title, figname = get_title_figname('Theta-S diagram', obs, mod['name'], obs.attrs['name'])
-    f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+    f.suptitle(title, x=0.35, fontsize=17, fontweight='bold')
 
     ax.set_ylabel('Potential temperature [°C]')
     ax.set_xlabel('Salinity [g/kg]')
