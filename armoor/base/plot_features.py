@@ -2580,7 +2580,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
 
         title, figname = get_title_figname(f"Unique profile radius {radius}km", obs,
                                            [mod["name"] for mod in models], obs.attrs['name'])
-        f.suptitle(title, fontsize=17, fontweight='bold')
+        f.suptitle(title, fontsize=17, fontweight='bold', x=0.35)
 
         # Add the mini-map
         ax_mini_map = add_mini_map(f, obs)
