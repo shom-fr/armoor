@@ -289,9 +289,9 @@ Variables to plot
 Available outputs
 ~~~~~~~~~~~~~~~~~
 
-* Current maps along trajectory : ``map_current_trajectroy``
+* Current maps along trajectory : ``map_current_trajectory``
     Map of current along the drifter trajectory from the model and the observation.
-* Trajectory maps : ``map_trajectroy``
+* Trajectory maps : ``map_trajectory``
     Map of the observed and simulated trajectory of the drifter.
 
     ** The model trajectories are re-initialized at the specified frequency (e.g. ``traj_freq_plot = 5``) and calculated over the specified integration period (e.g. ``traj_duration_plot = 10``)
