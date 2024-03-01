@@ -1248,7 +1248,7 @@ def plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot,
     traj_duration_plot : int
         duration of the simulated trajectory to plot.
     traj_freq_plot : int
-        frequency at which the trajsectories are plotted (ex : one ine 3).
+        frequency at which the trajectories are plotted (ex : one ine 3).
     time_step : float
         calculation time step.
     output_path : str
