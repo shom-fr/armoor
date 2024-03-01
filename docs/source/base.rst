@@ -173,6 +173,8 @@ You can select the variables to plot among the following ones with the parameter
     * ``mld`` : Mixed layer depth
     * ``sound_speed`` : Sound speed
 
+.. CAUTION::
+    Any optional ``attribute`` specified in the ``plot`` options must also appear in the ``meta-zone`` ``vars`` selection !
 
 Example
 -------
