@@ -149,8 +149,8 @@ For each output here is the list of possible options (with their associated desc
     * ``dvmin`` : To fix minimum comparison figure value scale
     * ``dvmax`` : To fix maximum comparison figure value scale
     * ``path_results_traj`` : Path to store temporary dataset files
-    * ``traj_duration_plot`` : Duration of the simulated trajectory to plot
-    * ``traj_freq_plot`` : Frequency at which the trajectories are plotted (ex : one ine 3)
+    * ``traj_duration_plot`` : Duration, in seconds, of the simulated trajectory to plot
+    * ``traj_freq_plot`` : Frequency, in seconds, at which the trajectories are plotted (ex : one ine 3)
     * ``scale`` : Scale to adapt the size of the ellipses/vectors. In case of ellipses plot, one scale factor per selected tidal wave must be specified, otherwise the first value will be applied to all.
     * ``analysis_start`` : Date to start the harmonic analysis
     * ``analysis_end`` : Date to end the harmonic analysis
