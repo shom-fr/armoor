@@ -326,6 +326,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             logger.info("Applying : cloud")
             points = config_obj["meta_zones"]["cloud"]
             xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
+            xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
 
         # Bathymetry threshold
         if 'h' in xarray_obj:
@@ -345,7 +346,14 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         # Radius for ADCP feature
         if "radius" in config_obj["meta_zones"] and mod_obs == 'mod' and config_obj[
             "functionality"] in ['ADCP']:
+            radius = config_obj["meta_zones"].get('radius')
             xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
+            xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
+
+        # Radius for data selection
+        if "radius" in config_obj["meta_zones"] and "radius" not in xarray_obj.attrs:
+            radius = config_obj["meta_zones"].get('radius')
+            xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
 
         # Density selection
         if 'dens' in config_obj["meta_zones"]:

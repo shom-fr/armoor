@@ -296,14 +296,15 @@ def sel_one_var(observation, models, var, depth=None):
                 i_mod].sel(depth=depth, method='nearest')
 
     # Bathy thresh in attrs if needed
-    if "bathy_thresh" in observation["xarray_meta"].attrs:
-        bath_attr = observation['xarray_meta'].attrs["bathy_thresh"]
-        observation_var['xarray_meta'] = observation_var['xarray_meta'].assign_attrs({"bathy_thresh":bath_attr})
-        for i_mod, mod in enumerate(models_var):
-            models_var[i_mod]["xarray_meta"] = models_var[i_mod]["xarray_meta"].assign_attrs({"bathy_thresh":bath_attr})
-            models_var[i_mod]["xarray_meta"] = models_var[i_mod]["xarray_meta"].assign_attrs({"bathy_thresh":bath_attr})
-            observation_var['xarray_meta_coloc'][i_mod] = observation_var[
-                'xarray_meta_coloc'][i_mod].assign_attrs({"bathy_thresh" : bath_attr})
+    list_attrs = ["bathy_thresh", "radius"]
+    for attr in list_attrs:
+        if attr in observation["xarray_meta"].attrs:
+            attr_name = observation['xarray_meta'].attrs[attr]
+            observation_var['xarray_meta'] = observation_var['xarray_meta'].assign_attrs({attr:attr_name})
+            for i_mod, mod in enumerate(models_var):
+                models_var[i_mod]["xarray_meta"] = models_var[i_mod]["xarray_meta"].assign_attrs({attr:attr_name})
+                observation_var['xarray_meta_coloc'][i_mod] = observation_var[
+                    'xarray_meta_coloc'][i_mod].assign_attrs({attr:attr_name})
 
     return observation_var, models_var
 
