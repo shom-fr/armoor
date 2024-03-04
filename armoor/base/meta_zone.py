@@ -415,6 +415,7 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_depth")
         max_depth = self._obj.depth.max(skipna=True)
+
         return self.vertical_selection_range([min_depth, max_depth], 'depth')
 
     def vertical_selection_max_depth(self, max_depth: list = None) -> xr.Dataset:
@@ -995,7 +996,7 @@ class MetazoneAccessor:
             return self._obj.interp(time=times, method=method)
         return self._obj.sel(time=times, method=method)
 
-    def time_selection_interval(self, interval: str = None, ) -> xr.Dataset:
+    def time_selection_interval(self, interval: str = None, start: str = None, end: str = None, ) -> xr.Dataset:
         """Return a new Dataset whose data is sorted per time interval selected.
 
         Parameters
@@ -1003,6 +1004,11 @@ class MetazoneAccessor:
         interval : str
             Length of the period, can be one hour, day, month or year.
 
+        start : datetime
+            Start date of the time period
+
+        end : datetime
+            End date of the time period
         Returns
         -------
         xarray.Dataset
@@ -1013,11 +1019,17 @@ class MetazoneAccessor:
         if interval in ["1M", "M"]:
             interval = "MS"
 
-        start = self._obj.isel(time=[0]).time.data[0]
-        end = self._obj.isel(time=[-1]).time.data[0]
-        end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
+        if start is None:
+            start = self._obj.isel(time=[0]).time.data[0]
+        else: start = pandas.to_datetime(start)
+
+        if end is None:
+            end = self._obj.isel(time=[-1]).time.data[0]
+            end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
+        else: end = pandas.to_datetime(end)
 
         time_interval = pandas.date_range(start=start, end=end, freq=interval)
+        print("interval ", time_interval)
 
         ds_group = self._obj.groupby_bins('time', time_interval, right=False)
         liste_ds = []

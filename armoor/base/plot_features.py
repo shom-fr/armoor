@@ -137,7 +137,6 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
 
     # Depth
     if 'profile' in figtitle or 'Theta-S' in figtitle:
-        print(obs)
         if 'pdens' in obs.coords and np.size(obs.pdens) > 1:
             title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
             depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
@@ -146,14 +145,17 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             depth = f"{obs.depth.min().data:.1f} m_to_{obs.depth.max().data:.1f} m"
 
     elif 'slice' in obs.dims:
-        title_depth = f"Slice: {obs.slice.data} m"
+        title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) == 1:
         title_depth = f"P. Density: {obs.pdens.values:.1f} kg/m3"
         depth = f"{obs.pdens.values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+        print(obs.attrs['depth_meta_zone'].split('_to_')[0])
+        # title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+        title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
+        # depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+        depth = f"{obs.attrs['depth_meta_zone']}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
