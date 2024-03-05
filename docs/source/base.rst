@@ -71,7 +71,7 @@ Relative to time restriction:
     * ``end`` : To consider only the dates up to a given date.
     * ``times`` : Only the dates from this list will be kept.
     * ``time-highlight`` : The dates of this list will be highlighted in the time series.
-    * ``interval`` : To group into intervals: hour(s), day(s), month, season(s) or year(s).
+    * ``interval`` : To group into intervals: minutes (min), hours (H), days (D), month (M) or year (A).
     * ``cyclic`` : This keyword makes it possible to consider only a period of the year expressed in months (january, february, march, april, may, june, july, august, september, october, november, december) or a series of several months ( between 2 and 11 consecutive letters from this list: *JFMAMJJASOND*)
     * ``time-restriction`` : Two values for the start and end times. To consider only the times in between (may straddle two days).
 
@@ -85,8 +85,8 @@ Relative to horizontal restriction:
 
 Relative to vertical restriction:
 
-    * ``depth`` : Selectiion of listed immersions by depth.
-    * ``density`` : Selectiion of listed immersions by depth.
+    * ``depth`` : Selection of listed immersions by depth (in m).
+    * ``density`` : Selection of listed immersions by density (in kg/m3).
 
     * ``min_depth`` : Minimum authorized depth value.
     * ``max_depth`` : Maximum authorized depth value.
