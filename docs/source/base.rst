@@ -71,7 +71,7 @@ Relative to time restriction:
     * ``end`` : To consider only the dates up to a given date.
     * ``times`` : Only the dates from this list will be kept.
     * ``time-highlight`` : The dates of this list will be highlighted in the time series.
-    * ``interval`` : To group into intervals: hour(s), day(s), month, season(s) or year(s).
+    * ``interval`` : To group into intervals: minutes (min), hours (H), days (D), month (M) or year (A).
     * ``cyclic`` : This keyword makes it possible to consider only a period of the year expressed in months (january, february, march, april, may, june, july, august, september, october, november, december) or a series of several months ( between 2 and 11 consecutive letters from this list: *JFMAMJJASOND*)
     * ``time-restriction`` : Two values for the start and end times. To consider only the times in between (may straddle two days).
 
@@ -85,8 +85,8 @@ Relative to horizontal restriction:
 
 Relative to vertical restriction:
 
-    * ``depth`` : Selectiion of listed immersions by depth.
-    * ``density`` : Selectiion of listed immersions by depth.
+    * ``depth`` : Selection of listed immersions by depth (in m).
+    * ``density`` : Selection of listed immersions by density (in kg/m3).
 
     * ``min_depth`` : Minimum authorized depth value.
     * ``max_depth`` : Maximum authorized depth value.
@@ -149,8 +149,8 @@ For each output here is the list of possible options (with their associated desc
     * ``dvmin`` : To fix minimum comparison figure value scale
     * ``dvmax`` : To fix maximum comparison figure value scale
     * ``path_results_traj`` : Path to store temporary dataset files
-    * ``traj_duration_plot`` : Duration of the simulated trajectory to plot
-    * ``traj_freq_plot`` : Frequency at which the trajectories are plotted (ex : one ine 3)
+    * ``traj_duration_plot`` : Duration, in seconds, of the simulated trajectory to plot
+    * ``traj_freq_plot`` : Frequency, in seconds, at which the trajectories are plotted (ex : one ine 3)
     * ``scale`` : Scale to adapt the size of the ellipses/vectors. In case of ellipses plot, one scale factor per selected tidal wave must be specified, otherwise the first value will be applied to all.
     * ``analysis_start`` : Date to start the harmonic analysis
     * ``analysis_end`` : Date to end the harmonic analysis
@@ -173,6 +173,8 @@ You can select the variables to plot among the following ones with the parameter
     * ``mld`` : Mixed layer depth
     * ``sound_speed`` : Sound speed
 
+.. CAUTION::
+    Any optional ``attribute`` specified in the ``plot`` options must also appear in the ``meta-zone`` ``vars`` selection !
 
 Example
 -------

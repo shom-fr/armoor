@@ -50,7 +50,6 @@ def plot(config_obj):
     # Remove missing values
     vars = [var for var in list(observation["xarray_meta_coloc"][0].keys()) if
             var in models[0]["xarray_meta_coloc"]]
-
     for i_mod, mod in enumerate(models):
         models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
