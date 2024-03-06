@@ -390,5 +390,9 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             min_depth = config_obj["meta_zones"].get('min_depth')
             max_depth = config_obj["meta_zones"].get("max_depth")
             xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": f"{min_depth}_to_{max_depth}"})
+        elif 'depth' in xarray_obj.coords:
+            min_depth = xarray_obj.depth.min().data
+            max_depth = xarray_obj.depth.max().data
+            xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": f"{min_depth}_to_{max_depth}"})
 
     return xarray_obj
