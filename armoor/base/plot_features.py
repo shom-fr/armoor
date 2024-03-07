@@ -86,13 +86,13 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     # Location
     if 'lon' in obs.coords and np.size(obs.lon.data) == 1:
         if obs.lon.data.shape == (1,):
-            title_loc = f'Longitude : {obs.lon.data[0]:.2f} - Latitude : {obs.lat.data[0]:.2f} -'
+            title_loc = f'Longitude : {obs.lon.data[0]:.2f}° - Latitude : {obs.lat.data[0]:.2f}°\n'
             loc = f"{obs.lon.data[0]:.2f}_{obs.lat.data[0]:.2f}"
         elif obs.lon.data.shape == (1, 1):
-            title_loc = f'Longitude : {obs.lon.data[0][0]:.2f} - Latitude : {obs.lat.data[0][0]:.2f} -'
+            title_loc = f'Longitude : {obs.lon.data[0][0]:.2f}° - Latitude : {obs.lat.data[0][0]:.2f}°\n'
             loc = f"{obs.lon.data[0][0]:.2f}_{obs.lat.data[0][0]:.2f}"
         else:
-            title_loc = f'Longitude : {obs.lon.data:.2f} - Latitude : {obs.lat.data:.2f} -'
+            title_loc = f'Longitude : {obs.lon.data:.2f}° - Latitude : {obs.lat.data:.2f}°\n'
             loc = f"{obs.lon.data:.2f}_{obs.lat.data:.2f}"
 
     else:
@@ -102,20 +102,21 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     if "bathy_thresh" in obs.attrs:
         loc += f"_bathythresh_{obs.attrs['bathy_thresh']}"
 
+    # Radius
+    if "radius" in obs.attrs:
+        title_loc += f" Radius : {obs.attrs['radius'][:-2]} km\n"
+        loc += f"_radius_{obs.attrs['radius'][:-2]}"
+
     # Time
     if 'interval' in obs.coords:
-        if np.size(obs.interval.data) == 1:
-            title_time = f"Interval : {obs.interval.data}\n"
-            time = obs.interval.data
-        else:
-            title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]}\n"
-            time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
-        if 'interval_duration' in obs.coords:
-            title_time = title_time[:-2] + f" - Interval {obs['interval_duration'].data}\n"
+        title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]} - Interval {obs['interval_duration'].data}\n"
+        time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
+        # if 'interval_duration' in obs.coords:
+        #     title_time = title_time[:-2] + f" - Interval {obs['interval_duration'].data}\n"
+
     elif 'analysis_period' in obs.attrs:
         title_time = f"Obs analysis period : {obs.analysis_period.replace(':00', '')} with {obs.attrs['tide_tool']}\n"
         time = f"analysis_{obs.attrs['tide_tool']}_{obs.analysis_period.replace(':00', '')}"
-
     else:
         if 'time' in obs.coords and np.size(obs.time.data) == 1:
             if 'U' in str(obs.time.data.dtype):  # Check if times are months names
@@ -137,30 +138,32 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     # Depth
     if 'profile' in figtitle or 'Theta-S' in figtitle:
         if 'pdens' in obs.coords and np.size(obs.pdens) > 1:
-            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f}"
+            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
             depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
         else:
-            title_depth = ""
-            depth = f"{obs.depth.min().data:.1f}m_to_{obs.depth.max().data:.1f}m"
+            title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
+            depth = f"{obs.attrs['depth_meta_zone']}m"
 
     elif 'slice' in obs.dims:
-        title_depth = f"Slice: {obs.slice.data}m"
+        title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) == 1:
         title_depth = f"P. Density: {obs.pdens.values:.1f} kg/m3"
         depth = f"{obs.pdens.values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        title_depth = f"Depth: {obs.depth.min().values:.1f}m to {obs.depth.max().values:.1f}m"
-        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
+        # title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+        title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
+        # depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+        depth = f"{obs.attrs['depth_meta_zone']}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
-        title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f}"
+        title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
         if obs.depth.data.shape == (1,):
-            title_depth = f"Depth: {obs.depth.values[0]:.1f}m"
+            title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
             depth = f"{obs.depth.values[0]:.1f}m"
         else:
-            title_depth = f"Depth: {obs.depth.values:.1f}m"
+            title_depth = f"Depth: {obs.depth.values:.1f} m"
             depth = f"{obs.depth.values:.1f}m"
     else:
         title_depth = "Depth : 0 m"
@@ -170,9 +173,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     title = f"{title_type}\n" \
             f"Model(s) : {mod_name} \nObservation : {obs_name}\n" \
             f"{title_time}" \
-            f"{title_loc} {title_depth}"
+            f"{title_loc} {title_depth}" #\n{title_rad}"
 
-    figname = f"{figtitle}_{var_name}_{mod_name}_{obs_name}_{loc}_{time}_{depth}"
+    figname = f"{figtitle}_{var_name}_{mod_name}_{obs_name}_{time}_{loc}_{depth}"
 
     title = title.replace("\'", '')
     figname = figname.replace("\'", '')
@@ -330,7 +333,7 @@ def figure_5lin_ts():
     axs : list
         5 axes for observation, model and comparison time series.
     """
-    f = plt.figure(figsize=(10, 15))
+    f = plt.figure(figsize=(12, 10))
     ax0 = plt.subplot2grid((5, 1), (0, 0))
     ax1 = plt.subplot2grid((5, 1), (1, 0))
     ax2 = plt.subplot2grid((5, 1), (2, 0))
@@ -2021,7 +2024,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
             title, figname = get_title_figname('Metric statistics', obs_coloc, mod_names,
                                                observation['name'])
 
-            f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+            f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
 
             # Rotate x labels
             for label in ax.get_xticklabels():
@@ -2055,7 +2058,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
                                                    observation['name'])
 
-                f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+                f.suptitle(title, x=0.25, fontsize=14, fontweight='bold')
 
         # MINI-MAP
         ax_mini_map = add_mini_map(f, obs_coloc_base)
@@ -2424,7 +2427,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             title, figname = get_title_figname(
                 f'Time series metrics on {list_dims_mean} dimensions', obs_coloc, mod_name,
                 observation['name'])
-            f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+            f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
             manage_output(figname, output_path)
 
     # Case no vertical slices
@@ -2457,7 +2460,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         mod_name = [mod['name'] for mod in models]
         title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
                                            obs_coloc, mod_name, observation['name'])
-        f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+        f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
         manage_output(figname, output_path)
 
 
@@ -2578,9 +2581,9 @@ def plot_profile_unique(models, observation, radius, output_path=None):
         ax.set_ylabel('Depth [m]', fontsize=12)
         ax.set_xlabel(var_title, fontsize=12)
 
-        title, figname = get_title_figname(f"Unique profile radius {radius}km", obs,
+        title, figname = get_title_figname(f"Unique profile", obs,
                                            [mod["name"] for mod in models], obs.attrs['name'])
-        f.suptitle(title, fontsize=17, fontweight='bold')
+        f.suptitle(title, fontsize=17, fontweight='bold', x=0.35)
 
         # Add the mini-map
         ax_mini_map = add_mini_map(f, obs)
@@ -2694,9 +2697,9 @@ def plot_profile_multi_figure(mod, observation, radius, linewidth, output_path=N
     ax.set_ylabel('Depth [m]')
     ax.set_xlabel(var_title)
 
-    title, figname = get_title_figname(f'Multi profile radius {radius}km', observation, mod['name'],
+    title, figname = get_title_figname(f'Multi profile', observation, mod['name'],
                                        obs.attrs['name'])
-    f.suptitle(title, fontsize=17, fontweight='bold')
+    f.suptitle(title, fontsize=17, fontweight='bold', x=0.35)
 
     # Add the mini-map
     ax_mini_map = add_mini_map(f, observation)
@@ -2932,7 +2935,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
     """
     # Add the colorbar, titles etc.
     title, figname = get_title_figname('Theta-S diagram', obs, mod['name'], obs.attrs['name'])
-    f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+    f.suptitle(title, x=0.35, fontsize=17, fontweight='bold')
 
     ax.set_ylabel('Potential temperature [°C]')
     ax.set_xlabel('Salinity [g/kg]')

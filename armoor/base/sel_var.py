@@ -508,7 +508,7 @@ class SSTAccessor:
             if not sal is None and not temp is None:
                 if ref_dens is None or ref_dens not in [0, 1000, 2000, 3000, 4000]:
                     logger.warning(
-                        'You did not specify the vertical reference to comute the potential density. '
+                        'You did not specify the vertical reference to compute the potential density. '
                         'Please define reference_density in the configuration file, with values among 0, 1000, 2000, 3000 and 4000 dbar.'
                         'The reference will be 0 dbar here.')
                     pdens = gsw.sigma0(sal, temp)
