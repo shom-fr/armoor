@@ -141,8 +141,8 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
             depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
         else:
-            title_depth = ""
-            depth = f"{obs.depth.min().data:.1f} m_to_{obs.depth.max().data:.1f} m"
+            title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
+            depth = f"{obs.attrs['depth_meta_zone']}m"
 
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
@@ -175,7 +175,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             f"{title_time}" \
             f"{title_loc} {title_depth}" #\n{title_rad}"
 
-    figname = f"{figtitle}_{var_name}_{mod_name}_{obs_name}_{loc}_{time}_{depth}"
+    figname = f"{figtitle}_{var_name}_{mod_name}_{obs_name}_{time}_{loc}_{depth}"
 
     title = title.replace("\'", '')
     figname = figname.replace("\'", '')

@@ -1030,6 +1030,7 @@ class MetazoneAccessor:
 
         time_interval = pandas.date_range(start=start, end=end, freq=interval)
 
+
         ds_group = self._obj.groupby_bins('time', time_interval, right=False)
         liste_ds = []
 
