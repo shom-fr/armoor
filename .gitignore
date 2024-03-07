@@ -1,6 +1,17 @@
 /armoor/base/__pycache__/
 /armoor/cli/__pycache__/
 /entry_points/__pycache__/
+tests/int/hmi/__pycache__/
+armoor/__pycache__/
+armoor/hmi/__pycache__/
+tests/__pycache__/
+tests/int/__pycache__/
+armoor/tick/__pycache__/
+tests/int/base/__pycache__/
+tests/uni/__pycache__/
+armoor/algo/__pycache__/
+armoor/bull/__pycache__/
+tests/int/bull/__pycache__/
 /docs/build/
 build/
 .eggs/
