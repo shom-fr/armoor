@@ -77,7 +77,7 @@ def plot(config_obj):
                                    "a radius in the meta-zone")
                 else:
                     plot_features.plot_diag_ts_multi(models, observation["xarray_meta"],
-                                                     config_obj["meta_zones"]["radius"],
+                                                     config_obj,
                                                      output_path=sub_func_output_folder)
 
         else:

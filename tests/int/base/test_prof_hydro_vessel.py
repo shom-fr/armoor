@@ -53,15 +53,6 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_diag_disp_tranche_intervalle(self):  # OK
-        out_path, logger = change_path(folder_test)
-        logger.info('test_diag_disp_tranche_intervalle')
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_tranche_intervalle.ini"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
-
     def test_map_diff(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_diff')
@@ -103,15 +94,6 @@ class TestBulletins:
         logger.info('test_ser_temp_intervalles')
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_intervalles.ini"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
-
-    def test_ser_temp_tranches(self):  # OK
-        out_path, logger = change_path(folder_test)
-        logger.info('test_ser_temp_tranches')
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_tranches.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

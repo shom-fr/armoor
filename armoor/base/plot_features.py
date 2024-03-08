@@ -62,6 +62,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         name of the figure to save
 
     """
+
     # Adapt figtitle
     if "RMSEc" in figtitle:
         figtitle = figtitle.replace("RMSEc", 'centered RMSE')
@@ -138,8 +139,10 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     # Depth
     if 'profile' in figtitle or 'Theta-S' in figtitle:
         if 'pdens' in obs.coords and np.size(obs.pdens) > 1:
-            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
-            depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+            # title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+            title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} m to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
+            # depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+            depth = f"{obs.attrs['density_meta_zone']}"
         else:
             title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
@@ -151,13 +154,16 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_depth = f"P. Density: {obs.pdens.values:.1f} kg/m3"
         depth = f"{obs.pdens.values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        # title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
-        # depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
-        depth = f"{obs.attrs['depth_meta_zone']}m"
+        print(obs.attrs)
+        title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+        # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
+        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+        # depth = f"{obs.attrs['depth_obs']}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+        # title_depth = f"P. Density: {obs.attrs['density_obs'].split('_to_')[0]} to {obs.attrs['density_obs'].split('_to_')[1]} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+        # depth = f"{obs.attrs['density_obs']}"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
         if obs.depth.data.shape == (1,):
             title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
@@ -173,7 +179,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     title = f"{title_type}\n" \
             f"Model(s) : {mod_name} \nObservation : {obs_name}\n" \
             f"{title_time}" \
-            f"{title_loc} {title_depth}" #\n{title_rad}"
+            f"{title_loc} {title_depth}"  # \n{title_rad}"
 
     figname = f"{figtitle}_{var_name}_{mod_name}_{obs_name}_{time}_{loc}_{depth}"
 
@@ -957,6 +963,7 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
                                                                                           dvmax)
 
     # Squeeze
+
     mod_coloc, obs_coloc = mod_coloc.squeeze(), obs_coloc.squeeze()
     comparison = comparison.squeeze()
 
@@ -1118,18 +1125,18 @@ def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_
     # Other metric than difference
     else:
         if flag_interval:
-            for i_inter, _ in enumerate(mod_coloc.interval):
+            for i_inter, _ in enumerate(interval_str_to_date(obs_coloc.interval)):
                 # Get the title
                 title, figname = get_title_figname(f'Map {metric}',
-                                                   obs_coloc.isel(interval=i_inter), mod_name,
+                                                   obs_coloc.isel(interval=[i_inter]), mod_name,
                                                    obs_name)
 
                 # Plot, save and display
-                plot_map_metr_figure(obs_meta.isel(interval=i_inter),
-                                     mod_meta.isel(interval=i_inter),
-                                     obs_coloc.isel(interval=i_inter),
-                                     mod_coloc.isel(interval=i_inter),
-                                     comparison.isel(interval=i_inter), vmin, vmax, cmap, title,
+                plot_map_metr_figure(obs_meta.isel(interval=[i_inter]),
+                                     mod_meta.isel(interval=[i_inter]),
+                                     obs_coloc.isel(interval=[i_inter]),
+                                     mod_coloc.isel(interval=[i_inter]),
+                                     comparison.isel(interval=[i_inter]), vmin, vmax, cmap, title,
                                      metric, dvmin=dvmin, dvmax=dvmax)
 
                 manage_output(figname, output_path)
@@ -2737,7 +2744,7 @@ def add_std_profile(ax, data, depth, color, name):
                          label=f"{name} +/- std")
 
 
-def plot_diag_ts_multi(models, observation, radius, output_path=None):
+def plot_diag_ts_multi(models, observation, config_obj, output_path=None):
     """
     Plot theta - S diagram with several profiles
 
@@ -2753,21 +2760,22 @@ def plot_diag_ts_multi(models, observation, radius, output_path=None):
         Path where to save the figure
     """
     logger.info('theta - S diagram with several profiles')
+
     for _, mod in enumerate(models):
         # Plot for the whole period
         vmin, vmax = observation.depth.min(skipna=True).data, observation.depth.max(
             skipna=True).data
-        plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
+        plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_path)
 
         # Plot for each interval
         for i_inter, _ in enumerate(observation.interval):
             observation_inter = observation.isel(interval=[i_inter])
             vmin, vmax = observation_inter.depth.min(skipna=True).data, observation_inter.depth.max(
                 skipna=True).data
-            plot_diag_ts_multi_figure(observation_inter, mod, radius, vmin, vmax, output_path)
+            plot_diag_ts_multi_figure(observation_inter, mod, config_obj, vmin, vmax, output_path)
 
 
-def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path):
+def plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_path):
     """
     Plot the figure of the theta - S diagram with several profiles
     Parameters
@@ -2806,13 +2814,14 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
                     for i_instr, _ in enumerate(obs.instr):
                         obs_instr = obs.isel(instr=i_instr)
                         sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs_instr, mod,
-                                                                                 radius, sals_mod,
+                                                                                 config_obj, sals_mod,
                                                                                  ptemps_mod,
                                                                                  depths_mod)
                 else:
-                    sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs, mod, radius,
+                    sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs, mod, config_obj,
                                                                              sals_mod, ptemps_mod,
                                                                              depths_mod)
+
         else:
             obs = observation.isel(interval=[i_inter])
             im_obs = ax.scatter(obs.sal.values, obs.ptemp.values, 30, obs.depth.values, vmin=vmin,
@@ -2824,18 +2833,20 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
             if 'instr' in obs.dims:
                 for i_instr, _ in enumerate(obs.instr):
                     obs_instr = obs.isel(instr=i_instr)
-                    sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs_instr, mod, radius,
+                    sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs_instr, mod, config_obj,
                                                                              sals_mod, ptemps_mod,
                                                                              depths_mod)
             else:
-                sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs, mod, radius, sals_mod,
+                sals_mod, ptemps_mod, depths_mod = get_sals_temps_depths(obs, mod, config_obj, sals_mod,
                                                                          ptemps_mod, depths_mod)
+
     im_mod = ax.scatter(sals_mod, ptemps_mod, 25, depths_mod, vmin=vmin, vmax=vmax, marker="o",
                         zorder=1, label=f'{mod["name"]}', alpha=0.4, cmap='summer')
 
     # "en trait épais, le profil moyen modèle(moyenne sur les disques)"
     sals_mod = np.nanmean(np.array(sals_mod), 0)
     ptemps_mod = np.nanmean(np.array(ptemps_mod), 0)
+
 
     im_mod_mean = ax.scatter(sals_mod, ptemps_mod, 50, depths_mod[0], vmin=vmin, vmax=vmax,
                              marker="o", zorder=3, edgecolors="black", linewidth=0.8,
@@ -2859,16 +2870,35 @@ def plot_diag_ts_multi_figure(observation, mod, radius, vmin, vmax, output_path)
     diag_ts_plot_features(f, ax, im_mod_mean, im_obs_mean, mod, observation, output_path)
 
 
-def get_sals_temps_depths(obs, mod, radius, sals_mod, ptemps_mod, depths_mod):
+def get_sals_temps_depths(obs, mod, config_obj, sals_mod, ptemps_mod, depths_mod):
+    if np.isnan(obs.lon.data):
+        return sals_mod, ptemps_mod, depths_mod
+
+    radius = config_obj["meta_zones"]["radius"]
+
     points = [obs.lon.data], [obs.lat.data]
     time = obs.time.values[0]
     mod_buffer = mod["xarray"].sel(time=time, method='nearest')
     mod_buffer = mod_buffer.meta.horizontal_selection_cloud_dots(points, radius)
+
+    # Get meta-zone parameter from config obj
+    min_dens, max_dens = config_obj["meta_zones"].get("min_dens"), config_obj["meta_zones"].get("max_dens")
+    ref_dens = config_obj.get("ref_dens")
+
+    # Select density
+    if min_dens:
+        mod_buffer = mod_buffer.meta.vertical_selection_min_dens(min_dens,
+                                                                 ref_dens=ref_dens)
+    if max_dens:
+        mod_buffer = mod_buffer.meta.vertical_selection_max_dens(max_dens,
+                                                                 ref_dens=ref_dens)
+
     for i_idx_point, _ in enumerate(mod_buffer.idx_point):
         mod_buffer_idx = mod_buffer.isel(idx_point=[i_idx_point]).squeeze()
         sals_mod.append(mod_buffer_idx.sal.values)
         ptemps_mod.append(mod_buffer_idx.ptemp.values)
         depths_mod.append(mod_buffer_idx.depth.values)
+
     return sals_mod, ptemps_mod, depths_mod
 
 
@@ -3330,7 +3360,6 @@ def modify_interval_label(ax):
         date_first, date_last = np.datetime64(date_first), np.datetime64(date_last)
         date_center = date_first + (date_last - date_first) / 2
         labels_modif.append(np.datetime_as_string(date_center))
-
     pas = max(1, len(labels_modif) // 15)
     updated_labels = [""] * len(labels_modif)
     updated_labels[::pas] = labels_modif[::pas]
