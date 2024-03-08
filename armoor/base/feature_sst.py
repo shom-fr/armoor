@@ -99,6 +99,7 @@ def plot(config_obj):
                              }
             if output["plot"] in plot_map_metr:
                 for i, mod in enumerate(models_var):
+
                     plot_features.plot_map_metr(flag_interval, flag_slice, mod["xarray_meta"],
                                                 mod["xarray_meta_coloc"],
                                                 observation_var["xarray_meta"],

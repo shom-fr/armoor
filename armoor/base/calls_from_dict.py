@@ -132,6 +132,7 @@ def get_observation_models_meta(config_obj: dict):
             observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
                 index_model].meta.time_selection_interval(interval, start, end)
 
+
         # Tranches verticales
         if 'slice' in config_obj["meta_zones"]:
             if 'depth' in config_obj["meta_zones"]:
@@ -162,6 +163,7 @@ def get_observation_models_meta(config_obj: dict):
         vert_slice = config_obj["meta_zones"]["slice"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
             vert_slice, var_slice)
+
     return config_obj
 
 

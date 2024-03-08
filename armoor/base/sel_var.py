@@ -389,7 +389,7 @@ class SSTAccessor:
             return ds_temp
         if 'ptemp' in self._obj:
             sal = self._obj.sel_var.sel_sal()
-            ptemp = self._obj.sel_var.sel_ptemp()
+            ptemp = self._obj.ptemp
             pres = self._obj.sel_var.sel_pres()
             cons_temp = gsw.CT_from_pt(sal, ptemp)
             temp = gsw.t_from_CT(sal, cons_temp, pres)
