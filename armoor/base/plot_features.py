@@ -139,8 +139,10 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     # Depth
     if 'profile' in figtitle or 'Theta-S' in figtitle:
         if 'pdens' in obs.coords and np.size(obs.pdens) > 1:
-            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
-            depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+            # title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+            title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} m to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
+            # depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+            depth = f"{obs.attrs['density_meta_zone']}"
         else:
             title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
@@ -152,13 +154,16 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_depth = f"P. Density: {obs.pdens.values:.1f} kg/m3"
         depth = f"{obs.pdens.values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        # title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
-        # depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
-        depth = f"{obs.attrs['depth_meta_zone']}m"
+        print(obs.attrs)
+        title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+        # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
+        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+        # depth = f"{obs.attrs['depth_obs']}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+        # title_depth = f"P. Density: {obs.attrs['density_obs'].split('_to_')[0]} to {obs.attrs['density_obs'].split('_to_')[1]} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+        # depth = f"{obs.attrs['density_obs']}"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
         if obs.depth.data.shape == (1,):
             title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
