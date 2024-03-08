@@ -2879,7 +2879,7 @@ def get_sals_temps_depths(obs, mod, config_obj, sals_mod, ptemps_mod, depths_mod
     # Get meta-zone parameter from config obj
     min_dens, max_dens = config_obj["meta_zones"].get("min_dens"), config_obj["meta_zones"].get("max_dens")
     ref_dens = config_obj.get("ref_dens")
-    # TODO : PROBLEME ICI : on n' apas toujours le meme nombre de points !
+
     # Select density
     if min_dens:
         mod_buffer = mod_buffer.meta.vertical_selection_min_dens(min_dens,
