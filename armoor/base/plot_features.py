@@ -154,7 +154,6 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_depth = f"P. Density: {obs.pdens.values:.1f} kg/m3"
         depth = f"{obs.pdens.values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        print(obs.attrs)
         title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
         # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
         depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
