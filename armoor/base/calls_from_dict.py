@@ -120,22 +120,16 @@ def get_observation_models_meta(config_obj: dict):
         logger.info("Collocation done for model %s", index_model)
 
         # Interval temporels successifs
-        if 'interval' in config_obj["meta_zones"] and 'start' in config_obj["meta_zones"] and 'end' in config_obj[
-            "meta_zones"]:
+        if 'interval' in config_obj["meta_zones"]:
+            if 'start' not in config_obj["meta_zones"] or 'end' not in config_obj["meta_zones"]:
+                start = observation["xarray"].time.data[0]
+                end = observation["xarray"].time.data[-1]
+            else:
+                start = config_obj["meta_zones"]["start"]
+                end = config_obj["meta_zones"]["end"]
+
             logger.info('Temporal interval segmentation...')
             interval = config_obj["meta_zones"]["interval"]
-            start = config_obj["meta_zones"]["start"]
-            end = config_obj["meta_zones"]["end"]
-            model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval, start, end)
-            model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.time_selection_interval(
-                interval, start, end)
-            observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
-                index_model].meta.time_selection_interval(interval, start, end)
-        elif 'interval' in config_obj["meta_zones"]:
-            logger.info('Temporal interval segmentation...')
-            interval = config_obj["meta_zones"]["interval"]
-            start = observation["xarray_meta"]["time"].data[0]
-            end = observation["xarray_meta"]["time"].data[-1]
             model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval, start, end)
             model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.time_selection_interval(
                 interval, start, end)
@@ -161,11 +155,8 @@ def get_observation_models_meta(config_obj: dict):
             observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
                 index_model].meta.vertical_selection_slice(vert_slice, var_slice)
 
-    if 'interval' in config_obj["meta_zones"].keys() and 'start' in config_obj["meta_zones"].keys() and 'end' in \
-            config_obj["meta_zones"].keys():
-        interval = config_obj["meta_zones"]["interval"]
-        start = config_obj["meta_zones"]["start"]
-        end = config_obj["meta_zones"]["end"]
+    # Obs meta is out of the loop for each mod
+    if 'interval' in config_obj["meta_zones"]:
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
             interval, start, end)
 
@@ -403,7 +394,8 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
 
         if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
             if 'depth' in config_obj["meta_zones"]:
-                logger.warning(f"For feature {config_obj['functionality']}, no depth can be specified ! Surface value is taken into account")
+                logger.warning(
+                    f"For feature {config_obj['functionality']}, no depth can be specified ! Surface value is taken into account")
             depth = [0]
             xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
 

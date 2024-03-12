@@ -110,8 +110,12 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
 
     # Time
     if 'interval' in obs.coords:
-        title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]} - Interval {obs['interval_duration'].data}\n"
-        time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
+        if np.size(obs.interval.data) ==1:
+            title_time = f"{obs.interval.data} - Interval {obs['interval_duration'].data}\n"
+            time = f"intervals_{obs.interval.data}"
+        else:
+            title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]} - Interval {obs['interval_duration'].data}\n"
+            time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
         # if 'interval_duration' in obs.coords:
         #     title_time = title_time[:-2] + f" - Interval {obs['interval_duration'].data}\n"
 
@@ -1769,7 +1773,6 @@ def plot_map_metr_current(flag_interval, flag_slice, models, observation, i_mod,
             raise Exception("Oops, pour utiliser cette carte de métrique, vous devriez fournir "
                             "une spécification d'intervalles temporels "
                             "ou de tranches verticales dans votre meta-zone")
-
         obs_coloc = obs_coloc.mean(list_dims_mean)
         obs_meta = obs_meta.mean(list_dims_mean)
         mod_coloc = mod_coloc.mean(list_dims_mean)
