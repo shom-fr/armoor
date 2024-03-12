@@ -110,8 +110,12 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
 
     # Time
     if 'interval' in obs.coords:
-        title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]} - Interval {obs['interval_duration'].data}\n"
-        time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
+        if np.size(obs.interval.data) ==1:
+            title_time = f"{obs.interval.data} - Interval {obs['interval_duration'].data}\n"
+            time = f"intervals_{obs.interval.data}"
+        else:
+            title_time = f"{obs.interval.data[0].split(' to ')[0]} to {obs.interval.data[-1].split(' to ')[1]} - Interval {obs['interval_duration'].data}\n"
+            time = f"intervals_{obs.interval.data[0].split(' to ')[0]}_to_{obs.interval.data[-1].split(' to ')[1]}"
         # if 'interval_duration' in obs.coords:
         #     title_time = title_time[:-2] + f" - Interval {obs['interval_duration'].data}\n"
 
@@ -146,33 +150,35 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         else:
             title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
-
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) == 1:
         title_depth = f"P. Density: {obs.pdens.values:.1f} kg/m3"
         depth = f"{obs.pdens.values:.1f}"
-    elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
-        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
-        # depth = f"{obs.attrs['depth_obs']}m"
+    elif 'depth_meta_zone' in obs.attrs:
+        title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
+        depth = f"{obs.attrs['depth_meta_zone']}m"
+    # elif 'depth' in obs.coords and np.size(obs.depth) > 1:
+    #     title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+    #     # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
+    #     depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+    #     # depth = f"{obs.attrs['depth_obs']}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         # title_depth = f"P. Density: {obs.attrs['density_obs'].split('_to_')[0]} to {obs.attrs['density_obs'].split('_to_')[1]} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
         # depth = f"{obs.attrs['density_obs']}"
-    elif 'depth' in obs.coords and np.size(obs.depth) == 1:
-        if obs.depth.data.shape == (1,):
-            title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
-            depth = f"{obs.depth.values[0]:.1f}m"
-        else:
-            title_depth = f"Depth: {obs.depth.values:.1f} m"
-            depth = f"{obs.depth.values:.1f}m"
+    # elif 'depth' in obs.coords and np.size(obs.depth) == 1:
+    #     if obs.depth.data.shape == (1,):
+    #         title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
+    #         depth = f"{obs.depth.values[0]:.1f}m"
+    #     else:
+    #         title_depth = f"Depth: {obs.depth.values:.1f} m"
+    #         depth = f"{obs.depth.values:.1f}m"
     else:
-        title_depth = "Depth : 0 m"
-        depth = '0m'
+        title_depth = " "
+        depth = ' '
 
     # Results
     title = f"{title_type}\n" \
@@ -1767,7 +1773,6 @@ def plot_map_metr_current(flag_interval, flag_slice, models, observation, i_mod,
             raise Exception("Oops, pour utiliser cette carte de métrique, vous devriez fournir "
                             "une spécification d'intervalles temporels "
                             "ou de tranches verticales dans votre meta-zone")
-
         obs_coloc = obs_coloc.mean(list_dims_mean)
         obs_meta = obs_meta.mean(list_dims_mean)
         mod_coloc = mod_coloc.mean(list_dims_mean)
@@ -2846,7 +2851,6 @@ def plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_p
     sals_mod = np.nanmean(np.array(sals_mod), 0)
     ptemps_mod = np.nanmean(np.array(ptemps_mod), 0)
 
-
     im_mod_mean = ax.scatter(sals_mod, ptemps_mod, 50, depths_mod[0], vmin=vmin, vmax=vmax,
                              marker="o", zorder=3, edgecolors="black", linewidth=0.8,
                              label=f'Mean {mod["name"]}', cmap='summer')
@@ -3050,9 +3054,10 @@ def plot_stick_plots(models, observation, output_path=None):
         manage_output(figname, output_path)
     else:
         if 'depth' in observation['xarray_meta_coloc'][0].dims:
-            for i_depth, _ in enumerate(observation['xarray_meta_coloc'][0].depth):
+            for i_depth, depth in enumerate(observation['xarray_meta_coloc'][0].depth.data):
                 f, ax = figure_1_stickplot()
                 obs = observation['xarray_meta_coloc'][0].isel(depth=i_depth)
+                obs.attrs["depth_meta_zone"] = depth
                 ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
                           width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
                           color='k', label=observation['name'])
