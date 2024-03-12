@@ -313,7 +313,6 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
     if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
         if 'depth' not in config_obj["meta_zones"]:
             logger.warning(f"For feature {config_obj['functionality']}, no depth can be specified !")
-        config_obj["meta_zones"]["depth"] = [0]
 
     filters = {"quality": lambda obj: obj.meta.quality_filter,
                "min_depth": lambda obj: obj.meta.vertical_selection_min_depth,
@@ -333,9 +332,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
         if 'current_bc' in vars_to_plot:
             xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
-        if 'current_res' in vars_to_plot:
-            filter = outputs[0]['low_pass_filter']
-            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
+
         if 'mld' in vars_to_plot:
             xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_mixed_layer_depth()])
 
@@ -345,7 +342,12 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             logger.info("Applying : cloud")
             points = config_obj["meta_zones"]["cloud"]
             xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
-            xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
+            if radius: xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
+
+        # Calculate current_res after cloud before time
+        if 'current_res' in vars_to_plot:
+            filter = outputs[0]['low_pass_filter']
+            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
 
         # Bathymetry threshold
         if 'h' in xarray_obj:
@@ -397,6 +399,13 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                 # For feature 4, we need to keep all depths to compute geo currents
                 depth = config_obj["meta_zones"]["depth"]
                 xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
+                xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": f"{depth}"})
+
+        if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
+            if 'depth' in config_obj["meta_zones"]:
+                logger.warning(f"For feature {config_obj['functionality']}, no depth can be specified ! Surface value is taken into account")
+            depth = [0]
+            xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
 
         # Other meta-zones, one by one
         for name, meta_filter in filters.items():

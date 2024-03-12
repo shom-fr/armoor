@@ -264,7 +264,9 @@ class SSTAccessor:
                 max_date = self._obj['time'].max().data.astype('datetime64[h]')
                 time_hor = np.arange(min_date, max_date, dtype='datetime64[h]')
                 self._obj = self._obj.interp(time=time_hor, method='linear',
-                                             kwargs={"fill_value": "extrapolate"})
+                                             )#kwargs={"fill_value": "extrapolate"})
+                self._obj = self._obj.interpolate_na(dim='time', method='linear')
+
                 # Filter
                 da_u = self._obj['u']
                 da_v = self._obj['v']

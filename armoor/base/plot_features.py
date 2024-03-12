@@ -146,33 +146,35 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         else:
             title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
-
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) == 1:
         title_depth = f"P. Density: {obs.pdens.values:.1f} kg/m3"
         depth = f"{obs.pdens.values:.1f}"
-    elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
-        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
-        # depth = f"{obs.attrs['depth_obs']}m"
+    elif 'depth_meta_zone' in obs.attrs:
+        title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
+        depth = f"{obs.attrs['depth_meta_zone']}m"
+    # elif 'depth' in obs.coords and np.size(obs.depth) > 1:
+    #     title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+    #     # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
+    #     depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+    #     # depth = f"{obs.attrs['depth_obs']}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         # title_depth = f"P. Density: {obs.attrs['density_obs'].split('_to_')[0]} to {obs.attrs['density_obs'].split('_to_')[1]} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
         # depth = f"{obs.attrs['density_obs']}"
-    elif 'depth' in obs.coords and np.size(obs.depth) == 1:
-        if obs.depth.data.shape == (1,):
-            title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
-            depth = f"{obs.depth.values[0]:.1f}m"
-        else:
-            title_depth = f"Depth: {obs.depth.values:.1f} m"
-            depth = f"{obs.depth.values:.1f}m"
+    # elif 'depth' in obs.coords and np.size(obs.depth) == 1:
+    #     if obs.depth.data.shape == (1,):
+    #         title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
+    #         depth = f"{obs.depth.values[0]:.1f}m"
+    #     else:
+    #         title_depth = f"Depth: {obs.depth.values:.1f} m"
+    #         depth = f"{obs.depth.values:.1f}m"
     else:
-        title_depth = "Depth : 0 m"
-        depth = '0m'
+        title_depth = " "
+        depth = ' '
 
     # Results
     title = f"{title_type}\n" \
@@ -2845,7 +2847,6 @@ def plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_p
     # "en trait épais, le profil moyen modèle(moyenne sur les disques)"
     sals_mod = np.nanmean(np.array(sals_mod), 0)
     ptemps_mod = np.nanmean(np.array(ptemps_mod), 0)
-
 
     im_mod_mean = ax.scatter(sals_mod, ptemps_mod, 50, depths_mod[0], vmin=vmin, vmax=vmax,
                              marker="o", zorder=3, edgecolors="black", linewidth=0.8,
