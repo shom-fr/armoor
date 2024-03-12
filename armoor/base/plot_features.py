@@ -3054,9 +3054,10 @@ def plot_stick_plots(models, observation, output_path=None):
         manage_output(figname, output_path)
     else:
         if 'depth' in observation['xarray_meta_coloc'][0].dims:
-            for i_depth, _ in enumerate(observation['xarray_meta_coloc'][0].depth):
+            for i_depth, depth in enumerate(observation['xarray_meta_coloc'][0].depth.data):
                 f, ax = figure_1_stickplot()
                 obs = observation['xarray_meta_coloc'][0].isel(depth=i_depth)
+                obs.attrs["depth_meta_zone"] = depth
                 ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
                           width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
                           color='k', label=observation['name'])
