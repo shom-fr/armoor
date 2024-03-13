@@ -148,9 +148,12 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} m to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
             # depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
             depth = f"{obs.attrs['density_meta_zone']}"
-        else:
-            title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
+        elif 'depth_meta_zone' in obs.attrs:
+            title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
+        else:
+            title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+            depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
@@ -162,9 +165,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         depth = f"{obs.attrs['depth_meta_zone']}m"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
         title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
         depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
-    #     # depth = f"{obs.attrs['depth_obs']}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
@@ -188,6 +189,8 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     figname = f"{figtitle}_{var_name}_{mod_name}_{obs_name}_{time}_{loc}_{depth}"
 
     title = title.replace("\'", '')
+    title = title.replace("[", '')
+    title = title.replace("]", '')
     figname = figname.replace("\'", '')
     figname = figname.replace("__", '_')
     figname = figname.replace("__", '_')
@@ -2981,7 +2984,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
     """
     # Add the colorbar, titles etc.
     title, figname = get_title_figname('Theta-S diagram', obs, mod['name'], obs.attrs['name'])
-    f.suptitle(title, x=0.35, fontsize=17, fontweight='bold')
+    f.suptitle(title, x=0.35, y=1.01, fontsize=17, fontweight='bold')
 
     ax.set_ylabel('Potential temperature [°C]')
     ax.set_xlabel('Salinity [g/kg]')
