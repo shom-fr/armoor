@@ -1,5 +1,6 @@
 """Plot figures and outpout for all features"""
 import os
+import re
 import math
 import logging
 import numpy as np
@@ -95,10 +96,10 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         else:
             title_loc = f'Longitude : {obs.lon.data:.2f}° - Latitude : {obs.lat.data:.2f}°\n'
             loc = f"{obs.lon.data:.2f}_{obs.lat.data:.2f}"
-
     else:
         title_loc = ''
         loc = ''
+
     # Seuil bathy
     if "bathy_thresh" in obs.attrs:
         loc += f"_bathythresh_{obs.attrs['bathy_thresh']}"
@@ -110,7 +111,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
 
     # Time
     if 'interval' in obs.coords:
-        if np.size(obs.interval.data) ==1:
+        if np.size(obs.interval.data) == 1:
             title_time = f"{obs.interval.data} - Interval {obs['interval_duration'].data}\n"
             time = f"intervals_{obs.interval.data}"
         else:
@@ -177,8 +178,8 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     #         title_depth = f"Depth: {obs.depth.values:.1f} m"
     #         depth = f"{obs.depth.values:.1f}m"
     else:
-        title_depth = " "
-        depth = ' '
+        title_depth = ""
+        depth = ''
 
     # Results
     title = f"{title_type}\n" \
@@ -193,6 +194,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     figname = figname.replace("__", '_')
     figname = figname.replace("__", '_')
     figname = figname.replace(",", '')
+    figname = re.sub('_+$', '', figname)
 
     return title, figname
 
@@ -2043,6 +2045,10 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
 
             # Change x interval labels
             modify_interval_label(axs[4])
+            axs[0].set_xticks(axs[4].get_xticks())
+            axs[1].set_xticks(axs[4].get_xticks())
+            axs[2].set_xticks(axs[4].get_xticks())
+            axs[3].set_xticks(axs[4].get_xticks())
 
         else:  # No flag interval : difference only
 
@@ -2432,6 +2438,10 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             # Change x interval labels
             if flag_interval:
                 modify_interval_label(axs[4])
+                axs[0].set_xticks(axs[4].get_xticks())
+                axs[1].set_xticks(axs[4].get_xticks())
+                axs[2].set_xticks(axs[4].get_xticks())
+                axs[3].set_xticks(axs[4].get_xticks())
 
             # Set title and save
             mod_name = [mod['name'] for mod in models]
@@ -2466,6 +2476,10 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         # Change x interval labels
         if flag_interval:
             modify_interval_label(axs[4])
+            axs[0].set_xticks(axs[4].get_xticks())
+            axs[1].set_xticks(axs[4].get_xticks())
+            axs[2].set_xticks(axs[4].get_xticks())
+            axs[3].set_xticks(axs[4].get_xticks())
 
         # Add title and save fig
         mod_name = [mod['name'] for mod in models]
@@ -2594,7 +2608,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
 
         title, figname = get_title_figname(f"Unique profile", obs,
                                            [mod["name"] for mod in models], obs.attrs['name'])
-        f.suptitle(title, fontsize=17, fontweight='bold', x=0.35)
+        f.suptitle(title, fontsize=17, fontweight='bold', x=0.35, y=1.01)
 
         # Add the mini-map
         ax_mini_map = add_mini_map(f, obs)
@@ -3365,7 +3379,10 @@ def modify_interval_label(ax):
         date_center = date_first + (date_last - date_first) / 2
         labels_modif.append(np.datetime_as_string(date_center))
     pas = max(1, len(labels_modif) // 15)
-    updated_labels = [""] * len(labels_modif)
-    updated_labels[::pas] = labels_modif[::pas]
-    ax = ax.set_xticklabels(updated_labels)
+
+    updated_labels = labels_modif[::pas]
+
+    ax.set_xticklabels(updated_labels)
+
+    ax.set_xticks(np.linspace(0, 0 + (pas * len(updated_labels)), len(updated_labels), endpoint=False))
     return ax
