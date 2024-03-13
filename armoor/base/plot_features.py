@@ -160,23 +160,21 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     elif 'depth_meta_zone' in obs.attrs:
         title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
         depth = f"{obs.attrs['depth_meta_zone']}m"
-    # elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-    #     title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-    #     # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
-    #     depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+    elif 'depth' in obs.coords and np.size(obs.depth) > 1:
+        title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+        # title_depth = f"Depth: {obs.attrs['depth_obs'].split('_to_')[0]} m to {obs.attrs['depth_obs'].split('_to_')[1]} m"
+        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
     #     # depth = f"{obs.attrs['depth_obs']}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
-        # title_depth = f"P. Density: {obs.attrs['density_obs'].split('_to_')[0]} to {obs.attrs['density_obs'].split('_to_')[1]} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
-        # depth = f"{obs.attrs['density_obs']}"
-    # elif 'depth' in obs.coords and np.size(obs.depth) == 1:
-    #     if obs.depth.data.shape == (1,):
-    #         title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
-    #         depth = f"{obs.depth.values[0]:.1f}m"
-    #     else:
-    #         title_depth = f"Depth: {obs.depth.values:.1f} m"
-    #         depth = f"{obs.depth.values:.1f}m"
+    elif 'depth' in obs.coords and np.size(obs.depth) == 1:
+        if obs.depth.data.shape == (1,):
+            title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
+            depth = f"{obs.depth.values[0]:.1f}m"
+        else:
+            title_depth = f"Depth: {obs.depth.values:.1f} m"
+            depth = f"{obs.depth.values:.1f}m"
     else:
         title_depth = ""
         depth = ''
@@ -836,9 +834,10 @@ def plot_map_metr_profiles(flag_interval, flag_slice, mod_coloc, obs_coloc, metr
                     manage_output(figname, output_path)
 
             elif 'depth' in obs_coloc.dims and len(obs_coloc.depth) > 0:
-                for index_depth, _ in enumerate(obs_coloc.depth):
+                for index_depth, depth in enumerate(obs_coloc.depth.data):
                     # Select the data to plot
                     obs_coloc_inter = obs_coloc.isel(interval=[index_time], depth=[index_depth])
+                    obs_coloc_inter.attrs['depth_meta_zone'] = depth
                     mod_coloc_inter = mod_coloc.isel(interval=[index_time], depth=[index_depth])
                     comparison_inter = comparison.isel(interval=[index_time], depth=[index_depth])
                     title, figname = get_title_figname(f'Map {metric}', mod_coloc_inter,

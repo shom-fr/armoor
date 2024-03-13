@@ -597,9 +597,15 @@ class MetazoneAccessor:
         if isinstance(depth, float) and depth == 0:
             logger.info(f'The first z/level layer will be selected')
             if 'type' in self._obj.attrs and self._obj.attrs['type'] == 'CROCO':  # for croco
-                return self._obj.isel(level=-1)
+                ds_tgt = self._obj.isel(level=-1)
+                ds_tgt = ds_tgt.drop(['level', 'depth'])
+                ds_tgt.coords['depth'] = 0
+                return ds_tgt
             else:  # Hycom
-                return self._obj.isel(z=0)
+                ds_tgt = self._obj.isel(z=0)
+                ds_tgt = ds_tgt.drop(['z', 'depth'])
+                ds_tgt.coords['depth'] = 0
+                return ds_tgt
 
         # Regrid1D only seems to work with negative depths for croco:
         # the following lines adapt the depths values to correctly select the depth defined.
@@ -615,7 +621,15 @@ class MetazoneAccessor:
             depth = [float(depth)]
         else:
             depth = np.array(depth)
+
+        # Manage 0 in list of depths
+        dataset0 = None
+        if 0 in depth:
+            dataset0 = self._obj.meta.vertical_selection_croco_hycom(float(0))
+            depth = depth[depth != 0]
+
         tgt_depth = xr.DataArray(depth, dims="depth", name="depth")
+
         # Select depth(s)
         tgt_ds = dataset
         for var in dataset.variables:
@@ -641,6 +655,13 @@ class MetazoneAccessor:
         # Reindex depths if necessary
         if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0] > tgt_ds.depth.data[-1]:
             tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
+
+        if dataset0:
+            if 'z' in tgt_ds:
+                tgt_ds = tgt_ds.drop('z')
+            elif 'level' in tgt_ds:
+                tgt_ds = tgt_ds.drop('level')
+            tgt_ds = xr.concat([dataset0, tgt_ds], dim="depth")
 
         return tgt_ds
 
@@ -1021,15 +1042,16 @@ class MetazoneAccessor:
 
         if start is None:
             start = self._obj.isel(time=[0]).time.data[0]
-        else: start = pandas.to_datetime(start)
+        else:
+            start = pandas.to_datetime(start)
 
         if end is None:
             end = self._obj.isel(time=[-1]).time.data[0]
             end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
-        else: end = pandas.to_datetime(end)
+        else:
+            end = pandas.to_datetime(end)
 
         time_interval = pandas.date_range(start=start, end=end, freq=interval)
-
 
         ds_group = self._obj.groupby_bins('time', time_interval, right=False)
         liste_ds = []
