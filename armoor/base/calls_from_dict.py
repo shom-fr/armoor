@@ -7,6 +7,7 @@ from armoor.base import feature_sst, feature_prof_hydro_vessel, feature_prof_hyd
     feature_currents_VMADCP, feature_drifters
 from armoor.base.open_decode import open_decode
 from armoor.base.colocation import colocate_all
+import matplotlib.pyplot as plt
 
 import armoor.base.meta_zone
 import armoor.base.sel_var
@@ -81,6 +82,7 @@ def get_observation_models_meta(config_obj: dict):
                                                            get_method(observation))
                         })
 
+    # observation['xarray_meta'].u_res.isel(lon=0, lat=0).plot();plt.savefig('1_obs_calldict.png');plt.close()
     logger.info("File(s) read for observation")
 
     # Open model dataset from path then decode dataset and apply meta-zone
@@ -99,6 +101,7 @@ def get_observation_models_meta(config_obj: dict):
                                                          get_method(model), mod_obs='mod')
                       })
 
+        # model['xarray_meta'].u_res.isel(lon=0, lat=0).plot();plt.savefig(str(imod)+'_model_calldict.png');plt.close()
         logger.info("File(s) read for model %s", imod)
 
     # Set colocation flags
@@ -340,6 +343,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             filter = outputs[0]['low_pass_filter']
             xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
 
+        # xarray_obj.u_res.isel(lon=0, lat=0).plot();plt.savefig('2_obs_calldict.png');plt.close()
         # Bathymetry threshold
         if 'h' in xarray_obj:
             xarray_obj = xarray_obj.rename({'h': 'bathy'})
@@ -396,14 +400,18 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             if 'depth' in config_obj["meta_zones"]:
                 logger.warning(
                     f"For feature {config_obj['functionality']}, no depth can be specified ! Surface value is taken into account")
-            depth = [0]
-            xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
+            if "depth" in xarray_obj:
+                depth = [0]
+                xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
+                # xarray_obj.u_res.isel(lon=0, lat=0).plot();plt.savefig('3_obs_calldict.png');plt.close()
 
         # Other meta-zones, one by one
         for name, meta_filter in filters.items():
             if name in config_obj["meta_zones"]:
                 logger.info("Applying : %s", name)
                 xarray_obj = meta_filter(xarray_obj)(config_obj["meta_zones"][name])
+                # if name == "depth":
+                    # xarray_obj.u_res.isel(lon=0, lat=0).plot();plt.savefig('3_obs_calldict.png');plt.close()
 
         # Assign depth attrs
         if 'min_depth' in config_obj["meta_zones"] or 'max_depth' in config_obj["meta_zones"]:

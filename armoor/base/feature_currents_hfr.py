@@ -4,7 +4,7 @@ import os
 import copy
 import numpy as np
 from armoor.base.tools_features import remove_missing_values_ds
-from armoor.base import plot_features, ttide_tide_feature
+from armoor.base import plot_features, utide_ttide_tide_feature
 from armoor.base.colocation import colocate_all
 from armoor.hmi.script_tools import create_folder
 
