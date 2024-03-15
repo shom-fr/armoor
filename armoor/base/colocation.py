@@ -4,7 +4,7 @@ import xarray as xr
 import numpy as np
 import xoa.grid
 import xesmf as xe
-
+from armoor.base import sel_var
 logger = logging.getLogger(__name__)
 
 
@@ -97,6 +97,17 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             # Vertical colocation
             if ver_flag:
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
+
+    for var in obs_coloc.variables:
+        if "u" in var:
+            type = var[1:]
+            obs_coloc = obs_coloc.sel_var.get_norm_dir(type=type)
+
+    for var in mod_coloc.variables:
+        if "u" in var:
+            type = var[1:]
+            mod_coloc = mod_coloc.sel_var.get_norm_dir(type=type)
+
 
     return obs_coloc, mod_coloc
 
