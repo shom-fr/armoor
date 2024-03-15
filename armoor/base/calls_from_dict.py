@@ -1,6 +1,7 @@
 """Decode the config file to plot the required outputs"""
 
 import logging
+import copy
 import xarray as xr
 from armoor.base import feature_sst, feature_prof_hydro_vessel, feature_prof_hydro_mooring, \
     feature_section_hydro, feature_clim_hydro, feature_currents_hfr, feature_currents_ADCP, \
@@ -82,7 +83,7 @@ def get_observation_models_meta(config_obj: dict):
                                                            get_method(observation))
                         })
 
-    # observation['xarray_meta'].u_res.isel(lon=0, lat=0).plot();plt.savefig('1_obs_calldict.png');plt.close()
+    # observation['xarray_meta'].u_res.isel(lon=0, lat=0).plot();plt.savefig('obs_calldict_final.png');plt.close()
     logger.info("File(s) read for observation")
 
     # Open model dataset from path then decode dataset and apply meta-zone
@@ -325,10 +326,10 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         outputs = config_obj['outputs']
         vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
         if 'current_bc' in vars_to_plot:
-            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
+            xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
 
         if 'mld' in vars_to_plot:
-            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_mixed_layer_depth()])
+            xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_mixed_layer_depth()])
 
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
@@ -341,9 +342,8 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         # Calculate current_res after cloud before time
         if 'current_res' in vars_to_plot:
             filter = outputs[0]['low_pass_filter']
-            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
+            xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
 
-        # xarray_obj.u_res.isel(lon=0, lat=0).plot();plt.savefig('2_obs_calldict.png');plt.close()
         # Bathymetry threshold
         if 'h' in xarray_obj:
             xarray_obj = xarray_obj.rename({'h': 'bathy'})
@@ -411,12 +411,31 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                 logger.info("Applying : %s", name)
                 xarray_obj = meta_filter(xarray_obj)(config_obj["meta_zones"][name])
                 # if name == "depth":
-                    # xarray_obj.u_res.isel(lon=0, lat=0).plot();plt.savefig('3_obs_calldict.png');plt.close()
+                # xarray_obj.u_res.isel(lon=0, lat=0).plot();plt.savefig('3_obs_calldict.png');plt.close()
 
         # Assign depth attrs
         if 'min_depth' in config_obj["meta_zones"] or 'max_depth' in config_obj["meta_zones"]:
             min_depth = config_obj["meta_zones"].get('min_depth')
             max_depth = config_obj["meta_zones"].get("max_depth")
             xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": f"{min_depth}_to_{max_depth}"})
+
+    return xarray_obj
+
+
+def merge_no_fail(list_ds):
+    """
+    list_ds : list of xr.dataset
+        First dataset must contain the correct attributes
+    """
+
+    xarray_obj_tmp = xr.Dataset()
+    for ds in list_ds:
+        if isinstance(ds, xr.DataArray):
+            xarray_obj_tmp[ds.name] = ds
+        else:
+            for var in ds:
+                xarray_obj_tmp[var] = ds[var]
+    attrs = list_ds[0].attrs
+    xarray_obj = xarray_obj_tmp.assign_attrs(attrs)
 
     return xarray_obj
