@@ -272,25 +272,26 @@ class SSTAccessor:
                 logger.info(
                     f'The time step of the data is not constant, it will be resampled on hourly dates.')
                 # Resample the data on hourly dates
+                ini_time = self._obj['time'].data
                 min_date = self._obj['time'].min().data.astype('datetime64[h]')
                 max_date = self._obj['time'].max().data.astype('datetime64[h]')
                 time_hor = pd.date_range(min_date.item(), max_date.item(), freq='1H')
-                self._obj['u'].isel(lon=0, lat=0).plot();plt.savefig('1_obs_avant.png');plt.close()
-                # time_hor = np.arange(min_date, max_date, dtype='datetime64[h]')
+
                 self._obj = self._obj.interp(time=time_hor, method='linear',
                                              kwargs={"fill_value": "extrapolate"})
 
                 # Filter
                 da_u = self._obj['u']
-                # da_u.isel(lon=0, lat=0).plot();plt.savefig('2_obs_apres.png');plt.close()
                 da_v = self._obj['v']
                 da_u_res = xfilter.tidal_filter(da_u, filter, na_thres=1)
                 da_v_res = xfilter.tidal_filter(da_v, filter, na_thres=1)
-                # da_u_res.isel(lon=0, lat=0).plot();plt.savefig('3_obs_res.png');plt.close()
+
+                # Put back on original dates
+                da_u_res = da_u_res.interp(time = ini_time)
+                da_v_res = da_v_res.interp(time = ini_time)
 
             current_res = xr.Dataset()
             current_res['u_res'] = da_u_res
-            # current_res.u_res.isel(lon=0, lat=0).plot();plt.savefig('4_obs_res.png');plt.close()
             current_res['v_res'] = da_v_res
             current_res = current_res.sel_var.get_norm_dir(type='_res')
             return current_res
