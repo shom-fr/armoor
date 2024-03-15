@@ -238,6 +238,16 @@ class SSTAccessor:
 
         return current
 
+    def get_norm_dir(self, type):
+        u = self._obj[f'u{type}']
+        v = self._obj[f'v{type}']
+        norm = (u ** 2 + v ** 2) ** 0.5
+        dir = np.arctan2(v,u) * 180 / np.pi
+        self._obj[f'norm{type}'] = norm
+        self._obj[f'norm{type}'] = self._obj[f'norm{type}'].assign_attrs({'units': 'm/s'})
+        self._obj[f'dir{type}'] = dir
+        self._obj[f'dir{type}'] = self._obj[f'dir{type}'].assign_attrs({'units': '°'})
+        return self._obj
     def sel_current_res(self, filter):
         """
         Select residual current from the dataset with demerliac, godin or mean filter.
@@ -282,10 +292,7 @@ class SSTAccessor:
             current_res['u_res'] = da_u_res
             # current_res.u_res.isel(lon=0, lat=0).plot();plt.savefig('4_obs_res.png');plt.close()
             current_res['v_res'] = da_v_res
-            current_res['norm_res'] = (current_res.u_res ** 2 + current_res.v_res ** 2) ** 0.5
-            current_res['dir_res'] = np.arctan2(current_res['v_res'],
-                                                current_res['u_res']) * 180 / np.pi
-            current_res['dir_res'] = current_res['dir_res'].assign_attrs({'units': '°'})
+            current_res = current_res.sel_var.get_norm_dir(type='_res')
             return current_res
 
     def sel_current_barocline(self):
@@ -323,8 +330,7 @@ class SSTAccessor:
         current_bc['u_bc'] = ubc
         current_bc['v_bc'] = vbc
         current_bc['norm_bc'] = vbc
-        current_bc['dir_bc'] = np.arctan2(current_bc['v_bc'], current_bc['u_bc']) * 180 / np.pi
-        current_bc['dir_bc'] = current_bc['dir_bc'].assign_attrs({'units': '°'})
+        current_bc = current_bc.sel_var.get_norm_dir(type='_bc')
         current_bc = current_bc.assign_attrs({'name': self._obj.attrs['name']})
         return current_bc
 
