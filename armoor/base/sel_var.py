@@ -5,11 +5,13 @@ import os
 import logging
 import numpy as np
 import xarray as xr
+import pandas as pd
 import xoa
 import xoa.cf as xcf
 import xoa.filter as xfilter
 import gsw
 from xoa.thermdyn import mixed_layer_depth
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -262,18 +264,23 @@ class SSTAccessor:
                 # Resample the data on hourly dates
                 min_date = self._obj['time'].min().data.astype('datetime64[h]')
                 max_date = self._obj['time'].max().data.astype('datetime64[h]')
-                time_hor = np.arange(min_date, max_date, dtype='datetime64[h]')
+                time_hor = pd.date_range(min_date.item(), max_date.item(), freq='1H')
+                self._obj['u'].isel(lon=0, lat=0).plot();plt.savefig('1_obs_avant.png');plt.close()
+                # time_hor = np.arange(min_date, max_date, dtype='datetime64[h]')
                 self._obj = self._obj.interp(time=time_hor, method='linear',
                                              kwargs={"fill_value": "extrapolate"})
 
                 # Filter
                 da_u = self._obj['u']
+                # da_u.isel(lon=0, lat=0).plot();plt.savefig('2_obs_apres.png');plt.close()
                 da_v = self._obj['v']
                 da_u_res = xfilter.tidal_filter(da_u, filter, na_thres=1)
                 da_v_res = xfilter.tidal_filter(da_v, filter, na_thres=1)
+                # da_u_res.isel(lon=0, lat=0).plot();plt.savefig('3_obs_res.png');plt.close()
 
             current_res = xr.Dataset()
             current_res['u_res'] = da_u_res
+            # current_res.u_res.isel(lon=0, lat=0).plot();plt.savefig('4_obs_res.png');plt.close()
             current_res['v_res'] = da_v_res
             current_res['norm_res'] = (current_res.u_res ** 2 + current_res.v_res ** 2) ** 0.5
             current_res['dir_res'] = np.arctan2(current_res['v_res'],
@@ -443,7 +450,9 @@ class SSTAccessor:
         cons_temp = gsw.CT_from_pt(sal, ptemp)
         pres = self._obj.sel_var.sel_pres()
         if sal is not None and cons_temp is not None and pres is not None:
-            return gsw.sound_speed(sal, cons_temp, pres)
+            snd_speed = gsw.sound_speed(sal, cons_temp, pres)
+            snd_speed.attrs["units"] = "m/s"
+            return snd_speed
 
         logger.warning("To compute sound speed you need to have salinity, "
                        "potential temperature and depth in your dataset.")

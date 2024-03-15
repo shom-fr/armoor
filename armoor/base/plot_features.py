@@ -83,7 +83,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         var_name = ''
     else:
         var_name, var_unit = find_var_title(obs)
-        title_type = f"{figtitle} : {var_name} [{var_unit}]"
+        title_type = f"{figtitle} :\n{var_name} [{var_unit}]"
 
     # Location
     if 'lon' in obs.coords and np.size(obs.lon.data) == 1:
@@ -181,16 +181,24 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         depth = ''
 
     # Results
+    title_time = title_time.replace("[", '')
+    title_time = title_time.replace("]", '')
+    title_depth = title_depth.replace("[", '')
+    title_depth = title_depth.replace("]", '')
+    model_title = f"Model(s) : {mod_name} \nObservation : {obs_name}\n"
+    model_title = model_title.replace("[", '')
+    model_title = model_title.replace("]", '')
+
     title = f"{title_type}\n" \
-            f"Model(s) : {mod_name} \nObservation : {obs_name}\n" \
+            f"{model_title}" \
             f"{title_time}" \
             f"{title_loc} {title_depth}"  # \n{title_rad}"
+
+    # f"Model(s) : {mod_name} \nObservation : {obs_name}\n" \
 
     figname = f"{figtitle}_{var_name}_{mod_name}_{obs_name}_{time}_{loc}_{depth}"
 
     title = title.replace("\'", '')
-    title = title.replace("[", '')
-    title = title.replace("]", '')
     figname = figname.replace("\'", '')
     figname = figname.replace("__", '_')
     figname = figname.replace("__", '_')
@@ -1630,7 +1638,7 @@ def plot_ellipses_tide_current_generic(observation, models, wave_name, scale, ou
                                        [mod.attrs['name'] for mod in models],
                                        observation.attrs['name'])
 
-    f.suptitle(title, fontsize=15, fontweight='bold')
+    f.suptitle(title, y=1.01, fontsize=15, fontweight='bold')
     f.subplots_adjust(top=0.85)
     manage_output(figname, output_path)
 
@@ -2193,7 +2201,7 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
                                        obs_meta_coloc.attrs['name'])
     _, var_unit = find_var_title(obs_meta_coloc)
 
-    f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+    f.suptitle(title, x=0.3, y=1.03, fontsize=17, fontweight='bold')
 
     colorbar_model = f.colorbar(im_obs, ax=axs[0], fraction=0.046, pad=0.04)
     colorbar_obs = f.colorbar(im_mod, ax=axs[1], fraction=0.046, pad=0.04)
@@ -2330,7 +2338,12 @@ def create_harmonic_table(models, observations, output_path):
                     ampl, phase = 'u_a', 'u_g'
                 elif var == 'V':
                     ampl, phase = 'v_a', 'v_g'
-                filename = f'{wave_name}_{var}_harm_table_{tide_tool}_{obs.lon.data[0]}_{obs.lat.data[0]}.csv'
+                if 'slice' in obs.dims:
+                    filename = f'{wave_name}_{var}_harm_table_{tide_tool}_{obs.lon.data[0]}_{obs.lat.data[0]}_with_slices.csv'
+                elif 'depth' in obs.dims:
+                    filename = f'{wave_name}_{var}_harm_table_{tide_tool}_{obs.lon.data[0]}_{obs.lat.data[0]}_with_depths.csv'
+                else:
+                    filename = f'{wave_name}_{var}_harm_table_{tide_tool}_{obs.lon.data[0]}_{obs.lat.data[0]}.csv'
                 logger.info('Saving :: %s', filename)
                 harmonic_table_file = open(os.path.join(output_path, filename), 'a')
                 harmonic_table_file.write(
@@ -2450,7 +2463,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             title, figname = get_title_figname(
                 f'Time series metrics on {list_dims_mean} dimensions', obs_coloc, mod_name,
                 observation['name'])
-            f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
+            f.suptitle(title, x=0.4, y=1.01, fontsize=15, fontweight='bold')
             manage_output(figname, output_path)
 
     # Case no vertical slices
@@ -2487,7 +2500,7 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         mod_name = [mod['name'] for mod in models]
         title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
                                            obs_coloc, mod_name, observation['name'])
-        f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
+        f.suptitle(title, x=0.4, y=1.01, fontsize=15, fontweight='bold')
         manage_output(figname, output_path)
 
 

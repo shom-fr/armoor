@@ -19,7 +19,7 @@ class TestReadVar:
 
     def test_sel_mld(self):  # needs xoa latest version
         logger.info('test_sel_mld')
-        path_ds = ["../data/test_uni/read_var/woa18_decav_t03_04.nc"]
-        ds = open_decode(path_ds, type='WOA18')
+        path_ds = ["../data/test_uni/read_var/nemo_for_sound_speed.nc"]
+        ds = open_decode(path_ds)
         mld = ds.sel_var.selection(['mld'])
         assert True
