@@ -3186,9 +3186,9 @@ def find_var_title(da):
     if 'sst' in var_name:
         var_name = 'SST'
     if 'res' in var_name:
-        var_name = f"\nResidual current {var_name.split('_')[0]}"
+        var_name = f"Residual current {var_name.split('_')[0]}"
     if 'bc' in var_name:
-        var_name = f"\nBaroclinic current {var_name.split('_')[0]}"
+        var_name = f"Baroclinic current {var_name.split('_')[0]}"
     if 'geo' in var_name:
         var_name = "Geostrophic current"
 
