@@ -427,6 +427,7 @@ def merge_no_fail(list_ds):
     list_ds : list of xr.dataset
         First dataset must contain the correct attributes
     """
+
     xarray_obj_tmp = xr.Dataset()
     for ds in list_ds:
         if isinstance(ds, xr.DataArray):
@@ -436,4 +437,5 @@ def merge_no_fail(list_ds):
                 xarray_obj_tmp[var] = ds[var]
     attrs = list_ds[0].attrs
     xarray_obj = xarray_obj_tmp.assign_attrs(attrs)
+
     return xarray_obj

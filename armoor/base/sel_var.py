@@ -248,6 +248,7 @@ class SSTAccessor:
         self._obj[f'dir{type}'] = dir
         self._obj[f'dir{type}'] = self._obj[f'dir{type}'].assign_attrs({'units': '°'})
         return self._obj
+
     def sel_current_res(self, filter):
         """
         Select residual current from the dataset with demerliac, godin or mean filter.
