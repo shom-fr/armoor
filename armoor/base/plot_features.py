@@ -83,7 +83,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         var_name = ''
     else:
         var_name, var_unit = find_var_title(obs)
-        title_type = f"{figtitle} :\n{var_name} [{var_unit}]"
+        title_type = f"{figtitle} :{var_name} [{var_unit}]"
 
     # Location
     if 'lon' in obs.coords and np.size(obs.lon.data) == 1:
@@ -102,12 +102,13 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
 
     # Seuil bathy
     if "bathy_thresh" in obs.attrs:
-        loc += f"_bathythresh_{obs.attrs['bathy_thresh']}"
+        if not 'None' in obs.attrs['bathy_thresh']:
+            loc += f"_bathythresh_{obs.attrs['bathy_thresh']}"
 
     # Radius
     if "radius" in obs.attrs:
         title_loc += f" Radius : {obs.attrs['radius'][:-2]} km\n"
-        loc += f"_radius_{obs.attrs['radius'][:-2]}"
+        loc += f"_radius_{obs.attrs['radius'][:-2]}km"
 
     # Time
     if 'interval' in obs.coords:
@@ -143,11 +144,12 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
 
     # Depth
     if 'profile' in figtitle or 'Theta-S' in figtitle:
-        if 'pdens' in obs.coords and np.size(obs.pdens) > 1:
-            # title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+        if 'density_meta_zone' in obs.attrs:
             title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} m to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
-            # depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
             depth = f"{obs.attrs['density_meta_zone']}"
+        elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
+            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+            depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
         elif 'depth_meta_zone' in obs.attrs:
             title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
@@ -177,6 +179,10 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_depth = f"Depth: {obs.depth.values:.1f} m"
             depth = f"{obs.depth.values:.1f}m"
     else:
+        title_depth = ""
+        depth = ''
+
+    if  'mld' in var_name:
         title_depth = ""
         depth = ''
 
@@ -2085,7 +2091,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
                                                    observation['name'])
 
-                f.suptitle(title, x=0.25, fontsize=14, fontweight='bold')
+                f.suptitle(title, x=0.25, y=1.01, fontsize=14, fontweight='bold')
 
         # MINI-MAP
         ax_mini_map = add_mini_map(f, obs_coloc_base)
@@ -2173,7 +2179,6 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
 
     # Select the variables to plot
     diff = mod_meta_coloc.transpose() - obs_meta_coloc.transpose()
-
     # Drop nans if not all nans
     if not np.isnan(obs_meta_coloc.min(skipna=True).data):
         mod_meta_coloc = mod_meta_coloc.dropna('time', 'all')
@@ -2289,7 +2294,7 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
     # Add the colorbar, titles etc.
     title, figname = get_title_figname("2D variable", obs_meta_coloc, mod_meta_coloc.attrs['name'],
                                        obs_meta_coloc.attrs['name'])
-    f.suptitle(title, x=0.3, fontsize=17, fontweight='bold')
+    f.suptitle(title, x=0.3, y = 1.01, fontsize=17, fontweight='bold')
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs_meta_coloc)
@@ -3181,9 +3186,9 @@ def find_var_title(da):
     if 'sst' in var_name:
         var_name = 'SST'
     if 'res' in var_name:
-        var_name = f"Residual current {var_name.split('_')[0]}"
+        var_name = f"\nResidual current {var_name.split('_')[0]}"
     if 'bc' in var_name:
-        var_name = f"Baroclinic current {var_name.split('_')[0]}"
+        var_name = f"\nBaroclinic current {var_name.split('_')[0]}"
     if 'geo' in var_name:
         var_name = "Geostrophic current"
 
