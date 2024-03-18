@@ -242,7 +242,7 @@ class SSTAccessor:
         u = self._obj[f'u{type}']
         v = self._obj[f'v{type}']
         norm = (u ** 2 + v ** 2) ** 0.5
-        dir = np.arctan2(v,u) * 180 / np.pi
+        dir = np.arctan2(u, v) * 180 / np.pi
         self._obj[f'norm{type}'] = norm
         self._obj[f'norm{type}'] = self._obj[f'norm{type}'].assign_attrs({'units': 'm/s'})
         self._obj[f'dir{type}'] = dir
