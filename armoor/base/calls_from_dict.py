@@ -403,7 +403,6 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             if "depth" in xarray_obj:
                 depth = [0]
                 xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
-                # xarray_obj.u_res.isel(lon=0, lat=0).plot();plt.savefig('3_obs_calldict.png');plt.close()
 
         # Other meta-zones, one by one
         for name, meta_filter in filters.items():

@@ -2309,9 +2309,10 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
                                        obs_meta_coloc.attrs['name'])
     f.suptitle(title, x=0.3, y = 1.01, fontsize=17, fontweight='bold')
 
+
     # Add minimap
     ax_mini_map = add_mini_map(f, obs_meta_coloc)
-    ax_mini_map.scatter(obs_meta_coloc.lon, obs_meta_coloc.lat, 30, transform=ccrs.PlateCarree())
+    ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc.values)), obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc.values)), 30, transform=ccrs.PlateCarree())
 
     # Add legend
     axs[0].legend(loc=5)
