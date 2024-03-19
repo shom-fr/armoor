@@ -135,6 +135,10 @@ def remove_missing_values(model, obs):
                 model = model.transpose(dim, ...)
                 obs = obs.transpose(dim, ...)
 
+    # if the shapes are not the same between datarrays:
+    if obs.shape == model.shape[:-1]:
+        model = model.squeeze()
+
     for coord in ['sig', 's_rho']:
         if coord in model.coords:
             model = model.drop(coord)
