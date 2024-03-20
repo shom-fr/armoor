@@ -337,7 +337,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             logger.info("Applying : cloud")
             points = config_obj["meta_zones"]["cloud"]
             xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
-            if radius: xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
+            if radius : xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
 
         # Calculate current_res after cloud before time
         if 'current_res' in vars_to_plot:
