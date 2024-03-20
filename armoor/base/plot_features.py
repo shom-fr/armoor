@@ -86,7 +86,10 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_type = f"{figtitle} :{var_name} [{var_unit}]"
 
     # Location
-    if 'lon' in obs.coords and np.size(obs.lon.data) == 1:
+    if 'cloud_plot' in obs.attrs:
+        title_loc = f"Longitude : {obs.attrs['cloud_plot'][0]:.2f}° - Latitude : {obs.attrs['cloud_plot'][1]:.2f}°\n"
+        loc = f"{obs.attrs['cloud_plot'][0]:.2f}_{obs.attrs['cloud_plot'][1]:.2f}"
+    elif 'lon' in obs.coords and np.size(obs.lon.data) == 1:
         if obs.lon.data.shape == (1,):
             title_loc = f'Longitude : {obs.lon.data[0]:.2f}° - Latitude : {obs.lat.data[0]:.2f}°\n'
             loc = f"{obs.lon.data[0]:.2f}_{obs.lat.data[0]:.2f}"
@@ -2012,6 +2015,11 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
 
     for index_lon, longitude in enumerate(longitudes):
         latitude = latitudes[index_lon]
+
+        # Get the cloud point corresponding to the obs to write it in the title of the plot
+        if 'cloud' in obs_coloc_base.attrs:
+            obs_coloc_base.attrs['cloud_plot'] = obs_coloc_base.attrs['cloud'][index_lon]
+
         if flag_interval:
             f, axs = figure_5lin_ts()
 
@@ -2100,8 +2108,16 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
 
         # MINI-MAP
         ax_mini_map = add_mini_map(f, obs_coloc_base)
-        ax_mini_map.scatter(longitudes, latitudes, 30, 'k', transform=ccrs.PlateCarree())
-        ax_mini_map.scatter(longitude, latitude, 90, marker='*', c='yellow', edgecolors='black',
+        if 'cloud' in obs_coloc_base.attrs:
+            ax_mini_map.scatter(np.array([lon[0] for lon in obs_coloc_base.attrs['cloud']]),
+                                np.array([lat[1] for lat in obs_coloc_base.attrs['cloud']]), 30, 'k', transform=ccrs.PlateCarree())
+            ax_mini_map.scatter(obs_coloc_base.attrs['cloud_plot'][0],
+                                obs_coloc_base.attrs['cloud_plot'][1], 90, marker='*', c='yellow',
+                                edgecolors='black',
+                                transform=ccrs.PlateCarree())
+        else:
+            ax_mini_map.scatter(longitudes, latitudes, 30, 'k', transform=ccrs.PlateCarree())
+            ax_mini_map.scatter(longitude, latitude, 90, marker='*', c='yellow', edgecolors='black',
                             transform=ccrs.PlateCarree())
 
         manage_output(figname, output_path)
@@ -2195,8 +2211,6 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     #     obs_meta_coloc = obs_meta_coloc.dropna('depth', 'all')
     #     diff = diff.dropna('depth', 'all')
 
-    print('model : ', mod_meta_coloc.values)
-    print('obs : ', obs_meta_coloc.values)
 
 
     # Get min/max colobar values
