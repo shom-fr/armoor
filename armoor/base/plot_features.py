@@ -162,9 +162,6 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
-    elif 'pdens' in obs.coords and np.size(obs.pdens) == 1:
-        title_depth = f"P. Density: {obs.pdens.values:.1f} kg/m3"
-        depth = f"{obs.pdens.values:.1f}"
     elif 'depth_meta_zone' in obs.attrs:
         if len(obs.attrs['depth_meta_zone']) > 1:
             title_depth = f"Depth: {obs.depth.values:.1f} m"
@@ -173,18 +170,25 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+        title_depth = f"Depth obs: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
         depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
-        title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+        title_depth = f"P. Density obs: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
         if obs.depth.data.shape == (1,):
-            title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
+            title_depth = f"Depth obs: {obs.depth.values[0]:.1f} m"
             depth = f"{obs.depth.values[0]:.1f}m"
         else:
-            title_depth = f"Depth: {obs.depth.values:.1f} m"
+            title_depth = f"Depth obs: {obs.depth.values:.1f} m"
             depth = f"{obs.depth.values:.1f}m"
+    elif 'pdens' in obs.coords and np.size(obs.pdens) == 1:
+        if obs.pdens.data.shape == (1,):
+            title_depth = f"Density obs: {obs.pdens.values[0]:.1f} m"
+            depth = f"{obs.pdens.values[0]:.1f}m"
+        else:
+            title_depth = f"Density obs: {obs.pdens.values:.1f} m"
+            depth = f"{obs.pdens.values:.1f}m"
     else:
         title_depth = ""
         depth = ''
