@@ -322,7 +322,7 @@ class SSTAccessor:
         current_bc = current['norm'] - current_mean_depth['norm']
 
         # Calculate the azimuth (in radians)
-        azimut = np.arctan2(current['v'], current['u'])
+        azimut = np.arctan2(current['u'], current['v'])
 
         # Calculate the zonal and meridional components of the baroclinic current
         ubc = current_bc * np.cos(azimut)
@@ -478,10 +478,10 @@ class SSTAccessor:
         if 'mld' in self._obj:
             return self._obj.mld
         ptemp = self._obj.sel_var.sel_ptemp()
-        mld = mixed_layer_depth(ptemp)
+        mld = mixed_layer_depth(ptemp, method='deltatemp')
         if np.isnan(mld.max().data):
             pdens = self._obj.sel_var.sel_pdensity()
-            mld = mixed_layer_depth(pdens)
+            mld = mixed_layer_depth(pdens, method='deltadens')
         return mld
 
     def sel_pres(self):

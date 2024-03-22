@@ -300,7 +300,7 @@ def sel_one_var(observation, models, var, depth=None):
                 i_mod].sel(depth=depth, method='nearest')
 
     # Bathy thresh in attrs if needed
-    list_attrs = ["bathy_thresh", "radius", "depth_meta_zone"]
+    list_attrs = ["bathy_thresh", "radius", "depth_meta_zone", "cloud"]
     for attr in list_attrs:
         if attr in observation["xarray_meta"].attrs:
             attr_name = observation['xarray_meta'].attrs[attr]
