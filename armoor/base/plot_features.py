@@ -149,32 +149,39 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     if 'profile' in figtitle or 'Theta-S' in figtitle:
         if 'density_meta_zone' in obs.attrs:
             title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} m to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
-            depth = f"{obs.attrs['density_meta_zone']}"
+            depth = f"{obs.attrs['density_meta_zone']}kgm-3"
         elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
             title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
-            depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+            depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}kgm-3"
         elif 'depth_meta_zone' in obs.attrs:
-            title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
+            title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
         else:
             title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-            depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+            depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
     elif 'depth_meta_zone' in obs.attrs:
-        if len(obs.attrs['depth_meta_zone']) > 1:
-            title_depth = f"Depth: {obs.depth.values:.1f} m"
-            depth = f"{obs.depth.values:.1f}m"
+        if isinstance(obs.attrs['depth_meta_zone'], list):
+            if len(obs.attrs['depth_meta_zone']) > 1:
+                title_depth = f"Depth: {obs.depth.values:.1f} m"
+                depth = f"{obs.depth.values:.1f}m"
+            else:
+                title_depth = f"Depth: {obs.attrs['depth_meta_zone'][0]} m"
+                depth = f"{obs.attrs['depth_meta_zone'][0]}m"
+        elif '_to_' in f"{obs.attrs['depth_meta_zone']}":
+            title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
+            depth = f"{obs.attrs['depth_meta_zone']}m"
         else:
             title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
         title_depth = f"Depth obs: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f} m"
+        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density obs: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
-        depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}"
+        depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}kgm-3"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
         if obs.depth.data.shape == (1,):
             title_depth = f"Depth obs: {obs.depth.values[0]:.1f} m"
@@ -2871,6 +2878,11 @@ def plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_p
 
     f, ax = figure_1_profile()
 
+    if "depth_meta_zone" in observation.attrs:
+        vmin = float(observation.attrs["depth_meta_zone"].split('_to_')[0])
+        vmax = float(observation.attrs["depth_meta_zone"].split('_to_')[1])
+
+
     # "en traits fins, tous les profils observés"
     sals_mod, ptemps_mod, depths_mod = [], [], []
     for i_inter, _ in enumerate(observation.interval):
@@ -2955,14 +2967,12 @@ def get_sals_temps_depths(obs, mod, config_obj, sals_mod, ptemps_mod, depths_mod
     mod_buffer = mod_buffer.meta.horizontal_selection_cloud_dots(points, radius)
 
     # Get meta-zone parameter from config obj
-    min_dens, max_dens = config_obj["meta_zones"].get("min_dens"), config_obj["meta_zones"].get("max_dens")
-    ref_dens = config_obj.get("ref_dens")
-
+    if "min_dens" in config_obj["meta_zones"] or "max_dens" in config_obj["meta_zones"]:
+        min_dens, max_dens = config_obj["meta_zones"].get("min_dens"), config_obj["meta_zones"].get("max_dens")
+        ref_dens = config_obj.get("ref_dens")
     # Select density
-    if min_dens:
         mod_buffer = mod_buffer.meta.vertical_selection_min_dens(min_dens,
                                                                  ref_dens=ref_dens)
-    if max_dens:
         mod_buffer = mod_buffer.meta.vertical_selection_max_dens(max_dens,
                                                                  ref_dens=ref_dens)
 
@@ -2991,6 +3001,14 @@ def plot_diag_ts_unique(models, observation, output_path=None):
     logger.info('Theta - S diagram with unique profiles')
     for _, time in enumerate(observation.time):
         obs = observation.sel(time=time).squeeze()
+
+        #Filter the depths fill with NaN for the colorbar and the plot
+        if "depth_meta_zone" in obs.attrs:
+            if 'z' in obs.dims:
+                obs = obs.dropna(dim='z')
+            elif 'depth' in obs.dims:
+                obs = obs.dropna(dim='depth')
+
         for _, mod in enumerate(models):
             # Get min/max depth values
             vmin, vmax = obs.depth.min(skipna=True).data, obs.depth.max(skipna=True).data
