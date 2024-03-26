@@ -177,8 +177,13 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        title_depth = f"Depth obs: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
+        if '3D variable' in figtitle:
+            nan_mask_obs = obs.isnull().all(dim='time')
+            title_depth = f"Depth obs: {obs.depth.where(~nan_mask_obs, other=np.nan).min().values:.1f} m to {obs.depth.where(~nan_mask_obs, other=np.nan).max().values:.1f} m"
+            depth = f"{obs.depth.where(~nan_mask_obs, other=np.nan).min().values:.1f}m_to_{obs.depth.where(~nan_mask_obs, other=np.nan).max().values:.1f}m"
+        else:
+            title_depth = f"Depth obs: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+            depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density obs: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}kgm-3"
@@ -2158,6 +2163,7 @@ def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vm
         Path where to save the figures.
     """
     logger.info('3D variable section difference between observation and model.')
+
     if isinstance(observation["xarray_meta_coloc"][0], xr.DataArray):
         for i_mod, mod in enumerate(models):
             obs_meta_coloc = observation["xarray_meta_coloc"][i_mod].assign_attrs(
@@ -2175,7 +2181,6 @@ def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vm
                     {'name': mod['name']})
                 plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin, vmax, dvmin, dvmax,
                                         cmap, output_path)
-
 
 def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None, dvmin=None,
                             dvmax=None, cmap=cmocean.cm.thermal, output_path=None):
@@ -2216,12 +2221,6 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
         mod_meta_coloc = mod_meta_coloc.dropna('time', 'all')
         obs_meta_coloc = obs_meta_coloc.dropna('time', 'all')
         diff = diff.dropna('time', 'all')
-    # Drop nans if not all nans
-    # if not np.isnan(obs_meta_coloc.min(skipna=True).data):
-    #     mod_meta_coloc = mod_meta_coloc.dropna('depth', 'all')
-    #     obs_meta_coloc = obs_meta_coloc.dropna('depth', 'all')
-    #     diff = diff.dropna('depth', 'all')
-
 
 
     # Get min/max colobar values
@@ -2229,7 +2228,6 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     #                                                        'difference', dvmin, dvmax, cmap)
     vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values_2(obs_meta_coloc, mod_meta_coloc, diff,
                                                            'difference', dvmin, dvmax, cmap)
-
 
     # Plot the graphs
     im_obs = axs[0].pcolormesh(obs_meta_coloc.time, obs_meta_coloc.depth,
@@ -2239,9 +2237,22 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     im_diff = axs[2].pcolormesh(mod_meta_coloc.time, mod_meta_coloc.depth, diff, vmin=dvmin,
                                 vmax=dvmax, cmap=cmocean.cm.balance)
 
-    # Reverse y axes
-    for ax in axs:
-        ax.invert_yaxis()
+
+
+    # Set lim axis and reverse y axes
+    if 'depth_meta_zone' in obs_meta_coloc.attrs:
+        for ax in axs:
+            ax.set_ylim(float(obs_meta_coloc.attrs['depth_meta_zone'].split('_to_')[0]), float(obs_meta_coloc.attrs['depth_meta_zone'].split('_to_')[1]))
+            ax.invert_yaxis()
+    else:
+        nan_mask_obs = obs_meta_coloc.isnull().all(dim='time')
+        nan_mask_mod = mod_meta_coloc.isnull().all(dim='time')
+
+        for ax in axs:
+            ax.set_ylim(np.min([obs_meta_coloc.depth.where(~nan_mask_obs, other=np.nan).min(), mod_meta_coloc.depth.where(~nan_mask_mod, other=np.nan).min()]),
+                        np.max([obs_meta_coloc.depth.where(~nan_mask_obs, other=np.nan).max(), mod_meta_coloc.depth.where(~nan_mask_mod, other=np.nan).max()]))
+            ax.invert_yaxis()
+
 
     # Add the colorbar, titles etc.
     title, figname = get_title_figname('3D variable', obs_meta_coloc, mod_meta_coloc.attrs['name'],

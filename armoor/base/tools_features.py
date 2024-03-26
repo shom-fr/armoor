@@ -52,7 +52,7 @@ def remove_missing_values_ds(models, observation, i, vars):
 
     """
     # Remove missing values
-    if len(vars) == 1:
+    if len(vars) == 1 and vars != 'mld':
         obs = observation["xarray_meta_coloc"][i][vars[0]]
         mod = models[i]["xarray_meta_coloc"][vars[0]]
 
@@ -61,11 +61,12 @@ def remove_missing_values_ds(models, observation, i, vars):
         models[i]["xarray_meta_coloc"][vars[0]] = mod
     else:
         for i_var, var in enumerate(vars):
-            obs = observation["xarray_meta_coloc"][i][var]
-            mod = models[i]["xarray_meta_coloc"][var]
-            mod, obs = remove_missing_values(mod, obs)
-            observation["xarray_meta_coloc"][i][var] = obs
-            models[i]["xarray_meta_coloc"][var] = mod
+            if var != 'mld':
+                obs = observation["xarray_meta_coloc"][i][var]
+                mod = models[i]["xarray_meta_coloc"][var]
+                mod, obs = remove_missing_values(mod, obs)
+                observation["xarray_meta_coloc"][i][var] = obs
+                models[i]["xarray_meta_coloc"][var] = mod
 
     return models, observation
 
