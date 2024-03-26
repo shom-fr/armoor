@@ -392,7 +392,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                 # For feature 4, we need to keep all depths to compute geo currents
                 depth = config_obj["meta_zones"]["depth"]
                 xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
-                xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": f"{depth}"})
+                xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": depth})
 
         if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
             if 'depth' in config_obj["meta_zones"]:
@@ -409,10 +409,14 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                 xarray_obj = meta_filter(xarray_obj)(config_obj["meta_zones"][name])
 
         # Assign depth attrs
-        if 'min_depth' in config_obj["meta_zones"] or 'max_depth' in config_obj["meta_zones"]:
+        if 'min_depth' in config_obj["meta_zones"] and 'max_depth' in config_obj["meta_zones"]:
             min_depth = config_obj["meta_zones"].get('min_depth')
             max_depth = config_obj["meta_zones"].get("max_depth")
             xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": f"{min_depth}_to_{max_depth}"})
+        elif 'min_depth' in config_obj["meta_zones"] and not 'max_depth' in config_obj["meta_zones"]:
+            logger.error("You've indicated a min depth, please indicate max depth in meta zone. By default entire dataset is considered.")
+        elif 'max_depth' in config_obj["meta_zones"] and not 'min_depth' in config_obj["meta_zones"]:
+            logger.error("You've indicated a max depth, please indicate min depth in meta zone. By default entire dataset is considered.")
 
     return xarray_obj
 
