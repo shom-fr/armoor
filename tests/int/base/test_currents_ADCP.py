@@ -46,38 +46,48 @@ class TestBulletins:
         assert True
 
 
-    def test_hovmoller_datashom_bc(self):  # OK
+    def test_hovmoller_LADCP_bc(self):  # OK
         out_path, logger = change_path(folder_test)
-        logger.info('test_hovmoller_datashom_bc')
+        logger.info('test_hovmoller_LADCP_bc')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom_bc.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP_bc.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_hovmoller_ladcp(self):  # OK
+    def test_hovmoller_LADCP_bathyradius(self):  # OK
         out_path, logger = change_path(folder_test)
-        logger.info('test_hovmoller_LADCP')
+        logger.info('test_hovmoller_LADCP_bathyradius')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP_bathyradius.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_hovmoller_datashom_bathyradius(self):  # OK
+    def test_hovmoller_ADCP_res(self):  # OK
         out_path, logger = change_path(folder_test)
-        logger.info('test_hovmoller_datashom_bathyradius')
+        logger.info('test_hovmoller_ADCP_res')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom_bathyradius.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_res.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_hovmoller_datashom_bathyradius_res(self):
+    def test_hovmoller_ADCP_bathyradius(self):  # OK
         out_path, logger = change_path(folder_test)
-        logger.info('test_hovmoller_datashom_bathyradius_res')
+        logger.info('test_hovmoller_ADCP_bathyradius')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_datashom_bathyradius_res.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_bathyradius.ini"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
+
+    def test_hovmoller_ADCP_bathyradius_res(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_hovmoller_ADCP_bathyradius_res')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_bathyradius_res.ini"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
