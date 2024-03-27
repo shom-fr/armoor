@@ -177,24 +177,29 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             title_depth = f"Depth: {obs.attrs['depth_meta_zone']} m"
             depth = f"{obs.attrs['depth_meta_zone']}m"
     elif 'depth' in obs.coords and np.size(obs.depth) > 1:
-        title_depth = f"Depth obs: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
-        depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
+        if '3D variable' in figtitle:
+            nan_mask_obs = obs.isnull().all(dim='time')
+            title_depth = f"Depth: {obs.depth.where(~nan_mask_obs, other=np.nan).min().values:.1f} m to {obs.depth.where(~nan_mask_obs, other=np.nan).max().values:.1f} m"
+            depth = f"{obs.depth.where(~nan_mask_obs, other=np.nan).min().values:.1f}m_to_{obs.depth.where(~nan_mask_obs, other=np.nan).max().values:.1f}m"
+        else:
+            title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
+            depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density obs: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}kgm-3"
     elif 'depth' in obs.coords and np.size(obs.depth) == 1:
         if obs.depth.data.shape == (1,):
-            title_depth = f"Depth obs: {obs.depth.values[0]:.1f} m"
+            title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
             depth = f"{obs.depth.values[0]:.1f}m"
         else:
-            title_depth = f"Depth obs: {obs.depth.values:.1f} m"
+            title_depth = f"Depth: {obs.depth.values:.1f} m"
             depth = f"{obs.depth.values:.1f}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) == 1:
         if obs.pdens.data.shape == (1,):
-            title_depth = f"Density obs: {obs.pdens.values[0]:.1f} m"
+            title_depth = f"Density: {obs.pdens.values[0]:.1f} m"
             depth = f"{obs.pdens.values[0]:.1f}m"
         else:
-            title_depth = f"Density obs: {obs.pdens.values:.1f} m"
+            title_depth = f"Density: {obs.pdens.values:.1f} m"
             depth = f"{obs.pdens.values:.1f}m"
     else:
         title_depth = ""
@@ -2158,6 +2163,7 @@ def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vm
         Path where to save the figures.
     """
     logger.info('3D variable section difference between observation and model.')
+
     if isinstance(observation["xarray_meta_coloc"][0], xr.DataArray):
         for i_mod, mod in enumerate(models):
             obs_meta_coloc = observation["xarray_meta_coloc"][i_mod].assign_attrs(
@@ -2175,7 +2181,6 @@ def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vm
                     {'name': mod['name']})
                 plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin, vmax, dvmin, dvmax,
                                         cmap, output_path)
-
 
 def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None, dvmin=None,
                             dvmax=None, cmap=cmocean.cm.thermal, output_path=None):
@@ -2216,12 +2221,6 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
         mod_meta_coloc = mod_meta_coloc.dropna('time', 'all')
         obs_meta_coloc = obs_meta_coloc.dropna('time', 'all')
         diff = diff.dropna('time', 'all')
-    # Drop nans if not all nans
-    # if not np.isnan(obs_meta_coloc.min(skipna=True).data):
-    #     mod_meta_coloc = mod_meta_coloc.dropna('depth', 'all')
-    #     obs_meta_coloc = obs_meta_coloc.dropna('depth', 'all')
-    #     diff = diff.dropna('depth', 'all')
-
 
 
     # Get min/max colobar values
@@ -2230,18 +2229,28 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values_2(obs_meta_coloc, mod_meta_coloc, diff,
                                                            'difference', dvmin, dvmax, cmap)
 
-
     # Plot the graphs
     im_obs = axs[0].pcolormesh(obs_meta_coloc.time, obs_meta_coloc.depth,
                                obs_meta_coloc.transpose().values, vmin=vmin, vmax=vmax, cmap=cmap)
     im_mod = axs[1].pcolormesh(mod_meta_coloc.time, mod_meta_coloc.depth,
                                mod_meta_coloc.transpose().values, vmin=vmin, vmax=vmax, cmap=cmap)
-    im_diff = axs[2].pcolormesh(mod_meta_coloc.time, mod_meta_coloc.depth, diff, vmin=dvmin,
+    im_diff = axs[2].pcolormesh(diff.time, diff.depth, diff, vmin=dvmin,
                                 vmax=dvmax, cmap=cmocean.cm.balance)
 
-    # Reverse y axes
-    for ax in axs:
-        ax.invert_yaxis()
+    # Set lim axis and reverse y axes
+    if 'depth_meta_zone' in obs_meta_coloc.attrs:
+        for ax in axs:
+            ax.set_ylim(float(obs_meta_coloc.attrs['depth_meta_zone'].split('_to_')[0]), float(obs_meta_coloc.attrs['depth_meta_zone'].split('_to_')[1]))
+            ax.invert_yaxis()
+    else:
+        nan_mask_obs = obs_meta_coloc.isnull().all(dim='time')
+        nan_mask_mod = mod_meta_coloc.isnull().all(dim='time')
+
+        for ax in axs:
+            ax.set_ylim(np.min([obs_meta_coloc.depth.where(~nan_mask_obs, other=np.nan).min(), mod_meta_coloc.depth.where(~nan_mask_mod, other=np.nan).min()]),
+                        np.max([obs_meta_coloc.depth.where(~nan_mask_obs, other=np.nan).max(), mod_meta_coloc.depth.where(~nan_mask_mod, other=np.nan).max()]))
+            ax.invert_yaxis()
+
 
     # Add the colorbar, titles etc.
     title, figname = get_title_figname('3D variable', obs_meta_coloc, mod_meta_coloc.attrs['name'],
@@ -2260,7 +2269,8 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs_meta_coloc)
-    ax_mini_map.scatter(obs_meta_coloc.lon.values, obs_meta_coloc.lat.values, 30,
+    ax_mini_map.scatter(obs_meta_coloc.lon.values,
+                        obs_meta_coloc.lat.values, 30,
                         transform=ccrs.PlateCarree())
 
     # Add second x axis
@@ -2341,7 +2351,8 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs_meta_coloc)
-    ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc.values)), obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc.values)), 30, transform=ccrs.PlateCarree())
+    ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc.values)),
+                        obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc.values)), 30, transform=ccrs.PlateCarree())
 
     # Add legend
     axs[0].legend(loc=5)
@@ -2610,7 +2621,7 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     if 'lon' in list_dims_mean:
         add_plg_minimap(ax_mini_map, obs_coloc, plg)
     else:
-        ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30,
+        ax_mini_map.scatter(obs_coloc.lon.where(~np.isnan(obs_coloc.values)), obs_coloc.lat.where(~np.isnan(obs_coloc.values)), 30,
                             transform=ccrs.PlateCarree())
 
     # Rotate x labels
@@ -2675,7 +2686,8 @@ def plot_profile_unique(models, observation, radius, output_path=None):
 
         # Add the mini-map
         ax_mini_map = add_mini_map(f, obs)
-        ax_mini_map.scatter(obs.lon, obs.lat, 30, 'navy', transform=ccrs.PlateCarree())
+        ax_mini_map.scatter(obs.lon.where(~np.isnan(obs.values)), obs.lat.where(~np.isnan(obs.values)), 30, c='navy', transform=ccrs.PlateCarree())
+        # ax_mini_map.scatter(obs.lon, obs.lat, 30, 'navy', transform=ccrs.PlateCarree())
 
         manage_output(figname, output_path)
 
@@ -2842,18 +2854,32 @@ def plot_diag_ts_multi(models, observation, config_obj, output_path=None):
     """
     logger.info('theta - S diagram with several profiles')
 
-    for _, mod in enumerate(models):
-        # Plot for the whole period
-        vmin, vmax = observation.depth.min(skipna=True).data, observation.depth.max(
-            skipna=True).data
-        plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_path)
+    if "depth_meta_zone" in observation.attrs:
+        vmin = float(observation.attrs["depth_meta_zone"].split('_to_')[0])
+        vmax = float(observation.attrs["depth_meta_zone"].split('_to_')[1])
+        for _, mod in enumerate(models):
+            # Plot for the whole period
+            plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_path)
 
-        # Plot for each interval
-        for i_inter, _ in enumerate(observation.interval):
-            observation_inter = observation.isel(interval=[i_inter])
-            vmin, vmax = observation_inter.depth.min(skipna=True).data, observation_inter.depth.max(
-                skipna=True).data
-            plot_diag_ts_multi_figure(observation_inter, mod, config_obj, vmin, vmax, output_path)
+            # Plot for each interval
+            for i_inter, _ in enumerate(observation.interval):
+                observation_inter = observation.isel(interval=[i_inter])
+                plot_diag_ts_multi_figure(observation_inter, mod, config_obj, vmin, vmax, output_path)
+    else:
+        for _, mod in enumerate(models):
+            # Plot for the whole period
+            vmin, vmax = (observation.depth.where(~np.isnan(observation.ptemp), other=np.nan).min(),
+                          observation.depth.where(~np.isnan(observation.ptemp), other=np.nan).max())  #.min(skipna=True).data, observation.depth.max(
+                # skipna=True).data
+            plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_path)
+
+            # Plot for each interval
+            for i_inter, _ in enumerate(observation.interval):
+                observation_inter = observation.isel(interval=[i_inter])
+                vmin, vmax = (observation_inter.depth.where(~np.isnan(observation_inter.ptemp), other=np.nan).min(),
+                              observation_inter.depth.where(~np.isnan(observation_inter.ptemp), other=np.nan).max())  #.min(skipna=True).data, observation_inter.depth.max(
+                    # skipna=True).data
+                plot_diag_ts_multi_figure(observation_inter, mod, config_obj, vmin, vmax, output_path)
 
 
 def plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_path):
@@ -2877,11 +2903,6 @@ def plot_diag_ts_multi_figure(observation, mod, config_obj, vmin, vmax, output_p
     logger.info('Theta - S diagram with several profiles')
 
     f, ax = figure_1_profile()
-
-    if "depth_meta_zone" in observation.attrs:
-        vmin = float(observation.attrs["depth_meta_zone"].split('_to_')[0])
-        vmax = float(observation.attrs["depth_meta_zone"].split('_to_')[1])
-
 
     # "en traits fins, tous les profils observés"
     sals_mod, ptemps_mod, depths_mod = [], [], []
@@ -3077,7 +3098,8 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
 
     # Add the mini-map
     ax_mini_map = add_mini_map(f, obs)
-    ax_mini_map.scatter(obs.lon, obs.lat, 30, c='navy', transform=ccrs.PlateCarree())
+    ax_mini_map.scatter(obs.lon.where(~np.isnan(obs.values)), obs.lat.where(~np.isnan(obs.values)), 30, c='navy', transform=ccrs.PlateCarree())
+    # ax_mini_map.scatter(obs.lon, obs.lat, 30, c='navy', transform=ccrs.PlateCarree())
 
     manage_output(figname, output_path)
 

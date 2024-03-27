@@ -478,10 +478,10 @@ class SSTAccessor:
         if 'mld' in self._obj:
             return self._obj.mld
         ptemp = self._obj.sel_var.sel_ptemp()
-        mld = mixed_layer_depth(ptemp, method='deltatemp')
+        mld = mixed_layer_depth(ptemp, zref=10)
         if np.isnan(mld.max().data):
             pdens = self._obj.sel_var.sel_pdensity()
-            mld = mixed_layer_depth(pdens, method='deltadens')
+            mld = mixed_layer_depth(pdens, zref=10)
         return mld
 
     def sel_pres(self):
