@@ -98,18 +98,18 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             if ver_flag:
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
 
-    for var in obs_coloc.variables:
-        if var[0] == 'u':
-            type = var[1:]
-            obs_coloc = obs_coloc.sel_var.get_norm_dir(type=type)
-
-    for var in mod_coloc.variables:
-        if var[0] == 'u':
-            type = var[1:]
-            mod_coloc = mod_coloc.sel_var.get_norm_dir(type=type)
+    obs_coloc = coloc_var(obs_coloc)
+    mod_coloc = coloc_var(mod_coloc)
 
     return obs_coloc, mod_coloc
 
+def coloc_var(obj_coloc):
+    if 'variables' in obj_coloc:
+        for var in obj_coloc['variables']:
+            if var[0] == 'u':
+                type = var[1:]
+                obj_coloc = obj_coloc.sel_var.get_norm_dir(type=type)
+    return obj_coloc
 
 def temporal_colocation(ds_to_coloc, tgt, coloc_method):
     """
