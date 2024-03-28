@@ -12,7 +12,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -21,7 +21,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_curr_geo')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_curr_geo.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_curr_geo.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -31,7 +31,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_hycom_manga_dens')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_hycom_manga_dens.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_hycom_manga_dens.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -40,7 +40,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_seasor')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -49,7 +49,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_scanfish')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_scanfish.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_scanfish.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -58,7 +58,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_croco')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_croco.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_croco.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -67,7 +67,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_seasor_topaz')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor_topaz.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor_topaz.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -76,7 +76,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_3d')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -85,7 +85,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_3d_curr_geo')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_curr_geo.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_curr_geo.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -94,7 +94,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_3d_seasor')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_seasor.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_seasor.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -103,7 +103,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_3d_scanfish')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_scanfish.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_scanfish.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -112,7 +112,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_3d_hycom')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_hycom.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_hycom.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -121,7 +121,28 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_3d_croco')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_croco.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_croco.cfg"])
         parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_3d_PSY4_SCA(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_variable_3d_PSY4_SCA.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_PSY4_SCA.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_2d_SCA(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_variable_2d_SCA.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_SCA.cfg"])
+        parser.update({'output_path': out_path})
+        # create_folder(f'tmp')
         dict2call(parser)
         assert True

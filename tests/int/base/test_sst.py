@@ -11,7 +11,7 @@ class TestBulletins:
     def test_diag_disp_sst(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_diag_disp_sst')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_disp_sst.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_disp_sst.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -19,7 +19,7 @@ class TestBulletins:
     def test_map_sst_biais(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_sst_biais')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_biais.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_biais.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -27,7 +27,7 @@ class TestBulletins:
     def test_map_sst_diff(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_sst_diff')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_diff.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_diff.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -35,8 +35,7 @@ class TestBulletins:
     def test_map_sst_diff_seuil_bathy(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_sst_diff_seuil_bathy')
-        print(f"../single_tests/{folder_test}/map_sst_diff_seuil_bathy.ini")
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_diff_seuil_bathy.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_diff_seuil_bathy.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -44,7 +43,7 @@ class TestBulletins:
     def test_map_sst_diff_topaz(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_sst_diff_TOPAZ')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_diff_TOPAZ.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_diff_TOPAZ.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -52,7 +51,7 @@ class TestBulletins:
     def test_map_sst_rmse(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_sst_rmse')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_rmse.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_rmse.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -60,7 +59,7 @@ class TestBulletins:
     def test_map_sst_rmse_centree(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_sst_rmse_centree')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_rmse_centree.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_sst_rmse_centree.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -68,7 +67,7 @@ class TestBulletins:
     def test_ser_temp_sst(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_ser_temp_sst')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ser_temp_sst.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ser_temp_sst.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -76,7 +75,7 @@ class TestBulletins:
     def test_ser_temp_sst_ponct_diff(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_ser_temp_sst_ponct_diff')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ser_temp_sst_ponct_diff.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/ser_temp_sst_ponct_diff.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -85,7 +84,72 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_ser_temp_sst_ponct_intervalles')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_sst_ponct_intervalles.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_sst_ponct_intervalles.cfg"])
         parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_sst_stats(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_sst_stats.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/sst_stats.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_sst_map_diff_hycom(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_sst_map_diff_hycom.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/sst_map_diff_hycom.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_map_sst_diff_quality(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_map_sst_diff_quality.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/map_sst_diff_quality.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_diag_disp_L4(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_diag_disp_L4.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_L4.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_sst_stats_intervalles(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_sst_stats_intervalles.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/sst_stats_intervalles.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_map_diff_croco(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_map_diff_croco.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/map_diff_croco.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
         dict2call(parser)
         assert True

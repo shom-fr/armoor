@@ -12,7 +12,7 @@ class TestBulletins:
     def test_map_current_db(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_current_DB')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_current_DB.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_current_DB.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -20,7 +20,7 @@ class TestBulletins:
     def test_map_trajectory(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_trajectory')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -28,7 +28,7 @@ class TestBulletins:
     def test_plot_diff_traj_distance(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_plot_diff_traj_distance')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/plot_diff_traj_distance.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/plot_diff_traj_distance.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -36,7 +36,16 @@ class TestBulletins:
     def test_map_trajectory_topaz(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_trajectory_TOPAZ')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory_TOPAZ.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory_TOPAZ.cfg"])
         parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+    def test_map_trajectory_hycom(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_map_trajectory_hycom.cfg")
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory_hycom.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
