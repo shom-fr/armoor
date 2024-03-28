@@ -2269,9 +2269,14 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs_meta_coloc)
-    ax_mini_map.scatter(obs_meta_coloc.lon.values,
-                        obs_meta_coloc.lat.values, 30,
-                        transform=ccrs.PlateCarree())
+    try:
+        ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values,
+                            obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values, 30,
+                            transform=ccrs.PlateCarree())
+    except:
+        ax_mini_map.scatter(obs_meta_coloc.lon.values,
+                            obs_meta_coloc.lat.values, 30,
+                            transform=ccrs.PlateCarree())
 
     # Add second x axis
     if len(np.unique(obs_meta_coloc.lon.values)) > 1:
@@ -2351,8 +2356,14 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs_meta_coloc)
-    ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc.values)),
-                        obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc.values)), 30, transform=ccrs.PlateCarree())
+    try:
+        ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values,
+                            obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values, 30,
+                            transform=ccrs.PlateCarree())
+    except:
+        ax_mini_map.scatter(obs_meta_coloc.lon.values,
+                            obs_meta_coloc.lat.values, 30,
+                            transform=ccrs.PlateCarree())
 
     # Add legend
     axs[0].legend(loc=5)
@@ -2621,8 +2632,13 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     if 'lon' in list_dims_mean:
         add_plg_minimap(ax_mini_map, obs_coloc, plg)
     else:
-        ax_mini_map.scatter(obs_coloc.lon.where(~np.isnan(obs_coloc.values)), obs_coloc.lat.where(~np.isnan(obs_coloc.values)), 30,
-                            transform=ccrs.PlateCarree())
+        try:
+            ax_mini_map.scatter(obs_coloc.lon.where(~np.isnan(obs_coloc.values), other=np.nan),
+                                obs_coloc.lat.where(~np.isnan(obs_coloc.values), other=np.nan), 30,
+                                transform=ccrs.PlateCarree())
+        except:
+            ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30,
+                                transform=ccrs.PlateCarree())
 
     # Rotate x labels
     for label in ax.get_xticklabels():
@@ -2686,8 +2702,7 @@ def plot_profile_unique(models, observation, radius, output_path=None):
 
         # Add the mini-map
         ax_mini_map = add_mini_map(f, obs)
-        ax_mini_map.scatter(obs.lon.where(~np.isnan(obs.values)), obs.lat.where(~np.isnan(obs.values)), 30, c='navy', transform=ccrs.PlateCarree())
-        # ax_mini_map.scatter(obs.lon, obs.lat, 30, 'navy', transform=ccrs.PlateCarree())
+        ax_mini_map.scatter(obs.lon, obs.lat, 30, 'navy', transform=ccrs.PlateCarree())
 
         manage_output(figname, output_path)
 
@@ -3098,8 +3113,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
 
     # Add the mini-map
     ax_mini_map = add_mini_map(f, obs)
-    ax_mini_map.scatter(obs.lon.where(~np.isnan(obs.values)), obs.lat.where(~np.isnan(obs.values)), 30, c='navy', transform=ccrs.PlateCarree())
-    # ax_mini_map.scatter(obs.lon, obs.lat, 30, c='navy', transform=ccrs.PlateCarree())
+    ax_mini_map.scatter(obs.lon, obs.lat, 30, c='navy', transform=ccrs.PlateCarree())
 
     manage_output(figname, output_path)
 
