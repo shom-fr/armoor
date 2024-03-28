@@ -13,7 +13,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_ellipse_courant_ttide')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_ttide.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_ttide.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -22,7 +22,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_ellipse_courant_utide')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_utide.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_utide.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -31,7 +31,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_harmonic_table')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/harmonic_table.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/harmonic_table.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -40,7 +40,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_harmonic_table_tranche')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/harmonic_table_tranche.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/harmonic_table_tranche.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -50,7 +50,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_hovmoller_LADCP_bc')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP_bc.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP_bc.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -59,7 +59,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_hovmoller_LADCP_bathyradius')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP_bathyradius.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_LADCP_bathyradius.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -68,7 +68,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_hovmoller_ADCP_res')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_res.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_res.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -77,7 +77,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_hovmoller_ADCP_bathyradius')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_bathyradius.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_bathyradius.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -86,8 +86,18 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_hovmoller_ADCP_bathyradius_res')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_bathyradius_res.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_ADCP_bathyradius_res.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
+    def test_ellipses_ADCP_CROCO(self):
+        out_path, logger = change_path(folder_test)
+
+        logger.info("test_ellipses_ADCP_CROCO.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ellipses_ADCP_CROCO.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
