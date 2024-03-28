@@ -482,6 +482,8 @@ class SSTAccessor:
         if np.isnan(mld.max().data):
             pdens = self._obj.sel_var.sel_pdensity()
             mld = mixed_layer_depth(pdens, zref=10)
+            if np.isnan(mld.max().data):
+                logger.warning("mld full of NaN, your dataset probably does not have ptemp and pdens value at zref = 10 m.")
         return mld
 
     def sel_pres(self):
