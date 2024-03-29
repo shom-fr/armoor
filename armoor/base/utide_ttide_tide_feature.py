@@ -181,7 +181,7 @@ def run_harmonic_analysis(ds, output):
             ds_res.append(ds_res_i)
             freq = ds_res_i.freq
         ds_res = xr.concat(ds_res, dim='lon')
-        ds_res = ds_res.drop('freq')
+        ds_res = ds_res.drop_vars('freq')
         ds_res['freq'] = freq
     else:
         ds_res = harmonic_analysis_depth_slice(ds, list_waves, tide_tool)
