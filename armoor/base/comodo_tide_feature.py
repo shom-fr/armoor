@@ -41,7 +41,7 @@ def harmonic_analysis(ds_to_anal, var, path_nc, path_atlas, path_tools, list_wav
     if 'time' in ds_to_anal.lon.dims:
         lon = ds_to_anal.lon.values[0]
         lat = ds_to_anal.lat.values[0]
-        ds_to_anal = ds_to_anal.drop(['lon', 'lat']).assign_coords({'lon': lon, 'lat': lat})
+        ds_to_anal = ds_to_anal.drop_vars(['lon', 'lat']).assign_coords({'lon': lon, 'lat': lat})
 
     # Create the netcdf file to run comodo
     format_ds2nc(ds_to_anal, path_nc, var)

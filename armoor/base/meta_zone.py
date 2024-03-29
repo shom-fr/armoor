@@ -499,7 +499,7 @@ class MetazoneAccessor:
         elif 'depth' in self._obj.dims:
             indice_min_densite = difference_densite.argmin(dim='depth')
             self._obj = self._obj.isel(depth=indice_min_densite)
-        self._obj = self._obj.drop('pdens').assign_coords({'pdens': pdens})
+        self._obj = self._obj.drop_vars('pdens').assign_coords({'pdens': pdens})
         if 'depth' in self._obj.coords:
             self._obj = self._obj.reset_coords('depth')
         return self._obj
@@ -578,7 +578,7 @@ class MetazoneAccessor:
         ds_nearest_depth = [self._obj.isel(time=i_time, z=nearest_depth_index[i_time]) for
                             i_time, time in enumerate(self._obj.time)]
         tgt_ds = xr.concat(ds_nearest_depth, dim='time')
-        tgt_ds = tgt_ds.drop('depth').assign_coords(depth=depth)
+        tgt_ds = tgt_ds.drop_vars('depth').assign_coords(depth=depth)
         return tgt_ds
 
     def vertical_selection_croco_hycom(self, depth):
@@ -598,12 +598,12 @@ class MetazoneAccessor:
             logger.info(f'The first z/level layer will be selected')
             if 'type' in self._obj.attrs and self._obj.attrs['type'] == 'CROCO':  # for croco
                 ds_tgt = self._obj.isel(level=-1)
-                ds_tgt = ds_tgt.drop(['level', 'depth'])
+                ds_tgt = ds_tgt.drop_vars(['level', 'depth'])
                 ds_tgt.coords['depth'] = 0
                 return ds_tgt
             else:  # Hycom
                 ds_tgt = self._obj.isel(z=0)
-                ds_tgt = ds_tgt.drop(['z', 'depth'])
+                ds_tgt = ds_tgt.drop_vars(['z', 'depth'])
                 ds_tgt.coords['depth'] = 0
                 return ds_tgt
 
@@ -658,9 +658,9 @@ class MetazoneAccessor:
 
         if dataset0:
             if 'z' in tgt_ds:
-                tgt_ds = tgt_ds.drop('z')
+                tgt_ds = tgt_ds.drop_vars('z')
             elif 'level' in tgt_ds:
-                tgt_ds = tgt_ds.drop('level')
+                tgt_ds = tgt_ds.drop_vars('level')
             tgt_ds = xr.concat([dataset0, tgt_ds], dim="depth")
 
         return tgt_ds
