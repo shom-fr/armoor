@@ -415,7 +415,7 @@ def open_decode_mouillages(path_file):
         measur = file.iloc[index_mesures[i] + 1:index_mesures[i + 1]].set_index('depth')
         unwanted_prefixes = ['Cruise', 'Station', 'Type', 'yyyy', 'Lon', 'Lat', 'Bot', 'Unnamed']
         columns_to_drop = measur.columns[measur.columns.str.startswith(tuple(unwanted_prefixes))]
-        measur_ds = measur.drop_vars(columns=columns_to_drop).astype(float).to_xarray()
+        measur_ds = measur.drop(columns=columns_to_drop).astype(float).to_xarray()
         measur_ds = measur_ds.expand_dims(lon=[lon], lat=[lat])
         measur_ds = measur_ds.assign_coords(time=date, bottom_depth=bottom_depth)
         list_ds.append(measur_ds.reset_coords())
@@ -448,7 +448,7 @@ def open_decode_mouillages(path_file):
     if len(np.unique(mouillage.lon)) == 1 and len(np.unique(mouillage.lat)) == 1:
         lon = np.unique(mouillage.lon.data)
         lat = np.unique(mouillage.lat.data)
-        mouillage = mouillage.drop_vars(['lon', 'lat']).assign_coords({'lon': lon, 'lat': lat})
+        mouillage = mouillage.drop(['lon', 'lat']).assign_coords({'lon': lon, 'lat': lat})
     return mouillage
 
 
@@ -572,7 +572,7 @@ def open_decode_croco(path_file):
             angle = croco['angle']
             da_u = croco['u'] * np.cos(angle) - croco['v'] * np.sin(angle)
             da_v = croco['v'] * np.cos(angle) + croco['u'] * np.sin(angle)
-            croco = croco.drop_vars(['u', 'v', 'angle'])
+            croco = croco.drop(['u', 'v', 'angle'])
             croco['u'] = da_u
             croco['v'] = da_v
 
@@ -1168,7 +1168,7 @@ def concat_cmems(list_ds):
             ds = ds.assign_coords({'DEPTH': ds.DEPTH.data})
             ds = ds.sel(DEPTH=common_depths, method='nearest')
             ds = ds.assign_coords({'DEPTH': common_depths})
-            ds = ds.drop_vars(['LONGITUDE', 'LATITUDE'])
+            ds = ds.drop(['LONGITUDE', 'LATITUDE'])
             ds = ds.where(ds.DEPTH.isin(depths_in_ds))
             ds = ds.assign_coords({'LONGITUDE': lon, 'LATITUDE': lat})
             # Put all TIMES on the same values

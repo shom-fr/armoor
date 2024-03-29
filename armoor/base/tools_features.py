@@ -142,9 +142,9 @@ def remove_missing_values(model, obs):
 
     for coord in ['sig', 's_rho']:
         if coord in model.coords:
-            model = model.drop_vars(coord)
+            model = model.drop(coord)
         if coord in obs.coords:
-            obs = obs.drop_vars(coord)
+            obs = obs.drop(coord)
 
     # .values otherwise returns all NaN for croco and topaz
 
@@ -329,10 +329,10 @@ def check_same_variables(models, observation):
             if var_mod not in observation:
                 logger.warning("%s is not included in the observation product ; "
                                "it is thus removed from model %s", var_mod, imod)
-                model = model.drop_vars(var_mod)
+                model = model.drop(var_mod)
         for var_obs in list(observation['xarray_meta'].keys()):
             if var_obs not in mod['xarray_meta']:
                 logger.warning("%s is not included in the observation product ; "
                                "it is thus removed from model %s", var_obs, imod)
-                observation['xarray_meta'] = observation['xarray_meta'].drop_vars(var_obs)
+                observation['xarray_meta'] = observation['xarray_meta'].drop(var_obs)
     return models, observation
