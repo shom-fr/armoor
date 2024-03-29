@@ -308,8 +308,8 @@ class SSTAccessor:
         """
 
         if 'u_bc' in self._obj:
-            current_res = self._obj[['u_bc', 'v_bc', 'norm_bc', 'dir_bc']]
-            return current_res
+            current_bc = self._obj[['u_bc', 'v_bc', 'norm_bc', 'dir_bc']]
+            return current_bc
 
         # Calculate the total current
         current = self._obj.sel_var.sel_current()
