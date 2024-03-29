@@ -106,7 +106,7 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
 def coloc_var(obj_coloc):
     if isinstance(obj_coloc, xr.Dataset):
         logger.info('coloc_var')
-        for var in obj_coloc['variables']:
+        for var in obj_coloc.variables:
             if var[0] == 'u':
                 type = var[1:]
                 obj_coloc = obj_coloc.sel_var.get_norm_dir(type=type)
