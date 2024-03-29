@@ -1,5 +1,6 @@
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
+from armoor.hmi.script_tools import create_folder
 from tests.int.base import change_path, copy_test_files
 
 folder_test = 'test_f2'
@@ -95,21 +96,21 @@ class TestBulletins:
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_intervalles.cfg"])
         parser.update({'output_path': out_path})
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_diag_ts_psy4(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_diag_ts_psy4.cfg")
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_ts_psy4.cfg"])
         parser.update({'output_path': out_path})
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_diag_ts_multi_cora(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_diag_ts_multi_cora.cfg")
         parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_ts_multi_cora.cfg"])
         parser.update({'output_path': out_path})
@@ -118,86 +119,80 @@ class TestBulletins:
 
     def test_ser_temp_tranches(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_ser_temp_tranches.cfg")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_tranches.cfg"])
         parser.update({'output_path': out_path})
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_diag_theta_s_unique_SCA(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_diag_theta_s_unique_SCA.cfg")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_unique_SCA.cfg"])
         parser.update({'output_path': out_path})
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_map_biais_intervalles_tranches_SCA(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_map_biais_intervalles_tranches_SCA.cfg")
         parser = command_line_interface(['--cfgfile',
                                          f"../single_tests/{folder_test}/map_biais_intervalles_tranches_SCA.cfg"])
         parser.update({'output_path': out_path})
-        # create_folder(f'tmp')
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_diag_disp_SCA(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_diag_disp_SCA.cfg")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_SCA.cfg"])
         parser.update({'output_path': out_path})
-        # create_folder(f'tmp')
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_profil_multi_temp_SCA(self):
         out_path, logger = change_path(folder_test)
-
-        logger.info("test_profil_multi_temp_SCA.cfg")
+        logger.info("test_profil_multi_temp_SCA")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/profil_multi_temp_SCA.cfg"])
         parser.update({'output_path': out_path})
-        # create_folder(f'tmp')
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_ser_temp_stat_SCA(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_ser_temp_stat_SCA.cfg")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_stat_SCA.cfg"])
         parser.update({'output_path': out_path})
-        # create_folder(f'tmp')
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_diag_disp_argo(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_diag_disp_argo.cfg")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_argo.cfg"])
         parser.update({'output_path': out_path})
-        # create_folder(f'tmp')
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_diag_disp_list_flotteurs(self):
         out_path, logger = change_path(folder_test)
-
         logger.info("test_diag_disp_list_flotteurs.cfg")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_list_flotteurs.cfg"])
         parser.update({'output_path': out_path})
-        # create_folder(f'tmp')
+        create_folder(f'tmp')
         dict2call(parser)
         assert True
