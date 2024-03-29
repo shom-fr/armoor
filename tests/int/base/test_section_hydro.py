@@ -128,8 +128,7 @@ class TestBulletins:
 
     def test_variable_3d_PSY4_SCA(self):
         out_path, logger = change_path(folder_test)
-
-        logger.info("test_variable_3d_PSY4_SCA.cfg")
+        logger.info("test_variable_3d_PSY4_SCA")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_PSY4_SCA.cfg"])
         parser.update({'output_path': out_path})
@@ -138,11 +137,9 @@ class TestBulletins:
 
     def test_variable_2d_SCA(self):
         out_path, logger = change_path(folder_test)
-
-        logger.info("test_variable_2d_SCA.cfg")
+        logger.info("test_variable_2d_SCA")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_SCA.cfg"])
         parser.update({'output_path': out_path})
-        # create_folder(f'tmp')
         dict2call(parser)
         assert True

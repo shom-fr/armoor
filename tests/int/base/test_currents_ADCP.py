@@ -1,5 +1,4 @@
 from armoor.cli.command_line_interface import command_line_interface
-from armoor.hmi.script_tools import create_folder
 from armoor.base.calls_from_dict import dict2call
 from tests.int.base import change_path, copy_test_files
 
@@ -93,11 +92,9 @@ class TestBulletins:
 
     def test_ellipses_ADCP_CROCO(self):
         out_path, logger = change_path(folder_test)
-
-        logger.info("test_ellipses_ADCP_CROCO.cfg")
+        logger.info("test_ellipses_ADCP_CROCO")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/ellipses_ADCP_CROCO.cfg"])
         parser.update({'output_path': out_path})
-        create_folder(f'tmp')
         dict2call(parser)
         assert True
