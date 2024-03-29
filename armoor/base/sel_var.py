@@ -154,7 +154,7 @@ class SSTAccessor:
             current['norm'] = (current.u ** 2 + current.v ** 2) ** 0.5
 
         # Retrieve direction
-        current['dir'] = np.arctan2(current['v'], current['u']) * 180 / np.pi
+        current['dir'] = np.arctan2(current['u'], current['v']) * 180 / np.pi
         current['dir'] = current['dir'].assign_attrs({'units': '°'})
         return current
 
@@ -306,8 +306,6 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing baroclinic current.
         """
-        if 'u_bc' in self._obj:
-            return self._obj[['u_bc', 'v_bc', 'norm_bc', 'dir_bc']]
 
         # Calculate the total current
         current = self._obj.sel_var.sel_current()
@@ -331,7 +329,6 @@ class SSTAccessor:
         current_bc = xr.Dataset()
         current_bc['u_bc'] = ubc
         current_bc['v_bc'] = vbc
-        current_bc['norm_bc'] = vbc
         current_bc = current_bc.sel_var.get_norm_dir(type='_bc')
         current_bc = current_bc.assign_attrs({'name': self._obj.attrs['name']})
         return current_bc
