@@ -11,7 +11,7 @@ class TestBulletins:
     def test_graph2d_steps(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_graph2d_steps')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/graph2d_steps.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/graph2d_steps.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -19,7 +19,7 @@ class TestBulletins:
     def test_graph2d_steps_bc(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_graph2d_steps_bc')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/graph2d_steps_bc.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/graph2d_steps_bc.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -28,7 +28,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_stick_plot_vmadcp_hycom_1depth')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_hycom_1depth.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_hycom_1depth.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -37,7 +37,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_stick_plot_vmadcp_hycom_1depth_bc')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_hycom_1depth_bc.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_hycom_1depth_bc.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -46,7 +46,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_stick_plot_vmadcp_hycom_3depths')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_hycom_3depths.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_hycom_3depths.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -54,7 +54,7 @@ class TestBulletins:
     def test_stick_plot_vmadcp_steps(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_stick_plot_vmadcp_steps')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_steps.ini"])
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_steps.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

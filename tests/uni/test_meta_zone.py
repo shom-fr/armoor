@@ -112,11 +112,10 @@ class TestMetaZone:
     def test_vertical_selection_range(self):
         logger.info('test_vertical_selection_range')
         depth_min, depth_max = 2, 5
-
         ds_meta = ds_lon_lat_depth.meta.vertical_selection_range([depth_min, depth_max],
                                                                  var_vert='depth')
-
-        assert ds_meta.depth.min() > depth_min and ds_meta.depth.max() < depth_max
+        ds_meta = ds_meta.dropna(dim='depth',how='all')
+        assert ds_meta.depth.min().data > depth_min and ds_meta.depth.max().data < depth_max
 
     def test_vertical_selection_list(self):
         logger.info('test_vertical_selection_list')

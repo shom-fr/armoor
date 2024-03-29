@@ -4,7 +4,7 @@ import os
 import copy
 import numpy as np
 from armoor.base.tools_features import remove_missing_values_ds
-from armoor.base import plot_features, ttide_tide_feature
+from armoor.base import plot_features, utide_ttide_tide_feature
 from armoor.base.colocation import colocate_all
 from armoor.hmi.script_tools import create_folder
 
@@ -77,11 +77,11 @@ def plot(config_obj):
             for i_mod, mod in enumerate(models):
                 # Proceed harmonic analysis on obs
                 logger.info(f'Computing harmonic analysis for the observation...')
-                ds_obs = ttide_tide_feature.run_harmonic_analysis_map(
+                ds_obs = utide_ttide_tide_feature.run_harmonic_analysis_map(
                     observation["xarray_meta_coloc"][i_mod], output)
                 # Proceed harmonic analysis on mod
                 logger.info(f'Computing harmonic analysis for model {i_mod}...')
-                ds_mod = ttide_tide_feature.run_harmonic_analysis_map(mod['xarray_meta_coloc'],
+                ds_mod = utide_ttide_tide_feature.run_harmonic_analysis_map(mod['xarray_meta_coloc'],
                                                                       output)
 
                 # Plot the maps
@@ -94,12 +94,12 @@ def plot(config_obj):
 
             # Proceed harmonic analysis on obs
             logger.info(f'Computing harmonic analysis for the observation...')
-            ds_obs = ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
+            ds_obs = utide_ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
 
             ds_models = []
             for i_mod, mod in enumerate(models):
                 logger.info(f'Computing harmonic analysis for model {i_mod}...')
-                ds_mod = ttide_tide_feature.run_harmonic_analysis(mod['xarray_meta_coloc'], output)
+                ds_mod = utide_ttide_tide_feature.run_harmonic_analysis(mod['xarray_meta_coloc'], output)
                 ds_models.append(ds_mod)
 
             # Get scale

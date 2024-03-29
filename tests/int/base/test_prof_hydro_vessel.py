@@ -12,7 +12,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_diag_disp')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -21,7 +21,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_multi_plot_tranche_intervalle')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/multi_plot_tranche_intervalle.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/multi_plot_tranche_intervalle.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -30,7 +30,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_diag_theta_s_multi')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_multi.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_multi.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -39,7 +39,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_diag_theta_s_multi_dens')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_multi_dens.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_multi_dens.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -48,16 +48,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_diag_theta_s_unique')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_unique.ini"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
-
-    def test_diag_disp_tranche_intervalle(self):  # OK
-        out_path, logger = change_path(folder_test)
-        logger.info('test_diag_disp_tranche_intervalle')
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_tranche_intervalle.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_unique.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -66,7 +57,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_map_diff')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/map_diff.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/map_diff.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -75,7 +66,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_map_diff_intervalles')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/map_diff_intervalles.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/map_diff_intervalles.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -84,7 +75,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_profil_multi_temp')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/profil_multi_temp.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/profil_multi_temp.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -93,7 +84,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_profil_unique_temp')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/profil_unique_temp.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/profil_unique_temp.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -102,16 +93,95 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_ser_temp_intervalles')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_intervalles.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_intervalles.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
 
-    def test_ser_temp_tranches(self):  # OK
+    def test_diag_ts_psy4(self):
         out_path, logger = change_path(folder_test)
-        logger.info('test_ser_temp_tranches')
+        logger.info("test_diag_ts_psy4")
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_ts_psy4.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_diag_ts_multi_cora(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_diag_ts_multi_cora")
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_ts_multi_cora.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_ser_temp_tranches(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_ser_temp_tranches")
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_tranches.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_tranches.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_diag_theta_s_unique_SCA(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_diag_theta_s_unique_SCA")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_theta_s_unique_SCA.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_map_biais_intervalles_tranches_SCA(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_map_biais_intervalles_tranches_SCA")
+        parser = command_line_interface(['--cfgfile',
+                                         f"../single_tests/{folder_test}/map_biais_intervalles_tranches_SCA.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_diag_disp_SCA(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_diag_disp_SCA")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_SCA.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_profil_multi_temp_SCA(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_profil_multi_temp_SCA")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/profil_multi_temp_SCA.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_ser_temp_stat_SCA(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_ser_temp_stat_SCA")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_stat_SCA.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_diag_disp_argo(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_diag_disp_argo")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_argo.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_diag_disp_list_flotteurs(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_diag_disp_list_flotteurs")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_list_flotteurs.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
