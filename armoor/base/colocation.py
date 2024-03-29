@@ -104,7 +104,8 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
     return obs_coloc, mod_coloc
 
 def coloc_var(obj_coloc):
-    if 'variables' in obj_coloc:
+    if isinstance(obj_coloc, xr.Dataset):
+        logger.info('coloc_var')
         for var in obj_coloc['variables']:
             if var[0] == 'u':
                 type = var[1:]
