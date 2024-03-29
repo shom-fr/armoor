@@ -1,6 +1,5 @@
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
-from armoor.hmi.script_tools import create_folder
 from tests.int.base import change_path, copy_test_files
 
 folder_test = 'test_f4'
@@ -129,22 +128,18 @@ class TestBulletins:
 
     def test_variable_3d_PSY4_SCA(self):
         out_path, logger = change_path(folder_test)
-
-        logger.info("test_variable_3d_PSY4_SCA.cfg")
+        logger.info("test_variable_3d_PSY4_SCA")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_3d_PSY4_SCA.cfg"])
         parser.update({'output_path': out_path})
-        create_folder(f'tmp')
         dict2call(parser)
         assert True
 
     def test_variable_2d_SCA(self):
         out_path, logger = change_path(folder_test)
-
-        logger.info("test_variable_2d_SCA.cfg")
+        logger.info("test_variable_2d_SCA")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_SCA.cfg"])
         parser.update({'output_path': out_path})
-        create_folder(f'tmp')
         dict2call(parser)
         assert True

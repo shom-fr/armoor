@@ -35,8 +35,7 @@ class TestBulletins:
 
     def test_ser_temp_ponct_SCA(self):
         out_path, logger = change_path(folder_test)
-
-        logger.info("test_ser_temp_ponct_SCA.cfg")
+        logger.info("test_ser_temp_ponct_SCA")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_ponct_SCA.cfg"])
         parser.update({'output_path': out_path})
@@ -45,8 +44,7 @@ class TestBulletins:
 
     def test_ser_temp_stats_SCA(self):
         out_path, logger = change_path(folder_test)
-
-        logger.info("test_ser_temp_stats_SCA.cfg")
+        logger.info("test_ser_temp_stats_SCA")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_stats_SCA.cfg"])
         parser.update({'output_path': out_path})
