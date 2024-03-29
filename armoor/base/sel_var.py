@@ -307,6 +307,10 @@ class SSTAccessor:
             Data array containing baroclinic current.
         """
 
+        if 'u_bc' in self._obj:
+            current_res = self._obj[['u_bc', 'v_bc', 'norm_bc', 'dir_bc']]
+            return current_res
+
         # Calculate the total current
         current = self._obj.sel_var.sel_current()
 
