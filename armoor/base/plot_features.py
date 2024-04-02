@@ -3271,8 +3271,10 @@ def find_var_title(da):
 
     if "salinity" in var_name or 'Salinity' in var_name:
         var_name = 'Salinity'
-    if "temperature" in var_name or 'Temperature' in var_name:
+    if "temperature" in var_name or 'Temperature' in var_name or var_name == 'temp':
         var_name = 'Temperature'
+    if 'ptemp' in var_name:
+        var_name = 'Potential temperature'
     if 'sst' in var_name:
         var_name = 'SST'
     if 'res' in var_name:
@@ -3286,6 +3288,8 @@ def find_var_title(da):
         var_unit = da.attrs['units']
     elif var_name in ['u', 'v', 'norm', "Geostrophic current"]:
         var_unit = 'm/s'
+    elif var_name in ['Temperature', 'temperature']:
+        var_unit = 'degC'
     elif var_name in ['Salinity']:
         var_unit = '0.001'
     elif 'dir' in var_name:
