@@ -416,6 +416,7 @@ class SSTAccessor:
                     'Temperature computation returned all nans : pot. temp. will be used.')
                 ds_temp = self._obj.sel_var.sel_ptemp()
                 ds_temp = ds_temp.rename('temp')
+            ds_temp.attrs['units'] = 'degC'
             return ds_temp
 
     def sel_ptemp(self):
