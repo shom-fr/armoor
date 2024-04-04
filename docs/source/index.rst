@@ -13,6 +13,7 @@ Welcome to [SHOM] Validation and reports tools's documentation!
    tick
    hmi_install
    hmi
+   fish
 
 
 As part of its activities, for the needs of its military and civilian customers, the Shom operates daily regional and coastal oceanographic forecasting models or exploits external models.
@@ -34,4 +35,5 @@ Indices and tables
 * :doc:`tick`: Presentation of the tool to create, search and read issues from Gitlab.
 * :doc:`hmi_install` : Installation process for the forecaster interface.
 * :doc:`hmi` : Presentation of the script to generate images for the forecaster interface.
+* :doc:`fish` : Installation process for fish interface
 

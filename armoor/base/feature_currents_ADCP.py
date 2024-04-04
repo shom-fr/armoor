@@ -3,8 +3,8 @@ import os
 import copy
 import logging
 import numpy as np
-from armoor.base.tools_features import remove_missing_values_ds
-from armoor.base import plot_features, ttide_tide_feature
+from armoor.base.tools_features import sel_one_var
+from armoor.base import plot_features, utide_ttide_tide_feature
 from armoor.base.colocation import colocate_all
 import armoor.hmi.script_tools as st
 
@@ -104,17 +104,7 @@ def plot(config_obj):
                 attributes = ['u', 'v', 'norm', 'dir']
 
             for attribute in attributes:
-                obs_var, mods_var = copy.deepcopy(observation), copy.deepcopy(models)
-                for i_mod, mod_var in enumerate(mods_var):
-                    # Remove missing values
-                    mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
-                                                                 [attribute])
-                    # Select variables to plot
-                    mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
-                    mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
-                    obs_var['xarray_meta_coloc'][i_mod] = obs_var['xarray_meta_coloc'][i_mod][
-                        attribute]
-                obs_var['xarray_meta'] = obs_var['xarray_meta'][attribute]
+                obs_var, mods_var = sel_one_var(observation, models, attribute)
 
                 plot_features.plot_variable_3d(mods_var, obs_var, cmap, vmin, vmax, dvmin, dvmax,
                                                output_path=sub_func_output_folder)
@@ -125,12 +115,12 @@ def plot(config_obj):
         if output["plot"] in harmonic_table:
             # Process harmonic analysis on observation
             logger.info(f'Computing harmonic analysis for the obesrvation...')
-            ds_obs = ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
+            ds_obs = utide_ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
 
             # Process harmonic analysis on models
             for i_mod, mod in enumerate(models):
                 logger.info(f'Computing harmonic analysis for model {i_mod}...')
-                ds_mod = ttide_tide_feature.run_harmonic_analysis(mod["xarray_meta_coloc"], output)
+                ds_mod = utide_ttide_tide_feature.run_harmonic_analysis(mod["xarray_meta_coloc"], output)
 
                 # Create the table
                 logger.info("Creation of tables in the directory : %s", sub_func_output_folder)
@@ -144,14 +134,14 @@ def plot(config_obj):
 
             # Calculate harmonic analysis
             logger.info(f'Computing harmonic analysis for the observation...')
-            ds_obs = ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
+            ds_obs = utide_ttide_tide_feature.run_harmonic_analysis(observation["xarray_meta"], output)
 
             # Process harmonic analysis on models
             ds_models = []
             for i_mod, mod in enumerate(models):
                 # Calculate harmonic analysis
                 logger.info(f'Computing harmonic analysis for model {i_mod}...')
-                ds_mod = ttide_tide_feature.run_harmonic_analysis(mod['xarray_meta_coloc'], output)
+                ds_mod = utide_ttide_tide_feature.run_harmonic_analysis(mod['xarray_meta_coloc'], output)
 
                 ds_models.append(ds_mod)
             # Get scale

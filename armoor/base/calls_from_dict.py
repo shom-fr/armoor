@@ -1,6 +1,7 @@
 """Decode the config file to plot the required outputs"""
 
 import logging
+import copy
 import xarray as xr
 from armoor.base import feature_sst, feature_prof_hydro_vessel, feature_prof_hydro_mooring, \
     feature_section_hydro, feature_clim_hydro, feature_currents_hfr, feature_currents_ADCP, \
@@ -26,6 +27,7 @@ def dict2call(config_obj: dict):
 
     """
     config_obj = get_observation_models_meta(config_obj)
+
     features = {"sst": feature_sst, "prof_hydro_vessel": feature_prof_hydro_vessel,
                 "prof_hydro_mooring": feature_prof_hydro_mooring,
                 "section_hydro": feature_section_hydro, "clim_hydro": feature_clim_hydro,
@@ -59,6 +61,7 @@ def get_observation_models_meta(config_obj: dict):
     """
 
     # Open dataset from path then decode dataset and apply meta-zone
+
     observation = config_obj["observation"]
     models = config_obj["models"]
 
@@ -119,15 +122,22 @@ def get_observation_models_meta(config_obj: dict):
 
         # Interval temporels successifs
         if 'interval' in config_obj["meta_zones"]:
+            if 'start' not in config_obj["meta_zones"] or 'end' not in config_obj["meta_zones"]:
+                start = observation["xarray"].time.data[0]
+                end = observation["xarray"].time.data[-1]
+            else:
+                start = config_obj["meta_zones"]["start"]
+                end = config_obj["meta_zones"]["end"]
+
             logger.info('Temporal interval segmentation...')
             interval = config_obj["meta_zones"]["interval"]
-            model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval)
+            model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval, start, end)
             model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.time_selection_interval(
-                interval)
+                interval, start, end)
             observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
-                index_model].meta.time_selection_interval(interval)
+                index_model].meta.time_selection_interval(interval, start, end)
 
-        # Tranches verticales
+            # Tranches verticales
         if 'slice' in config_obj["meta_zones"]:
             if 'depth' in config_obj["meta_zones"]:
                 var_slice = 'depth'
@@ -146,14 +156,16 @@ def get_observation_models_meta(config_obj: dict):
             observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
                 index_model].meta.vertical_selection_slice(vert_slice, var_slice)
 
-    if 'interval' in config_obj["meta_zones"].keys():
-        interval = config_obj["meta_zones"]["interval"]
+    # Obs meta is out of the loop for each mod
+    if 'interval' in config_obj["meta_zones"]:
         observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
-            interval)
+            interval, start, end)
+
     if 'slice' in config_obj["meta_zones"]:
         vert_slice = config_obj["meta_zones"]["slice"]
         observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
             vert_slice, var_slice)
+
     return config_obj
 
 
@@ -290,13 +302,11 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
     logger.info("Applying meta zone")
 
     # Add default meta-zone
-    if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
-        if 'depth' not in config_obj["meta_zones"]:
-            logger.warning(f"For feature {config_obj['functionality']}, no depth can be specified !")
-        config_obj["meta_zones"]["depth"] = [0]
+    # if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
+    #     if 'depth' not in config_obj["meta_zones"]:
+    #         logger.warning(f"For feature {config_obj['functionality']}, no depth can be specified !")
 
     filters = {"quality": lambda obj: obj.meta.quality_filter,
-               "depth": lambda obj: obj.meta.vertical_selection_depth,
                "min_depth": lambda obj: obj.meta.vertical_selection_min_depth,
                "max_depth": lambda obj: obj.meta.vertical_selection_max_depth,
                "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
@@ -313,12 +323,10 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         outputs = config_obj['outputs']
         vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
         if 'current_bc' in vars_to_plot:
-            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
-        if 'current_res' in vars_to_plot:
-            filter = outputs[0]['low_pass_filter']
-            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
+            xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
+
         if 'mld' in vars_to_plot:
-            xarray_obj = xr.merge([xarray_obj, xarray_obj.sel_var.sel_mixed_layer_depth()])
+            xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_mixed_layer_depth()])
 
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
@@ -326,6 +334,13 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             logger.info("Applying : cloud")
             points = config_obj["meta_zones"]["cloud"]
             xarray_obj = xarray_obj.meta.horizontal_selection_cloud_dots(points, radius, method)
+            xarray_obj = xarray_obj.assign_attrs({"cloud": points})
+            if radius: xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
+
+        # Calculate current_res after cloud before time
+        if 'current_res' in vars_to_plot:
+            filter = outputs[0]['low_pass_filter']
+            xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_current_res(filter)])
 
         # Bathymetry threshold
         if 'h' in xarray_obj:
@@ -345,7 +360,14 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         # Radius for ADCP feature
         if "radius" in config_obj["meta_zones"] and mod_obs == 'mod' and config_obj[
             "functionality"] in ['ADCP']:
+            radius = config_obj["meta_zones"].get('radius')
             xarray_obj = xarray_obj.meta.horizontal_selection_from_obs_radius(config_obj)
+            xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
+
+        # Radius for data selection
+        if "radius" in config_obj["meta_zones"] and "radius" not in xarray_obj.attrs:
+            radius = config_obj["meta_zones"].get('radius')
+            xarray_obj = xarray_obj.assign_attrs({"radius": f"{radius}"})
 
         # Density selection
         if 'dens' in config_obj["meta_zones"]:
@@ -362,11 +384,57 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             if max_dens:
                 xarray_obj = xarray_obj.meta.vertical_selection_max_dens(max_dens,
                                                                          ref_dens=ref_dens)
+            xarray_obj = xarray_obj.assign_attrs({"density_meta_zone": f"{min_dens}_to_{max_dens}"})
+
+        # Depth selection
+        if 'depth' in config_obj["meta_zones"]:
+            if config_obj["functionality"] != "section_hydro":
+                # For feature 4, we need to keep all depths to compute geo currents
+                depth = config_obj["meta_zones"]["depth"]
+                xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
+                xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": depth})
+
+        if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
+            if 'depth' in config_obj["meta_zones"]:
+                logger.warning(
+                    f"For feature {config_obj['functionality']}, no depth can be specified ! Surface value is taken into account")
+            if "depth" in xarray_obj:
+                depth = [0]
+                xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
 
         # Other meta-zones, one by one
         for name, meta_filter in filters.items():
             if name in config_obj["meta_zones"]:
                 logger.info("Applying : %s", name)
                 xarray_obj = meta_filter(xarray_obj)(config_obj["meta_zones"][name])
+
+        # Assign depth attrs
+        if 'min_depth' in config_obj["meta_zones"] and 'max_depth' in config_obj["meta_zones"]:
+            min_depth = config_obj["meta_zones"].get('min_depth')
+            max_depth = config_obj["meta_zones"].get("max_depth")
+            xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": f"{min_depth}_to_{max_depth}"})
+        elif 'min_depth' in config_obj["meta_zones"] and not 'max_depth' in config_obj["meta_zones"]:
+            logger.error("You've indicated a min depth, please indicate max depth in meta zone. By default entire dataset is considered.")
+        elif 'max_depth' in config_obj["meta_zones"] and not 'min_depth' in config_obj["meta_zones"]:
+            logger.error("You've indicated a max depth, please indicate min depth in meta zone. By default entire dataset is considered.")
+
+    return xarray_obj
+
+
+def merge_no_fail(list_ds):
+    """
+    list_ds : list of xr.dataset
+        First dataset must contain the correct attributes
+    """
+
+    xarray_obj_tmp = xr.Dataset()
+    for ds in list_ds:
+        if isinstance(ds, xr.DataArray):
+            xarray_obj_tmp[ds.name] = ds
+        else:
+            for var in ds:
+                xarray_obj_tmp[var] = ds[var]
+    attrs = list_ds[0].attrs
+    xarray_obj = xarray_obj_tmp.assign_attrs(attrs)
 
     return xarray_obj

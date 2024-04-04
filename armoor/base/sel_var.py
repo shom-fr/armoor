@@ -5,11 +5,13 @@ import os
 import logging
 import numpy as np
 import xarray as xr
+import pandas as pd
 import xoa
 import xoa.cf as xcf
 import xoa.filter as xfilter
 import gsw
 from xoa.thermdyn import mixed_layer_depth
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +154,7 @@ class SSTAccessor:
             current['norm'] = (current.u ** 2 + current.v ** 2) ** 0.5
 
         # Retrieve direction
-        current['dir'] = np.arctan2(current['v'], current['u']) * 180 / np.pi
+        current['dir'] = np.arctan2(current['u'], current['v']) * 180 / np.pi
         current['dir'] = current['dir'].assign_attrs({'units': '°'})
         return current
 
@@ -236,6 +238,17 @@ class SSTAccessor:
 
         return current
 
+    def get_norm_dir(self, type):
+        u = self._obj[f'u{type}']
+        v = self._obj[f'v{type}']
+        norm = (u ** 2 + v ** 2) ** 0.5
+        dir = np.arctan2(u, v) * 180 / np.pi
+        self._obj[f'norm{type}'] = norm
+        self._obj[f'norm{type}'] = self._obj[f'norm{type}'].assign_attrs({'units': 'm/s'})
+        self._obj[f'dir{type}'] = dir
+        self._obj[f'dir{type}'] = self._obj[f'dir{type}'].assign_attrs({'units': '°'})
+        return self._obj
+
     def sel_current_res(self, filter):
         """
         Select residual current from the dataset with demerliac, godin or mean filter.
@@ -260,24 +273,28 @@ class SSTAccessor:
                 logger.info(
                     f'The time step of the data is not constant, it will be resampled on hourly dates.')
                 # Resample the data on hourly dates
+                ini_time = self._obj['time'].data
                 min_date = self._obj['time'].min().data.astype('datetime64[h]')
                 max_date = self._obj['time'].max().data.astype('datetime64[h]')
-                time_hor = np.arange(min_date, max_date, dtype='datetime64[h]')
+                time_hor = pd.date_range(min_date.item(), max_date.item(), freq='1H')
+
                 self._obj = self._obj.interp(time=time_hor, method='linear',
                                              kwargs={"fill_value": "extrapolate"})
+
                 # Filter
                 da_u = self._obj['u']
                 da_v = self._obj['v']
-                da_u_res = xfilter.tidal_filter(da_u, filter)
-                da_v_res = xfilter.tidal_filter(da_v, filter)
+                da_u_res = xfilter.tidal_filter(da_u, filter, na_thres=1)
+                da_v_res = xfilter.tidal_filter(da_v, filter, na_thres=1)
+
+                # Put back on original dates
+                da_u_res = da_u_res.interp(time = ini_time)
+                da_v_res = da_v_res.interp(time = ini_time)
 
             current_res = xr.Dataset()
             current_res['u_res'] = da_u_res
             current_res['v_res'] = da_v_res
-            current_res['norm_res'] = (current_res.u_res ** 2 + current_res.v_res ** 2) ** 0.5
-            current_res['dir_res'] = np.arctan2(current_res['v_res'],
-                                                current_res['u_res']) * 180 / np.pi
-            current_res['dir_res'] = current_res['dir_res'].assign_attrs({'units': '°'})
+            current_res = current_res.sel_var.get_norm_dir(type='_res')
             return current_res
 
     def sel_current_barocline(self):
@@ -289,8 +306,10 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing baroclinic current.
         """
+
         if 'u_bc' in self._obj:
-            return self._obj[['u_bc', 'v_bc', 'norm_bc', 'dir_bc']]
+            current_bc = self._obj[['u_bc', 'v_bc', 'norm_bc', 'dir_bc']]
+            return current_bc
 
         # Calculate the total current
         current = self._obj.sel_var.sel_current()
@@ -305,7 +324,7 @@ class SSTAccessor:
         current_bc = current['norm'] - current_mean_depth['norm']
 
         # Calculate the azimuth (in radians)
-        azimut = np.arctan2(current['v'], current['u'])
+        azimut = np.arctan2(current['u'], current['v'])
 
         # Calculate the zonal and meridional components of the baroclinic current
         ubc = current_bc * np.cos(azimut)
@@ -314,9 +333,7 @@ class SSTAccessor:
         current_bc = xr.Dataset()
         current_bc['u_bc'] = ubc
         current_bc['v_bc'] = vbc
-        current_bc['norm_bc'] = vbc
-        current_bc['dir_bc'] = np.arctan2(current_bc['v_bc'], current_bc['u_bc']) * 180 / np.pi
-        current_bc['dir_bc'] = current_bc['dir_bc'].assign_attrs({'units': '°'})
+        current_bc = current_bc.sel_var.get_norm_dir(type='_bc')
         current_bc = current_bc.assign_attrs({'name': self._obj.attrs['name']})
         return current_bc
 
@@ -389,7 +406,7 @@ class SSTAccessor:
             return ds_temp
         if 'ptemp' in self._obj:
             sal = self._obj.sel_var.sel_sal()
-            ptemp = self._obj.sel_var.sel_ptemp()
+            ptemp = self._obj.ptemp
             pres = self._obj.sel_var.sel_pres()
             cons_temp = gsw.CT_from_pt(sal, ptemp)
             temp = gsw.t_from_CT(sal, cons_temp, pres)
@@ -442,7 +459,9 @@ class SSTAccessor:
         cons_temp = gsw.CT_from_pt(sal, ptemp)
         pres = self._obj.sel_var.sel_pres()
         if sal is not None and cons_temp is not None and pres is not None:
-            return gsw.sound_speed(sal, cons_temp, pres)
+            snd_speed = gsw.sound_speed(sal, cons_temp, pres)
+            snd_speed.attrs["units"] = "m/s"
+            return snd_speed
 
         logger.warning("To compute sound speed you need to have salinity, "
                        "potential temperature and depth in your dataset.")
@@ -460,10 +479,12 @@ class SSTAccessor:
         if 'mld' in self._obj:
             return self._obj.mld
         ptemp = self._obj.sel_var.sel_ptemp()
-        mld = mixed_layer_depth(ptemp)
+        mld = mixed_layer_depth(ptemp, zref=10)
         if np.isnan(mld.max().data):
             pdens = self._obj.sel_var.sel_pdensity()
-            mld = mixed_layer_depth(pdens)
+            mld = mixed_layer_depth(pdens, zref=10)
+            if np.isnan(mld.max().data):
+                logger.warning("mld full of NaN, your dataset probably does not have ptemp and pdens value at zref = 10 m.")
         return mld
 
     def sel_pres(self):
@@ -508,7 +529,7 @@ class SSTAccessor:
             if not sal is None and not temp is None:
                 if ref_dens is None or ref_dens not in [0, 1000, 2000, 3000, 4000]:
                     logger.warning(
-                        'You did not specify the vertical reference to comute the potential density. '
+                        'You did not specify the vertical reference to compute the potential density. '
                         'Please define reference_density in the configuration file, with values among 0, 1000, 2000, 3000 and 4000 dbar.'
                         'The reference will be 0 dbar here.')
                     pdens = gsw.sigma0(sal, temp)

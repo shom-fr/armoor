@@ -9,6 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def plot(config_obj):
     """
     Plot figures required in functionality 4 : section_hydro.
@@ -46,16 +47,22 @@ def plot(config_obj):
                 [mod["xarray_meta_coloc"],
                  mod["xarray_meta_coloc"].sel_var.sel_current_geo()])
 
+    if "depth" in config_obj["meta_zones"]:
+        depth = config_obj["meta_zones"]["depth"]
+        for i_mod, mod in enumerate(models):
+            observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                i_mod].meta.vertical_selection_depth(depth)
+            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].meta.vertical_selection_depth(depth)
 
     # Remove missing values
     vars = [var for var in list(observation["xarray_meta_coloc"][0].keys()) if
             var in models[0]["xarray_meta_coloc"]]
+
     for i_mod, mod in enumerate(models):
         models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
     # PLOTS
     for output in outputs:
-
         # Get the figure parameters from config obj
         vmin = output.get('vmin')
         vmax = output.get('vmax')

@@ -4,7 +4,7 @@ import xarray as xr
 import numpy as np
 import xoa.grid
 import xesmf as xe
-
+from armoor.base import sel_var
 logger = logging.getLogger(__name__)
 
 
@@ -37,7 +37,6 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
     time_flag, hor_flag, ver_flag = flags
     if ver_flag and coloc_method_z is None:
         coloc_method_z = 'nearest'
-
     # Colocate
     if tgt_grid == 'auto':
         logger.info('Auto colocation : the model and observation will be colocated '
@@ -99,8 +98,19 @@ def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method
             if ver_flag:
                 obs_coloc = vertical_colocation(obs_coloc, mod, coloc_method_z)
 
+    obs_coloc = coloc_var(obs_coloc)
+    mod_coloc = coloc_var(mod_coloc)
+
     return obs_coloc, mod_coloc
 
+def coloc_var(obj_coloc):
+    if isinstance(obj_coloc, xr.Dataset):
+        logger.info('coloc_var')
+        for var in obj_coloc.variables:
+            if var[0] == 'u':
+                type = var[1:]
+                obj_coloc = obj_coloc.sel_var.get_norm_dir(type=type)
+    return obj_coloc
 
 def temporal_colocation(ds_to_coloc, tgt, coloc_method):
     """
@@ -375,7 +385,6 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
         mod = mod.meta.vertical_selection_depth(obs.depth.data)
         mod = mod.expand_dims('depth')
         method_z = None
-
     list_ds = []
     for i, time in enumerate(obs.time.values):
         # Colocation time
@@ -384,18 +393,14 @@ def colocate_lon_lat_time(mod, obs, method, method_z):
         else:
             mod_interp = mod.sel(time=time, method='nearest')
         mod_interp = mod_interp.assign_coords(time=time)
-
         # Colocation lon/lat
         if 'lon' in obs.coords:
             lon = obs.lon.isel(time=[i]).values
             lat = obs.lat.isel(time=[i]).values
             if 'lon' in mod_interp.dims:  # For rect. grids
-                mod_interp = mod_interp.interp(lon=lon, lat=lat, method=method,
-                                               kwargs={"fill_value": "extrapolate"}).squeeze(
-                    ['lon', 'lat'])
+                mod_interp = mod_interp.interp(lon=lon, lat=lat, method=method, kwargs={"fill_value": "extrapolate"}).squeeze(['lon', 'lat'])  #
             elif 'x' in mod_interp.dims:  # For curv. grids
                 mod_interp = mod_interp.meta.sel_closest(lon, lat)
-
         # Colocate depth
         if method_z:
             if 'depth' in obs.dims:

@@ -415,6 +415,7 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_depth")
         max_depth = self._obj.depth.max(skipna=True)
+
         return self.vertical_selection_range([min_depth, max_depth], 'depth')
 
     def vertical_selection_max_depth(self, max_depth: list = None) -> xr.Dataset:
@@ -593,12 +594,18 @@ class MetazoneAccessor:
         Croco or Hycom product at the required depth.
         """
         # For surface variables, select layer instead of depth
-        if len(depth) == 1 and depth == 0:
+        if isinstance(depth, float) and depth == 0:
             logger.info(f'The first z/level layer will be selected')
             if 'type' in self._obj.attrs and self._obj.attrs['type'] == 'CROCO':  # for croco
-                return self._obj.isel(level=-1)
+                ds_tgt = self._obj.isel(level=-1)
+                ds_tgt = ds_tgt.drop(['level', 'depth'])
+                ds_tgt.coords['depth'] = 0
+                return ds_tgt
             else:  # Hycom
-                return self._obj.isel(z=0)
+                ds_tgt = self._obj.isel(z=0)
+                ds_tgt = ds_tgt.drop(['z', 'depth'])
+                ds_tgt.coords['depth'] = 0
+                return ds_tgt
 
         # Regrid1D only seems to work with negative depths for croco:
         # the following lines adapt the depths values to correctly select the depth defined.
@@ -614,7 +621,15 @@ class MetazoneAccessor:
             depth = [float(depth)]
         else:
             depth = np.array(depth)
+
+        # Manage 0 in list of depths
+        dataset0 = None
+        if 0 in depth:
+            dataset0 = self._obj.meta.vertical_selection_croco_hycom(float(0))
+            depth = depth[depth != 0]
+
         tgt_depth = xr.DataArray(depth, dims="depth", name="depth")
+
         # Select depth(s)
         tgt_ds = dataset
         for var in dataset.variables:
@@ -640,6 +655,13 @@ class MetazoneAccessor:
         # Reindex depths if necessary
         if np.size(tgt_ds.depth.data) > 1 and tgt_ds.depth.data[0] > tgt_ds.depth.data[-1]:
             tgt_ds = tgt_ds.reindex(depth=tgt_ds.depth[::-1])
+
+        if dataset0:
+            if 'z' in tgt_ds:
+                tgt_ds = tgt_ds.drop('z')
+            elif 'level' in tgt_ds:
+                tgt_ds = tgt_ds.drop('level')
+            tgt_ds = xr.concat([dataset0, tgt_ds], dim="depth")
 
         return tgt_ds
 
@@ -729,7 +751,7 @@ class MetazoneAccessor:
         # Select all depth between min and max
         selection = (self._obj[var_vert] >= dmin) & (self._obj[var_vert] <= dmax)
 
-        return self._obj.where(selection, drop=True).set_coords(var_vert)
+        return self._obj.where(selection).set_coords(var_vert)
 
     def vertical_selection_list(self, depths: list) -> xr.Dataset:
         """
@@ -797,8 +819,13 @@ class MetazoneAccessor:
                 ds_slice = ds_slice.assign_coords(depth=np.arange(
                     len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
             elif 'z' in ds_slice.dims:
-                ds_slice = ds_slice.assign_coords(z=np.arange(
-                    len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
+                if len(ds_slice[var_slice].dims) ==1:
+                    ds_slice = ds_slice.assign_coords(z=np.arange(
+                        len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
+                else:
+                    ds_slice[var_slice] = ds_slice[var_slice][0,:,0,0]
+                    ds_slice = ds_slice.assign_coords(z=np.arange(
+                        len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
             liste_ds[i_ds] = ds_slice
 
         dataset = xr.concat(liste_ds, 'slice')
@@ -995,7 +1022,7 @@ class MetazoneAccessor:
             return self._obj.interp(time=times, method=method)
         return self._obj.sel(time=times, method=method)
 
-    def time_selection_interval(self, interval: str = None, ) -> xr.Dataset:
+    def time_selection_interval(self, interval: str = None, start: str = None, end: str = None, ) -> xr.Dataset:
         """Return a new Dataset whose data is sorted per time interval selected.
 
         Parameters
@@ -1003,6 +1030,11 @@ class MetazoneAccessor:
         interval : str
             Length of the period, can be one hour, day, month or year.
 
+        start : datetime
+            Start date of the time period
+
+        end : datetime
+            End date of the time period
         Returns
         -------
         xarray.Dataset
@@ -1013,9 +1045,16 @@ class MetazoneAccessor:
         if interval in ["1M", "M"]:
             interval = "MS"
 
-        start = self._obj.isel(time=[0]).time.data[0]
-        end = self._obj.isel(time=[-1]).time.data[0]
-        end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
+        if start is None:
+            start = self._obj.isel(time=[0]).time.data[0]
+        else:
+            start = pandas.to_datetime(start)
+
+        if end is None:
+            end = self._obj.isel(time=[-1]).time.data[0]
+            end = pandas.to_datetime(end) + MonthEnd(1) + pandas.to_timedelta(1, 'D')
+        else:
+            end = pandas.to_datetime(end)
 
         time_interval = pandas.date_range(start=start, end=end, freq=interval)
 

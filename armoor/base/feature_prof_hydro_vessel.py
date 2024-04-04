@@ -38,6 +38,7 @@ def plot(config_obj):
 
     # Remove missing values
     vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
+
     for i_mod, mod in enumerate(models):
         models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
@@ -76,7 +77,7 @@ def plot(config_obj):
                                    "a radius in the meta-zone")
                 else:
                     plot_features.plot_diag_ts_multi(models, observation["xarray_meta"],
-                                                     config_obj["meta_zones"]["radius"],
+                                                     config_obj,
                                                      output_path=sub_func_output_folder)
 
         else:
