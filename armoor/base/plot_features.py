@@ -162,6 +162,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
+    elif 'slice' in obs.coords:
+        title_depth = f"Slice: {obs.slice.data.tolist().split(' to ')[0]} to {obs.slice.data.tolist().split(' to ')[1]} m"
+        depth = f"{obs.slice.data}m"
     elif 'depth_meta_zone' in obs.attrs:
         if isinstance(obs.attrs['depth_meta_zone'], list):
             if len(obs.attrs['depth_meta_zone']) > 1:
@@ -3118,7 +3121,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
     manage_output(figname, output_path)
 
 
-def plot_stick_plots(models, observation, output_path=None):
+def plot_stick_plots(models, observation, flag_slice, output_path=None):
     """
     Plot stick plots for current data.
     Parameters
@@ -3127,6 +3130,8 @@ def plot_stick_plots(models, observation, output_path=None):
         List of the models data.
     observation : xarray.dataset
         Observation current data.
+    flag_slice : bool
+        Indicate if the figure must be plotted by slices or not.
     output_path : str
         Path where to save the figures.
 
@@ -3145,107 +3150,164 @@ def plot_stick_plots(models, observation, output_path=None):
         var_v = 'v'
         var_norm = 'norm'
 
-    if "depth" not in obs_base.dims and "dens" not in obs_base.dims:
-        f, ax = figure_1_stickplot()
-        obs = observation['xarray_meta_coloc'][0]
-        ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
-                  headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
-                  label=observation['name'])
-        for i_mod, mod in enumerate(models):
-            mod = mod['xarray_meta_coloc'].squeeze()
-            ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
-                      width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                      color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
-        # Add legend
-        ax.set_ylabel('Current(m/s)')
-        handles, labels = plt.gca().get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        plt.legend(by_label.values(), by_label.keys())
+    if flag_slice:
+        list_dims_mean = []
 
-        # Add mini-map
-        ax_mini_map = add_mini_map(f, obs)
-        ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+        # Get the dimensions on which to calculate the statistics
+        if flag_slice:
+            list_dims_mean.append('idx_depth')
+        if 'lon' in observation["xarray_meta_coloc"][0].dims:
+            list_dims_mean.append('lon')
+            list_dims_mean.append('lat')
+        if 'instr' in observation["xarray_meta_coloc"][0].dims:
+            list_dims_mean.append('instr')
+        if 'depth' in obs_base.dims and len(obs_base.depth) > 1:
+            list_dims_mean.append('depth')
+        elif 'dens' in obs_base.dims and len(obs_base.dens) > 1:
+            list_dims_mean.append('dens')
+        elif 'z' in obs_base.dims and len(obs_base.z) > 1:
+            list_dims_mean.append('z')
 
-        # Add second x axis
-        add_second_x_axis(f, ax, obs)
+        logger.info('The statistics are calculated on the following dimensions:')
+        logger.info(f'{list_dims_mean}')
+        for idx_slice, _ in enumerate(observation["xarray_meta_coloc"][0].slice):
+            f, ax = figure_1_stickplot()
+            # Plot mean for observation (plotted only once)
+            obs_mean = obs_base.isel(slice=idx_slice).mean(list_dims_mean,
+                                                                 skipna=True).squeeze()
 
-        # Set title
-        title, figname = get_title_figname('Stick plot', obs[var_norm],
-                                           [mod['name'] for mod in models], observation['name'])
+            ax.quiver(obs_mean.time, [[0] * len(obs_mean.time)], obs_mean[var_u], obs_mean[var_v], angles='uv', width=0.001,
+                      headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
+                      label=observation['name'])
+            for i_mod, mod in enumerate(models):
+                mod_mean = mod['xarray_meta_coloc'].isel(slice=idx_slice).mean(list_dims_mean,
+                                                                 skipna=True).squeeze()
+                ax.quiver(mod_mean.time, [[0] * len(mod_mean.time)], mod_mean[var_u], mod_mean[var_v], angles='uv',
+                          width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                          color=COLORS[i_mod], label=f'{mod["xarray_meta_coloc"].attrs["name"]}')
+            # Add legend
+            ax.set_ylabel('Current(m/s)')
+            handles, labels = plt.gca().get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            plt.legend(by_label.values(), by_label.keys())
 
-        f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
-        # Save figure
-        manage_output(figname, output_path)
+            # Add mini-map
+            ax_mini_map = add_mini_map(f, obs_mean)
+            ax_mini_map.scatter(obs_mean.lon, obs_mean.lat, 15, c='navy', transform=ccrs.PlateCarree())
+
+            # Add second x axis
+            add_second_x_axis(f, ax, obs_mean)
+
+            # Set title
+            title, figname = get_title_figname('Stick plot', obs_mean[var_norm],
+                                               [mod['name'] for mod in models], observation['name'])
+
+            f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
+            # Save figure
+            manage_output(figname, output_path)
+
     else:
-        if 'depth' in observation['xarray_meta_coloc'][0].dims:
-            for i_depth, depth in enumerate(observation['xarray_meta_coloc'][0].depth.data):
-                f, ax = figure_1_stickplot()
-                obs = observation['xarray_meta_coloc'][0].isel(depth=i_depth)
-                obs.attrs["depth_meta_zone"] = depth
-                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
+        if "depth" not in obs_base.dims and "dens" not in obs_base.dims:
+            f, ax = figure_1_stickplot()
+            obs = observation['xarray_meta_coloc'][0]
+            ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
+                      headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
+                      label=observation['name'])
+            for i_mod, mod in enumerate(models):
+                mod = mod['xarray_meta_coloc'].squeeze()
+                ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
                           width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                          color='k', label=observation['name'])
-                for i_mod, mod in enumerate(models):
-                    mod = mod['xarray_meta_coloc'].isel(depth=i_depth).squeeze()
-                    ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+                          color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
+            # Add legend
+            ax.set_ylabel('Current(m/s)')
+            handles, labels = plt.gca().get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            plt.legend(by_label.values(), by_label.keys())
+
+            # Add mini-map
+            ax_mini_map = add_mini_map(f, obs)
+            ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+
+            # Add second x axis
+            add_second_x_axis(f, ax, obs)
+
+            # Set title
+            title, figname = get_title_figname('Stick plot', obs[var_norm],
+                                               [mod['name'] for mod in models], observation['name'])
+
+            f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
+            # Save figure
+            manage_output(figname, output_path)
+        else:
+            if 'depth' in observation['xarray_meta_coloc'][0].dims:
+                for i_depth, depth in enumerate(observation['xarray_meta_coloc'][0].depth.data):
+                    f, ax = figure_1_stickplot()
+                    obs = observation['xarray_meta_coloc'][0].isel(depth=i_depth)
+                    obs.attrs["depth_meta_zone"] = depth
+                    ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
                               width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                              color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
-                # Add legend
-                ax.set_ylabel('Current(m/s)')
-                handles, labels = plt.gca().get_legend_handles_labels()
-                by_label = dict(zip(labels, handles))
-                plt.legend(by_label.values(), by_label.keys())
+                              color='k', label=observation['name'])
+                    for i_mod, mod in enumerate(models):
+                        mod = mod['xarray_meta_coloc'].isel(depth=i_depth).squeeze()
+                        ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+                                  width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                                  color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
+                    # Add legend
+                    ax.set_ylabel('Current(m/s)')
+                    handles, labels = plt.gca().get_legend_handles_labels()
+                    by_label = dict(zip(labels, handles))
+                    plt.legend(by_label.values(), by_label.keys())
 
-                # Add mini-map
-                ax_mini_map = add_mini_map(f, obs)
-                ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+                    # Add mini-map
+                    ax_mini_map = add_mini_map(f, obs)
+                    ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
 
-                # Add second x axis
-                add_second_x_axis(f, ax, obs)
+                    # Add second x axis
+                    add_second_x_axis(f, ax, obs)
 
-                # Set title
-                title, figname = get_title_figname('Stick plot', obs,
-                                                   [mod['name'] for mod in models],
-                                                   observation['name'])
+                    # Set title
+                    title, figname = get_title_figname('Stick plot', obs,
+                                                       [mod['name'] for mod in models],
+                                                       observation['name'])
 
-                f.suptitle(title, fontsize=12, fontweight='bold')
-                # Save figure
-                manage_output(figname, output_path)
+                    f.suptitle(title, fontsize=12, fontweight='bold')
+                    # Save figure
+                    manage_output(figname, output_path)
 
-        elif 'dens' in observation['xarray_meta_coloc'][0].dims:
-            for i_dens, _ in enumerate(observation['xarray_meta_coloc'][0].dens):
-                f, ax = figure_1_stickplot()
-                obs = observation['xarray_meta_coloc'][0].isel(dens=i_dens)
-                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
-                          width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                          color='k', label=observation['name'])
-                for i_mod, mod in enumerate(models):
-                    mod_name = mod.name
-                    mod = mod['xarray_meta_coloc'].isel(dens=i_dens).squeeze()
-                    ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+            elif 'dens' in observation['xarray_meta_coloc'][0].dims:
+                for i_dens, _ in enumerate(observation['xarray_meta_coloc'][0].dens):
+                    f, ax = figure_1_stickplot()
+                    obs = observation['xarray_meta_coloc'][0].isel(dens=i_dens)
+                    ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
                               width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                              color=COLORS[i_mod], label=f'{mod_name}')
-                # Add legend
-                ax.set_ylabel('Current(m/s)')
-                handles, labels = plt.gca().get_legend_handles_labels()
-                by_label = dict(zip(labels, handles))
-                plt.legend(by_label.values(), by_label.keys())
+                              color='k', label=observation['name'])
+                    for i_mod, mod in enumerate(models):
+                        mod_name = mod.name
+                        mod = mod['xarray_meta_coloc'].isel(dens=i_dens).squeeze()
+                        ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+                                  width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                                  color=COLORS[i_mod], label=f'{mod_name}')
+                    # Add legend
+                    ax.set_ylabel('Current(m/s)')
+                    handles, labels = plt.gca().get_legend_handles_labels()
+                    by_label = dict(zip(labels, handles))
+                    plt.legend(by_label.values(), by_label.keys())
 
-                # Add mini-map
-                ax_mini_map = add_mini_map(f, obs)
-                ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+                    # Add mini-map
+                    ax_mini_map = add_mini_map(f, obs)
+                    ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
 
-                # Add second x axis
-                add_second_x_axis(f, ax, obs)
+                    # Add second x axis
+                    add_second_x_axis(f, ax, obs)
 
-                # Set title
-                title, figname = get_title_figname('Stick plot', obs,
-                                                   [mod['name'] for mod in models],
-                                                   observation['name'])
+                    # Set title
+                    title, figname = get_title_figname('Stick plot', obs,
+                                                       [mod['name'] for mod in models],
+                                                       observation['name'])
 
-                f.suptitle(title, fontsize=12, fontweight='bold')
-                # Save figure
-                manage_output(figname, output_path)
+                    f.suptitle(title, fontsize=12, fontweight='bold')
+                    # Save figure
+                    manage_output(figname, output_path)
 
 
 # Useful functions

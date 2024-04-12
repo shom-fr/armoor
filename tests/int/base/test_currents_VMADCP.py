@@ -51,10 +51,10 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_stick_plot_vmadcp_steps(self):
+    def test_stick_plot_vmadcp_tranches(self):
         out_path, logger = change_path(folder_test)
-        logger.info('test_stick_plot_vmadcp_steps')
-        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_steps.cfg"])
+        logger.info('test_stick_plot_vmadcp_tranches')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/stick_plot_vmadcp_tranches.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
