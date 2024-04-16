@@ -118,6 +118,16 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_124_ellipses_ADCP_CROCO(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_124_ellipses_ADCP_CROCO.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/124_ellipses_ADCP_CROCO.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
     def test_129_glider(self):
         out_path, logger = change_path(folder_test)
         logger.info("test_129_glider.ini")
