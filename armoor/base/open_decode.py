@@ -550,7 +550,7 @@ def open_decode_croco(path_file):
     croco = xr.open_dataset(path_file).decode_sigma()
 
     # Remove variables that are never used in the features. May need to be completed.
-    list_to_keep = ['temp', 'salt', 'u', 'v', 'h', 'angle']
+    list_to_keep = ['temp', 'salt', 'u', 'v', 'h', 'angle', 'mask_rho']
     for var in list(croco.keys()):
         if var not in list_to_keep:
             croco = croco.drop_vars(var)
@@ -581,8 +581,12 @@ def open_decode_croco(path_file):
         croco = croco.drop_vars(['lon', 'lat'])
 
     # Clean coordinates
-    croco = croco.rename(
-        {'xi_rho': 'x', 'eta_rho': 'y', 's_rho': 'z', 'lon_rho': 'lon', 'lat_rho': 'lat'})
+    croco = croco.rename({'xi_rho': 'x', 
+                          'eta_rho': 'y', 
+                          's_rho': 'z', 
+                          'lon_rho': 'lon', 
+                          'lat_rho': 'lat', 
+                          'mask_rho': 'mask'})
     for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
                 'eta_v', 'depth_w', 'sig', 's_w']:
         if var in croco:
@@ -615,6 +619,8 @@ def open_decode_croco(path_file):
     # Rename ptemp
     if 'temp' in croco:
         croco = croco.rename({'temp': 'ptemp'})
+    # Remove values outside mask
+    croco = croco.where(croco['mask'] > 0, drop=True)
 
     return croco
 
