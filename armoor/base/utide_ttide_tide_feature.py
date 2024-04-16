@@ -187,6 +187,8 @@ def run_harmonic_analysis(ds, output):
         ds_res = harmonic_analysis_depth_slice(ds, list_waves, tide_tool)
     # Assign attributes
     ds_res = ds_res.assign_attrs({'name': ds.attrs['name'], 'tide_tool': tide_tool})
+    if "depth_meta_zone" in ds.attrs:
+        ds_res = ds_res.assign_attrs({'depth_meta_zone': ds.attrs['depth_meta_zone']})
 
     # Remove waves where the harmonic analyses could not be computed
     ds_res = ds_res.where(~ds_res.isnull())

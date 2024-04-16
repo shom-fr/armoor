@@ -208,6 +208,10 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_depth = ""
         depth = ''
 
+    if 'Tidal current ellipses' in figtitle and 'depth_meta_zone' in obs.attrs:
+        title_depth = f"Depth: {obs.depth.values:.1f} m"
+        depth = f"{obs.depth.values:.1f}m"
+
     if 'mld' in var_name or 'SST' in var_name or "drifter" in obs_name or 'HFR' in obs_name:
         title_depth = ""
         depth = ''
@@ -1608,9 +1612,18 @@ def plot_ellipses_tide_current(models, observations, scales, output_path=None):
         if freq > 0:
             # If vertical immersions : on plot per immersion (depth)
             if 'depth' in observations.dims:
-                for i_depth, _ in enumerate(observations.depth):
-                    plot_ellipses_tide_current_generic(observations, models, wave, scale,
+                if "depth_meta_zone" in observations.attrs:
+                    depth_min = observations.attrs['depth_meta_zone'].split('_to_')[0]
+                    depth_max = observations.attrs['depth_meta_zone'].split('_to_')[1]
+                    obs_meta = (observations.depth >= float(depth_min)) & (observations.depth <= float(depth_max))
+                    indexes = np.where(obs_meta)[0]
+                    for i_depth in indexes:
+                        plot_ellipses_tide_current_generic(observations, models, wave, scale,
                                                        output_path, i_depth=i_depth)
+                else:
+                    for i_depth, _ in enumerate(observations.depth):
+                        plot_ellipses_tide_current_generic(observations, models, wave, scale,
+                                                           output_path, i_depth=i_depth)
 
             # If vertical immersions : on plot per immersion (density)
             elif 'dens' in observations.dims:
@@ -3574,7 +3587,7 @@ def add_scale(ax, scale):
     lon = extent[0] + (extent[1] - extent[0]) / 10
     lat = extent[2] + (extent[3] - extent[2]) / 15
     lat_txt = extent[2] + (extent[3] - extent[2]) / 25
-    ax.plot([lon, lon + 0.1 * scale], [lat, lat], c='k', transform=ccrs.PlateCarree())
+    ax.plot([lon, lon + 0.05 * scale], [lat, lat], c='k', transform=ccrs.PlateCarree())
     ax.text(lon, lat_txt, '0.1 m.s-1', transform=ccrs.PlateCarree())
     ax.set_extent(extent)
     return ax
