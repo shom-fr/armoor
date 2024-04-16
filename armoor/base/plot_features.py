@@ -76,14 +76,14 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_type = f"{figtitle}"
         var_name = ''
     elif "Stick plot" in figtitle:
-        title_type = f"{figtitle}"
         var_name, var_unit = find_var_title(obs)
+        title_type = f"{figtitle} : {var_name} [{var_unit}]"
     elif "rajector" in figtitle:  # for trajectories
         title_type = f"{figtitle}"
         var_name = ''
     else:
         var_name, var_unit = find_var_title(obs)
-        title_type = f"{figtitle} :{var_name} [{var_unit}]"
+        title_type = f"{figtitle} : {var_name} [{var_unit}]"
 
     # Location
     if 'cloud_plot' in obs.attrs:
@@ -3361,7 +3361,7 @@ def find_var_title(da):
 
     if "units" in da.attrs:
         var_unit = da.attrs['units']
-    elif var_name in ['u', 'v', 'norm', "Geostrophic current"]:
+    elif var_name in ['u', 'v', 'norm', "Geostrophic current", "Baroclinic current", "Residual current"]:
         var_unit = 'm/s'
     elif var_name in ['Temperature', 'temperature']:
         var_unit = 'degC'
