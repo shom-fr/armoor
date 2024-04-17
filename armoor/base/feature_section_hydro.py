@@ -88,5 +88,8 @@ def plot(config_obj):
             # TIMESERIES
             plot_variable_2d = {"plot_variable_2d": 'variable_2d'}
             if output["plot"] in plot_variable_2d:
-                plot_features.plot_variable_2d(models_var, observation_var,
+                if 'mld' in var:
+                    plot_features.plot_variable_2d(models_var, observation_var,
                                                output_path=sub_func_output_folder)
+                else:
+                    logger.warning(f"{var} is not a 2D variable. The plot of {var} is omitted.")
