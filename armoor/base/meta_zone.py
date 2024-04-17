@@ -819,7 +819,11 @@ class MetazoneAccessor:
                 ds_slice = ds_slice.assign_coords(depth=np.arange(
                     len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
             elif 'z' in ds_slice.dims:
-                if len(ds_slice[var_slice].dims) ==1:
+                if len(ds_slice[var_slice].dims) == 1:
+                    ds_slice = ds_slice.assign_coords(z=np.arange(
+                        len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
+                elif len(ds_slice[var_slice].dims) == 2:
+                    ds_slice[var_slice] = ds_slice[var_slice][0, :]
                     ds_slice = ds_slice.assign_coords(z=np.arange(
                         len(ds_slice[var_slice].squeeze())))  # change les profondeurs en indices
                 else:
