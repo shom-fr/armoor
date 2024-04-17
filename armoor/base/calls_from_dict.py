@@ -394,6 +394,9 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                 xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
                 xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": depth})
 
+        if 'times' in config_obj["meta_zones"]:
+            xarray_obj = xarray_obj.assign_attrs({"echeances": config_obj["meta_zones"]["times"]})
+
         if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
             if 'depth' in config_obj["meta_zones"]:
                 logger.warning(

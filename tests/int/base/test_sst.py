@@ -98,6 +98,15 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_sst_stats_echeances(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_sst_stats_echeances")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/sst_stats_echeances.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_sst_map_diff_hycom(self):
         out_path, logger = change_path(folder_test)
         logger.info("test_sst_map_diff_hycom")
