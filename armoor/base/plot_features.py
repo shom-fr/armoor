@@ -1007,12 +1007,13 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
         Path where to save the figures.
     """
     # Get min/max colobar values
-    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values_2(#vmin,
-                                                                                          #vmax,
+    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values_2(
                                                                                           obs_coloc,
                                                                                           mod_coloc,
                                                                                           comparison,
                                                                                           metric,
+                                                                                          vmin,
+                                                                                          vmax,
                                                                                           dvmin,
                                                                                           dvmax)
 
@@ -1248,12 +1249,13 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
     """
     logger.info('map figures with comparison metric')
     # Get min/max colobar values
-    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values_2(#vmin,
-                                                                                          #vmax,
+    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values_2(
                                                                                           obs_meta,
                                                                                           mod_meta,
                                                                                           comparison,
                                                                                           metric,
+                                                                                          vmin,
+                                                                                          vmax,
                                                                                           dvmin,
                                                                                           dvmax)
     # Squeeze
@@ -2243,7 +2245,7 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     # vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values(vmin, vmax, obs_meta_coloc, diff,
     #                                                        'difference', dvmin, dvmax, cmap)
     vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values_2(obs_meta_coloc, mod_meta_coloc, diff,
-                                                           'difference', dvmin, dvmax, cmap)
+                                                           'difference', vmin, vmax, dvmin, dvmax, cmap)
 
     # Plot the graphs
     im_obs = axs[0].pcolormesh(obs_meta_coloc.time, obs_meta_coloc.depth,
@@ -3506,7 +3508,7 @@ def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None,
     return vmin, vmax, dvmin, dvmax, cmap, dcmap
 
 
-def get_min_max_values_2(ds1, ds2, comparison=None, metric=None, dvmin=None, dvmax=None,
+def get_min_max_values_2(ds1, ds2, comparison=None, metric=None, vmin=None, vmax=None, dvmin=None, dvmax=None,
                        cmap=None):
     """
     Give the appropriate values for the colorbar.
@@ -3545,15 +3547,17 @@ def get_min_max_values_2(ds1, ds2, comparison=None, metric=None, dvmin=None, dvm
     vmax1 = ds1.max(skipna=True).values
     vmax2 = ds2.max(skipna=True).values
 
-    vmin = np.min([vmin1, vmin2])
-    vmax = np.max([vmax1, vmax2])
+    if vmin is None:
+        vmin = np.min([vmin1, vmin2])
+    if vmax is None:
+        vmax = np.max([vmax1, vmax2])
 
     # dvmin / dvmax / cmap
     if metric in ["difference", "bias"]:
         if dvmin is None:
-            dvmin = -abs(np.nanmax(comparison))
+            dvmin = -np.nanmax(abs(comparison))
         if dvmax is None:
-            dvmax = abs(np.nanmax(comparison))
+            dvmax = np.nanmax(abs(comparison))
         dcmap = cmocean.cm.balance
     elif metric in ['RMSE', 'RMSEc']:
         if dvmin is None:
