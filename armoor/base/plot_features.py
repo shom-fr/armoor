@@ -693,28 +693,54 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                                                        mod.attrs['name'], obs.attrs['name'])
                     diag_disp_figure(mod_inter, obs_inter, title)
                     manage_output(figname, output_path)
-        else:
-            if flag_slice:
-                for index_slice, _ in enumerate(mod['slice']):
-                    mod_inter = mod.isel(slice=[index_slice])
-                    obs_inter = obs.isel(slice=[index_slice])
+
+        elif 'echeances' in obs.attrs:
+            for index_time, _ in enumerate(obs.attrs['echeances']):
+                if flag_slice:
+                    for index_slice, _ in enumerate(mod['slice']):
+                        mod_inter = mod.isel(time=[index_time], slice=[index_slice])
+                        obs_inter = obs.isel(time=[index_time], slice=[index_slice])
+                        title, figname = get_title_figname('Dispersion diagram', obs_inter,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_inter, obs_inter, title)
+                        manage_output(figname, output_path)
+                elif 'depth' in mod.dims and len(mod.depth) > 1:
+                    for index_depth, _ in enumerate(mod['depth']):
+                        mod_depth = mod.isel(depth=[index_depth])
+                        obs_depth = obs.isel(depth=[index_depth])
+                        title, figname = get_title_figname('Dispersion diagram', obs_depth,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_depth, obs_depth, title)
+                        manage_output(figname, output_path)
+                else:
+                    mod_inter = mod.isel(time=[index_time])
+                    obs_inter = obs.isel(time=[index_time])
                     title, figname = get_title_figname('Dispersion diagram', obs_inter,
                                                        mod.attrs['name'], obs.attrs['name'])
                     diag_disp_figure(mod_inter, obs_inter, title)
                     manage_output(figname, output_path)
-            elif 'depth' in mod.dims and len(mod.depth) > 1:
-                for index_depth, _ in enumerate(mod['depth']):
-                    mod_depth = mod.isel(depth=[index_depth])
-                    obs_depth = obs.isel(depth=[index_depth])
-                    title, figname = get_title_figname('Dispersion diagram', obs_depth,
-                                                       mod.attrs['name'], obs.attrs['name'])
-                    diag_disp_figure(mod_depth, obs_depth, title)
-                    manage_output(figname, output_path)
             else:
-                title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
-                                                   obs.attrs['name'])
-                diag_disp_figure(mod, obs, title)
-                manage_output(figname, output_path)
+                if flag_slice:
+                    for index_slice, _ in enumerate(mod['slice']):
+                        mod_inter = mod.isel(slice=[index_slice])
+                        obs_inter = obs.isel(slice=[index_slice])
+                        title, figname = get_title_figname('Dispersion diagram', obs_inter,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_inter, obs_inter, title)
+                        manage_output(figname, output_path)
+                elif 'depth' in mod.dims and len(mod.depth) > 1:
+                    for index_depth, _ in enumerate(mod['depth']):
+                        mod_depth = mod.isel(depth=[index_depth])
+                        obs_depth = obs.isel(depth=[index_depth])
+                        title, figname = get_title_figname('Dispersion diagram', obs_depth,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_depth, obs_depth, title)
+                        manage_output(figname, output_path)
+                else:
+                    title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
+                                                       obs.attrs['name'])
+                    diag_disp_figure(mod, obs, title)
+                    manage_output(figname, output_path)
 
 
 def diag_disp_figure(mod, obs, title):
@@ -2157,13 +2183,6 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
         manage_output(figname, output_path)
 
 
-
-###########################################################################################################
-###########################################################################################################
-###########################################################################################################
-###########################################################################################################
-
-
 def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=None, plg=None):
     """
     Plot punctual time series of model and observation and the associated metric.
@@ -2291,12 +2310,6 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
                                     transform=ccrs.PlateCarree())
 
         manage_output(figname, output_path)
-##################################################################################################
-##################################################################################################
-##################################################################################################
-##################################################################################################
-
-
 
 
 def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vmax=None, dvmin=None,
