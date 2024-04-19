@@ -2208,7 +2208,6 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
     elif 'z' in obs_coloc_base.dims and len(obs_coloc_base.z) > 1:
         list_dims_mean.append('z')
 
-    logger.info(f'The statistics are calculated on the following dimensions: {list_dims_mean}')
 
     # Get variable name and unit
     _, var_unit = find_var_title(obs_meta)
@@ -2216,24 +2215,22 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
     obs_mean = obs_coloc_base.mean(list_dims_mean, skipna=True).squeeze()
     obs_std = obs_coloc_base.std(list_dims_mean, skipna=True).squeeze()
     if flag_interval:
+
+        logger.info(f'The statistics are calculated on the following dimensions: {list_dims_mean}')
+
         time_coloc = obs_mean.interval.values
 
         f, axs = figure_5lin_ts()
         f.autofmt_xdate(rotation=5)
 
-        if "echeances" in obs_coloc_base.attrs:
-            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=8, label=f'{observation["name"]} ')
-            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=8, label=f'{observation["name"]} ')
-        else:
-            axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
-            axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
+        axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
+        axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"].assign_attrs({'name': mod['name']})
             obs_coloc = observation["xarray_meta_coloc"][i].assign_attrs(
                 {'name': observation['name']})
             plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, plg)
-
 
         # Change x interval labels
         if flag_interval:
@@ -2250,17 +2247,13 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
         f.suptitle(title, x=0.4, y=1.01, fontsize=15, fontweight='bold')
         manage_output(figname, output_path)
 
-    else:
-
+    elif "echeances" in observation["xarray_meta_coloc"][0].attrs:
         f, axs = figure_2lin_ts()
+        f.autofmt_xdate(rotation=5)
 
         obs_0 = observation["xarray_meta_coloc"][0].squeeze()
         time_coloc = obs_0.time
-        if "echeances" in observation["xarray_meta_coloc"][0].attrs:
-            axs[0].plot(time_coloc, obs_0, 'k-o', label=f'{observation["name"]}')
-        else:
-            axs[0].plot(time_coloc, obs_0, 'k', label=f'{observation["name"]}')
-        f.autofmt_xdate(rotation=5)
+        axs[0].plot(time_coloc, obs_0, 'k-o', label=f'{observation["name"]}')
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"].squeeze()
@@ -2269,20 +2262,19 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
             # DIFFERENCE
             comparison = mod_coloc.data - obs_coloc.data
 
-            if "echeances" in observation["xarray_meta_coloc"][0].attrs:
-                axs[0].plot(time_coloc, mod_coloc, '-o', label=f'{mod["name"]} ')
-                axs[1].plot(time_coloc, comparison, '-o', label=f'{mod["name"]} ')
-            else:
-                axs[0].plot(time_coloc, mod_coloc, label=f'{mod["name"]} ')
-                axs[1].plot(time_coloc, comparison, label=f'{mod["name"]} ')
+            axs[0].plot(time_coloc, mod_coloc, '-o', label=f'{mod["name"]} ')
+            axs[1].plot(time_coloc, comparison, '-o', label=f'{mod["name"]} ')
 
             # Set title and legend
             axs[0].legend(loc=0)
+            # Set labels and titles
+            for ax in axs:
+                ax.set_ylabel(f'{var_unit}')
             mod_names = [mod['name'] for mod in models]
             title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
                                                observation['name'])
 
-            f.suptitle(title, x=0.25, y=1.01, fontsize=14, fontweight='bold')
+            f.suptitle(title, x=0.4, y=1.01, fontsize=14, fontweight='bold')
 
         # MINI-MAP
         # add minimap

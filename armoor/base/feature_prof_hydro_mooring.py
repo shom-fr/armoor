@@ -80,11 +80,7 @@ def plot(config_obj):
                                                          plg=plg)
 ############################################################################################
             # PONCTUAL TIMES SERIES
-            plot_ts_metr_f3 = {"plot_ts_metr_ecart_f3": 'difference_stats',
-                               "plot_ts_metr_bias_f3": 'bias_stats',
-                               "plot_ts_metr_RMSE_f3": 'RMSEc_stats',
-                               "plot_ts_metr_f3": 'all_metrics'
-                               }
+            plot_ts_metr_f3 = {"plot_ts_metr_f3": 'all_metrics'}
             if output["plot"] in plot_ts_metr_f3:
                 plg = config_obj["meta_zones"].get("polygon")
                 if 'depth' not in models[0]["xarray_meta_coloc"].dims or len(
