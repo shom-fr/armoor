@@ -80,23 +80,26 @@ def plot(config_obj):
                                                          plg=plg)
 ############################################################################################
             # PONCTUAL TIMES SERIES
-            plot_ts_metr_f3 = {"plot_ts_metr_ecart_point": 'difference_point',
-                                  "plot_ts_metr_bias_point": 'bias_point',
-                                  "plot_ts_metr_RMSE_point": 'RMSEc_point',
-                                  "plot_ts_metr_f3": 'all_metrics'
-                                  }
+            plot_ts_metr_f3 = {"plot_ts_metr_ecart_f3": 'difference_stats',
+                               "plot_ts_metr_bias_f3": 'bias_stats',
+                               "plot_ts_metr_RMSE_f3": 'RMSEc_stats',
+                               "plot_ts_metr_f3": 'all_metrics'
+                               }
             if output["plot"] in plot_ts_metr_f3:
+                plg = config_obj["meta_zones"].get("polygon")
                 if 'depth' not in models[0]["xarray_meta_coloc"].dims or len(
                         models[0]["xarray_meta_coloc"].depth) == 1:
                     models_depth, observation_depth = models_var, observation_var
                     plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
-                                                     output_path=sub_func_output_folder)
+                                                     output_path=sub_func_output_folder,
+                                                         plg=plg)
                 else:
                     for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
                         models_depth, observation_depth = select_depth(models_var, observation_var,
                                                                        depth)
                         plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
-                                                     output_path=sub_func_output_folder)
+                                                     output_path=sub_func_output_folder,
+                                                         plg=plg)
 
 def select_depth(models, observation, depth):
     """

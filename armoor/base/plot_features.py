@@ -2164,7 +2164,7 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
 ###########################################################################################################
 
 
-def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=None):
+def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=None, plg=None):
     """
     Plot punctual time series of model and observation and the associated metric.
     Parameters
@@ -2186,137 +2186,117 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
     obs_meta = observation["xarray_meta"]
 
     # all data are going to be colocated on the same bases, we can select lon lat on the first one
+    # obs_coloc_base = observation["xarray_meta_coloc"][0]
     obs_coloc_base = observation["xarray_meta_coloc"][0]
-    longitudes, latitudes = obs_coloc_base.lon, obs_coloc_base.lat
-
     list_dims_mean = []
+    longitudes, latitudes = obs_coloc_base.lon[0], obs_coloc_base.lat[0]
 
+    # Get the dimensions on which to calculate the statistics
     if flag_interval:
         list_dims_mean.append('idx_time')
     if flag_slice:
-        if 'depth' in obs_coloc_base.dims:
-            list_dims_mean.append('idx_depth')
-        elif 'dens' in obs_coloc_base.dims:
-            list_dims_mean.append('idx_dens')
+        list_dims_mean.append('idx_depth')
+    if 'lon' in observation["xarray_meta_coloc"][0].dims:
+        list_dims_mean.append('lon')
+        list_dims_mean.append('lat')
+    if 'instr' in observation["xarray_meta_coloc"][0].dims:
+        list_dims_mean.append('instr')
     if 'depth' in obs_coloc_base.dims and len(obs_coloc_base.depth) > 1:
         list_dims_mean.append('depth')
     elif 'dens' in obs_coloc_base.dims and len(obs_coloc_base.dens) > 1:
         list_dims_mean.append('dens')
-    logging.info(f'The statistics are calculated on the following dimensions: {list_dims_mean}')
+    elif 'z' in obs_coloc_base.dims and len(obs_coloc_base.z) > 1:
+        list_dims_mean.append('z')
+
+    logger.info(f'The statistics are calculated on the following dimensions: {list_dims_mean}')
 
     # Get variable name and unit
     _, var_unit = find_var_title(obs_meta)
 
-    for index_lon, longitude in enumerate(longitudes):
-        latitude = latitudes[index_lon]
+    obs_mean = obs_coloc_base.mean(list_dims_mean, skipna=True).squeeze()
+    obs_std = obs_coloc_base.std(list_dims_mean, skipna=True).squeeze()
+    if flag_interval:
+        time_coloc = obs_mean.interval.values
 
-        # Get the cloud point corresponding to the obs to write it in the title of the plot
-        if 'cloud' in obs_coloc_base.attrs:
-            obs_coloc_base.attrs['cloud_plot'] = obs_coloc_base.attrs['cloud'][index_lon]
+        f, axs = figure_5lin_ts()
+        f.autofmt_xdate(rotation=5)
 
+        if "echeances" in obs_coloc_base.attrs:
+            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=8, label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=8, label=f'{observation["name"]} ')
+        else:
+            axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
+
+        for i, mod in enumerate(models):
+            mod_coloc = mod["xarray_meta_coloc"].assign_attrs({'name': mod['name']})
+            obs_coloc = observation["xarray_meta_coloc"][i].assign_attrs(
+                {'name': observation['name']})
+            plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, plg)
+
+
+        # Change x interval labels
         if flag_interval:
-            f, axs = figure_5lin_ts()
-
-            obs_mean = obs_coloc_base.squeeze()
-            obs_std = obs_coloc_base.squeeze()
-            time_coloc = obs_mean.interval
-
-            axs[0].plot(time_coloc, obs_mean, 'k', label=f'{observation["name"]} ')
-            f.autofmt_xdate(rotation=5)
-            axs[2].plot(time_coloc, obs_std, 'k', label=f'{observation["name"]} ')
-
-            for i, mod in enumerate(models):
-                mod_coloc = mod["xarray_meta_coloc"].squeeze()
-                obs_coloc = observation["xarray_meta_coloc"][i].squeeze()
-                # MOYENNES
-                mod_mean = mod_coloc.mean(list_dims_mean)
-                axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod["name"]}')
-
-                # BIAIS
-                biais = mod_mean - obs_mean
-                axs[1].plot(time_coloc, biais, '-', label=f'{mod["name"]}')
-
-                # ECART-TYPE
-                mod_std = mod_coloc.std(list_dims_mean)
-                axs[2].plot(time_coloc, mod_std, '-', label=f'{mod["name"]}')
-
-                # RMSE
-                rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean)
-                axs[3].plot(time_coloc, rmse, '-', label=f'{mod["name"]}')
-
-                # RMSE CENTREE
-                rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean)
-                axs[4].plot(time_coloc, rmse_centree, '-',
-                            label=f'Centered RMSE : {observation["name"]}  {mod["name"]} ')
-                axs[0].legend(loc=0)  # Demande de Mogan
-            # Set labels and titles
-            for ax in axs:
-                ax.set_ylabel(f'{var_unit}')
-
-            mod_names = [mod['name'] for mod in models]
-            title, figname = get_title_figname('Metric statistics', obs_coloc, mod_names,
-                                               observation['name'])
-
-            f.suptitle(title, x=0.4, fontsize=15, fontweight='bold')
-
-            # Rotate x labels
-            for label in ax.get_xticklabels():
-                label.set_rotation(25)
-
-            # Change x interval labels
             modify_interval_label(axs[4])
             axs[0].set_xticks(axs[4].get_xticks())
             axs[1].set_xticks(axs[4].get_xticks())
             axs[2].set_xticks(axs[4].get_xticks())
             axs[3].set_xticks(axs[4].get_xticks())
 
-        else:  # No flag interval : difference only
+        # Add title and save fig
+        mod_name = [mod['name'] for mod in models]
+        title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
+                                           obs_coloc, mod_name, observation['name'])
+        f.suptitle(title, x=0.4, y=1.01, fontsize=15, fontweight='bold')
+        manage_output(figname, output_path)
 
-            f, axs = figure_2lin_ts()
+    else:
 
-            obs_0 = observation["xarray_meta_coloc"][0].squeeze()
-            time_coloc = obs_0.time
-            if "echeances" in observation["xarray_meta_coloc"][0]:
-                axs[0].plot(time_coloc, obs_0, 'k-o', label=f'{observation["name"]}')
+        f, axs = figure_2lin_ts()
+
+        obs_0 = observation["xarray_meta_coloc"][0].squeeze()
+        time_coloc = obs_0.time
+        if "echeances" in observation["xarray_meta_coloc"][0].attrs:
+            axs[0].plot(time_coloc, obs_0, 'k-o', label=f'{observation["name"]}')
+        else:
+            axs[0].plot(time_coloc, obs_0, 'k', label=f'{observation["name"]}')
+        f.autofmt_xdate(rotation=5)
+
+        for i, mod in enumerate(models):
+            mod_coloc = mod["xarray_meta_coloc"].squeeze()
+            obs_coloc = observation["xarray_meta_coloc"][i].squeeze()
+
+            # DIFFERENCE
+            comparison = mod_coloc.data - obs_coloc.data
+
+            if "echeances" in observation["xarray_meta_coloc"][0].attrs:
+                axs[0].plot(time_coloc, mod_coloc, '-o', label=f'{mod["name"]} ')
+                axs[1].plot(time_coloc, comparison, '-o', label=f'{mod["name"]} ')
             else:
-                axs[0].plot(time_coloc, obs_0, 'k', label=f'{observation["name"]}')
-            f.autofmt_xdate(rotation=5)
+                axs[0].plot(time_coloc, mod_coloc, label=f'{mod["name"]} ')
+                axs[1].plot(time_coloc, comparison, label=f'{mod["name"]} ')
 
-            for i, mod in enumerate(models):
-                mod_coloc = mod["xarray_meta_coloc"].squeeze()
-                obs_coloc = observation["xarray_meta_coloc"][i].squeeze()
+            # Set title and legend
+            axs[0].legend(loc=0)
+            mod_names = [mod['name'] for mod in models]
+            title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
+                                               observation['name'])
 
-                # DIFFERENCE
-                comparison = mod_coloc.data - obs_coloc.data
-
-                if "echeances" in observation["xarray_meta_coloc"][0]:
-                    axs[0].plot(time_coloc, mod_coloc, '-o', label=f'{mod["name"]} ')
-                    axs[1].plot(time_coloc, comparison, '-o', label=f'{mod["name"]} ')
-                else:
-                    axs[0].plot(time_coloc, mod_coloc, label=f'{mod["name"]} ')
-                    axs[1].plot(time_coloc, comparison, label=f'{mod["name"]} ')
-
-                # Set title and legend
-                axs[0].legend(loc=0)
-                mod_names = [mod['name'] for mod in models]
-                title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
-                                                   observation['name'])
-
-                f.suptitle(title, x=0.25, y=1.01, fontsize=14, fontweight='bold')
+            f.suptitle(title, x=0.25, y=1.01, fontsize=14, fontweight='bold')
 
         # MINI-MAP
-        ax_mini_map = add_mini_map(f, obs_coloc_base)
-        if 'cloud' in obs_coloc_base.attrs:
-            ax_mini_map.scatter(np.array([lon[0] for lon in obs_coloc_base.attrs['cloud']]),
-                                np.array([lat[1] for lat in obs_coloc_base.attrs['cloud']]), 30, 'k', transform=ccrs.PlateCarree())
-            ax_mini_map.scatter(obs_coloc_base.attrs['cloud_plot'][0],
-                                obs_coloc_base.attrs['cloud_plot'][1], 90, marker='*', c='yellow',
-                                edgecolors='black',
-                                transform=ccrs.PlateCarree())
+        # add minimap
+        ax_mini_map = add_mini_map(f, obs_coloc)
+        if 'lon' in list_dims_mean:
+            add_plg_minimap(ax_mini_map, obs_coloc, plg)
         else:
-            ax_mini_map.scatter(longitudes, latitudes, 30, 'k', transform=ccrs.PlateCarree())
-            ax_mini_map.scatter(longitude, latitude, 90, marker='*', c='yellow', edgecolors='black',
-                            transform=ccrs.PlateCarree())
+            try:
+                ax_mini_map.scatter(obs_coloc.lon.where(~np.isnan(obs_coloc.values), other=np.nan),
+                                    obs_coloc.lat.where(~np.isnan(obs_coloc.values), other=np.nan), 30,
+                                    transform=ccrs.PlateCarree())
+            except:
+                ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30,
+                                    transform=ccrs.PlateCarree())
 
         manage_output(figname, output_path)
 ##################################################################################################
