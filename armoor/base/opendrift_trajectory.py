@@ -30,6 +30,11 @@ def format_opendrift(mod, path_model):
     mod['y_sea_water_velocity'].attrs = {'standard_name': "northward_sea_water_velocity",
                                          'long_name': "Northward velocity", 'units': "m s-1"
                                          }
+    
+    blacklist = [var for var in mod.variables if var in ['dir', 'norm']]
+    if blacklist:
+        mod = mod.drop_vars(blacklist)
+
     if not check_delta_constant(mod):
         mod = regrid_constant_delta(mod)
 
