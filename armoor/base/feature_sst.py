@@ -65,7 +65,6 @@ def plot(config_obj):
         # PLOTS
         for var in vars:
             observation_var, models_var = sel_one_var(observation, models, var)
-
             ########################################################################################
             # TIME SERIES POINT
             plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point',

@@ -243,7 +243,7 @@ def set_coloc_flags(config_obj):
         vertical_colocation_flag = False
     if 'cloud' in config_obj['meta_zones']:
         horizontal_colocation_flag = False
-    if 'times' in config_obj['meta_zones']:
+    if 'times' in config_obj['meta_zones'] and config_obj["functionality"] != "prof_hydro_mooring":
         temporal_colocation_flag = False
 
     flags = temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag
@@ -393,6 +393,9 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                 depth = config_obj["meta_zones"]["depth"]
                 xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
                 xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": depth})
+
+        if 'times' in config_obj["meta_zones"]:
+            xarray_obj = xarray_obj.assign_attrs({"echeances": config_obj["meta_zones"]["times"]})
 
         if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
             if 'depth' in config_obj["meta_zones"]:

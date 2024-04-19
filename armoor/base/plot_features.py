@@ -2063,9 +2063,9 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 list_dims_mean).squeeze()
             time_coloc = obs_mean.interval
 
-            axs[0].plot(time_coloc, obs_mean, 'k-o', label=f'{observation["name"]} ')
+            axs[0].plot(time_coloc, obs_mean, 'k', label=f'{observation["name"]} ')
             f.autofmt_xdate(rotation=5)
-            axs[2].plot(time_coloc, obs_std, 'k-o', label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, 'k', label=f'{observation["name"]} ')
 
             for i, mod in enumerate(models):
                 mod_coloc = mod["xarray_meta_coloc"].isel(lat=index_lon, lon=index_lon).squeeze()
@@ -2073,23 +2073,23 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                                                                      lon=index_lon).squeeze()
                 # MOYENNES
                 mod_mean = mod_coloc.mean(list_dims_mean)
-                axs[0].plot(time_coloc, mod_mean, '-o', label=f'{mod["name"]}')
+                axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod["name"]}')
 
                 # BIAIS
                 biais = mod_mean - obs_mean
-                axs[1].plot(time_coloc, biais, '-o', label=f'{mod["name"]}')
+                axs[1].plot(time_coloc, biais, '-', label=f'{mod["name"]}')
 
                 # ECART-TYPE
                 mod_std = mod_coloc.std(list_dims_mean)
-                axs[2].plot(time_coloc, mod_std, '-o', label=f'{mod["name"]}')
+                axs[2].plot(time_coloc, mod_std, '-', label=f'{mod["name"]}')
 
                 # RMSE
                 rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean)
-                axs[3].plot(time_coloc, rmse, '-o', label=f'{mod["name"]}')
+                axs[3].plot(time_coloc, rmse, '-', label=f'{mod["name"]}')
 
                 # RMSE CENTREE
                 rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean)
-                axs[4].plot(time_coloc, rmse_centree, '-o',
+                axs[4].plot(time_coloc, rmse_centree, '-',
                             label=f'Centered RMSE : {observation["name"]}  {mod["name"]} ')
                 axs[0].legend(loc=0)  # Demande de Mogan
             # Set labels and titles
@@ -2155,6 +2155,148 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                             transform=ccrs.PlateCarree())
 
         manage_output(figname, output_path)
+
+
+
+###########################################################################################################
+###########################################################################################################
+###########################################################################################################
+###########################################################################################################
+
+
+def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=None, plg=None):
+    """
+    Plot punctual time series of model and observation and the associated metric.
+    Parameters
+    ----------
+    models : dict
+        Dictionary with the model dataarrays.
+    observation : dict
+        Dictionary with the observations dataarrays.
+    metric
+    flag_interval : bool
+        Indicates if the figures must be plot by intervals or not.
+    flag_slice : bool
+        Indicates if the figures must be plot by slices or not.
+    output_path : str
+        path where to save the figure.
+
+    """
+    logger.info('Punctual time series of model and observation and the associated metric.')
+    obs_meta = observation["xarray_meta"]
+
+    # all data are going to be colocated on the same bases, we can select lon lat on the first one
+    # obs_coloc_base = observation["xarray_meta_coloc"][0]
+    obs_coloc_base = observation["xarray_meta_coloc"][0]
+    list_dims_mean = []
+    longitudes, latitudes = obs_coloc_base.lon[0], obs_coloc_base.lat[0]
+
+    # Get the dimensions on which to calculate the statistics
+    if flag_interval:
+        list_dims_mean.append('idx_time')
+    if flag_slice:
+        list_dims_mean.append('idx_depth')
+    if 'lon' in observation["xarray_meta_coloc"][0].dims:
+        list_dims_mean.append('lon')
+        list_dims_mean.append('lat')
+    if 'instr' in observation["xarray_meta_coloc"][0].dims:
+        list_dims_mean.append('instr')
+    if 'depth' in obs_coloc_base.dims and len(obs_coloc_base.depth) > 1:
+        list_dims_mean.append('depth')
+    elif 'dens' in obs_coloc_base.dims and len(obs_coloc_base.dens) > 1:
+        list_dims_mean.append('dens')
+    elif 'z' in obs_coloc_base.dims and len(obs_coloc_base.z) > 1:
+        list_dims_mean.append('z')
+
+
+    # Get variable name and unit
+    _, var_unit = find_var_title(obs_meta)
+
+    obs_mean = obs_coloc_base.mean(list_dims_mean, skipna=True).squeeze()
+    obs_std = obs_coloc_base.std(list_dims_mean, skipna=True).squeeze()
+    if flag_interval:
+
+        logger.info(f'The statistics are calculated on the following dimensions: {list_dims_mean}')
+
+        time_coloc = obs_mean.interval.values
+
+        f, axs = figure_5lin_ts()
+        f.autofmt_xdate(rotation=5)
+
+        axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
+        axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
+
+        for i, mod in enumerate(models):
+            mod_coloc = mod["xarray_meta_coloc"].assign_attrs({'name': mod['name']})
+            obs_coloc = observation["xarray_meta_coloc"][i].assign_attrs(
+                {'name': observation['name']})
+            plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, plg)
+
+        # Change x interval labels
+        if flag_interval:
+            modify_interval_label(axs[4])
+            axs[0].set_xticks(axs[4].get_xticks())
+            axs[1].set_xticks(axs[4].get_xticks())
+            axs[2].set_xticks(axs[4].get_xticks())
+            axs[3].set_xticks(axs[4].get_xticks())
+
+        # Add title and save fig
+        mod_name = [mod['name'] for mod in models]
+        title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
+                                           obs_coloc, mod_name, observation['name'])
+        f.suptitle(title, x=0.4, y=1.01, fontsize=15, fontweight='bold')
+        manage_output(figname, output_path)
+
+    elif "echeances" in observation["xarray_meta_coloc"][0].attrs:
+        f, axs = figure_2lin_ts()
+        f.autofmt_xdate(rotation=5)
+
+        obs_0 = observation["xarray_meta_coloc"][0].squeeze()
+        time_coloc = obs_0.time
+        axs[0].plot(time_coloc, obs_0, 'k-o', label=f'{observation["name"]}')
+
+        for i, mod in enumerate(models):
+            mod_coloc = mod["xarray_meta_coloc"].squeeze()
+            obs_coloc = observation["xarray_meta_coloc"][i].squeeze()
+
+            # DIFFERENCE
+            comparison = mod_coloc.data - obs_coloc.data
+
+            axs[0].plot(time_coloc, mod_coloc, '-o', label=f'{mod["name"]} ')
+            axs[1].plot(time_coloc, comparison, '-o', label=f'{mod["name"]} ')
+
+            # Set title and legend
+            axs[0].legend(loc=0)
+            # Set labels and titles
+            for ax in axs:
+                ax.set_ylabel(f'{var_unit}')
+            mod_names = [mod['name'] for mod in models]
+            title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
+                                               observation['name'])
+
+            f.suptitle(title, x=0.4, y=1.01, fontsize=14, fontweight='bold')
+
+        # MINI-MAP
+        # add minimap
+        ax_mini_map = add_mini_map(f, obs_coloc)
+        if 'lon' in list_dims_mean:
+            add_plg_minimap(ax_mini_map, obs_coloc, plg)
+        else:
+            try:
+                ax_mini_map.scatter(obs_coloc.lon.where(~np.isnan(obs_coloc.values), other=np.nan),
+                                    obs_coloc.lat.where(~np.isnan(obs_coloc.values), other=np.nan), 30,
+                                    transform=ccrs.PlateCarree())
+            except:
+                ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30,
+                                    transform=ccrs.PlateCarree())
+
+        manage_output(figname, output_path)
+##################################################################################################
+##################################################################################################
+##################################################################################################
+##################################################################################################
+
+
 
 
 def plot_variable_3d(models, observation, cmap=cmocean.cm.thermal, vmin=None, vmax=None, dvmin=None,
@@ -2527,9 +2669,12 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 time_coloc = obs_mean.interval.values
             else:
                 time_coloc = obs_mean.time.values
-
-            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
-            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
+            if "echeances" in obs_coloc_base.attrs:
+                axs[0].plot(time_coloc, obs_mean, ls='-o', c='k', ms=8, label=f'{observation["name"]} ')
+                axs[2].plot(time_coloc, obs_std, ls='-o', c='k', ms=8, label=f'{observation["name"]} ')
+            else:
+                axs[0].plot(time_coloc, obs_mean, ls='-', c='k',  label=f'{observation["name"]} ')
+                axs[2].plot(time_coloc, obs_std, ls='-', c='k', label=f'{observation["name"]} ')
             for i, mod in enumerate(models):
                 mod_coloc = mod["xarray_meta_coloc"].isel(slice=[idx_slice]).assign_attrs(
                     {'name': mod['name']})
@@ -2567,8 +2712,12 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         f, axs = figure_5lin_ts()
         f.autofmt_xdate(rotation=5)
 
-        axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
-        axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
+        if "echeances" in obs_coloc_base.attrs:
+            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=8, label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=8, label=f'{observation["name"]} ')
+        else:
+            axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"].assign_attrs({'name': mod['name']})
@@ -2621,23 +2770,38 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     # MOYENNES
     mod_mean = mod_coloc.mean(list_dims_mean, skipna=True).squeeze()
     obs_mean = obs_coloc.mean(list_dims_mean, skipna=True).squeeze()
-    axs[0].plot(time_coloc, mod_mean, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[0].plot(time_coloc, mod_mean, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod_name}')
 
     # BIAIS
     biais = (mod_mean - obs_mean).squeeze()
-    axs[1].plot(time_coloc, biais, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[1].plot(time_coloc, biais, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[1].plot(time_coloc, biais, '-', label=f'{mod_name}')
 
     # ECART-TYPE
     mod_std = mod_coloc.std(list_dims_mean, skipna=True).squeeze()
-    axs[2].plot(time_coloc, mod_std, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[2].plot(time_coloc, mod_std, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[2].plot(time_coloc, mod_std, '-', label=f'{mod_name}')
 
     # RMSE
     rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
-    axs[3].plot(time_coloc, rmse, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[3].plot(time_coloc, rmse, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[3].plot(time_coloc, rmse, '-', label=f'{mod_name}')
 
     # RMSE CENTREE
     rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
-    axs[4].plot(time_coloc, rmse_centree, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[4].plot(time_coloc, rmse_centree, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[4].plot(time_coloc, rmse_centree, '-', label=f'{mod_name}')
 
     axs[0].legend(loc=0)  # Demande de Morgan
     for ax in axs:
