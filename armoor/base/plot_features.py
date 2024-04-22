@@ -212,7 +212,7 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_depth = f"Depth: {obs.depth.values:.1f} m"
         depth = f"{obs.depth.values:.1f}m"
 
-    if 'mld' in var_name or 'SST' in var_name or "drifter" in obs_name or 'HFR' in obs_name:
+    if 'mld' in var_name or 'SST' in var_name or "drift" in obs_name or 'HFR' in obs_name:
         title_depth = ""
         depth = ''
 

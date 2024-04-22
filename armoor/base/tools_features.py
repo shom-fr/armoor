@@ -204,7 +204,7 @@ def sel_default_vars(config_obj):
         default_vars = ['ptemp', 'sal', 'pdens']
 
     elif feature == "section_hydro":  # F4
-        default_vars = ['ptemp', 'temp', 'sal', 'psal', 'pres']
+        default_vars = ['ptemp', 'sal']
 
     elif feature == "clim_hydro":  # F5
         default_vars = ['ptemp', 'sal']
