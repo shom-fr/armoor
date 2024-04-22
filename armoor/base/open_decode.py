@@ -215,6 +215,9 @@ def open_decode_cmems(path_files, steps):
         cmems = decode_profiler(cmems)
 
     # Calculate depth from pressure
+    if "PRES" in cmems:
+        cmems = cmems.rename({'PRES':'pres'})
+
     if 'depth' in cmems.dims and 'depth' not in cmems.coords and 'pres' in cmems:
         cmems = depth_from_press(cmems)
 
