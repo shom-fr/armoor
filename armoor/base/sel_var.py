@@ -490,8 +490,7 @@ class SSTAccessor:
             mld = mixed_layer_depth(pdens, zref=10)
             if np.isnan(mld.max().data):
                 logger.warning("mld full of NaNs, your dataset probably does not have pdens values at zref=10m.")
-
-        logger.error("mld full of NaNs, you won't get mld for this product")
+                logger.error("mld full of NaNs, you won't get mld for this product")
         return mld
 
     def sel_pres(self):
