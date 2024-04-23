@@ -479,23 +479,18 @@ class SSTAccessor:
         # Has mld in product
         if 'mld' in self._obj:
             return self._obj.mld
-        ptemp = self._obj.sel_var.sel_ptemp()
 
         # Compute mld from ptemp
-        mld = mixed_layer_depth(ptemp)
+        ptemp = self._obj.sel_var.sel_ptemp()
+        mld = mixed_layer_depth(ptemp, zref=10)
         if np.isnan(mld.max().data):
-            mld = mixed_layer_depth(ptemp, zref=10)
-
-        # computed mld from pdens
-        if np.isnan(mld.max().data):
+            logger.warning("mld full of NaNs, your dataset probably does not have ptemp values at zref=10m.")
+            # compute mld from pdens as with ptemp, mld is full of NaNs
             pdens = self._obj.sel_var.sel_pdensity()
-            mld = mixed_layer_depth(pdens)
+            mld = mixed_layer_depth(pdens, zref=10)
             if np.isnan(mld.max().data):
-                mld = mixed_layer_depth(pdens, zref=10)
-
-            if np.isnan(mld.max().data):
-                logger.warning("mld full of NaN, your dataset probably does not have ptemp and pdens value at zref = 10 m.")
-        
+                logger.warning("mld full of NaNs, your dataset probably does not have pdens values at zref=10m.")
+                logger.error("mld full of NaNs, you won't get mld for this product")
         return mld
 
     def sel_pres(self):
