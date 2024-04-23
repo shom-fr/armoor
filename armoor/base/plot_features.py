@@ -2205,10 +2205,8 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
     obs_meta = observation["xarray_meta"]
 
     # all data are going to be colocated on the same bases, we can select lon lat on the first one
-    # obs_coloc_base = observation["xarray_meta_coloc"][0]
     obs_coloc_base = observation["xarray_meta_coloc"][0]
     list_dims_mean = []
-    longitudes, latitudes = obs_coloc_base.lon[0], obs_coloc_base.lat[0]
 
     # Get the dimensions on which to calculate the statistics
     if flag_interval:
@@ -3523,12 +3521,14 @@ def find_var_title(da):
     else:
         var_name = da.name
 
-    if "salinity" in var_name or 'Salinity' in var_name:
+    if "salinity" in var_name or 'Salinity' in var_name or 'sal' in var_name:
         var_name = 'Salinity'
     if "temperature" in var_name or 'Temperature' in var_name or var_name == 'temp':
         var_name = 'Temperature'
+    if 'pdens' in var_name:
+        var_name = 'Pot. density'
     if 'ptemp' in var_name:
-        var_name = 'Potential temperature'
+        var_name = 'Pot. temperature'
     if 'sst' in var_name:
         var_name = 'SST'
     if 'res' in var_name:
