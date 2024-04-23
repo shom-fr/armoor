@@ -2,6 +2,7 @@
 import os
 import copy
 import logging
+import numpy as np
 from armoor.base.tools_features import remove_missing_values_ds, sel_one_var, sel_default_vars
 from armoor.base import plot_features
 from armoor.hmi.script_tools import create_folder
@@ -47,10 +48,24 @@ def plot(config_obj):
         observation = copy.copy(config_obj["observation"])
         models = copy.copy(config_obj["models"])
 
-        # Remove missing values
-        vars = [var for var in list(observation["xarray_meta"].keys()) if var in models[0]["xarray_meta"]]
-        for i_mod, mod in enumerate(models):
-            models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
+        # Depth selection
+        if "depth" in config_obj["meta_zones"] and "DEPTH" in observation["xarray_meta"].dims:
+            depth = config_obj["meta_zones"]["depth"]
+            depth_diff = np.abs(observation["xarray_meta"]["depth"] - float(depth[0]))
+            nearest_depth_index = np.nanargmin(depth_diff.data)
+            observation["xarray_meta"] = observation["xarray_meta"].isel(DEPTH=nearest_depth_index)
+            for i_mod, mod in enumerate(models):
+                depth_diff = np.abs(observation["xarray_meta_coloc"][i_mod]["depth"] - float(depth[0]))
+                nearest_depth_index = np.nanargmin(depth_diff.data)
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].sel(
+                    DEPTH=nearest_depth_index)
+
+        # Removing of the lon-lat dimensions in the model data
+        if "lat" not in observation["xarray_meta"].dims and "lat" in models[0]["xarray_meta_coloc"].dims:
+            for i_mod, mod in enumerate(models):
+                models[i_mod]["xarray_meta_coloc"] = models[i_mod]["xarray_meta_coloc"].isel(lon=0, lat=0)
+
+        vars = [var for var in list(observation["xarray_meta_coloc"][0].keys()) if var in models[0]["xarray_meta_coloc"]]
 
         # PLOTS
         for var in vars:
