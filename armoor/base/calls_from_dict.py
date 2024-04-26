@@ -231,7 +231,7 @@ def set_coloc_flags(config_obj):
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
         temporal_colocation_flag = True
-        vertical_colocation_flag = False
+        vertical_colocation_flag = True
         horizontal_colocation_flag = True
 
     if 'tide' in config_obj['outputs'][0]["plot"] or 'harm' in config_obj['outputs'][0]["plot"]:
@@ -401,7 +401,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
             if 'depth' in config_obj["meta_zones"]:
                 logger.warning(
                     f"For feature {config_obj['functionality']}, no depth can be specified ! Surface value is taken into account")
-            if "depth" in xarray_obj:
+            if "depth" in xarray_obj and config_obj['functionality'] in ["sst", "currents_hfr"]:
                 depth = [0]
                 xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
 
