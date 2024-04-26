@@ -48,7 +48,7 @@ def plot(config_obj):
             create_folder(sub_func_output_folder)
         else:
             sub_func_output_folder = output_path
-
+        
         # PLOTS
         ############################################################################################
         # MAP CURRENTS TRAJECTORY
@@ -58,9 +58,27 @@ def plot(config_obj):
             observation["xarray_meta"] = observation["xarray_meta"].sel_var.selection(
                 ['current']).assign_attrs({'name': observation['name']})
             for i_mod, mod in enumerate(models):
-                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
-                    i_mod].sel_var.selection(['current']).assign_attrs(
-                    {'name': observation['name']})
+                # observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][
+                #     i_mod].sel_var.selection(['current']).assign_attrs(
+                #     {'name': observation['name']})
+                
+                # Determine which obs depth contains data
+                if ('depth' in observation["xarray_meta"].dims) and ('depth' in mod["xarray_meta_coloc"].dims):
+                    depth_with_data = None
+                    # Loop over every depth
+                    for i, d in enumerate(observation["xarray_meta"].depth):
+                        ids = observation["xarray_meta"].isel(depth=i)
+                        # Pick the first depth that isn't full of nodata values
+                        if not np.all(np.isnan(ids.u)):
+                            depth_with_data = i
+                            break
+                        if depth_with_data is None:
+                            logger.warning("No data on obs")
+                    # Subset obs and mod to select the right depth
+                    observation["xarray_meta"] = observation["xarray_meta"].isel(depth=depth_with_data)
+                    print('mod["xarray_meta_coloc"] has type', type(mod["xarray_meta_coloc"]))
+                    mod["xarray_meta_coloc"]= mod["xarray_meta_coloc"].isel(depth=depth_with_data) 
+                
                 # Plot
                 plot_features.plot_map_current_trajectory(observation, mod,
                                                           output_path=sub_func_output_folder)
