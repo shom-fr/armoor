@@ -588,8 +588,10 @@ def open_decode_croco(path_file):
                           'eta_rho': 'y', 
                           's_rho': 'z', 
                           'lon_rho': 'lon', 
-                          'lat_rho': 'lat', 
-                          'mask_rho': 'mask'})
+                          'lat_rho': 'lat'})
+    if 'mask_rho' in list(croco.keys()):
+        croco = croco.rename({'mask_rho': 'mask'})
+
     for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
                 'eta_v', 'depth_w', 'sig', 's_w']:
         if var in croco:
@@ -623,7 +625,9 @@ def open_decode_croco(path_file):
     if 'temp' in croco:
         croco = croco.rename({'temp': 'ptemp'})
     # Remove values outside mask
-    croco = croco.where(croco['mask'] > 0, drop=True)
+    
+    if 'mask' in list(croco.keys()):
+        croco = croco.where(croco['mask'] > 0, drop=True)
 
     return croco
 
