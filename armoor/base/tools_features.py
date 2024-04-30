@@ -204,7 +204,7 @@ def sel_default_vars(config_obj):
         default_vars = ['ptemp', 'sal', 'pdens']
 
     elif feature == "section_hydro":  # F4
-        default_vars = ['ptemp', 'temp', 'sal', 'psal', 'pres']
+        default_vars = ['ptemp', 'sal']
 
     elif feature == "clim_hydro":  # F5
         default_vars = ['ptemp', 'sal']
@@ -301,7 +301,7 @@ def sel_one_var(observation, models, var, depth=None):
                 i_mod].sel(depth=depth, method='nearest')
 
     # Bathy thresh in attrs if needed
-    list_attrs = ["bathy_thresh", "radius", "depth_meta_zone", "cloud"]
+    list_attrs = ["bathy_thresh", "radius", "depth_meta_zone", "cloud", "echeances"]
     for attr in list_attrs:
         if attr in observation["xarray_meta"].attrs:
             attr_name = observation['xarray_meta'].attrs[attr]

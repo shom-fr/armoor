@@ -98,21 +98,31 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    # def test_pasdedata145_diag_disp_argo(self):
-    #     out_path, logger = change_path(folder_test)
-    #     logger.info("test_pasdedata145_diag_disp_argo.ini")
-    #     parser = command_line_interface(
-    #         ['--cfgfile', f"../single_tests/{folder_test}/pasdedata145_diag_disp_argo.ini"])
-    #     parser.update({'output_path': out_path})
-    #     create_folder(f'tmp')
-    #     dict2call(parser)
-    #     assert True
+    def test_145_diag_disp_argo(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_145_diag_disp_argo.ini")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/145_diag_disp_argo.ini"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
 
     def test_123_harmonic_table_ADCP_CROCO(self):
         out_path, logger = change_path(folder_test)
         logger.info("test_123_harmonic_table_ADCP_CROCO.ini")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/123_harmonic_table_ADCP_CROCO.ini"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_124_ellipses_ADCP_CROCO(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_124_ellipses_ADCP_CROCO.cfg")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/124_ellipses_ADCP_CROCO.cfg"])
         parser.update({'output_path': out_path})
         create_folder(f'tmp')
         dict2call(parser)
@@ -143,16 +153,6 @@ class TestBulletins:
         logger.info("test_144_ser_temp_stats_nov.cfg")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/144_ser_temp_stats_nov.cfg"])
-        parser.update({'output_path': out_path})
-        create_folder(f'tmp')
-        dict2call(parser)
-        assert True
-
-    def test_124_ellipses_ADCP_CROCO(self):
-        out_path, logger = change_path(folder_test)
-        logger.info("test_124_ellipses_ADCP_CROCO.ini")
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/124_ellipses_ADCP_CROCO.ini"])
         parser.update({'output_path': out_path})
         create_folder(f'tmp')
         dict2call(parser)

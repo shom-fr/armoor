@@ -25,6 +25,9 @@ def plot(config_obj):
     outputs = config_obj["outputs"]
     output_path = config_obj.get("output_path")
 
+    # Set the flags
+    flag_slice = 'slice' in config_obj["meta_zones"]
+
     # SELECT THE VARIABLES
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
@@ -79,4 +82,4 @@ def plot(config_obj):
         # STICKS PLOT
         plot_stick_plot = {"plot_stick_plot": 'stick_plot'}
         if output["plot"] in plot_stick_plot:
-            plot_features.plot_stick_plots(models, observation, output_path=sub_func_output_folder)
+            plot_features.plot_stick_plots(models, observation, flag_slice, output_path=sub_func_output_folder)

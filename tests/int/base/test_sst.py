@@ -16,6 +16,14 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_diag_disp_echeances(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_diag_disp_echeances')
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/diag_disp_echeances.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_map_sst_biais(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_map_sst_biais')
@@ -98,6 +106,15 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_sst_stats_echeances(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_sst_stats_echeances")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/sst_stats_echeances.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_sst_map_diff_hycom(self):
         out_path, logger = change_path(folder_test)
         logger.info("test_sst_map_diff_hycom")
@@ -116,11 +133,11 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_diag_disp_L4(self):
+    def test_diag_disp_intervalles(self):
         out_path, logger = change_path(folder_test)
-        logger.info("test_diag_disp_L4")
+        logger.info("test_diag_disp_intervalles")
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_L4.cfg"])
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_intervalles.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

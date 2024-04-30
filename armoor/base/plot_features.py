@@ -76,14 +76,14 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_type = f"{figtitle}"
         var_name = ''
     elif "Stick plot" in figtitle:
-        title_type = f"{figtitle}"
         var_name, var_unit = find_var_title(obs)
+        title_type = f"{figtitle} : {var_name} [{var_unit}]"
     elif "rajector" in figtitle:  # for trajectories
         title_type = f"{figtitle}"
         var_name = ''
     else:
         var_name, var_unit = find_var_title(obs)
-        title_type = f"{figtitle} :{var_name} [{var_unit}]"
+        title_type = f"{figtitle} : {var_name} [{var_unit}]"
 
     # Location
     if 'cloud_plot' in obs.attrs:
@@ -162,6 +162,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     elif 'slice' in obs.dims:
         title_depth = f"Slice: {obs.slice.data[0].split(' to ')[0]} to {obs.slice.data[0].split(' to ')[1]} m"
         depth = f"{obs.slice.data}m"
+    elif 'slice' in obs.coords:
+        title_depth = f"Slice: {obs.slice.data.tolist().split(' to ')[0]} to {obs.slice.data.tolist().split(' to ')[1]} m"
+        depth = f"{obs.slice.data}m"
     elif 'depth_meta_zone' in obs.attrs:
         if isinstance(obs.attrs['depth_meta_zone'], list):
             if len(obs.attrs['depth_meta_zone']) > 1:
@@ -205,7 +208,11 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_depth = ""
         depth = ''
 
-    if 'mld' in var_name or 'SST' in var_name or "drifter" in obs_name or 'HFR' in obs_name:
+    if 'Tidal current ellipses' in figtitle and 'depth_meta_zone' in obs.attrs:
+        title_depth = f"Depth: {obs.depth.values:.1f} m"
+        depth = f"{obs.depth.values:.1f}m"
+
+    if 'mld' in var_name or 'SST' in var_name or "drift" in obs_name or 'HFR' in obs_name:
         title_depth = ""
         depth = ''
 
@@ -686,28 +693,54 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                                                        mod.attrs['name'], obs.attrs['name'])
                     diag_disp_figure(mod_inter, obs_inter, title)
                     manage_output(figname, output_path)
-        else:
-            if flag_slice:
-                for index_slice, _ in enumerate(mod['slice']):
-                    mod_inter = mod.isel(slice=[index_slice])
-                    obs_inter = obs.isel(slice=[index_slice])
+
+        elif 'echeances' in obs.attrs:
+            for index_time, _ in enumerate(obs.attrs['echeances']):
+                if flag_slice:
+                    for index_slice, _ in enumerate(mod['slice']):
+                        mod_inter = mod.isel(time=[index_time], slice=[index_slice])
+                        obs_inter = obs.isel(time=[index_time], slice=[index_slice])
+                        title, figname = get_title_figname('Dispersion diagram', obs_inter,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_inter, obs_inter, title)
+                        manage_output(figname, output_path)
+                elif 'depth' in mod.dims and len(mod.depth) > 1:
+                    for index_depth, _ in enumerate(mod['depth']):
+                        mod_depth = mod.isel(depth=[index_depth])
+                        obs_depth = obs.isel(depth=[index_depth])
+                        title, figname = get_title_figname('Dispersion diagram', obs_depth,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_depth, obs_depth, title)
+                        manage_output(figname, output_path)
+                else:
+                    mod_inter = mod.isel(time=[index_time])
+                    obs_inter = obs.isel(time=[index_time])
                     title, figname = get_title_figname('Dispersion diagram', obs_inter,
                                                        mod.attrs['name'], obs.attrs['name'])
                     diag_disp_figure(mod_inter, obs_inter, title)
                     manage_output(figname, output_path)
-            elif 'depth' in mod.dims and len(mod.depth) > 1:
-                for index_depth, _ in enumerate(mod['depth']):
-                    mod_depth = mod.isel(depth=[index_depth])
-                    obs_depth = obs.isel(depth=[index_depth])
-                    title, figname = get_title_figname('Dispersion diagram', obs_depth,
-                                                       mod.attrs['name'], obs.attrs['name'])
-                    diag_disp_figure(mod_depth, obs_depth, title)
-                    manage_output(figname, output_path)
             else:
-                title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
-                                                   obs.attrs['name'])
-                diag_disp_figure(mod, obs, title)
-                manage_output(figname, output_path)
+                if flag_slice:
+                    for index_slice, _ in enumerate(mod['slice']):
+                        mod_inter = mod.isel(slice=[index_slice])
+                        obs_inter = obs.isel(slice=[index_slice])
+                        title, figname = get_title_figname('Dispersion diagram', obs_inter,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_inter, obs_inter, title)
+                        manage_output(figname, output_path)
+                elif 'depth' in mod.dims and len(mod.depth) > 1:
+                    for index_depth, _ in enumerate(mod['depth']):
+                        mod_depth = mod.isel(depth=[index_depth])
+                        obs_depth = obs.isel(depth=[index_depth])
+                        title, figname = get_title_figname('Dispersion diagram', obs_depth,
+                                                           mod.attrs['name'], obs.attrs['name'])
+                        diag_disp_figure(mod_depth, obs_depth, title)
+                        manage_output(figname, output_path)
+                else:
+                    title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
+                                                       obs.attrs['name'])
+                    diag_disp_figure(mod, obs, title)
+                    manage_output(figname, output_path)
 
 
 def diag_disp_figure(mod, obs, title):
@@ -1000,12 +1033,13 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
         Path where to save the figures.
     """
     # Get min/max colobar values
-    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values_2(#vmin,
-                                                                                          #vmax,
+    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values_2(
                                                                                           obs_coloc,
                                                                                           mod_coloc,
                                                                                           comparison,
                                                                                           metric,
+                                                                                          vmin,
+                                                                                          vmax,
                                                                                           dvmin,
                                                                                           dvmax)
 
@@ -1241,12 +1275,13 @@ def plot_map_metr_figure(obs_meta, mod_meta, obs_coloc, mod_coloc, comparison, v
     """
     logger.info('map figures with comparison metric')
     # Get min/max colobar values
-    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values_2(#vmin,
-                                                                                          #vmax,
+    vmin, vmax, comparison_vmin, comparison_vmax, _, comparison_cmap = get_min_max_values_2(
                                                                                           obs_meta,
                                                                                           mod_meta,
                                                                                           comparison,
                                                                                           metric,
+                                                                                          vmin,
+                                                                                          vmax,
                                                                                           dvmin,
                                                                                           dvmax)
     # Squeeze
@@ -1605,9 +1640,18 @@ def plot_ellipses_tide_current(models, observations, scales, output_path=None):
         if freq > 0:
             # If vertical immersions : on plot per immersion (depth)
             if 'depth' in observations.dims:
-                for i_depth, _ in enumerate(observations.depth):
-                    plot_ellipses_tide_current_generic(observations, models, wave, scale,
+                if "depth_meta_zone" in observations.attrs:
+                    depth_min = observations.attrs['depth_meta_zone'].split('_to_')[0]
+                    depth_max = observations.attrs['depth_meta_zone'].split('_to_')[1]
+                    obs_meta = (observations.depth >= float(depth_min)) & (observations.depth <= float(depth_max))
+                    indexes = np.where(obs_meta)[0]
+                    for i_depth in indexes:
+                        plot_ellipses_tide_current_generic(observations, models, wave, scale,
                                                        output_path, i_depth=i_depth)
+                else:
+                    for i_depth, _ in enumerate(observations.depth):
+                        plot_ellipses_tide_current_generic(observations, models, wave, scale,
+                                                           output_path, i_depth=i_depth)
 
             # If vertical immersions : on plot per immersion (density)
             elif 'dens' in observations.dims:
@@ -2045,9 +2089,9 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                 list_dims_mean).squeeze()
             time_coloc = obs_mean.interval
 
-            axs[0].plot(time_coloc, obs_mean, 'k-o', label=f'{observation["name"]} ')
+            axs[0].plot(time_coloc, obs_mean, 'k', label=f'{observation["name"]} ')
             f.autofmt_xdate(rotation=5)
-            axs[2].plot(time_coloc, obs_std, 'k-o', label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, 'k', label=f'{observation["name"]} ')
 
             for i, mod in enumerate(models):
                 mod_coloc = mod["xarray_meta_coloc"].isel(lat=index_lon, lon=index_lon).squeeze()
@@ -2055,23 +2099,23 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
                                                                      lon=index_lon).squeeze()
                 # MOYENNES
                 mod_mean = mod_coloc.mean(list_dims_mean)
-                axs[0].plot(time_coloc, mod_mean, '-o', label=f'{mod["name"]}')
+                axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod["name"]}')
 
                 # BIAIS
                 biais = mod_mean - obs_mean
-                axs[1].plot(time_coloc, biais, '-o', label=f'{mod["name"]}')
+                axs[1].plot(time_coloc, biais, '-', label=f'{mod["name"]}')
 
                 # ECART-TYPE
                 mod_std = mod_coloc.std(list_dims_mean)
-                axs[2].plot(time_coloc, mod_std, '-o', label=f'{mod["name"]}')
+                axs[2].plot(time_coloc, mod_std, '-', label=f'{mod["name"]}')
 
                 # RMSE
                 rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean)
-                axs[3].plot(time_coloc, rmse, '-o', label=f'{mod["name"]}')
+                axs[3].plot(time_coloc, rmse, '-', label=f'{mod["name"]}')
 
                 # RMSE CENTREE
                 rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean)
-                axs[4].plot(time_coloc, rmse_centree, '-o',
+                axs[4].plot(time_coloc, rmse_centree, '-',
                             label=f'Centered RMSE : {observation["name"]}  {mod["name"]} ')
                 axs[0].legend(loc=0)  # Demande de Mogan
             # Set labels and titles
@@ -2135,6 +2179,133 @@ def plot_ts_metr_point(models, observation, flag_interval, flag_slice, output_pa
             ax_mini_map.scatter(longitudes, latitudes, 30, 'k', transform=ccrs.PlateCarree())
             ax_mini_map.scatter(longitude, latitude, 90, marker='*', c='yellow', edgecolors='black',
                             transform=ccrs.PlateCarree())
+
+        manage_output(figname, output_path)
+
+
+def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=None, plg=None):
+    """
+    Plot punctual time series of model and observation and the associated metric.
+    Parameters
+    ----------
+    models : dict
+        Dictionary with the model dataarrays.
+    observation : dict
+        Dictionary with the observations dataarrays.
+    metric
+    flag_interval : bool
+        Indicates if the figures must be plot by intervals or not.
+    flag_slice : bool
+        Indicates if the figures must be plot by slices or not.
+    output_path : str
+        path where to save the figure.
+
+    """
+    logger.info('Punctual time series of model and observation and the associated metric.')
+    obs_meta = observation["xarray_meta"]
+
+    # all data are going to be colocated on the same bases, we can select lon lat on the first one
+    obs_coloc_base = observation["xarray_meta_coloc"][0]
+    list_dims_mean = []
+
+    # Get the dimensions on which to calculate the statistics
+    if flag_interval:
+        list_dims_mean.append('idx_time')
+    if flag_slice:
+        list_dims_mean.append('idx_depth')
+    if 'lon' in observation["xarray_meta_coloc"][0].dims:
+        list_dims_mean.append('lon')
+        list_dims_mean.append('lat')
+    if 'instr' in observation["xarray_meta_coloc"][0].dims:
+        list_dims_mean.append('instr')
+    if 'depth' in obs_coloc_base.dims and len(obs_coloc_base.depth) > 1:
+        list_dims_mean.append('depth')
+    elif 'dens' in obs_coloc_base.dims and len(obs_coloc_base.dens) > 1:
+        list_dims_mean.append('dens')
+    elif 'z' in obs_coloc_base.dims and len(obs_coloc_base.z) > 1:
+        list_dims_mean.append('z')
+
+
+    # Get variable name and unit
+    _, var_unit = find_var_title(obs_meta)
+
+    obs_mean = obs_coloc_base.mean(list_dims_mean, skipna=True).squeeze()
+    obs_std = obs_coloc_base.std(list_dims_mean, skipna=True).squeeze()
+    if flag_interval:
+
+        logger.info(f'The statistics are calculated on the following dimensions: {list_dims_mean}')
+
+        time_coloc = obs_mean.interval.values
+
+        f, axs = figure_5lin_ts()
+        f.autofmt_xdate(rotation=5)
+
+        axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
+        axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
+
+        for i, mod in enumerate(models):
+            mod_coloc = mod["xarray_meta_coloc"].assign_attrs({'name': mod['name']})
+            obs_coloc = observation["xarray_meta_coloc"][i].assign_attrs(
+                {'name': observation['name']})
+            plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dims_mean, plg)
+
+        # Change x interval labels
+        if flag_interval:
+            modify_interval_label(axs[4])
+            axs[0].set_xticks(axs[4].get_xticks())
+            axs[1].set_xticks(axs[4].get_xticks())
+            axs[2].set_xticks(axs[4].get_xticks())
+            axs[3].set_xticks(axs[4].get_xticks())
+
+        # Add title and save fig
+        mod_name = [mod['name'] for mod in models]
+        title, figname = get_title_figname(f'Time series metrics on {list_dims_mean} dimensions',
+                                           obs_coloc, mod_name, observation['name'])
+        f.suptitle(title, x=0.4, y=1.01, fontsize=15, fontweight='bold')
+        manage_output(figname, output_path)
+
+    elif "echeances" in observation["xarray_meta_coloc"][0].attrs:
+        f, axs = figure_2lin_ts()
+        f.autofmt_xdate(rotation=5)
+
+        obs_0 = observation["xarray_meta_coloc"][0].squeeze()
+        time_coloc = obs_0.time
+        axs[0].plot(time_coloc, obs_0, 'k-o', label=f'{observation["name"]}')
+
+        for i, mod in enumerate(models):
+            mod_coloc = mod["xarray_meta_coloc"].squeeze()
+            obs_coloc = observation["xarray_meta_coloc"][i].squeeze()
+
+            # DIFFERENCE
+            comparison = mod_coloc.data - obs_coloc.data
+
+            axs[0].plot(time_coloc, mod_coloc, '-o', label=f'{mod["name"]} ')
+            axs[1].plot(time_coloc, comparison, '-o', label=f'{mod["name"]} ')
+
+            # Set title and legend
+            axs[0].legend(loc=0)
+            # Set labels and titles
+            for ax in axs:
+                ax.set_ylabel(f'{var_unit}')
+            mod_names = [mod['name'] for mod in models]
+            title, figname = get_title_figname('Metric difference', obs_coloc, mod_names,
+                                               observation['name'])
+
+            f.suptitle(title, x=0.4, y=1.01, fontsize=14, fontweight='bold')
+
+        # MINI-MAP
+        # add minimap
+        ax_mini_map = add_mini_map(f, obs_coloc)
+        if 'lon' in list_dims_mean:
+            add_plg_minimap(ax_mini_map, obs_coloc, plg)
+        else:
+            try:
+                ax_mini_map.scatter(obs_coloc.lon.where(~np.isnan(obs_coloc.values), other=np.nan),
+                                    obs_coloc.lat.where(~np.isnan(obs_coloc.values), other=np.nan), 30,
+                                    transform=ccrs.PlateCarree())
+            except:
+                ax_mini_map.scatter(obs_coloc.lon.values, obs_coloc.lat.values, 30,
+                                    transform=ccrs.PlateCarree())
 
         manage_output(figname, output_path)
 
@@ -2227,7 +2398,7 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
     # vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values(vmin, vmax, obs_meta_coloc, diff,
     #                                                        'difference', dvmin, dvmax, cmap)
     vmin, vmax, dvmin, dvmax, cmap, _ = get_min_max_values_2(obs_meta_coloc, mod_meta_coloc, diff,
-                                                           'difference', dvmin, dvmax, cmap)
+                                                           'difference', vmin, vmax, dvmin, dvmax, cmap)
 
     # Plot the graphs
     im_obs = axs[0].pcolormesh(obs_meta_coloc.time, obs_meta_coloc.depth,
@@ -2509,9 +2680,12 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
                 time_coloc = obs_mean.interval.values
             else:
                 time_coloc = obs_mean.time.values
-
-            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
-            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
+            if "echeances" in obs_coloc_base.attrs:
+                axs[0].plot(time_coloc, obs_mean, ls='-o', c='k', ms=8, label=f'{observation["name"]} ')
+                axs[2].plot(time_coloc, obs_std, ls='-o', c='k', ms=8, label=f'{observation["name"]} ')
+            else:
+                axs[0].plot(time_coloc, obs_mean, ls='-', c='k',  label=f'{observation["name"]} ')
+                axs[2].plot(time_coloc, obs_std, ls='-', c='k', label=f'{observation["name"]} ')
             for i, mod in enumerate(models):
                 mod_coloc = mod["xarray_meta_coloc"].isel(slice=[idx_slice]).assign_attrs(
                     {'name': mod['name']})
@@ -2549,8 +2723,12 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         f, axs = figure_5lin_ts()
         f.autofmt_xdate(rotation=5)
 
-        axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
-        axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=0.2, label=f'{observation["name"]} ')
+        if "echeances" in obs_coloc_base.attrs:
+            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=8, label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=8, label=f'{observation["name"]} ')
+        else:
+            axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"].assign_attrs({'name': mod['name']})
@@ -2603,23 +2781,38 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     # MOYENNES
     mod_mean = mod_coloc.mean(list_dims_mean, skipna=True).squeeze()
     obs_mean = obs_coloc.mean(list_dims_mean, skipna=True).squeeze()
-    axs[0].plot(time_coloc, mod_mean, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[0].plot(time_coloc, mod_mean, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod_name}')
 
     # BIAIS
     biais = (mod_mean - obs_mean).squeeze()
-    axs[1].plot(time_coloc, biais, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[1].plot(time_coloc, biais, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[1].plot(time_coloc, biais, '-', label=f'{mod_name}')
 
     # ECART-TYPE
     mod_std = mod_coloc.std(list_dims_mean, skipna=True).squeeze()
-    axs[2].plot(time_coloc, mod_std, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[2].plot(time_coloc, mod_std, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[2].plot(time_coloc, mod_std, '-', label=f'{mod_name}')
 
     # RMSE
     rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
-    axs[3].plot(time_coloc, rmse, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[3].plot(time_coloc, rmse, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[3].plot(time_coloc, rmse, '-', label=f'{mod_name}')
 
     # RMSE CENTREE
     rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
-    axs[4].plot(time_coloc, rmse_centree, '-o', ms=0.2, label=f'{mod_name}')
+    if "echeances" in obs_coloc.attrs:
+        axs[4].plot(time_coloc, rmse_centree, '-o', ms=8, label=f'{mod_name}')
+    else:
+        axs[4].plot(time_coloc, rmse_centree, '-', label=f'{mod_name}')
 
     axs[0].legend(loc=0)  # Demande de Morgan
     for ax in axs:
@@ -3118,7 +3311,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
     manage_output(figname, output_path)
 
 
-def plot_stick_plots(models, observation, output_path=None):
+def plot_stick_plots(models, observation, flag_slice, output_path=None):
     """
     Plot stick plots for current data.
     Parameters
@@ -3127,6 +3320,8 @@ def plot_stick_plots(models, observation, output_path=None):
         List of the models data.
     observation : xarray.dataset
         Observation current data.
+    flag_slice : bool
+        Indicate if the figure must be plotted by slices or not.
     output_path : str
         Path where to save the figures.
 
@@ -3145,107 +3340,164 @@ def plot_stick_plots(models, observation, output_path=None):
         var_v = 'v'
         var_norm = 'norm'
 
-    if "depth" not in obs_base.dims and "dens" not in obs_base.dims:
-        f, ax = figure_1_stickplot()
-        obs = observation['xarray_meta_coloc'][0]
-        ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
-                  headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
-                  label=observation['name'])
-        for i_mod, mod in enumerate(models):
-            mod = mod['xarray_meta_coloc'].squeeze()
-            ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
-                      width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                      color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
-        # Add legend
-        ax.set_ylabel('Current(m/s)')
-        handles, labels = plt.gca().get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        plt.legend(by_label.values(), by_label.keys())
+    if flag_slice:
+        list_dims_mean = []
 
-        # Add mini-map
-        ax_mini_map = add_mini_map(f, obs)
-        ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+        # Get the dimensions on which to calculate the statistics
+        if flag_slice:
+            list_dims_mean.append('idx_depth')
+        if 'lon' in observation["xarray_meta_coloc"][0].dims:
+            list_dims_mean.append('lon')
+            list_dims_mean.append('lat')
+        if 'instr' in observation["xarray_meta_coloc"][0].dims:
+            list_dims_mean.append('instr')
+        if 'depth' in obs_base.dims and len(obs_base.depth) > 1:
+            list_dims_mean.append('depth')
+        elif 'dens' in obs_base.dims and len(obs_base.dens) > 1:
+            list_dims_mean.append('dens')
+        elif 'z' in obs_base.dims and len(obs_base.z) > 1:
+            list_dims_mean.append('z')
 
-        # Add second x axis
-        add_second_x_axis(f, ax, obs)
+        logger.info('The statistics are calculated on the following dimensions:')
+        logger.info(f'{list_dims_mean}')
+        for idx_slice, _ in enumerate(observation["xarray_meta_coloc"][0].slice):
+            f, ax = figure_1_stickplot()
+            # Plot mean for observation (plotted only once)
+            obs_mean = obs_base.isel(slice=idx_slice).mean(list_dims_mean,
+                                                                 skipna=True).squeeze()
 
-        # Set title
-        title, figname = get_title_figname('Stick plot', obs[var_norm],
-                                           [mod['name'] for mod in models], observation['name'])
+            ax.quiver(obs_mean.time, [[0] * len(obs_mean.time)], obs_mean[var_u], obs_mean[var_v], angles='uv', width=0.001,
+                      headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
+                      label=observation['name'])
+            for i_mod, mod in enumerate(models):
+                mod_mean = mod['xarray_meta_coloc'].isel(slice=idx_slice).mean(list_dims_mean,
+                                                                 skipna=True).squeeze()
+                ax.quiver(mod_mean.time, [[0] * len(mod_mean.time)], mod_mean[var_u], mod_mean[var_v], angles='uv',
+                          width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                          color=COLORS[i_mod], label=f'{mod["xarray_meta_coloc"].attrs["name"]}')
+            # Add legend
+            ax.set_ylabel('Current(m/s)')
+            handles, labels = plt.gca().get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            plt.legend(by_label.values(), by_label.keys())
 
-        f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
-        # Save figure
-        manage_output(figname, output_path)
+            # Add mini-map
+            ax_mini_map = add_mini_map(f, obs_mean)
+            ax_mini_map.scatter(obs_mean.lon, obs_mean.lat, 15, c='navy', transform=ccrs.PlateCarree())
+
+            # Add second x axis
+            add_second_x_axis(f, ax, obs_mean)
+
+            # Set title
+            title, figname = get_title_figname('Stick plot', obs_mean[var_norm],
+                                               [mod['name'] for mod in models], observation['name'])
+
+            f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
+            # Save figure
+            manage_output(figname, output_path)
+
     else:
-        if 'depth' in observation['xarray_meta_coloc'][0].dims:
-            for i_depth, depth in enumerate(observation['xarray_meta_coloc'][0].depth.data):
-                f, ax = figure_1_stickplot()
-                obs = observation['xarray_meta_coloc'][0].isel(depth=i_depth)
-                obs.attrs["depth_meta_zone"] = depth
-                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
+        if "depth" not in obs_base.dims and "dens" not in obs_base.dims:
+            f, ax = figure_1_stickplot()
+            obs = observation['xarray_meta_coloc'][0]
+            ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv', width=0.001,
+                      headwidth=0.001, headlength=0.001, headaxislength=0.001, color='k',
+                      label=observation['name'])
+            for i_mod, mod in enumerate(models):
+                mod = mod['xarray_meta_coloc'].squeeze()
+                ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
                           width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                          color='k', label=observation['name'])
-                for i_mod, mod in enumerate(models):
-                    mod = mod['xarray_meta_coloc'].isel(depth=i_depth).squeeze()
-                    ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+                          color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
+            # Add legend
+            ax.set_ylabel('Current(m/s)')
+            handles, labels = plt.gca().get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            plt.legend(by_label.values(), by_label.keys())
+
+            # Add mini-map
+            ax_mini_map = add_mini_map(f, obs)
+            ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+
+            # Add second x axis
+            add_second_x_axis(f, ax, obs)
+
+            # Set title
+            title, figname = get_title_figname('Stick plot', obs[var_norm],
+                                               [mod['name'] for mod in models], observation['name'])
+
+            f.suptitle(title, x=0.3, fontsize=12, fontweight='bold')
+            # Save figure
+            manage_output(figname, output_path)
+        else:
+            if 'depth' in observation['xarray_meta_coloc'][0].dims:
+                for i_depth, depth in enumerate(observation['xarray_meta_coloc'][0].depth.data):
+                    f, ax = figure_1_stickplot()
+                    obs = observation['xarray_meta_coloc'][0].isel(depth=i_depth)
+                    obs.attrs["depth_meta_zone"] = depth
+                    ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
                               width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                              color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
-                # Add legend
-                ax.set_ylabel('Current(m/s)')
-                handles, labels = plt.gca().get_legend_handles_labels()
-                by_label = dict(zip(labels, handles))
-                plt.legend(by_label.values(), by_label.keys())
+                              color='k', label=observation['name'])
+                    for i_mod, mod in enumerate(models):
+                        mod = mod['xarray_meta_coloc'].isel(depth=i_depth).squeeze()
+                        ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+                                  width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                                  color=COLORS[i_mod], label=f'{mod.attrs["name"]}')
+                    # Add legend
+                    ax.set_ylabel('Current(m/s)')
+                    handles, labels = plt.gca().get_legend_handles_labels()
+                    by_label = dict(zip(labels, handles))
+                    plt.legend(by_label.values(), by_label.keys())
 
-                # Add mini-map
-                ax_mini_map = add_mini_map(f, obs)
-                ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+                    # Add mini-map
+                    ax_mini_map = add_mini_map(f, obs)
+                    ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
 
-                # Add second x axis
-                add_second_x_axis(f, ax, obs)
+                    # Add second x axis
+                    add_second_x_axis(f, ax, obs)
 
-                # Set title
-                title, figname = get_title_figname('Stick plot', obs,
-                                                   [mod['name'] for mod in models],
-                                                   observation['name'])
+                    # Set title
+                    title, figname = get_title_figname('Stick plot', obs,
+                                                       [mod['name'] for mod in models],
+                                                       observation['name'])
 
-                f.suptitle(title, fontsize=12, fontweight='bold')
-                # Save figure
-                manage_output(figname, output_path)
+                    f.suptitle(title, fontsize=12, fontweight='bold')
+                    # Save figure
+                    manage_output(figname, output_path)
 
-        elif 'dens' in observation['xarray_meta_coloc'][0].dims:
-            for i_dens, _ in enumerate(observation['xarray_meta_coloc'][0].dens):
-                f, ax = figure_1_stickplot()
-                obs = observation['xarray_meta_coloc'][0].isel(dens=i_dens)
-                ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
-                          width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                          color='k', label=observation['name'])
-                for i_mod, mod in enumerate(models):
-                    mod_name = mod.name
-                    mod = mod['xarray_meta_coloc'].isel(dens=i_dens).squeeze()
-                    ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+            elif 'dens' in observation['xarray_meta_coloc'][0].dims:
+                for i_dens, _ in enumerate(observation['xarray_meta_coloc'][0].dens):
+                    f, ax = figure_1_stickplot()
+                    obs = observation['xarray_meta_coloc'][0].isel(dens=i_dens)
+                    ax.quiver(obs.time, [[0] * len(obs.time)], obs[var_u], obs[var_v], angles='uv',
                               width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
-                              color=COLORS[i_mod], label=f'{mod_name}')
-                # Add legend
-                ax.set_ylabel('Current(m/s)')
-                handles, labels = plt.gca().get_legend_handles_labels()
-                by_label = dict(zip(labels, handles))
-                plt.legend(by_label.values(), by_label.keys())
+                              color='k', label=observation['name'])
+                    for i_mod, mod in enumerate(models):
+                        mod_name = mod.name
+                        mod = mod['xarray_meta_coloc'].isel(dens=i_dens).squeeze()
+                        ax.quiver(mod.time, [[0] * len(mod.time)], mod[var_u], mod[var_v], angles='uv',
+                                  width=0.001, headwidth=0.001, headlength=0.001, headaxislength=0.001,
+                                  color=COLORS[i_mod], label=f'{mod_name}')
+                    # Add legend
+                    ax.set_ylabel('Current(m/s)')
+                    handles, labels = plt.gca().get_legend_handles_labels()
+                    by_label = dict(zip(labels, handles))
+                    plt.legend(by_label.values(), by_label.keys())
 
-                # Add mini-map
-                ax_mini_map = add_mini_map(f, obs)
-                ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+                    # Add mini-map
+                    ax_mini_map = add_mini_map(f, obs)
+                    ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
 
-                # Add second x axis
-                add_second_x_axis(f, ax, obs)
+                    # Add second x axis
+                    add_second_x_axis(f, ax, obs)
 
-                # Set title
-                title, figname = get_title_figname('Stick plot', obs,
-                                                   [mod['name'] for mod in models],
-                                                   observation['name'])
+                    # Set title
+                    title, figname = get_title_figname('Stick plot', obs,
+                                                       [mod['name'] for mod in models],
+                                                       observation['name'])
 
-                f.suptitle(title, fontsize=12, fontweight='bold')
-                # Save figure
-                manage_output(figname, output_path)
+                    f.suptitle(title, fontsize=12, fontweight='bold')
+                    # Save figure
+                    manage_output(figname, output_path)
 
 
 # Useful functions
@@ -3269,10 +3521,14 @@ def find_var_title(da):
     else:
         var_name = da.name
 
-    if "salinity" in var_name or 'Salinity' in var_name:
+    if "salinity" in var_name or 'Salinity' in var_name or 'sal' in var_name:
         var_name = 'Salinity'
-    if "temperature" in var_name or 'Temperature' in var_name:
+    if "temperature" in var_name or 'Temperature' in var_name or var_name == 'temp':
         var_name = 'Temperature'
+    if 'pdens' in var_name:
+        var_name = 'Pot. density'
+    if 'ptemp' in var_name:
+        var_name = 'Pot. temperature'
     if 'sst' in var_name:
         var_name = 'SST'
     if 'res' in var_name:
@@ -3284,8 +3540,10 @@ def find_var_title(da):
 
     if "units" in da.attrs:
         var_unit = da.attrs['units']
-    elif var_name in ['u', 'v', 'norm', "Geostrophic current"]:
+    elif var_name in ['u', 'v', 'norm', "Geostrophic current", "Baroclinic current", "Residual current"]:
         var_unit = 'm/s'
+    elif var_name in ['Temperature', 'temperature']:
+        var_unit = 'degC'
     elif var_name in ['Salinity']:
         var_unit = '0.001'
     elif 'dir' in var_name:
@@ -3427,7 +3685,7 @@ def get_min_max_values(vmin, vmax, ds, comparison=None, metric=None, dvmin=None,
     return vmin, vmax, dvmin, dvmax, cmap, dcmap
 
 
-def get_min_max_values_2(ds1, ds2, comparison=None, metric=None, dvmin=None, dvmax=None,
+def get_min_max_values_2(ds1, ds2, comparison=None, metric=None, vmin=None, vmax=None, dvmin=None, dvmax=None,
                        cmap=None):
     """
     Give the appropriate values for the colorbar.
@@ -3466,15 +3724,17 @@ def get_min_max_values_2(ds1, ds2, comparison=None, metric=None, dvmin=None, dvm
     vmax1 = ds1.max(skipna=True).values
     vmax2 = ds2.max(skipna=True).values
 
-    vmin = np.min([vmin1, vmin2])
-    vmax = np.max([vmax1, vmax2])
+    if vmin is None:
+        vmin = np.min([vmin1, vmin2])
+    if vmax is None:
+        vmax = np.max([vmax1, vmax2])
 
     # dvmin / dvmax / cmap
     if metric in ["difference", "bias"]:
         if dvmin is None:
-            dvmin = -abs(np.nanmax(comparison))
+            dvmin = -np.nanmax(abs(comparison))
         if dvmax is None:
-            dvmax = abs(np.nanmax(comparison))
+            dvmax = np.nanmax(abs(comparison))
         dcmap = cmocean.cm.balance
     elif metric in ['RMSE', 'RMSEc']:
         if dvmin is None:
@@ -3508,7 +3768,7 @@ def add_scale(ax, scale):
     lon = extent[0] + (extent[1] - extent[0]) / 10
     lat = extent[2] + (extent[3] - extent[2]) / 15
     lat_txt = extent[2] + (extent[3] - extent[2]) / 25
-    ax.plot([lon, lon + 0.1 * scale], [lat, lat], c='k', transform=ccrs.PlateCarree())
+    ax.plot([lon, lon + 0.05 * scale], [lat, lat], c='k', transform=ccrs.PlateCarree())
     ax.text(lon, lat_txt, '0.1 m.s-1', transform=ccrs.PlateCarree())
     ax.set_extent(extent)
     return ax
