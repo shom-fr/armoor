@@ -108,7 +108,16 @@ class TestBulletins:
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
-
+    
+    def test_ser_temp_uv_stat_echeances(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_ser_temp_uv_stat_echeances')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_uv_stat_echeances.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+    
     def test_ser_temp_uv_res_stat_intervalles(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_ser_temp_uv_res_stat_intervalles')
