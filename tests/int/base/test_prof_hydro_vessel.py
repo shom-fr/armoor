@@ -16,7 +16,16 @@ class TestBulletins:
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
-
+    
+    def test_diag_disp_tranche_intervalle(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_diag_disp_tranche_intervalle')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/diag_disp_tranche_intervalle.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+    
     def test_multi_plot_tranche_intervalle(self):  # OK
         out_path, logger = change_path(folder_test)
         logger.info('test_multi_plot_tranche_intervalle')
