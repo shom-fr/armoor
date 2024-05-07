@@ -742,6 +742,29 @@ def diag_disp(flag_interval, flag_slice, diag_type, mod, obs, output_path=None):
                     diag_disp_figure(mod, obs, title)
                     manage_output(figname, output_path)
 
+        else:
+            if flag_slice:
+                for index_slice, _ in enumerate(mod['slice']):
+                    mod_slice = mod.isel(slice=[index_slice])
+                    obs_slice = obs.isel(slice=[index_slice])
+                    title, figname = get_title_figname('Dispersion diagram', obs_slice,
+                                                        mod.attrs['name'], obs.attrs['name'])
+                    diag_disp_figure(mod_slice, obs_slice, title)
+                    manage_output(figname, output_path)
+            elif 'depth' in mod.dims and len(mod.depth) > 1:
+                for index_depth, _ in enumerate(mod['depth']):
+                    mod_depth = mod.isel(depth=[index_depth])
+                    obs_depth = obs.isel(depth=[index_depth])
+                    title, figname = get_title_figname('Dispersion diagram', obs_depth,
+                                                        mod.attrs['name'], obs.attrs['name'])
+                    diag_disp_figure(mod_depth, obs_depth, title)
+                    manage_output(figname, output_path)
+            else:
+                title, figname = get_title_figname('Dispersion diagram', obs,
+                                                    mod.attrs['name'], obs.attrs['name'])
+                diag_disp_figure(mod, obs, title)
+                manage_output(figname, output_path)
+
 
 def diag_disp_figure(mod, obs, title):
     """
