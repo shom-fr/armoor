@@ -155,6 +155,15 @@ def get_observation_models_meta(config_obj: dict):
                 vert_slice, var_slice)
             observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
                 index_model].meta.vertical_selection_slice(vert_slice, var_slice)
+            
+        outputs = config_obj['outputs']
+        vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
+        if 'mld' in vars_to_plot:
+            observation["xarray_meta_coloc"][index_model] = merge_no_fail([observation["xarray_meta_coloc"][index_model], observation["xarray_meta_coloc"][index_model].sel_var.sel_mixed_layer_depth()])
+            if model.get("type").upper() == 'CROCO':
+                model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].drop_vars(["x", "y", "level"]).sel_var.sel_mixed_layer_depth()])
+            else:
+                model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].sel_var.sel_mixed_layer_depth()])
 
     # Obs meta is out of the loop for each mod
     if 'interval' in config_obj["meta_zones"]:
@@ -324,9 +333,6 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
         if 'current_bc' in vars_to_plot:
             xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
-
-        if 'mld' in vars_to_plot:
-            xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_mixed_layer_depth()])
 
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
