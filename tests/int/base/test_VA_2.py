@@ -100,9 +100,9 @@ class TestBulletins:
 
     def test_145_diag_disp_argo(self):
         out_path, logger = change_path(folder_test)
-        logger.info("test_145_diag_disp_argo.ini")
+        logger.info("test_145_diag_disp_argo")
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/145_diag_disp_argo.ini"])
+            ['--cfgfile', f"../single_tests/{folder_test}/145_diag_disp_argo.cfg"])
         parser.update({'output_path': out_path})
         create_folder(f'tmp')
         dict2call(parser)
