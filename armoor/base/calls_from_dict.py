@@ -160,7 +160,7 @@ def get_observation_models_meta(config_obj: dict):
         vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
         if 'mld' in vars_to_plot:
             observation["xarray_meta_coloc"][index_model] = merge_no_fail([observation["xarray_meta_coloc"][index_model], observation["xarray_meta_coloc"][index_model].sel_var.sel_mixed_layer_depth()])
-            if model.get("type").upper() == 'CROCO':
+            if model.get("type") == 'CROCO':
                 model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].drop_vars(["x", "y", "level"]).sel_var.sel_mixed_layer_depth()])
             else:
                 model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].sel_var.sel_mixed_layer_depth()])
