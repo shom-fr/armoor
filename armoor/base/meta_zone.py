@@ -751,7 +751,7 @@ class MetazoneAccessor:
         # Select all depth between min and max
         selection = (self._obj[var_vert] >= dmin) & (self._obj[var_vert] <= dmax)
 
-        return self._obj.where(selection, drop=True).set_coords(var_vert)
+        return self._obj.where(selection).set_coords(var_vert)
 
     def vertical_selection_list(self, depths: list) -> xr.Dataset:
         """
