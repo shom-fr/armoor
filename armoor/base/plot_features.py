@@ -2624,22 +2624,47 @@ def create_harmonic_table(models, observations, output_path):
                         obs_depth = obs.sel(depth=depth, method='nearest')
                         mod_depth = mod.sel(depth=depth, method='nearest')
                         diff_depth = diff.sel(depth=depth, method='nearest')
-                        harmonic_table_file.write(f'{depth.values}m ;'
-                                                  f'{obs_depth[ampl].values} ;'
-                                                  f'{mod_depth[ampl].values} ;'
-                                                  f'{diff_depth[ampl].values} ;'
-                                                  f'{obs_depth[phase].values} ;'
-                                                  f'{mod_depth[phase].values} ; '
-                                                  f'{diff_depth[phase].values} \n')
+
+                        obs_ampl = obs_depth[ampl].values
+                        mod_ampl = mod_depth[ampl].values
+                        diff_ampl = diff_depth[ampl].values
+                        obs_phase = obs_depth[phase].values
+                        mod_phase = mod_depth[phase].values
+                        diff_phase = diff_depth[phase].values
+
+                        # Check if all values are NaN
+                        if not (np.isnan(obs_ampl) and np.isnan(mod_ampl) and np.isnan(diff_ampl) and
+                                np.isnan(obs_phase) and np.isnan(mod_phase) and np.isnan(diff_phase)):
+                            harmonic_table_file.write(f'{depth.values}m ;'
+                                                    f'{obs_ampl} ;'
+                                                    f'{mod_ampl} ;'
+                                                    f'{diff_ampl} ;'
+                                                    f'{obs_phase} ;'
+                                                    f'{mod_phase} ;'
+                                                    f'{diff_phase} \n')
+                            
                 elif 'slice' in obs.dims:
                     harmonic_table_file.write(f'Slice ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
                                               f'Phase obs ; Phase mod ; Phase diff \n')
                     for i_slice, slice in enumerate(obs.slice):
-                        harmonic_table_file.write(
-                            f'{slice.values}m ; {obs[ampl][i_slice].values} ; '
-                            f'{mod[ampl][i_slice].values} ;'
-                            f'{diff[ampl][i_slice].values} ; {obs[phase][i_slice].values} ; '
-                            f'{mod[phase][i_slice].values} ; {diff[phase][i_slice].values} \n')
+
+                        obs_ampl = obs[ampl][i_slice].values
+                        mod_ampl = mod[ampl][i_slice].values
+                        diff_ampl = diff[ampl][i_slice].values
+                        obs_phase = obs[phase][i_slice].values
+                        mod_phase = mod[phase][i_slice].values
+                        diff_phase = diff[phase][i_slice].values
+
+                        # Check if all values are NaN
+                        if not (np.isnan(obs_ampl) and np.isnan(mod_ampl) and np.isnan(diff_ampl) and
+                                np.isnan(obs_phase) and np.isnan(mod_phase) and np.isnan(diff_phase)):
+                            harmonic_table_file.write(f'{slice.values}m ;'
+                                                  f'{obs_ampl} ;'
+                                                  f'{mod_ampl} ;'
+                                                  f'{diff_ampl} ;' 
+                                                  f'{obs_phase} ;'
+                                                  f'{mod_phase} ;'
+                                                  f'{diff_phase} \n')
 
 
 def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, plg=None):
