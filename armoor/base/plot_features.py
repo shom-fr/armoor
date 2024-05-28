@@ -76,8 +76,18 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_type = f"{figtitle}"
         var_name = ''
     elif "Stick plot" in figtitle:
-        var_name, var_unit = find_var_title(obs)
-        title_type = f"{figtitle} : {var_name} [{var_unit}]"
+        if 'variable' in obs.coords:
+            var_name = obs.coords['variable'].data
+        else:
+            var_name = obs.name
+        if 'res' in var_name:
+            var_name = f"Residual current"
+        if 'bc' in var_name:
+            var_name = f"Baroclinic current"
+        if 'geo' in var_name:
+            var_name = "Geostrophic current"
+        else : var_name = 'Total current'
+        title_type = f"{figtitle} : {var_name}"
     elif "rajector" in figtitle:  # for trajectories
         title_type = f"{figtitle}"
         var_name = ''
@@ -3613,17 +3623,23 @@ def find_var_title(da):
     if 'sst' in var_name:
         var_name = 'SST'
     if 'res' in var_name:
-        var_name = f"Residual current"
+        var_name = f"Residual current {var_name.split('_')[0]}"
     if 'bc' in var_name:
-        var_name = f"Baroclinic current"
+        var_name = f"Baroclinic current {var_name.split('_')[0]}"
     if 'geo' in var_name:
         var_name = "Geostrophic current"
     if var_name == 'norm':
-        var_name = "Total current"
+        var_name = "Total current norm"
+    if var_name == 'dir':
+        var_name = "Total current dir"
+    if var_name == 'u':
+        var_name = "Total current u"
+    if var_name == 'v':
+        var_name = "Total current v"
 
     if "units" in da.attrs:
         var_unit = da.attrs['units']
-    elif var_name in ['u', 'v', 'norm', "Geostrophic current", "Baroclinic current", "Residual current"]:
+    elif var_name in ['Total current', "Geostrophic current", "Baroclinic current", "Residual current"]:
         var_unit = 'm/s'
     elif var_name in ['Temperature', 'temperature']:
         var_unit = 'degC'
