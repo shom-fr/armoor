@@ -3537,7 +3537,7 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     add_second_x_axis(f, ax, obs)
 
                     # Set title
-                    title, figname = get_title_figname('Stick plot', obs,
+                    title, figname = get_title_figname('Stick plot', obs[var_norm],
                                                        [mod['name'] for mod in models],
                                                        observation['name'])
 
@@ -3572,7 +3572,7 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     add_second_x_axis(f, ax, obs)
 
                     # Set title
-                    title, figname = get_title_figname('Stick plot', obs,
+                    title, figname = get_title_figname('Stick plot', obs[var_norm],
                                                        [mod['name'] for mod in models],
                                                        observation['name'])
 
@@ -3613,11 +3613,13 @@ def find_var_title(da):
     if 'sst' in var_name:
         var_name = 'SST'
     if 'res' in var_name:
-        var_name = f"Residual current {var_name.split('_')[0]}"
+        var_name = f"Residual current"
     if 'bc' in var_name:
-        var_name = f"Baroclinic current {var_name.split('_')[0]}"
+        var_name = f"Baroclinic current"
     if 'geo' in var_name:
         var_name = "Geostrophic current"
+    if var_name == 'norm':
+        var_name = "Total current"
 
     if "units" in da.attrs:
         var_unit = da.attrs['units']
