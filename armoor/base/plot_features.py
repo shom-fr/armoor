@@ -2291,9 +2291,17 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
         f, axs = figure_2lin_ts()
         f.autofmt_xdate(rotation=5)
 
+        echeances = observation["xarray_meta_coloc"][0].attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+
         obs_0 = observation["xarray_meta_coloc"][0].squeeze()
         time_coloc = obs_0.time
-        axs[0].plot(time_coloc, obs_0, 'k-o', label=f'{observation["name"]}')
+
+        obs_echeances = observation["xarray_meta_coloc"][0].sel(time=echeances_dt)
+
+        axs[0].plot(time_coloc, obs_0, 'k-', label=f'{observation["name"]}')
+        axs[0].plot(time_coloc.sel(time=echeances_dt), obs_0.sel(time=echeances_dt), 'ko')
+
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"].squeeze()
@@ -2301,9 +2309,13 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
 
             # DIFFERENCE
             comparison = mod_coloc.data - obs_coloc.data
+            comparison_ech = mod_coloc.sel(time=echeances_dt).data - obs_coloc.sel(time=echeances_dt).data
 
-            axs[0].plot(time_coloc, mod_coloc, '-o', label=f'{mod["name"]} ')
-            axs[1].plot(time_coloc, comparison, '-o', label=f'{mod["name"]} ')
+            axs[0].plot(time_coloc, mod_coloc, '-', label=f'{mod["name"]} ')
+            axs[0].plot(time_coloc.sel(time=echeances_dt), mod_coloc.sel(time=echeances_dt), 'C0o')
+
+            axs[1].plot(time_coloc, comparison, '-', label=f'{mod["name"]} ')
+            axs[1].plot(time_coloc.sel(time=echeances_dt), comparison_ech, 'C0o')
 
             # Set title and legend
             axs[0].legend(loc=0)
