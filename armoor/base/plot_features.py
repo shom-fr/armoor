@@ -2297,8 +2297,6 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
         obs_0 = observation["xarray_meta_coloc"][0].squeeze()
         time_coloc = obs_0.time
 
-        obs_echeances = observation["xarray_meta_coloc"][0].sel(time=echeances_dt)
-
         axs[0].plot(time_coloc, obs_0, 'k-', label=f'{observation["name"]}')
         axs[0].plot(time_coloc.sel(time=echeances_dt), obs_0.sel(time=echeances_dt), 'ko')
 
@@ -2741,8 +2739,12 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             else:
                 time_coloc = obs_mean.time.values
             if "echeances" in obs_coloc_base.attrs:
-                axs[0].plot(time_coloc, obs_mean, ls='-o', c='k', ms=8, label=f'{observation["name"]} ')
-                axs[2].plot(time_coloc, obs_std, ls='-o', c='k', ms=8, label=f'{observation["name"]} ')
+                echeances = obs_coloc_base.attrs["echeances"]
+                echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+                axs[0].plot(time_coloc, obs_mean, ls='-', c='k', label=f'{observation["name"]} ')
+                axs[0].plot(time_coloc.sel(time=echeances_dt), obs_mean.sel(time=echeances_dt), 'ko', ms=8)
+                axs[2].plot(time_coloc, obs_std, ls='-', c='k', label=f'{observation["name"]} ')
+                axs[2].plot(time_coloc.sel(time=echeances_dt), obs_std.sel(time=echeances_dt),  'ko', ms=8)
             else:
                 axs[0].plot(time_coloc, obs_mean, ls='-', c='k',  label=f'{observation["name"]} ')
                 axs[2].plot(time_coloc, obs_std, ls='-', c='k', label=f'{observation["name"]} ')
@@ -2778,14 +2780,18 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         if flag_interval:
             time_coloc = obs_mean.interval.values
         else:
-            time_coloc = obs_mean.time.values
+            time_coloc = obs_mean.time
 
         f, axs = figure_5lin_ts()
         f.autofmt_xdate(rotation=5)
 
         if "echeances" in obs_coloc_base.attrs:
-            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=8, label=f'{observation["name"]} ')
-            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=8, label=f'{observation["name"]} ')
+            echeances = obs_coloc_base.attrs["echeances"]
+            echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+            axs[0].plot(time_coloc, obs_mean, ls='-', c='k', label=f'{observation["name"]} ')
+            axs[0].plot(time_coloc.sel(time=echeances_dt, method='nearest'), obs_mean.sel(time=echeances_dt, method='nearest'), 'ko', ms=8, markeredgecolor='red')
+            axs[2].plot(time_coloc, obs_std, ls='-', c='k', label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc.sel(time=echeances_dt, method='nearest'), obs_std.sel(time=echeances_dt, method='nearest'),  'ko', ms=8, markeredgecolor='red')
         else:
             axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
             axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
@@ -2842,35 +2848,50 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     mod_mean = mod_coloc.mean(list_dims_mean, skipna=True).squeeze()
     obs_mean = obs_coloc.mean(list_dims_mean, skipna=True).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[0].plot(time_coloc, mod_mean, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod_name}')
+        axs[0].plot(time_coloc.sel(time=echeances_dt, method='nearest'), mod_mean.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod_name}')
 
     # BIAIS
     biais = (mod_mean - obs_mean).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[1].plot(time_coloc, biais, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[1].plot(time_coloc, biais, '-', label=f'{mod_name}')
+        axs[1].plot(time_coloc.sel(time=echeances_dt, method='nearest'), biais.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[1].plot(time_coloc, biais, '-', label=f'{mod_name}')
 
     # ECART-TYPE
     mod_std = mod_coloc.std(list_dims_mean, skipna=True).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[2].plot(time_coloc, mod_std, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[2].plot(time_coloc, mod_std, '-', label=f'{mod_name}')
+        axs[2].plot(time_coloc.sel(time=echeances_dt, method='nearest'), mod_std.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[2].plot(time_coloc, mod_std, '-', label=f'{mod_name}')
 
     # RMSE
     rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[3].plot(time_coloc, rmse, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[3].plot(time_coloc, rmse, '-', label=f'{mod_name}')
+        axs[3].plot(time_coloc.sel(time=echeances_dt, method='nearest'), rmse.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[3].plot(time_coloc, rmse, '-', label=f'{mod_name}')
 
     # RMSE CENTREE
     rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[4].plot(time_coloc, rmse_centree, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[4].plot(time_coloc, rmse_centree, '-', label=f'{mod_name}')
+        axs[4].plot(time_coloc.sel(time=echeances_dt, method='nearest'), rmse_centree.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[4].plot(time_coloc, rmse_centree, '-', label=f'{mod_name}')
 
