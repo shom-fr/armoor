@@ -82,11 +82,11 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
             var_name = obs.name
         if 'res' in var_name:
             var_name = f"Residual current"
-        if 'bc' in var_name:
+        elif 'bc' in var_name:
             var_name = f"Baroclinic current"
-        if 'geo' in var_name:
+        elif 'geo' in var_name:
             var_name = "Geostrophic current"
-        else : var_name = 'Total current'
+        else: var_name = 'Total current'
         title_type = f"{figtitle} : {var_name}"
     elif "rajector" in figtitle:  # for trajectories
         title_type = f"{figtitle}"
