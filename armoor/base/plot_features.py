@@ -148,10 +148,10 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     # Depth
     if 'profile' in figtitle or 'Theta-S' in figtitle:
         if 'density_meta_zone' in obs.attrs:
-            title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} m to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
+            title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} kg/m3 to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
             depth = f"{obs.attrs['density_meta_zone']}kgm-3"
         elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
-            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+            title_depth = f"P. Density: {obs.pdens.min().values:.1f} kg/m3 to {obs.pdens.max().values:.1f} kg/m3"
             depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}kgm-3"
         elif 'depth_meta_zone' in obs.attrs:
             title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
