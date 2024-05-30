@@ -76,8 +76,18 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         title_type = f"{figtitle}"
         var_name = ''
     elif "Stick plot" in figtitle:
-        var_name, var_unit = find_var_title(obs)
-        title_type = f"{figtitle} : {var_name} [{var_unit}]"
+        if 'variable' in obs.coords:
+            var_name = obs.coords['variable'].data
+        else:
+            var_name = obs.name
+        if 'res' in var_name:
+            var_name = f"Residual current"
+        elif 'bc' in var_name:
+            var_name = f"Baroclinic current"
+        elif 'geo' in var_name:
+            var_name = "Geostrophic current"
+        else: var_name = 'Total current'
+        title_type = f"{figtitle} : {var_name}"
     elif "rajector" in figtitle:  # for trajectories
         title_type = f"{figtitle}"
         var_name = ''
@@ -148,10 +158,10 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     # Depth
     if 'profile' in figtitle or 'Theta-S' in figtitle:
         if 'density_meta_zone' in obs.attrs:
-            title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} m to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
+            title_depth = f"P. Density: {obs.attrs['density_meta_zone'].split('_to_')[0]} kg/m3 to {obs.attrs['density_meta_zone'].split('_to_')[1]} kg/m3"
             depth = f"{obs.attrs['density_meta_zone']}kgm-3"
         elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
-            title_depth = f"P. Density: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
+            title_depth = f"P. Density: {obs.pdens.min().values:.1f} kg/m3 to {obs.pdens.max().values:.1f} kg/m3"
             depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}kgm-3"
         elif 'depth_meta_zone' in obs.attrs:
             title_depth = f"Depth: {obs.attrs['depth_meta_zone'].split('_to_')[0]} m to {obs.attrs['depth_meta_zone'].split('_to_')[1]} m"
@@ -2291,9 +2301,15 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
         f, axs = figure_2lin_ts()
         f.autofmt_xdate(rotation=5)
 
+        echeances = observation["xarray_meta_coloc"][0].attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+
         obs_0 = observation["xarray_meta_coloc"][0].squeeze()
         time_coloc = obs_0.time
-        axs[0].plot(time_coloc, obs_0, 'k-o', label=f'{observation["name"]}')
+
+        axs[0].plot(time_coloc, obs_0, 'k-', label=f'{observation["name"]}')
+        axs[0].plot(time_coloc.sel(time=echeances_dt), obs_0.sel(time=echeances_dt), 'ko')
+
 
         for i, mod in enumerate(models):
             mod_coloc = mod["xarray_meta_coloc"].squeeze()
@@ -2301,9 +2317,13 @@ def plot_ts_metr_f3(models, observation, flag_interval, flag_slice, output_path=
 
             # DIFFERENCE
             comparison = mod_coloc.data - obs_coloc.data
+            comparison_ech = mod_coloc.sel(time=echeances_dt).data - obs_coloc.sel(time=echeances_dt).data
 
-            axs[0].plot(time_coloc, mod_coloc, '-o', label=f'{mod["name"]} ')
-            axs[1].plot(time_coloc, comparison, '-o', label=f'{mod["name"]} ')
+            axs[0].plot(time_coloc, mod_coloc, '-', label=f'{mod["name"]} ')
+            axs[0].plot(time_coloc.sel(time=echeances_dt), mod_coloc.sel(time=echeances_dt), 'C0o')
+
+            axs[1].plot(time_coloc, comparison, '-', label=f'{mod["name"]} ')
+            axs[1].plot(time_coloc.sel(time=echeances_dt), comparison_ech, 'C0o')
 
             # Set title and legend
             axs[0].legend(loc=0)
@@ -2729,8 +2749,12 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
             else:
                 time_coloc = obs_mean.time.values
             if "echeances" in obs_coloc_base.attrs:
-                axs[0].plot(time_coloc, obs_mean, ls='-o', c='k', ms=8, label=f'{observation["name"]} ')
-                axs[2].plot(time_coloc, obs_std, ls='-o', c='k', ms=8, label=f'{observation["name"]} ')
+                echeances = obs_coloc_base.attrs["echeances"]
+                echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+                axs[0].plot(time_coloc, obs_mean, ls='-', c='k', label=f'{observation["name"]} ')
+                axs[0].plot(time_coloc.sel(time=echeances_dt), obs_mean.sel(time=echeances_dt), 'ko', ms=8)
+                axs[2].plot(time_coloc, obs_std, ls='-', c='k', label=f'{observation["name"]} ')
+                axs[2].plot(time_coloc.sel(time=echeances_dt), obs_std.sel(time=echeances_dt),  'ko', ms=8)
             else:
                 axs[0].plot(time_coloc, obs_mean, ls='-', c='k',  label=f'{observation["name"]} ')
                 axs[2].plot(time_coloc, obs_std, ls='-', c='k', label=f'{observation["name"]} ')
@@ -2766,14 +2790,18 @@ def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_pa
         if flag_interval:
             time_coloc = obs_mean.interval.values
         else:
-            time_coloc = obs_mean.time.values
+            time_coloc = obs_mean.time
 
         f, axs = figure_5lin_ts()
         f.autofmt_xdate(rotation=5)
 
         if "echeances" in obs_coloc_base.attrs:
-            axs[0].plot(time_coloc, obs_mean, '-o', c='k', ms=8, label=f'{observation["name"]} ')
-            axs[2].plot(time_coloc, obs_std, '-o', c='k', ms=8, label=f'{observation["name"]} ')
+            echeances = obs_coloc_base.attrs["echeances"]
+            echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+            axs[0].plot(time_coloc, obs_mean, ls='-', c='k', label=f'{observation["name"]} ')
+            axs[0].plot(time_coloc.sel(time=echeances_dt, method='nearest'), obs_mean.sel(time=echeances_dt, method='nearest'), 'ko', ms=8, markeredgecolor='red')
+            axs[2].plot(time_coloc, obs_std, ls='-', c='k', label=f'{observation["name"]} ')
+            axs[2].plot(time_coloc.sel(time=echeances_dt, method='nearest'), obs_std.sel(time=echeances_dt, method='nearest'),  'ko', ms=8, markeredgecolor='red')
         else:
             axs[0].plot(time_coloc, obs_mean, '-', c='k', label=f'{observation["name"]} ')
             axs[2].plot(time_coloc, obs_std, '-', c='k', label=f'{observation["name"]} ')
@@ -2830,35 +2858,50 @@ def plot_ts_metr_stats_figure(f, axs, time_coloc, mod_coloc, obs_coloc, list_dim
     mod_mean = mod_coloc.mean(list_dims_mean, skipna=True).squeeze()
     obs_mean = obs_coloc.mean(list_dims_mean, skipna=True).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[0].plot(time_coloc, mod_mean, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod_name}')
+        axs[0].plot(time_coloc.sel(time=echeances_dt, method='nearest'), mod_mean.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[0].plot(time_coloc, mod_mean, '-', label=f'{mod_name}')
 
     # BIAIS
     biais = (mod_mean - obs_mean).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[1].plot(time_coloc, biais, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[1].plot(time_coloc, biais, '-', label=f'{mod_name}')
+        axs[1].plot(time_coloc.sel(time=echeances_dt, method='nearest'), biais.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[1].plot(time_coloc, biais, '-', label=f'{mod_name}')
 
     # ECART-TYPE
     mod_std = mod_coloc.std(list_dims_mean, skipna=True).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[2].plot(time_coloc, mod_std, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[2].plot(time_coloc, mod_std, '-', label=f'{mod_name}')
+        axs[2].plot(time_coloc.sel(time=echeances_dt, method='nearest'), mod_std.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[2].plot(time_coloc, mod_std, '-', label=f'{mod_name}')
 
     # RMSE
     rmse = calculation.rmse_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[3].plot(time_coloc, rmse, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[3].plot(time_coloc, rmse, '-', label=f'{mod_name}')
+        axs[3].plot(time_coloc.sel(time=echeances_dt, method='nearest'), rmse.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[3].plot(time_coloc, rmse, '-', label=f'{mod_name}')
 
     # RMSE CENTREE
     rmse_centree = calculation.rmse_center_generic(obs_coloc, mod_coloc, list_dims_mean).squeeze()
     if "echeances" in obs_coloc.attrs:
-        axs[4].plot(time_coloc, rmse_centree, '-o', ms=8, label=f'{mod_name}')
+        echeances = obs_coloc.attrs["echeances"]
+        echeances_dt = np.array(echeances, dtype='datetime64[ns]')
+        axs[4].plot(time_coloc, rmse_centree, '-', label=f'{mod_name}')
+        axs[4].plot(time_coloc.sel(time=echeances_dt, method='nearest'), rmse_centree.sel(time=echeances_dt, method='nearest'), 'C0o', ms=8, markeredgecolor='red')
     else:
         axs[4].plot(time_coloc, rmse_centree, '-', label=f'{mod_name}')
 
@@ -3504,7 +3547,7 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     add_second_x_axis(f, ax, obs)
 
                     # Set title
-                    title, figname = get_title_figname('Stick plot', obs,
+                    title, figname = get_title_figname('Stick plot', obs[var_norm],
                                                        [mod['name'] for mod in models],
                                                        observation['name'])
 
@@ -3539,7 +3582,7 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     add_second_x_axis(f, ax, obs)
 
                     # Set title
-                    title, figname = get_title_figname('Stick plot', obs,
+                    title, figname = get_title_figname('Stick plot', obs[var_norm],
                                                        [mod['name'] for mod in models],
                                                        observation['name'])
 
@@ -3585,10 +3628,18 @@ def find_var_title(da):
         var_name = f"Baroclinic current {var_name.split('_')[0]}"
     if 'geo' in var_name:
         var_name = "Geostrophic current"
+    if var_name == 'norm':
+        var_name = "Total current norm"
+    if var_name == 'dir':
+        var_name = "Total current dir"
+    if var_name == 'u':
+        var_name = "Total current u"
+    if var_name == 'v':
+        var_name = "Total current v"
 
     if "units" in da.attrs:
         var_unit = da.attrs['units']
-    elif var_name in ['u', 'v', 'norm', "Geostrophic current", "Baroclinic current", "Residual current"]:
+    elif var_name in ['Total current', "Geostrophic current", "Baroclinic current", "Residual current"]:
         var_unit = 'm/s'
     elif var_name in ['Temperature', 'temperature']:
         var_unit = 'degC'

@@ -82,6 +82,7 @@ def get_observation_models_meta(config_obj: dict):
                                                            get_method(observation))
                         })
 
+
     logger.info("File(s) read for observation")
 
     # Open model dataset from path then decode dataset and apply meta-zone
@@ -402,6 +403,8 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
 
         if 'times' in config_obj["meta_zones"]:
             xarray_obj = xarray_obj.assign_attrs({"echeances": config_obj["meta_zones"]["times"]})
+        if 'time_highlight' in config_obj["meta_zones"]:
+            xarray_obj = xarray_obj.assign_attrs({"echeances": config_obj["meta_zones"]["time_highlight"]})
 
         if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
             if 'depth' in config_obj["meta_zones"]:
