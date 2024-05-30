@@ -322,7 +322,7 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
                "start": lambda obj: obj.meta.time_selection_start,
                "end": lambda obj: obj.meta.time_selection_end,
-               "time": lambda obj: obj.meta.time_selection_list,
+               "times": lambda obj: obj.meta.time_selection_list,
                "frequency": lambda obj: obj.meta.time_selection_freq,
                "time_restriction": lambda obj: obj.meta.time_restriction,
                "cyclic": lambda obj: obj.meta.time_selection_climatological
