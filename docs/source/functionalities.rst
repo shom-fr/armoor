@@ -14,7 +14,11 @@ Comparison to satellite SST.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variable:
+
 * Sea surface temperature : ``attribute = SST``
+
+There is no optional variable for this functionality.
 
 Available outputs
 ~~~~~~~~~~~~~~~~~
@@ -48,9 +52,14 @@ Comparison to hydrological profiles.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variables:
+
 * Potential temperature : ``attribute = ptemp``
 * Salinity : ``attribute = sal``
 * Potential density : ``attribute = pdens``
+
+Optional variables:
+
 * In-situ temperature : ``attribute = temp``
 * Sound speed : ``attribute = sound_speed``
 
@@ -109,9 +118,14 @@ Comparison to hydrological moorings.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variables:
+
 * Potential temperature : ``attribute = ptemp``
 * Salinity : ``attribute = sal``
 * Potential density : ``attribute = pdens``
+
+Optional variables:
+
 * In-situ temperature : ``attribute = temp``
 * Sound speed : ``attribute = sound_speed``
 
@@ -139,8 +153,13 @@ Comparison to hydrological sections.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variables:
+
 * Potential temperature : ``attribute = ptemp``
 * Salinity : ``attribute = sal``
+
+Optional variables:
+
 * Potential density : ``attribute = pdens``
 * In-situ temperature : ``attribute = temp``
 * Geostrophic current : ``attribute = current_geo``
@@ -163,8 +182,12 @@ Comparison to hydrological climatologies.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variables:
+
 * Potential temperature : ``attribute = ptemp``
 * Salinity : ``attribute = sal``
+
+There is no optional variable for this functionality.
 
 Available outputs
 ~~~~~~~~~~~~~~~~~
@@ -188,10 +211,13 @@ Comparison to HF radar surface currents.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variables:
+
 * Total current : ``attribute = current``
 * Residual current : ``attribute = current_res``
 * Tidal current harmonic consituents : ``plot = plot_map_current_harmonic`` or ``plot = plot_tide_current_ellipses``
 
+Caution: residual current and harmonic component will be considered only if the temporal interval is long enough.
 
 Available outputs
 ~~~~~~~~~~~~~~~~~
@@ -228,11 +254,14 @@ Comparison to ADCP measurements.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variables:
+
 * Total current : ``attribute = current``
 * Residual current : ``attribute = current_res``
 * Baroclinic current : ``attribute = current_bc``
 * Tidal current harmonic consituents : ``plot = plot_map_current_harmonic`` or ``plot = plot_tide_current_ellipses``
 
+Caution: residual current and harmonic component will be considered only if the temporal interval is long enough.
 
 Available outputs
 ~~~~~~~~~~~~~~~~~
@@ -259,8 +288,12 @@ Comparison to VM-ADCP measurements.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variables:
+
 * Total current : ``attribute = current``
 * Baroclinic current : ``attribute = current_bc``
+
+Intensity and direction are calculated
 
 
 Available outputs
@@ -284,6 +317,9 @@ Comparison to drifter measurements.
 Variables to plot
 ~~~~~~~~~~~~~~~~~
 
+Default variables:
+
+* Lagrangian trajectories
 * Total current : ``attribute = current``
 
 Available outputs
