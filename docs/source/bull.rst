@@ -9,7 +9,10 @@ How to generate reports
 -----------------------
 
 You will learn here how to use ``armoor-bull`` to create reports based on the 9 functionalities of armoor.
-To generate a report run the command ``armoor-bull`` with a configuration file using the option ``--cfgfile``.
+To generate a report, run the command ``armoor-bull`` with two options:
+
+    * ``-o``: This option specifies the output folder where the report will be saved. Please create the output folder before running the command.
+    * ``-c``: This option specifies the configuration file that defines the report generation parameters.
 
 We can distinguish 3 sections in the configuration file:
 
