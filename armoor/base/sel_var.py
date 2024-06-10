@@ -477,10 +477,6 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing the mixed layer depth.
         """
-        # Has mld in product
-        if 'mld' in self._obj:
-            return self._obj.mld
-
         # Compute mld from ptemp
         ptemp = self._obj.sel_var.sel_ptemp()
         mld = mixed_layer_depth(ptemp, zref=10)
