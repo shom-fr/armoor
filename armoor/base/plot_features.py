@@ -14,7 +14,7 @@ import cartopy.feature as cfeature
 import cmocean
 from armoor.algo import calculation
 from xoa.geo import haversine
-from armoor.base.tools_features import manage_output, angle_between_vectors
+from armoor.base.tools_features import manage_output, angle_between_vectors, calcul_mean_angle
 
 logger = logging.getLogger(__name__)
 
@@ -1466,12 +1466,14 @@ def plot_map_current_trajectory(obs, mod, output_path=None):
     manage_output(figname, output_path)
 
 
-def plot_difference_trajectory(obs, mod, output_path=None):
+def plot_difference_trajectory(obs_for_title, obs, mod, output_path=None):
     """
     Plot the difference in terms of distance and direction between the model and
      observation trajectories.
     Parameters
     ----------
+    obs_for_title : xarray.dataset
+        Initial bservation dataset for plot information.
     obs : xarray.dataset
         Observation trajectory dataset.
     mod : xarray.dataset
@@ -1482,44 +1484,47 @@ def plot_difference_trajectory(obs, mod, output_path=None):
     """
     logger.info(f'Difference in terms of distance and direction between '
                 f'the model and observation trajectories')
-    angles = []
-    distances = []
-    duree = []
+    angles = np.arange(mod.dims['trajectory']*mod.dims['time'], dtype=float).reshape(
+                        mod.dims['trajectory'], mod.dims['time'])*0.
+    distances = np.arange(mod.dims['trajectory']*mod.dims['time'], dtype=float).reshape(
+                            mod.dims['trajectory'], mod.dims['time'])*0.
+    mean_angles = np.arange(mod.dims['time'], dtype=float)
 
-    obs_ini = obs.isel(time=0)
-    for i_time, time in enumerate(mod.time):
-        duree.append((time.data - obs_ini.time.data).astype('timedelta64[h]'))
-        mod_time_mean = mod.isel(time=i_time).mean('trajectory', skipna=True)
-        obs_time = obs.sel(time=time, method='nearest')
+    duree = (mod.time.isel(trajectory=0).values - obs.time.isel(trajectory=0).isel(time=0).values)
 
-        # Calculate angles
-        angle = angle_between_vectors(obs_ini, obs_time, mod_time_mean)
-        angles.append(angle)
-        # Calculate distances
-        distance = haversine(obs_time.lon, obs_time.lat, mod_time_mean.lon,
-                             mod_time_mean.lat) / 1000
-        distances.append(distance)
+    for i in range(mod.dims["time"]):
+        distances[:, i] = haversine(obs.lon.values[:, i], obs.lat.values[:, i],
+                                    mod.isel(time=i).lon,
+                                    mod.isel(time=i).lat) / 1000
+
+    mean_distances = np.nanmean(distances, axis=0)
+
+    for i in range(mod.dims["time"]):
+        for t in range(mod.dims["trajectory"]):
+            angles[t, i] = angle_between_vectors(obs.isel(time=0).isel(trajectory=t), obs.isel(time=i).isel(trajectory=t), mod.isel(time=i).isel(trajectory=t))
+
+        mean_angles[i] = calcul_mean_angle(angles[:, i])
 
     # Get title and fignames
-    title, figname = get_title_figname('Difference trajectory', obs, mod.attrs['name'],
-                                       obs.attrs['name'])
+    title, figname = get_title_figname('Difference trajectory', obs_for_title, mod.attrs['name'],
+                                       obs_for_title.attrs['name'])
     # Plot
     f = plt.figure(figsize=(11, 10))
     f.suptitle(title, x=0.35, fontsize=15, fontweight='bold')
     ax0 = plt.subplot2grid((2, 1), (0, 0))
     ax1 = plt.subplot2grid((2, 1), (1, 0))
-    ax0.plot(duree, distances)
+    ax0.plot(duree/(3600*1e9), mean_distances)
     ax0.set_title('Mean distance difference [m]', fontsize=15)
     ax0.set_ylabel(f'm', fontsize=12)
     ax0.set_xlabel(f'Duration (h)', fontsize=12)
-    ax1.plot(duree, angles)
+    ax1.plot(duree/(3600*1e9), mean_angles)
     ax1.set_title('Mean direction difference [°]', fontsize=15)
     ax1.set_ylabel(f'°', fontsize=12)
     ax1.set_xlabel(f'Duration (h)', fontsize=12)
 
     # Add minimap
     ax_mini_map = add_mini_map(f, obs)
-    ax_mini_map.plot(obs.lon.values, obs.lat.values, transform=ccrs.PlateCarree())
+    ax_mini_map.plot(obs_for_title.lon.values, obs_for_title.lat.values, transform=ccrs.PlateCarree())
 
     manage_output(figname, output_path)
 

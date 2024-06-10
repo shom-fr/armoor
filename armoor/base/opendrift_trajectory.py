@@ -129,9 +129,9 @@ def calculate_trajectory(path_model, lons, lats, times, time_step, nb_step, outp
     o.set_config('general:use_auto_landmask', False)  # Disabling the automatic GSHHG landmask
     o.set_config('general:coastline_action', 'stranding')
 
-    # Run calculation
+    # Run calculation for every position of the drifter on the entire time period of the observation
     o.seed_elements(lons, lats, time=times)
-    o.run(steps=nb_step, time_step=int(time_step), outfile=output_file)
+    o.run(steps=len(times), time_step=int(time_step), outfile=output_file)
 
     # Open file result in dataset
     trajectory = xr.open_dataset(output_file)
