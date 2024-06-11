@@ -214,7 +214,10 @@ def set_coloc_flags(config_obj):
 
     # Colocation for functionnality 3
     if config_obj["functionality"] == "prof_hydro_mooring":
-        vertical_colocation_flag = True
+        if 'depth' in config_obj['meta_zones'] or 'slice' in config_obj['meta_zones']:
+            vertical_colocation_flag = True
+        else:
+            vertical_colocation_flag = False
         horizontal_colocation_flag = True
         temporal_colocation_flag = True
 
