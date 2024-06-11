@@ -1,6 +1,7 @@
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
 from tests.int.base import change_path, copy_test_files
+from pytest import raises
 
 folder_test = 'test_f4'
 copy_test_files(folder_test)
@@ -23,8 +24,8 @@ class TestBulletins:
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor.cfg"])
         parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
+        with raises(ValueError):
+            dict2call(parser)
 
     def test_variable_2d_scanfish(self):
         out_path, logger = change_path(folder_test)
@@ -59,8 +60,8 @@ class TestBulletins:
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor_topaz.cfg"])
         parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
+        with raises(ValueError):
+            dict2call(parser)
 
     def test_variable_3d(self):
         out_path, logger = change_path(folder_test)

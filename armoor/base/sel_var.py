@@ -83,8 +83,10 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_current_res(filter)
             elif var == 'current_bc':
                 dataset = self._obj.sel_var.sel_current_barocline()
-            elif var == 'mld':
-                dataset = self._obj.sel_var.sel_mixed_layer_depth()
+            elif var == 'mld_pdens':
+                dataset = self._obj.sel_var.sel_mixed_layer_depth('pdens')
+            elif var == 'mld_ptemp':
+                dataset = self._obj.sel_var.sel_mixed_layer_depth('ptemp')
             elif var == 'pres':
                 dataset = self._obj.sel_var.sel_pres()
             elif var == 'sound_speed':
@@ -468,7 +470,7 @@ class SSTAccessor:
                        "potential temperature and depth in your dataset.")
         return self._obj
 
-    def sel_mixed_layer_depth(self):
+    def sel_mixed_layer_depth(self, var: str):
         """
         Compute the mixed layer depth
 
@@ -478,16 +480,23 @@ class SSTAccessor:
             Data array containing the mixed layer depth.
         """
         # Compute mld from ptemp
-        ptemp = self._obj.sel_var.sel_ptemp()
-        mld = mixed_layer_depth(ptemp, zref=10)
-        if np.isnan(mld.max().data):
-            logger.warning("mld full of NaNs, your dataset probably does not have ptemp values at zref=10m.")
-            # compute mld from pdens as with ptemp, mld is full of NaNs
+        if var == 'ptemp':
+            ptemp = self._obj.sel_var.sel_ptemp()
+            mld = mixed_layer_depth(ptemp, zref=10)
+        # Compute mld from pdens
+        elif var == 'pdens':
             pdens = self._obj.sel_var.sel_pdensity()
             mld = mixed_layer_depth(pdens, zref=10)
-            if np.isnan(mld.max().data):
-                logger.warning("mld full of NaNs, your dataset probably does not have pdens values at zref=10m.")
-                logger.error("mld full of NaNs, you won't get mld for this product")
+        else:
+            msg = f"For now we don't cumpute mld from {var}."
+            logger.error(msg)
+            raise ValueError(msg)
+        # mld empty
+        if np.isnan(mld.max().data):
+            msg = f"mld full of NaNs, your dataset probably does not have {var} values at zref=10m."
+            logger.error(msg)
+            raise ValueError(msg)
+        # return mld
         return mld
 
     def sel_pres(self):
