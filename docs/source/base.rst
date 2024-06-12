@@ -170,11 +170,12 @@ You can select the variables to plot among the following ones with the parameter
     * ``current_res`` : Residual current
     * ``current_geo`` : Geostrophic current
     * ``current_bc`` : Baroclinic current
-    * ``mld`` : Mixed layer depth
+    * ``mld_ptemp`` : Temperature mixed layer depth, where potential temperature is equal to potential temperature at 10m +- 0.2°C.
+    * ``mld_pdens`` : Density mixed layer depth, where potential density is equal to potential density at 10m +- 0.03kg.m-3.
     * ``sound_speed`` : Sound speed
 
 .. CAUTION::
-    Any optional ``attribute`` specified in the ``plot`` options must also appear in the ``meta-zone`` ``vars`` selection !
+    Any optional ``attribute`` specified in the ``plot`` options must also appear in the ``meta-zone``'s ``vars`` selection, except for ``mld_ptemp`` and ``mld_pdens`` where only ``mld`` needs to be included.
 
 Example
 -------

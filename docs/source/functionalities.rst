@@ -163,7 +163,7 @@ Optional variables:
 * Potential density : ``attribute = pdens``
 * In-situ temperature : ``attribute = temp``
 * Geostrophic current : ``attribute = current_geo``
-* Mixed layer depth : ``attribute = mld``
+* Mixed layer depth : ``attribute = mld_ptemp`` or ``attribute = mld_pdens``
 
 Available outputs
 ~~~~~~~~~~~~~~~~~
@@ -274,7 +274,9 @@ Available outputs
 * Tidal current ellipsis : ``plot_tide_current_ellipses``
    Maps of tidal current ellipses from model and observation at points in the meta-zone. One map per tidal wave and per vertical immersion or slice.
 
-   **These ellipses require to specify the additional parameters : ``analysis_start``, ``analysis_end``, ``tidal_waves`` and ``tide_tool``**.
+.. NOTE::
+
+    These ellipses require to specify the additional parameters : ``analysis_start``, ``analysis_end``, ``tidal_waves`` and ``tide_tool``.
 
 8. CURRENTS_VMADCP
 ------------------
