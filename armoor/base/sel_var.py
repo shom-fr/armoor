@@ -483,17 +483,20 @@ class SSTAccessor:
         if var == 'ptemp':
             ptemp = self._obj.sel_var.sel_ptemp()
             mld = mixed_layer_depth(ptemp, zref=10)
+            mld.attrs['from'] = 'ptemp'
         # Compute mld from pdens
         elif var == 'pdens':
             pdens = self._obj.sel_var.sel_pdensity()
             mld = mixed_layer_depth(pdens, deltadens=0.03, zref=10)
+            mld.attrs['from'] = 'pdens'
         else:
-            msg = f"For now we don't cumpute mld from {var}."
+            msg = f"Currently, we do not compute the mixed layer depth using {var}."
             logger.error(msg)
             raise ValueError(msg)
         # mld empty
         if np.isnan(mld.max().data):
-            msg = f"mld full of NaNs, your dataset probably does not have {var} values at zref=10m."
+            msg = f"The mixed layer depth is full of NaNs, which likely indicates that " \
+                  f"your dataset does not have {var} values at a reference depth of 10 meters."
             logger.error(msg)
             raise ValueError(msg)
         # return mld

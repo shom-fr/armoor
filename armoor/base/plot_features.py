@@ -94,7 +94,8 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
     else:
         var_name, var_unit = find_var_title(obs)
         title_type = f"{figtitle} : {var_name} [{var_unit}]"
-
+        if 'from' in obs.attrs:
+            title_type += f" from {obs.attrs['from']}."
     # Location
     if 'cloud_plot' in obs.attrs:
         title_loc = f"Longitude : {obs.attrs['cloud_plot'][0]:.2f}° - Latitude : {obs.attrs['cloud_plot'][1]:.2f}°\n"
