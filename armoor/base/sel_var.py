@@ -486,7 +486,7 @@ class SSTAccessor:
         # Compute mld from pdens
         elif var == 'pdens':
             pdens = self._obj.sel_var.sel_pdensity()
-            mld = mixed_layer_depth(pdens, zref=10)
+            mld = mixed_layer_depth(pdens, deltadens=0.03, zref=10)
         else:
             msg = f"For now we don't cumpute mld from {var}."
             logger.error(msg)
