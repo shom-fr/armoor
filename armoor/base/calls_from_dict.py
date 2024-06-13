@@ -159,12 +159,17 @@ def get_observation_models_meta(config_obj: dict):
             
         outputs = config_obj['outputs']
         vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
-        if 'mld' in vars_to_plot:
-            observation["xarray_meta_coloc"][index_model] = merge_no_fail([observation["xarray_meta_coloc"][index_model], observation["xarray_meta_coloc"][index_model].sel_var.sel_mixed_layer_depth()])
+        mld_var = False
+        if 'mld_ptemp' in vars_to_plot:
+            mld_var = 'ptemp'
+        elif 'mld_pdens' in vars_to_plot:
+            mld_var = 'pdens'
+        if mld_var:
+            observation["xarray_meta_coloc"][index_model] = merge_no_fail([observation["xarray_meta_coloc"][index_model], observation["xarray_meta_coloc"][index_model].sel_var.sel_mixed_layer_depth(mld_var)])
             if model.get("type") == 'CROCO':
-                model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].drop_vars(["x", "y", "level"]).sel_var.sel_mixed_layer_depth()])
+                model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].drop_vars(["x", "y", "level"]).sel_var.sel_mixed_layer_depth(mld_var)])
             else:
-                model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].sel_var.sel_mixed_layer_depth()])
+                model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].sel_var.sel_mixed_layer_depth(mld_var)])
 
     # Obs meta is out of the loop for each mod
     if 'interval' in config_obj["meta_zones"]:
@@ -214,7 +219,10 @@ def set_coloc_flags(config_obj):
 
     # Colocation for functionnality 3
     if config_obj["functionality"] == "prof_hydro_mooring":
-        vertical_colocation_flag = True
+        if 'depth' in config_obj['meta_zones'] or 'slice' in config_obj['meta_zones']:
+            vertical_colocation_flag = True
+        else:
+            vertical_colocation_flag = False
         horizontal_colocation_flag = True
         temporal_colocation_flag = True
 

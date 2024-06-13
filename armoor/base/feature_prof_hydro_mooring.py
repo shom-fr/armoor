@@ -49,11 +49,11 @@ def plot(config_obj):
         models = copy.copy(config_obj["models"])
 
         # Depth selection
-        if "depth" in config_obj["meta_zones"] and "DEPTH" in observation["xarray_meta"].dims:
+        if "depth" in config_obj["meta_zones"] and "depth" in observation["xarray_meta"].dims:
             depth = config_obj["meta_zones"]["depth"]
             depth_diff = np.abs(observation["xarray_meta"]["depth"] - float(depth[0]))
             nearest_depth_index = np.nanargmin(depth_diff.data)
-            observation["xarray_meta"] = observation["xarray_meta"].isel(DEPTH=nearest_depth_index)
+            observation["xarray_meta"] = observation["xarray_meta"].isel(depth=nearest_depth_index)
             for i_mod, mod in enumerate(models):
                 depth_diff = np.abs(observation["xarray_meta_coloc"][i_mod]["depth"] - float(depth[0]))
                 nearest_depth_index = np.nanargmin(depth_diff.data)
@@ -86,13 +86,24 @@ def plot(config_obj):
                                                      flag_slice, output_path=sub_func_output_folder,
                                                      plg=plg)
                 else:
-                    for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
-                        models_depth, observation_depth = select_depth(models_var, observation_var,
-                                                                       depth)
-                        plot_features.plot_ts_metr_stats(models_depth, observation_depth,
-                                                         flag_interval, flag_slice,
-                                                         output_path=sub_func_output_folder,
-                                                         plg=plg)
+                    if config_obj['colocate'] == observation:
+                        for i_depth, depth in enumerate(observation["xarray_meta_coloc"][0].depth.values):
+                            if depth > 0:
+                                models_depth, observation_depth = select_depth(models_var, observation_var,
+                                                                               depth)
+                                plot_features.plot_ts_metr_stats(models_depth, observation_depth,
+                                                                 flag_interval, flag_slice,
+                                                                 output_path=sub_func_output_folder,
+                                                                 plg=plg)
+                        else:
+                            for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
+                                if depth > 0:
+                                    models_depth, observation_depth = select_depth(models_var, observation_var,
+                                                                                   depth)
+                                    plot_features.plot_ts_metr_stats(models_depth, observation_depth,
+                                                                     flag_interval, flag_slice,
+                                                                     output_path=sub_func_output_folder,
+                                                                     plg=plg)
 ############################################################################################
             # PONCTUAL TIMES SERIES
             plot_ts_metr_f3 = {"plot_ts_metr_f3": 'all_metrics'}
@@ -105,12 +116,22 @@ def plot(config_obj):
                                                      output_path=sub_func_output_folder,
                                                          plg=plg)
                 else:
-                    for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
-                        models_depth, observation_depth = select_depth(models_var, observation_var,
-                                                                       depth)
-                        plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
-                                                     output_path=sub_func_output_folder,
-                                                         plg=plg)
+                    if config_obj['colocate'] == 'observation':
+                        for i_depth, depth in enumerate(observation["xarray_meta_coloc"][0].depth.values):
+                            if depth > 0:
+                                models_depth, observation_depth = select_depth(models_var, observation_var,
+                                                                               depth)
+                                plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
+                                                             output_path=sub_func_output_folder,
+                                                                 plg=plg)
+                    else:
+                        for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
+                            if depth > 0:
+                                models_depth, observation_depth = select_depth(models_var, observation_var,
+                                                                               depth)
+                                plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
+                                                              output_path=sub_func_output_folder,
+                                                              plg=plg)
 
 def select_depth(models, observation, depth):
     """
@@ -135,7 +156,7 @@ def select_depth(models, observation, depth):
         observation_depth["xarray_meta_coloc"] = []
         models_depth[i_mod]["xarray_meta"] = mod["xarray_meta"].sel(depth=depth, method='nearest')
         models_depth[i_mod]['name'] = mod['name']
-        models_depth[i_mod]["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel(depth=depth)
+        models_depth[i_mod]["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel(depth=depth, method='nearest')
         observation_depth["xarray_meta_coloc"].append(
             observation["xarray_meta_coloc"][i_mod].sel(depth=depth, method='nearest'))
 

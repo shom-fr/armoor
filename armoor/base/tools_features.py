@@ -110,6 +110,27 @@ def angle_between_vectors(pointA, pointB, pointC):
 
     return theta_deg
 
+def calcul_mean_angle(angles):
+    angles_rad = np.deg2rad(angles)
+
+    # Compute x and y components
+    x = np.cos(angles_rad)
+    y = np.sin(angles_rad)
+
+    # Compute means of x and y components
+    x_moy = np.nanmean(x)
+    y_moy = np.nanmean(y)
+
+    # Compute mean angle
+    angle_moyen_rad = np.arctan2(y_moy, x_moy)
+
+    # Convert mean angle in degrees
+    angle_moyen_deg = np.degrees(angle_moyen_rad)
+
+    if angle_moyen_deg < 0:
+        angle_moyen_deg += 360
+
+    return angle_moyen_deg
 
 def remove_missing_values(model, obs):
     """

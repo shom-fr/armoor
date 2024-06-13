@@ -4,6 +4,8 @@ import copy
 import logging
 import pandas
 import numpy as np
+import xarray as xr
+import datetime
 from armoor.hmi.script_tools import create_folder
 from armoor.base import plot_features, opendrift_trajectory
 from armoor.base.colocation import convert_curv_rect
@@ -103,8 +105,17 @@ def plot(config_obj):
             observation['xarray_meta'] = observation['xarray_meta'].sel(
                 time=slice(date_start, date_end))
 
+            # Define the duration of simulated trajectories to calculate
+            if 'traj_duration' in output:
+                traj_duration = output["traj_duration"]
+            else:
+                traj_duration = 172800
+                logger.warning("You should specify the duration (in s) for the trajectories "
+                               "to display. It is arbitrarily set at 48 hours")
+
+
             # Get the parameters for the OpenDrift calculation
-            lons, lats, times, time_step, nb_step = param_pour_opendrift(observation)
+            lons, lats, times, time_step, nb_step = param_pour_opendrift(observation, traj_duration)
 
             # Define the duration of simulated trajectories to plot
             if 'traj_duration_plot' in output:
@@ -171,8 +182,16 @@ def plot(config_obj):
             observation['xarray_meta'] = observation['xarray_meta'].sel(
                 time=slice(date_start, date_end))
 
+            # Define the duration of simulated trajectories to calculate
+            if 'traj_duration' in output:
+                traj_duration = output["traj_duration"]
+            else:
+                traj_duration = 172800
+                logger.warning("You should specify the duration (in s) for the trajectories "
+                               "to display. It is arbitrarily set at 48 hours")
+
             # Get the parameters for the OpenDrift calculation
-            lons, lats, times, time_step, nb_step = param_pour_opendrift(observation)
+            lons, lats, times, time_step, nb_step = param_pour_opendrift(observation, traj_duration)
 
             # Calculate the trajectories
             for i_mod, mod in enumerate(models):
@@ -188,22 +207,28 @@ def plot(config_obj):
                                                                      output_file)
                 models[i_mod]['traj'] = mod_traj.assign_attrs({'name': mod['name']})
 
+                # Reformatting the model and observation matrix
+                mod_reform = reshaping_mod(models[i_mod]['traj'], int(nb_step))
+                obs_reform = reshaping_obs(observation['xarray_meta'], mod_reform)
+
                 # Plot the trajectories
-                plot_features.plot_difference_trajectory(observation['xarray_meta'],
-                                                         models[i_mod]['traj'],
+                plot_features.plot_difference_trajectory(observation['xarray_meta'], obs_reform,
+                                                         mod_reform,
                                                          output_path=sub_func_output_folder)
 
 
 ####################################################################################################
 
 
-def param_pour_opendrift(observation):
+def param_pour_opendrift(observation, traj_duration):
     """
     Retreive the parameter for the calculation of the trajectories with the opendrift tool.
     Parameters
     ----------
-    observation : : xarray.Dataset
+    observation : xarray.Dataset
         Observation dataset from which to retrieve the calculation parameters.
+    traj_duration : int
+        duration of the computation of the simulated trajectories in seconds
 
     Returns
     -------
@@ -220,12 +245,88 @@ def param_pour_opendrift(observation):
 
     """
     duration = (observation["xarray_meta"].time[-1].values - observation["xarray_meta"].time[
-        0].values).astype('timedelta64[s]').item().total_seconds()
-    nb_step = len(observation["xarray_meta"].time)
-    time_step = duration / nb_step
+        0].values).astype('timedelta64[s]').item().total_seconds()  # time duration of the observation file
+
+    time_step = duration / len(observation["xarray_meta"].time)
+    nb_step = traj_duration/time_step+1   #nb_step : nbre of positions for which trajectory is simulated
+    # (+1 is the time t0 which correspond to the emission of the particule)
+
     lons = observation["xarray_meta"].lon.values
     lats = observation["xarray_meta"].lat.values
     times = []
     for time in observation["xarray_meta"].time.values:
         times.append(pandas.to_datetime(time))
     return lons, lats, times, time_step, nb_step
+
+
+def reshaping_mod(mod, nb_step):
+    """
+     Reshape the observation matrix to have the same number of trajectories as the simulated matrix.
+     Parameters
+     ----------
+     mod : xarray.Dataset
+         Model dataset to be reshaped.
+     nb_step : int
+         Number of step of the trajectories.
+
+     Returns
+     -------
+     mod_rshp : array.Dataset
+        Model dataset reshaped according to the trajectories dataset
+    """
+
+    mod_lon_rshp = np.zeros((mod.dims['trajectory']-nb_step, nb_step))
+    mod_lat_rshp = np.zeros((mod.dims['trajectory']-nb_step, nb_step))
+    mod_time_rshp = np.zeros((mod.dims['trajectory']-nb_step, nb_step))
+
+    for i in range(mod.dims['trajectory']-nb_step):
+
+        mod_lon_rshp[i, :] = mod.lon.values[i,i:i+nb_step]
+        mod_lat_rshp[i, :] = mod.lat.values[i,i:i+nb_step]
+        mod_time_rshp[i, :] = mod.time.values[i:i+nb_step]
+
+    mod_rshp = xr.Dataset({
+        'lon': (['trajectory', 'time'], mod_lon_rshp),
+        'lat': (['trajectory', 'time'], mod_lat_rshp),
+        'time': (['trajectory', 'time'], mod_time_rshp)
+    })
+
+    mod_rshp.attrs.update(mod.attrs)
+
+    return mod_rshp
+
+
+def reshaping_obs(obs, mod):
+    """
+     Reshape the observation matrix to have the same number of trajectories as the simulated matrix.
+     Parameters
+     ----------
+     obs : xarray.Dataset
+         Observation dataset to be reshaped.
+     mod : xarray.Dataset
+         Model trajectory dataset.
+
+     Returns
+     -------
+     obs_rshp : array.Dataset
+        Observation dataset reshaped according to the trajectories dataset
+    """
+
+    obs_lon_rshp = np.zeros((mod.dims['trajectory'], mod.dims['time']))
+    obs_lat_rshp = np.zeros((mod.dims['trajectory'], mod.dims['time']))
+    obs_time_rshp = np.zeros((mod.dims['trajectory'], mod.dims['time']))
+
+    for i in range(mod.dims['trajectory']):
+        obs_lon_rshp[i, :] = obs.lon.values[i:i+mod.dims['time']]
+        obs_lat_rshp[i, :] = obs.lat.values[i:i+mod.dims['time']]
+        obs_time_rshp[i, :] = pandas.to_datetime(obs.time.values[i:i+mod.dims['time']])
+
+    obs_rshp = xr.Dataset({
+        'lon': (['trajectory', 'time'], obs_lon_rshp),
+        'lat': (['trajectory', 'time'], obs_lat_rshp),
+        'time': (['trajectory', 'time'], obs_time_rshp.astype(datetime.datetime))
+    })
+
+    obs_rshp.attrs.update(obs.attrs)
+
+    return obs_rshp
