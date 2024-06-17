@@ -166,12 +166,21 @@ def plot(config_obj):
                     # Remove missing values
                     mods_var, obs_var = remove_missing_values_ds(mods_var, obs_var, i_mod,
                                                                  [attribute])
+
                     # Select variables to plot
                     mod_var['xarray_meta'] = mod_var['xarray_meta'][attribute]
                     mod_var['xarray_meta_coloc'] = mod_var['xarray_meta_coloc'][attribute]
                     obs_var['xarray_meta_coloc'][i_mod] = obs_var['xarray_meta_coloc'][i_mod][
                         attribute]
+                    # Add of attributes information
+                    if "echeances" in observation['xarray_meta'].attrs:
+                        obs_var['xarray_meta_coloc'][i_mod] = obs_var['xarray_meta_coloc'][i_mod].assign_attrs(
+                            {"echeances": observation['xarray_meta'].attrs["echeances"]})
+
                 obs_var['xarray_meta'] = obs_var['xarray_meta'][attribute]
+                #Add of attributes information
+                if "echeances" in observation['xarray_meta'].attrs:
+                    obs_var['xarray_meta'] = obs_var['xarray_meta'].assign_attrs({"echeances":observation['xarray_meta'].attrs["echeances"]})
 
                 plot_features.plot_ts_metr_stats(mods_var, obs_var, flag_interval, flag_slice,
                                                  output_path=sub_func_output_folder, plg=plg)

@@ -1,6 +1,7 @@
 from armoor.cli.command_line_interface import command_line_interface
 from armoor.base.calls_from_dict import dict2call
 from tests.int.base import change_path, copy_test_files
+from pytest import raises
 
 folder_test = 'test_f4'
 copy_test_files(folder_test)
@@ -17,21 +18,11 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_variable_2d_curr_geo(self):
+    def test_variable_2d_pdens(self):
         out_path, logger = change_path(folder_test)
-        logger.info('test_variable_2d_curr_geo')
+        logger.info('test_variable_2d_pdens')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_curr_geo.cfg"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
-
-
-    def test_variable_2d_hycom_manga_dens(self):
-        out_path, logger = change_path(folder_test)
-        logger.info('test_variable_2d_hycom_manga_dens')
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_hycom_manga_dens.cfg"])
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_pdens.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
@@ -42,8 +33,8 @@ class TestBulletins:
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor.cfg"])
         parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
+        with raises(ValueError):
+            dict2call(parser)
 
     def test_variable_2d_scanfish(self):
         out_path, logger = change_path(folder_test)
@@ -63,14 +54,41 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_variable_2d_croco_pdens(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_2d_croco_pdens')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_croco_pdens.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+    
+    def test_variable_2d_hycom_manga(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_2d_hycom_manga')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_hycom_manga.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+    
+    def test_variable_2d_hycom_manga_pdens(self):
+        out_path, logger = change_path(folder_test)
+        logger.info('test_variable_2d_hycom_manga_pdens')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_hycom_manga_pdens.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+    
     def test_variable_2d_seasor_topaz(self):
         out_path, logger = change_path(folder_test)
         logger.info('test_variable_2d_seasor_topaz')
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_seasor_topaz.cfg"])
         parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
+        with raises(ValueError):
+            dict2call(parser)
 
     def test_variable_3d(self):
         out_path, logger = change_path(folder_test)
@@ -140,6 +158,15 @@ class TestBulletins:
         logger.info("test_variable_2d_SCA")
         parser = command_line_interface(
             ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_SCA.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_variable_2d_SCA_pdens(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_variable_2d_SCA_pdens")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/variable_2d_SCA_pdens.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True

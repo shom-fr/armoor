@@ -82,6 +82,7 @@ def get_observation_models_meta(config_obj: dict):
                                                            get_method(observation))
                         })
 
+
     logger.info("File(s) read for observation")
 
     # Open model dataset from path then decode dataset and apply meta-zone
@@ -155,6 +156,20 @@ def get_observation_models_meta(config_obj: dict):
                 vert_slice, var_slice)
             observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
                 index_model].meta.vertical_selection_slice(vert_slice, var_slice)
+            
+        outputs = config_obj['outputs']
+        vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
+        mld_var = False
+        if 'mld_ptemp' in vars_to_plot:
+            mld_var = 'ptemp'
+        elif 'mld_pdens' in vars_to_plot:
+            mld_var = 'pdens'
+        if mld_var:
+            observation["xarray_meta_coloc"][index_model] = merge_no_fail([observation["xarray_meta_coloc"][index_model], observation["xarray_meta_coloc"][index_model].sel_var.sel_mixed_layer_depth(mld_var)])
+            if model.get("type") == 'CROCO':
+                model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].drop_vars(["x", "y", "level"]).sel_var.sel_mixed_layer_depth(mld_var)])
+            else:
+                model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].sel_var.sel_mixed_layer_depth(mld_var)])
 
     # Obs meta is out of the loop for each mod
     if 'interval' in config_obj["meta_zones"]:
@@ -204,7 +219,10 @@ def set_coloc_flags(config_obj):
 
     # Colocation for functionnality 3
     if config_obj["functionality"] == "prof_hydro_mooring":
-        vertical_colocation_flag = True
+        if 'depth' in config_obj['meta_zones'] or 'slice' in config_obj['meta_zones']:
+            vertical_colocation_flag = True
+        else:
+            vertical_colocation_flag = False
         horizontal_colocation_flag = True
         temporal_colocation_flag = True
 
@@ -231,7 +249,7 @@ def set_coloc_flags(config_obj):
     # Colocation for functionnality 9
     if config_obj["functionality"] == "drifters":
         temporal_colocation_flag = True
-        vertical_colocation_flag = False
+        vertical_colocation_flag = True
         horizontal_colocation_flag = True
 
     if 'tide' in config_obj['outputs'][0]["plot"] or 'harm' in config_obj['outputs'][0]["plot"]:
@@ -243,7 +261,7 @@ def set_coloc_flags(config_obj):
         vertical_colocation_flag = False
     if 'cloud' in config_obj['meta_zones']:
         horizontal_colocation_flag = False
-    if 'times' in config_obj['meta_zones']:
+    if 'times' in config_obj['meta_zones'] and config_obj["functionality"] != "prof_hydro_mooring":
         temporal_colocation_flag = False
 
     flags = temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag
@@ -325,9 +343,6 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
         if 'current_bc' in vars_to_plot:
             xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_current_barocline()])
 
-        if 'mld' in vars_to_plot:
-            xarray_obj = merge_no_fail([xarray_obj, xarray_obj.sel_var.sel_mixed_layer_depth()])
-
         # Cloud horizontal selection
         if "cloud" in config_obj["meta_zones"]:
             radius = config_obj["meta_zones"].get('radius')
@@ -394,11 +409,16 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                 xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
                 xarray_obj = xarray_obj.assign_attrs({"depth_meta_zone": depth})
 
+        if 'times' in config_obj["meta_zones"]:
+            xarray_obj = xarray_obj.assign_attrs({"echeances": config_obj["meta_zones"]["times"]})
+        if 'time_highlight' in config_obj["meta_zones"]:
+            xarray_obj = xarray_obj.assign_attrs({"echeances": config_obj["meta_zones"]["time_highlight"]})
+
         if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
             if 'depth' in config_obj["meta_zones"]:
                 logger.warning(
                     f"For feature {config_obj['functionality']}, no depth can be specified ! Surface value is taken into account")
-            if "depth" in xarray_obj:
+            if "depth" in xarray_obj and config_obj['functionality'] in ["sst", "currents_hfr"]:
                 depth = [0]
                 xarray_obj = xarray_obj.meta.vertical_selection_depth(depth)
 

@@ -137,7 +137,7 @@ def temporal_colocation(ds_to_coloc, tgt, coloc_method):
     else:
         ds_to_coloc = pick_time(ds_to_coloc, time_values)
 
-    ds_to_coloc = ds_to_coloc.assign_coords(time=tgt.time)
+    ds_to_coloc = ds_to_coloc.assign_coords(time=tgt.time.data)
 
     return ds_to_coloc
 

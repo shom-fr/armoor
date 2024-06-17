@@ -71,14 +71,14 @@ Relative to time restriction:
     * ``end`` : To consider only the dates up to a given date.
     * ``times`` : Only the dates from this list will be kept.
     * ``time-highlight`` : The dates of this list will be highlighted in the time series.
-    * ``interval`` : To group into intervals: minutes (min), hours (H), days (D), month (M) or year (A).
+    * ``interval`` : To group into intervals: minutes (min), hours (H), days (D), month (M) or year (A). The defined temporal intervals are left-closed and right-open.
     * ``cyclic`` : This keyword makes it possible to consider only a period of the year expressed in months (january, february, march, april, may, june, july, august, september, october, november, december) or a series of several months ( between 2 and 11 consecutive letters from this list: *JFMAMJJASOND*)
     * ``time-restriction`` : Two values for the start and end times. To consider only the times in between (may straddle two days).
 
 Relative to horizontal restriction:
 
     * ``cloud`` : To indicate the list of points of interest
-    * ``radius`` : To expand the area of interest to a radius (in km). This option is in combination with ``[[cloud]]``.
+    * ``radius`` : To expand the area of interest to a radius (in km). This option is in combination with ``[[cloud]]``. When no radius is specified, the closest point from the observation is selected.
     * ``polygon`` : To consider only the region inside the polygon defined by a list of points.
     * ``bathy_min`` : Minimum authorized bathymetry value.
     * ``bathy_max`` : Maximum authorized bathymetry value.
@@ -88,11 +88,11 @@ Relative to vertical restriction:
     * ``depth`` : Selection of listed immersions by depth (in m).
     * ``density`` : Selection of listed immersions by density (in kg/m3).
 
-    * ``min_depth`` : Minimum authorized depth value.
-    * ``max_depth`` : Maximum authorized depth value.
+    * ``min_depth`` : Minimum authorized depth value. This value cannot be specified without ``max_depth``.
+    * ``max_depth`` : Maximum authorized depth value. This value cannot be specified without ``min_depth``.
 
-    * ``min_dens`` : Minimum authorized density value.
-    * ``max_dens`` : Maximum authorized density value.
+    * ``min_dens`` : Minimum authorized density value. This value cannot be specified without ``max_dens``.
+    * ``max_dens`` : Maximum authorized density value. This value cannot be specified without ``min_dens``.
 
     * ``slice`` : To group into vertical slices between the specified values of depth or density levels (e.g. --slice 0,150 500,1000 will define two vertical slices).
 
@@ -170,11 +170,12 @@ You can select the variables to plot among the following ones with the parameter
     * ``current_res`` : Residual current
     * ``current_geo`` : Geostrophic current
     * ``current_bc`` : Baroclinic current
-    * ``mld`` : Mixed layer depth
+    * ``mld_ptemp`` : Temperature mixed layer depth, where potential temperature is equal to potential temperature at 10m +- 0.2°C.
+    * ``mld_pdens`` : Density mixed layer depth, where potential density is equal to potential density at 10m +- 0.03kg.m-3.
     * ``sound_speed`` : Sound speed
 
 .. CAUTION::
-    Any optional ``attribute`` specified in the ``plot`` options must also appear in the ``meta-zone`` ``vars`` selection !
+    Any optional ``attribute`` specified in the ``plot`` options must also appear in the ``meta-zone``'s ``vars`` selection, except for ``mld_ptemp`` and ``mld_pdens`` where only ``mld`` needs to be included.
 
 Example
 -------

@@ -215,6 +215,9 @@ def open_decode_cmems(path_files, steps):
         cmems = decode_profiler(cmems)
 
     # Calculate depth from pressure
+    if "PRES" in cmems:
+        cmems = cmems.rename({'PRES':'pres'})
+
     if 'depth' in cmems.dims and 'depth' not in cmems.coords and 'pres' in cmems:
         cmems = depth_from_press(cmems)
 
@@ -514,7 +517,7 @@ def open_decode_seasoar(path_file, steps):
            file["TimeQ"] * np.timedelta64(1, 's')
 
     # Create the dataset
-    file = file.assign(time=time, depth=depth, temp=file['T190C'], sal=file['Sal11'])
+    file = file.assign(time=time, depth=depth, temp=file['T190C'], sal=file['Sal11'], ptemp=file['Potemp190C'])
     file = file.set_index("time")
     seasoar = file.to_xarray()
 
@@ -550,7 +553,7 @@ def open_decode_croco(path_file):
     croco = xr.open_dataset(path_file).decode_sigma()
 
     # Remove variables that are never used in the features. May need to be completed.
-    list_to_keep = ['temp', 'salt', 'u', 'v', 'h', 'angle']
+    list_to_keep = ['temp', 'salt', 'u', 'v', 'h', 'angle', 'mask_rho']
     for var in list(croco.keys()):
         if var not in list_to_keep:
             croco = croco.drop_vars(var)
@@ -581,8 +584,14 @@ def open_decode_croco(path_file):
         croco = croco.drop_vars(['lon', 'lat'])
 
     # Clean coordinates
-    croco = croco.rename(
-        {'xi_rho': 'x', 'eta_rho': 'y', 's_rho': 'z', 'lon_rho': 'lon', 'lat_rho': 'lat'})
+    croco = croco.rename({'xi_rho': 'x', 
+                          'eta_rho': 'y', 
+                          's_rho': 'z', 
+                          'lon_rho': 'lon', 
+                          'lat_rho': 'lat'})
+    if 'mask_rho' in list(croco.keys()):
+        croco = croco.rename({'mask_rho': 'mask'})
+
     for var in ['lat_rho', 'lon_rho', 'xi', 'eta', 'lat_u', 'lat_v', 'lon_u', 'lon_v', 'xi_u',
                 'eta_v', 'depth_w', 'sig', 's_w']:
         if var in croco:
@@ -615,6 +624,10 @@ def open_decode_croco(path_file):
     # Rename ptemp
     if 'temp' in croco:
         croco = croco.rename({'temp': 'ptemp'})
+    # Remove values outside mask
+    
+    if 'mask' in list(croco.keys()):
+        croco = croco.where(croco['mask'] > 0, drop=True)
 
     return croco
 
@@ -827,6 +840,8 @@ def open_decode_basic(path_files):
         dataset = dataset.drop_duplicates(['lon'])
     if 'lat' in dataset.dims:
         dataset = dataset.drop_duplicates(['lat'])
+    if 'DEPTH' in dataset.dims and 'depth' in dataset.coords:
+        dataset = dataset.swap_dims({'DEPTH': 'depth'})
     return dataset
 
 
@@ -1046,6 +1061,7 @@ def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
     lats = obs.lat
     depth = obs.depth
     time = obs.time
+    ptemp_in_obs = 'ptemp' in obs.attrs
 
     # Define depth and time bins
     dist_deb_fin = xgeo.haversine(lons.values[0], lats.values[0], lons.values[-1],
@@ -1061,15 +1077,21 @@ def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
     depth_bins = i_depth_bins[:-1] + i_depth_bins[1] / 2
     mean_times, mean_lons, mean_lats = [], [], []
     temp = np.full((n_time_bin - 1, n_depth_bin), np.nan)
+    if ptemp_in_obs:
+        ptemp = np.full((n_time_bin - 1, n_depth_bin), np.nan)
     sal = np.full((n_time_bin - 1, n_depth_bin), np.nan)
 
     # Binning
     for it in range(n_time_bin - 1):
         i_0, i_1 = i_time_bins[it:it + 2]
         temp[it] = np.histogram(depth[i_0:i_1], i_depth_bins, weights=obs['temp'][i_0:i_1])[0]
+        if ptemp_in_obs:
+            ptemp[it] = np.histogram(depth[i_0:i_1], i_depth_bins, weights=obs['ptemp'][i_0:i_1])[0]
         sal[it] = np.histogram(depth[i_0:i_1], i_depth_bins, weights=obs['sal'][i_0:i_1])[0]
         denom = np.histogram(depth[i_0:i_1], i_depth_bins)[0]
         temp[it] = np.where(denom == 0, np.nan, temp[it] / denom)
+        if ptemp_in_obs:
+            ptemp[it] = np.where(denom == 0, np.nan, ptemp[it] / denom)
         sal[it] = np.where(denom == 0, np.nan, sal[it] / denom)
         mean_times.append(time[i_0:i_1].mean().values)
         mean_lons.append(lons[i_0:i_1].mean())
@@ -1077,9 +1099,13 @@ def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
 
     # Create xarray dataset
     da_temp = xr.DataArray(data=temp, dims=["time", "depth"])
+    if ptemp_in_obs:
+        da_ptemp = xr.DataArray(data=ptemp, dims=["time", "depth"])
     da_sal = xr.DataArray(data=sal, dims=["time", "depth"])
     obs_grid = xr.Dataset()
-    obs_grid['temp'], obs_grid['sal'] = da_temp, da_sal
+    if ptemp_in_obs:
+        obs_grid['ptemp'] = da_ptemp
+    obs_grid['temp'], obs_grid['sal']= da_temp, da_sal
     obs_grid = obs_grid.assign_coords(
         {'lon': ('time', mean_lons), 'lat': ('time', mean_lats), 'depth': ('depth', depth_bins),
          'time': ('time', mean_times)
