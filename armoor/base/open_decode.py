@@ -167,19 +167,23 @@ def open_decode_cmems(path_files, steps):
      """
     # Open
     if len(path_files) > 1:
-        list_ds_cmems = []
-        for path in path_files:
-            dataset = xr.open_dataset(path)
-            lon_ds = dataset.LONGITUDE.assign_coords(LONGITUDE=dataset.TIME.data).rename(
-                {'LONGITUDE': 'TIME'})
-            lat_ds = dataset.LATITUDE.assign_coords(LATITUDE=dataset.TIME.data).rename(
-                {'LATITUDE': 'TIME'})
-            dataset = dataset.drop_vars(['LONGITUDE', 'LATITUDE'])
-            dataset['LATITUDE'] = lat_ds
-            dataset['LONGITUDE'] = lon_ds
-            list_ds_cmems.append(dataset)
+        #TODO replace this 'try' with a new TYPE
+        try:
+            cmems = xr.open_mfdataset(path_files, combine='nested', concat_dim='TIME')
+        except:
+            list_ds_cmems = []
+            for path in path_files:
+                dataset = xr.open_dataset(path)
+                lon_ds = dataset.LONGITUDE.assign_coords(LONGITUDE=dataset.TIME.data).rename(
+                    {'LONGITUDE': 'TIME'})
+                lat_ds = dataset.LATITUDE.assign_coords(LATITUDE=dataset.TIME.data).rename(
+                    {'LATITUDE': 'TIME'})
+                dataset = dataset.drop_vars(['LONGITUDE', 'LATITUDE'])
+                dataset['LATITUDE'] = lat_ds
+                dataset['LONGITUDE'] = lon_ds
+                list_ds_cmems.append(dataset)
 
-        cmems = concat_cmems(list_ds_cmems)
+            cmems = concat_cmems(list_ds_cmems)
     else:
         cmems = xr.open_dataset(path_files[0])
 
@@ -203,6 +207,7 @@ def open_decode_cmems(path_files, steps):
     # Decode
     cmems = cmems.xoa.decode()
 
+    cmems = cmems.sortby('time')
     # Manage lon(time) and lat(time)
     len_lon = len(cmems.lon)
     len_lat = len(cmems.lat)
@@ -984,15 +989,22 @@ def decode_profiler(profiler):
         Decoded dataset
     """
     colonnes = profiler.DEPH.values
-    depth_values = np.empty(np.size(colonnes, 1))
-    for i in range(np.size(colonnes, 1)):
-        colonne_test = colonnes[:, i]
-        colonne_test = colonne_test[~np.isnan(colonne_test)]
-        depth_column = set(colonne_test)
-        if len(depth_column) == 1:  # Tests if the depth values are all the same throughout time
-            depth_values[i] = list(depth_column)[0]
-        else:  # if depth is truely depth(time,z)
-            return decode_depths_vmadcp(profiler)
+
+    if len(colonnes.shape) == 2:
+        depth_values = np.empty(np.size(colonnes, 1))
+        for i in range(np.size(colonnes, 1)):
+            colonne_test = colonnes[:, i]
+            colonne_test = colonne_test[~np.isnan(colonne_test)]
+            depth_column = set(colonne_test)
+            if len(depth_column) == 1:  # Tests if the depth values are all the same throughout time
+                depth_values[i] = list(depth_column)[0]
+            else:  # if depth is truely depth(time,z)
+                return decode_depths_vmadcp(profiler)
+    elif len(colonnes.shape) == 1:
+        depth_values = colonnes
+    else:
+        logger.error('please handle this case')
+    logger.error(f'{ depth_values =}')
     profiler = profiler.assign_coords({'depth': depth_values})
     profiler = convert_trajectory(profiler)
     return profiler

@@ -15,6 +15,10 @@ import cmocean
 from armoor.algo import calculation
 from xoa.geo import haversine
 from armoor.base.tools_features import manage_output, angle_between_vectors, calcul_mean_angle
+import matplotlib.colors as mcolors
+import matplotlib as mpl
+mpl.rcParams['figure.dpi'] = 300
+mpl.use('agg')
 
 logger = logging.getLogger(__name__)
 
@@ -1387,7 +1391,16 @@ def plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot,
 
     # Plot observation
     obs = observation["xarray_meta"].squeeze()
-    ax.plot(obs.lon, obs.lat, 'k', transform=ccrs.PlateCarree(), label=observation["name"])
+    if 'TRAJECTORY' in obs.coords:
+        for drifter in set(obs["TRAJECTORY"].values):
+            obs_trajectory = obs.where(obs["TRAJECTORY"]==drifter, drop=True)
+            ax.plot(obs_trajectory.lon, 
+                    obs_trajectory.lat, 
+                    transform=ccrs.PlateCarree(), 
+                    label=observation["name"]+'_'+str(drifter.decode('utf-8')))
+    else:
+        ax.plot(obs.lon, obs.lat, 'k', transform=ccrs.PlateCarree(), label=observation["name"])
+
 
     # Convert parameters
     traj_duration_plot_int = max(int(traj_duration_plot / time_step), 1)
@@ -1442,9 +1455,26 @@ def plot_map_current_trajectory(obs, mod, output_path=None):
 
     # Plot Observation current
     obs = obs["xarray_meta"].squeeze()
-    ax.quiver(obs.lon, obs.lat, obs.u, obs.v, angles='uv', width=0.001, headwidth=0.001,
-              headlength=0.001, headaxislength=0.001, color='b', label=obs.attrs['name'],
-              transform=ccrs.PlateCarree())
+    if 'TRAJECTORY' in obs.coords:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        for i, drifter in enumerate(set(obs["TRAJECTORY"].values)):
+            obs_trajectory = obs.where(obs["TRAJECTORY"]==drifter, drop=True )
+            ax.quiver(obs_trajectory.lon, 
+                    obs_trajectory.lat, 
+                    obs_trajectory.u, 
+                    obs_trajectory.v, 
+                    angles='uv', 
+                    width=0.001, 
+                    headwidth=0.001,
+                    headlength=0.001, 
+                    headaxislength=0.001, 
+                    color=colors[i] , 
+                    label=obs.attrs["name"]+'_'+str(drifter.decode('utf-8')),
+                    transform=ccrs.PlateCarree())
+    else:
+        ax.quiver(obs.lon, obs.lat, obs.u, obs.v, angles='uv', width=0.001, headwidth=0.001,
+            headlength=0.001, headaxislength=0.001, color='b', label=obs.attrs['name'],
+            transform=ccrs.PlateCarree())
 
     # Plot model current
     mod = mod["xarray_meta_coloc"].squeeze()
