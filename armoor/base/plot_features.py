@@ -2647,9 +2647,43 @@ def create_harmonic_table(models, observations, output_path):
                 harmonic_table_file.write(f'Observation : {obs.name} ; '
                                           f'Analysis period : {obs.analysis_period}\n')
 
-                if 'depth' in obs.dims:
-                    harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
+                if 'slice' in obs.dims:
+                    logger.info('harmonic table by slice')
+                    
+                    harmonic_table_file.write(f'Slice ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
                                               f'Phase obs ; Phase mod ; Phase diff \n')
+                    for i_slice, slice in enumerate(obs.slice):
+
+                        obs_ampl = obs[ampl][i_slice].values
+                        mod_ampl = mod[ampl][i_slice].values
+                        diff_ampl = diff[ampl][i_slice].values
+                        obs_phase = obs[phase][i_slice].values
+                        mod_phase = mod[phase][i_slice].values
+                        diff_phase = diff[phase][i_slice].values
+
+                        # Check if all values are NaN
+                        if not (np.isnan(obs_ampl) and np.isnan(mod_ampl) and np.isnan(diff_ampl) and
+                                np.isnan(obs_phase) and np.isnan(mod_phase) and np.isnan(diff_phase)):
+                            harmonic_table_file.write(f'{slice.values}m ;'
+                                                  f'{obs_ampl} ;'
+                                                  f'{mod_ampl} ;'
+                                                  f'{diff_ampl} ;' 
+                                                  f'{obs_phase} ;'
+                                                  f'{mod_phase} ;'
+                                                  f'{diff_phase} \n')
+                        else:
+                            logger.warning(f'{slice.values}m ;'
+                                                  f'{obs_ampl} ;'
+                                                  f'{mod_ampl} ;'
+                                                  f'{diff_ampl} ;' 
+                                                  f'{obs_phase} ;'
+                                                  f'{mod_phase} ;'
+                                                  f'{diff_phase} \n')
+                            
+                elif 'depth' in obs.dims:
+                    logger.info('harmonic table with depths')
+                    harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
+                                              f'Phase obs ; Phase mod ; Phase diff \n') 
                     for i_depth, depth in enumerate(obs.depth):
                         obs_depth = obs.sel(depth=depth, method='nearest')
                         mod_depth = mod.sel(depth=depth, method='nearest')
@@ -2672,29 +2706,40 @@ def create_harmonic_table(models, observations, output_path):
                                                     f'{obs_phase} ;'
                                                     f'{mod_phase} ;'
                                                     f'{diff_phase} \n')
-                            
-                elif 'slice' in obs.dims:
-                    harmonic_table_file.write(f'Slice ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
-                                              f'Phase obs ; Phase mod ; Phase diff \n')
-                    for i_slice, slice in enumerate(obs.slice):
+                        else:
+                            logger.warning(f'{depth.values}m ;'
+                                                    f'{obs_ampl} ;'
+                                                    f'{mod_ampl} ;'
+                                                    f'{diff_ampl} ;'
+                                                    f'{obs_phase} ;'
+                                                    f'{mod_phase} ;'
+                                                    f'{diff_phase} \n')
+                elif 'depth' in obs.coords:
+                    logger.info('harmonic table with depth')
+                    harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
+                                              f'Phase obs ; Phase mod ; Phase diff \n') 
+                    logger.error(f'{obs.depth = }')
+                    logger.error(f'{type(obs.depth) = }')
+                    if not isinstance(obs.depth, (list, np.ndarray)):
 
-                        obs_ampl = obs[ampl][i_slice].values
-                        mod_ampl = mod[ampl][i_slice].values
-                        diff_ampl = diff[ampl][i_slice].values
-                        obs_phase = obs[phase][i_slice].values
-                        mod_phase = mod[phase][i_slice].values
-                        diff_phase = diff[phase][i_slice].values
+                        obs_ampl = obs[ampl].values
+                        mod_ampl = mod[ampl].values
+                        diff_ampl = diff[ampl].values
+                        obs_phase = obs[phase].values
+                        mod_phase = mod[phase].values
+                        diff_phase = diff[phase].values
 
-                        # Check if all values are NaN
-                        if not (np.isnan(obs_ampl) and np.isnan(mod_ampl) and np.isnan(diff_ampl) and
-                                np.isnan(obs_phase) and np.isnan(mod_phase) and np.isnan(diff_phase)):
-                            harmonic_table_file.write(f'{slice.values}m ;'
-                                                  f'{obs_ampl} ;'
-                                                  f'{mod_ampl} ;'
-                                                  f'{diff_ampl} ;' 
-                                                  f'{obs_phase} ;'
-                                                  f'{mod_phase} ;'
-                                                  f'{diff_phase} \n')
+
+                        harmonic_table_file.write(f'{obs.depth.values}m ;'
+                                                f'{obs_ampl} ;'
+                                                f'{mod_ampl} ;'
+                                                f'{diff_ampl} ;'
+                                                f'{obs_phase} ;'
+                                                f'{mod_phase} ;'
+                                                f'{diff_phase} \n')
+                else:
+                    logger.error('ERROR')
+                                
 
 
 def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, plg=None):
