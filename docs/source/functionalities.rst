@@ -185,6 +185,9 @@ Available outputs
 * 2D variables : ``plot_variable_2d``
     Time series of the variable difference between model and observation.
 
+.. NOTE::
+
+    The first point of the section is indicated by a red point in the minimap.
 
 5. CLIM_HYDRO
 -------------
@@ -317,6 +320,10 @@ Available outputs
     2D graphs (variable along time and depth) per variable and per section of the *difference* statistical metrics.
 * Stick plots : ``plot_stick_plot``
     Stick plot diagrams per radial and per specified vertical immersion or slice.
+
+.. NOTE::
+
+    The first point of the section is indicated by a red point in the minima
 
 9. DRIFTERS
 -----------

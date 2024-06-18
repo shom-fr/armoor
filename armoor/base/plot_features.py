@@ -2493,14 +2493,16 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
         ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values,
                             obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values, 30,
                             transform=ccrs.PlateCarree())
+        ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values[0],
+                            obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values[0], 30, c='red',
+                            transform=ccrs.PlateCarree())
     except:
         ax_mini_map.scatter(obs_meta_coloc.lon.values,
                             obs_meta_coloc.lat.values, 30,
                             transform=ccrs.PlateCarree())
-
-    # Add second x axis
-    if len(np.unique(obs_meta_coloc.lon.values)) > 1:
-        add_second_x_axis(f, axs[2], mod_meta_coloc)
+        ax_mini_map.scatter(obs_meta_coloc.lon.values[0],
+                            obs_meta_coloc.lat.values[0], 30, c='red',
+                            transform=ccrs.PlateCarree())
 
     manage_output(figname, output_path)
 
@@ -2580,17 +2582,19 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
         ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values,
                             obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values, 30,
                             transform=ccrs.PlateCarree())
+        ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values[0],
+                            obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values[0], 30, c='red',
+                            transform=ccrs.PlateCarree())
     except:
         ax_mini_map.scatter(obs_meta_coloc.lon.values,
                             obs_meta_coloc.lat.values, 30,
                             transform=ccrs.PlateCarree())
+        ax_mini_map.scatter(obs_meta_coloc.lon.values[0],
+                            obs_meta_coloc.lat.values[0], 30, c='red',
+                            transform=ccrs.PlateCarree())
 
     # Add legend
     axs[0].legend(loc=5)
-
-    # Add second x axis
-    if len(np.unique(obs_meta_coloc.lon.values)) > 1:
-        add_second_x_axis(f, axs[1], mod_meta_coloc)
 
     manage_output(figname, output_path)
 
@@ -3481,9 +3485,10 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
             # Add mini-map
             ax_mini_map = add_mini_map(f, obs_mean)
             ax_mini_map.scatter(obs_mean.lon, obs_mean.lat, 15, c='navy', transform=ccrs.PlateCarree())
+            ax_mini_map.scatter(obs_mean.lon[0], obs_mean.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
-            # Add second x axis
-            add_second_x_axis(f, ax, obs_mean)
+            # # Add second x axis
+            # add_second_x_axis(f, ax, obs_mean)
 
             # Set title
             title, figname = get_title_figname('Stick plot', obs_mean[var_norm],
@@ -3514,9 +3519,10 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
             # Add mini-map
             ax_mini_map = add_mini_map(f, obs)
             ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+            ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
-            # Add second x axis
-            add_second_x_axis(f, ax, obs)
+            # # Add second x axis
+            # add_second_x_axis(f, ax, obs)
 
             # Set title
             title, figname = get_title_figname('Stick plot', obs[var_norm],
@@ -3548,9 +3554,10 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     # Add mini-map
                     ax_mini_map = add_mini_map(f, obs)
                     ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+                    ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
-                    # Add second x axis
-                    add_second_x_axis(f, ax, obs)
+                    # # Add second x axis
+                    # add_second_x_axis(f, ax, obs)
 
                     # Set title
                     title, figname = get_title_figname('Stick plot', obs[var_norm],
@@ -3583,9 +3590,10 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     # Add mini-map
                     ax_mini_map = add_mini_map(f, obs)
                     ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
+                    ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
-                    # Add second x axis
-                    add_second_x_axis(f, ax, obs)
+                    # # Add second x axis
+                    # add_second_x_axis(f, ax, obs)
 
                     # Set title
                     title, figname = get_title_figname('Stick plot', obs[var_norm],
