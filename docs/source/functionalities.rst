@@ -245,6 +245,13 @@ Available outputs
     **These maps require to specify the additional parameters : ``analysis_start``, ``analysis_end`` and ``tidal_waves``**.
 * Tidal current ellipsis : ``plot_tide_current_ellipses``
     Maps of tidal current ellipses from model and observation at points in the meta-zone. One map per tidal wave.
+    The ellipsis can be scaled by the user:
+
+    - if one scale is specified it will be the one for all the tidal component.
+
+    - if one scale per tidal wave is specified, each tidal wave will have its own scale.
+
+    - if no scale is specified: the scales are adapted automatically so that the figure is readable.
 
     **These ellipses require to specify the additional parameters : ``analysis_start``, ``analysis_end`` and ``tidal_waves``**.
 * Punctual time series : ``plot_ts_metr_ecart_point``
@@ -288,10 +295,19 @@ Available outputs
     Diplays values for observed and modelled current amplitudes and phase and their difference.
 * Tidal current ellipsis : ``plot_tide_current_ellipses``
    Maps of tidal current ellipses from model and observation at points in the meta-zone. One map per tidal wave and per vertical immersion or slice.
+   The ellipsis can be scaled by the user:
+
+   - if one scale is specified it will be the one for all the tidal component.
+
+   - if one scale per tidal wave is specified, each tidal wave will have its own scale.
+
+   - if no scale is specified: the scales are adapted automatically so that the figure is readable.
+
 
 .. NOTE::
 
     These ellipses require to specify the additional parameters : ``analysis_start``, ``analysis_end``, ``tidal_waves`` and ``tide_tool``.
+
 
 8. CURRENTS_VMADCP
 ------------------
