@@ -3487,9 +3487,6 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
             ax_mini_map.scatter(obs_mean.lon, obs_mean.lat, 15, c='navy', transform=ccrs.PlateCarree())
             ax_mini_map.scatter(obs_mean.lon[0], obs_mean.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
-            # # Add second x axis
-            # add_second_x_axis(f, ax, obs_mean)
-
             # Set title
             title, figname = get_title_figname('Stick plot', obs_mean[var_norm],
                                                [mod['name'] for mod in models], observation['name'])
@@ -3520,9 +3517,6 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
             ax_mini_map = add_mini_map(f, obs)
             ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
             ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
-
-            # # Add second x axis
-            # add_second_x_axis(f, ax, obs)
 
             # Set title
             title, figname = get_title_figname('Stick plot', obs[var_norm],
@@ -3556,9 +3550,6 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
                     ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
-                    # # Add second x axis
-                    # add_second_x_axis(f, ax, obs)
-
                     # Set title
                     title, figname = get_title_figname('Stick plot', obs[var_norm],
                                                        [mod['name'] for mod in models],
@@ -3591,9 +3582,6 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     ax_mini_map = add_mini_map(f, obs)
                     ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
                     ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
-
-                    # # Add second x axis
-                    # add_second_x_axis(f, ax, obs)
 
                     # Set title
                     title, figname = get_title_figname('Stick plot', obs[var_norm],
