@@ -78,3 +78,11 @@ class TestBulletins:
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
+
+    def test_map_trajectory_nov(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_map_trajectory_nov")
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory_nov.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
