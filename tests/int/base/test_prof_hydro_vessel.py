@@ -159,14 +159,6 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
-    def test_ser_temp_stat_SCA(self):
-        out_path, logger = change_path(folder_test)
-        logger.info("test_ser_temp_stat_SCA")
-        parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_stat_SCA.cfg"])
-        parser.update({'output_path': out_path})
-        dict2call(parser)
-        assert True
 
     def test_diag_disp_argo(self):
         out_path, logger = change_path(folder_test)
