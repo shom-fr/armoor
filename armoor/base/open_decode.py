@@ -1004,7 +1004,6 @@ def decode_profiler(profiler):
         depth_values = colonnes
     else:
         logger.error('please handle this case')
-    logger.error(f'{ depth_values =}')
     profiler = profiler.assign_coords({'depth': depth_values})
     profiler = convert_trajectory(profiler)
     return profiler

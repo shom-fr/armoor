@@ -2752,8 +2752,6 @@ def create_harmonic_table(models, observations, output_path):
                     logger.info('harmonic table with depth')
                     harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
                                               f'Phase obs ; Phase mod ; Phase diff \n') 
-                    logger.error(f'{obs.depth = }')
-                    logger.error(f'{type(obs.depth) = }')
                     if not isinstance(obs.depth, (list, np.ndarray)):
 
                         obs_ampl = obs[ampl].values
