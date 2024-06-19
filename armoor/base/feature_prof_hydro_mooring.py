@@ -58,7 +58,7 @@ def plot(config_obj):
                 depth_diff = np.abs(observation["xarray_meta_coloc"][i_mod]["depth"] - float(depth[0]))
                 nearest_depth_index = np.nanargmin(depth_diff.data)
                 observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].sel(
-                    DEPTH=nearest_depth_index)
+                    depth=nearest_depth_index)
 
         # Removing of the lon-lat dimensions in the model data
         if "lat" not in observation["xarray_meta"].dims and "lat" in models[0]["xarray_meta_coloc"].dims:
