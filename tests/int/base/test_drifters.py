@@ -32,6 +32,14 @@ class TestBulletins:
         dict2call(parser)
         assert True
 
+    def test_map_trajectory_hycom_nemo_multi_drifters(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_map_trajectory_hycom_nemo_multi_drifters")
+        parser = command_line_interface(['--cfgfile', f"../single_tests/{folder_test}/map_trajectory_hycom_nemo_multi_drifters.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
     def test_map_trajectory_hycom_multi_drifters_current(self):
         out_path, logger = change_path(folder_test)
         logger.info("test_map_trajectory_hycom_multi_drifters_current")
