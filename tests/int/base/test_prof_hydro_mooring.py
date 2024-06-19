@@ -32,3 +32,12 @@ class TestBulletins:
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
+
+    def test_ser_temp_stats_nov(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_ser_temp_stats_nov")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_stats_nov.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
