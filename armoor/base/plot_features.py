@@ -15,6 +15,10 @@ import cmocean
 from armoor.algo import calculation
 from xoa.geo import haversine
 from armoor.base.tools_features import manage_output, angle_between_vectors, calcul_mean_angle
+import matplotlib.colors as mcolors
+import matplotlib as mpl
+mpl.rcParams['figure.dpi'] = 300
+mpl.use('agg')
 
 logger = logging.getLogger(__name__)
 
@@ -1387,7 +1391,16 @@ def plot_map_trajectory(observation, models, traj_duration_plot, traj_freq_plot,
 
     # Plot observation
     obs = observation["xarray_meta"].squeeze()
-    ax.plot(obs.lon, obs.lat, 'k', transform=ccrs.PlateCarree(), label=observation["name"])
+    if 'TRAJECTORY' in obs.coords:
+        for drifter in set(obs["TRAJECTORY"].values):
+            obs_trajectory = obs.where(obs["TRAJECTORY"]==drifter, drop=True)
+            ax.plot(obs_trajectory.lon, 
+                    obs_trajectory.lat, 
+                    transform=ccrs.PlateCarree(), 
+                    label=observation["name"]+'_'+str(drifter.decode('utf-8')))
+    else:
+        ax.plot(obs.lon, obs.lat, 'k', transform=ccrs.PlateCarree(), label=observation["name"])
+
 
     # Convert parameters
     traj_duration_plot_int = max(int(traj_duration_plot / time_step), 1)
@@ -1442,9 +1455,26 @@ def plot_map_current_trajectory(obs, mod, output_path=None):
 
     # Plot Observation current
     obs = obs["xarray_meta"].squeeze()
-    ax.quiver(obs.lon, obs.lat, obs.u, obs.v, angles='uv', width=0.001, headwidth=0.001,
-              headlength=0.001, headaxislength=0.001, color='b', label=obs.attrs['name'],
-              transform=ccrs.PlateCarree())
+    if 'TRAJECTORY' in obs.coords:
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        for i, drifter in enumerate(set(obs["TRAJECTORY"].values)):
+            obs_trajectory = obs.where(obs["TRAJECTORY"]==drifter, drop=True )
+            ax.quiver(obs_trajectory.lon, 
+                    obs_trajectory.lat, 
+                    obs_trajectory.u, 
+                    obs_trajectory.v, 
+                    angles='uv', 
+                    width=0.001, 
+                    headwidth=0.001,
+                    headlength=0.001, 
+                    headaxislength=0.001, 
+                    color=colors[i] , 
+                    label=obs.attrs["name"]+'_'+str(drifter.decode('utf-8')),
+                    transform=ccrs.PlateCarree())
+    else:
+        ax.quiver(obs.lon, obs.lat, obs.u, obs.v, angles='uv', width=0.001, headwidth=0.001,
+            headlength=0.001, headaxislength=0.001, color='b', label=obs.attrs['name'],
+            transform=ccrs.PlateCarree())
 
     # Plot model current
     mod = mod["xarray_meta_coloc"].squeeze()
@@ -2493,14 +2523,18 @@ def plot_variable_3d_figure(obs_meta_coloc, mod_meta_coloc, vmin=None, vmax=None
         ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values,
                             obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values, 30,
                             transform=ccrs.PlateCarree())
+        if obs_meta_coloc.lon.size != 1:
+            ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values[0],
+                                obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values[0], 30, c='red',
+                                transform=ccrs.PlateCarree())
     except:
         ax_mini_map.scatter(obs_meta_coloc.lon.values,
                             obs_meta_coloc.lat.values, 30,
                             transform=ccrs.PlateCarree())
-
-    # Add second x axis
-    if len(np.unique(obs_meta_coloc.lon.values)) > 1:
-        add_second_x_axis(f, axs[2], mod_meta_coloc)
+        if obs_meta_coloc.lon.size != 1:
+            ax_mini_map.scatter(obs_meta_coloc.lon.values[0],
+                                obs_meta_coloc.lat.values[0], 30, c='red',
+                                transform=ccrs.PlateCarree())
 
     manage_output(figname, output_path)
 
@@ -2580,17 +2614,21 @@ def plot_variable_2d_figure(obs_meta_coloc, mod_meta_coloc, output_path=None):
         ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values,
                             obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values, 30,
                             transform=ccrs.PlateCarree())
+        if obs_meta_coloc.lon.size != 1:
+            ax_mini_map.scatter(obs_meta_coloc.lon.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values[0],
+                                obs_meta_coloc.lat.where(~np.isnan(obs_meta_coloc).values, other=np.nan).values[0], 30, c='red',
+                                transform=ccrs.PlateCarree())
     except:
         ax_mini_map.scatter(obs_meta_coloc.lon.values,
                             obs_meta_coloc.lat.values, 30,
                             transform=ccrs.PlateCarree())
+        if obs_meta_coloc.lon.size != 1:
+            ax_mini_map.scatter(obs_meta_coloc.lon.values[0],
+                                obs_meta_coloc.lat.values[0], 30, c='red',
+                                transform=ccrs.PlateCarree())
 
     # Add legend
     axs[0].legend(loc=5)
-
-    # Add second x axis
-    if len(np.unique(obs_meta_coloc.lon.values)) > 1:
-        add_second_x_axis(f, axs[1], mod_meta_coloc)
 
     manage_output(figname, output_path)
 
@@ -2643,9 +2681,43 @@ def create_harmonic_table(models, observations, output_path):
                 harmonic_table_file.write(f'Observation : {obs.name} ; '
                                           f'Analysis period : {obs.analysis_period}\n')
 
-                if 'depth' in obs.dims:
-                    harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
+                if 'slice' in obs.dims:
+                    logger.info('harmonic table by slice')
+                    
+                    harmonic_table_file.write(f'Slice ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
                                               f'Phase obs ; Phase mod ; Phase diff \n')
+                    for i_slice, slice in enumerate(obs.slice):
+
+                        obs_ampl = obs[ampl][i_slice].values
+                        mod_ampl = mod[ampl][i_slice].values
+                        diff_ampl = diff[ampl][i_slice].values
+                        obs_phase = obs[phase][i_slice].values
+                        mod_phase = mod[phase][i_slice].values
+                        diff_phase = diff[phase][i_slice].values
+
+                        # Check if all values are NaN
+                        if not (np.isnan(obs_ampl) and np.isnan(mod_ampl) and np.isnan(diff_ampl) and
+                                np.isnan(obs_phase) and np.isnan(mod_phase) and np.isnan(diff_phase)):
+                            harmonic_table_file.write(f'{slice.values}m ;'
+                                                  f'{obs_ampl} ;'
+                                                  f'{mod_ampl} ;'
+                                                  f'{diff_ampl} ;' 
+                                                  f'{obs_phase} ;'
+                                                  f'{mod_phase} ;'
+                                                  f'{diff_phase} \n')
+                        else:
+                            logger.warning(f'{slice.values}m ;'
+                                                  f'{obs_ampl} ;'
+                                                  f'{mod_ampl} ;'
+                                                  f'{diff_ampl} ;' 
+                                                  f'{obs_phase} ;'
+                                                  f'{mod_phase} ;'
+                                                  f'{diff_phase} \n')
+                            
+                elif 'depth' in obs.dims:
+                    logger.info('harmonic table with depths')
+                    harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
+                                              f'Phase obs ; Phase mod ; Phase diff \n') 
                     for i_depth, depth in enumerate(obs.depth):
                         obs_depth = obs.sel(depth=depth, method='nearest')
                         mod_depth = mod.sel(depth=depth, method='nearest')
@@ -2668,29 +2740,38 @@ def create_harmonic_table(models, observations, output_path):
                                                     f'{obs_phase} ;'
                                                     f'{mod_phase} ;'
                                                     f'{diff_phase} \n')
-                            
-                elif 'slice' in obs.dims:
-                    harmonic_table_file.write(f'Slice ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
-                                              f'Phase obs ; Phase mod ; Phase diff \n')
-                    for i_slice, slice in enumerate(obs.slice):
+                        else:
+                            logger.warning(f'{depth.values}m ;'
+                                                    f'{obs_ampl} ;'
+                                                    f'{mod_ampl} ;'
+                                                    f'{diff_ampl} ;'
+                                                    f'{obs_phase} ;'
+                                                    f'{mod_phase} ;'
+                                                    f'{diff_phase} \n')
+                elif 'depth' in obs.coords:
+                    logger.info('harmonic table with depth')
+                    harmonic_table_file.write(f'Depth ; Ampl. obs ; Ampl. mod ; Ampl. diff. ; '
+                                              f'Phase obs ; Phase mod ; Phase diff \n') 
+                    if not isinstance(obs.depth, (list, np.ndarray)):
 
-                        obs_ampl = obs[ampl][i_slice].values
-                        mod_ampl = mod[ampl][i_slice].values
-                        diff_ampl = diff[ampl][i_slice].values
-                        obs_phase = obs[phase][i_slice].values
-                        mod_phase = mod[phase][i_slice].values
-                        diff_phase = diff[phase][i_slice].values
+                        obs_ampl = obs[ampl].values
+                        mod_ampl = mod[ampl].values
+                        diff_ampl = diff[ampl].values
+                        obs_phase = obs[phase].values
+                        mod_phase = mod[phase].values
+                        diff_phase = diff[phase].values
 
-                        # Check if all values are NaN
-                        if not (np.isnan(obs_ampl) and np.isnan(mod_ampl) and np.isnan(diff_ampl) and
-                                np.isnan(obs_phase) and np.isnan(mod_phase) and np.isnan(diff_phase)):
-                            harmonic_table_file.write(f'{slice.values}m ;'
-                                                  f'{obs_ampl} ;'
-                                                  f'{mod_ampl} ;'
-                                                  f'{diff_ampl} ;' 
-                                                  f'{obs_phase} ;'
-                                                  f'{mod_phase} ;'
-                                                  f'{diff_phase} \n')
+
+                        harmonic_table_file.write(f'{obs.depth.values}m ;'
+                                                f'{obs_ampl} ;'
+                                                f'{mod_ampl} ;'
+                                                f'{diff_ampl} ;'
+                                                f'{obs_phase} ;'
+                                                f'{mod_phase} ;'
+                                                f'{diff_phase} \n')
+                else:
+                    logger.error('ERROR')
+                                
 
 
 def plot_ts_metr_stats(models, observation, flag_interval, flag_slice, output_path=None, plg=None):
@@ -3481,9 +3562,8 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
             # Add mini-map
             ax_mini_map = add_mini_map(f, obs_mean)
             ax_mini_map.scatter(obs_mean.lon, obs_mean.lat, 15, c='navy', transform=ccrs.PlateCarree())
-
-            # Add second x axis
-            add_second_x_axis(f, ax, obs_mean)
+            if obs_mean.lon.size != 1:
+                ax_mini_map.scatter(obs_mean.lon[0], obs_mean.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
             # Set title
             title, figname = get_title_figname('Stick plot', obs_mean[var_norm],
@@ -3514,9 +3594,8 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
             # Add mini-map
             ax_mini_map = add_mini_map(f, obs)
             ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
-
-            # Add second x axis
-            add_second_x_axis(f, ax, obs)
+            if obs.lon.size != 1:
+                ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
             # Set title
             title, figname = get_title_figname('Stick plot', obs[var_norm],
@@ -3548,9 +3627,8 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     # Add mini-map
                     ax_mini_map = add_mini_map(f, obs)
                     ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
-
-                    # Add second x axis
-                    add_second_x_axis(f, ax, obs)
+                    if obs.lon.size != 1:
+                        ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
                     # Set title
                     title, figname = get_title_figname('Stick plot', obs[var_norm],
@@ -3583,9 +3661,8 @@ def plot_stick_plots(models, observation, flag_slice, output_path=None):
                     # Add mini-map
                     ax_mini_map = add_mini_map(f, obs)
                     ax_mini_map.scatter(obs.lon, obs.lat, 15, c='navy', transform=ccrs.PlateCarree())
-
-                    # Add second x axis
-                    add_second_x_axis(f, ax, obs)
+                    if obs.lon.size != 1:
+                        ax_mini_map.scatter(obs.lon[0], obs.lat[0], 15, c='red', transform=ccrs.PlateCarree())
 
                     # Set title
                     title, figname = get_title_figname('Stick plot', obs[var_norm],

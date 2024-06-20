@@ -63,6 +63,10 @@ Optional variables:
 * In-situ temperature : ``attribute = temp``
 * Sound speed : ``attribute = sound_speed``
 
+.. NOTE::
+
+    Please note that if the In-situ temperature is not directly included in the data; it is calculated from the potential temperature, salinity and pressure. If the calculation results in an array full of NaNs, the potential temperature is used instead.
+
 Available outputs
 ~~~~~~~~~~~~~~~~~
 
@@ -129,6 +133,10 @@ Optional variables:
 * In-situ temperature : ``attribute = temp``
 * Sound speed : ``attribute = sound_speed``
 
+.. NOTE::
+
+    Please note that if the In-situ temperature is not directly included in the data; it is calculated from the potential temperature, salinity and pressure. If the calculation results in an array full of NaNs, the potential temperature is used instead.
+
 Available outputs
 ~~~~~~~~~~~~~~~~~
 
@@ -165,6 +173,10 @@ Optional variables:
 * Geostrophic current : ``attribute = current_geo``
 * Mixed layer depth : ``attribute = mld_ptemp`` or ``attribute = mld_pdens``
 
+.. NOTE::
+
+    Please note that if the In-situ temperature is not directly included in the data; it is calculated from the potential temperature, salinity and pressure. If the calculation results in an array full of NaNs, the potential temperature is used instead.
+
 Available outputs
 ~~~~~~~~~~~~~~~~~
 
@@ -173,6 +185,9 @@ Available outputs
 * 2D variables : ``plot_variable_2d``
     Time series of the variable difference between model and observation.
 
+.. NOTE::
+
+    The first point of the section is indicated by a red point in the minimap.
 
 5. CLIM_HYDRO
 -------------
@@ -206,7 +221,7 @@ Comparison to HF radar surface currents.
 
 .. NOTE::
 
-    Some outputs of this functionality require to specify additional parameters to plot tidal constituent: ``analysis_start``, ``analysis_end``, ``tidal_waves`` and ``tide_tool``.
+    Some outputs of this functionality require to specify additional parameters to plot tidal components: ``analysis_start``, ``analysis_end``, ``tidal_waves`` and ``tide_tool``.
 
 Variables to plot
 ~~~~~~~~~~~~~~~~~
@@ -215,7 +230,7 @@ Default variables:
 
 * Total current : ``attribute = current``
 * Residual current : ``attribute = current_res``
-* Tidal current harmonic consituents : ``plot = plot_map_current_harmonic`` or ``plot = plot_tide_current_ellipses``
+* Tidal current harmonic components : ``plot = plot_map_current_harmonic`` or ``plot = plot_tide_current_ellipses``
 
 Caution: residual current and harmonic component will be considered only if the temporal interval is long enough.
 
@@ -224,12 +239,19 @@ Available outputs
 
 * Current maps : ``plot_map_metr_ecart``, ``plot_map_metr_biais``, ``plot_map_metr_RMSE`` and ``plot_map_metr_RMSEc``
     Maps for each variable and meta-zone, of the statistical metrics : *difference, bias, centered RMSE, RMSE*.
-* Tidal current harmonic consituents maps : ``plot_map_harm``
+* Tidal current harmonic component maps : ``plot_map_harm``
     Maps of the *difference* statistic metric for each specified tidal wave, of the tidal current amplitude and phase.
 
     **These maps require to specify the additional parameters : ``analysis_start``, ``analysis_end`` and ``tidal_waves``**.
 * Tidal current ellipsis : ``plot_tide_current_ellipses``
     Maps of tidal current ellipses from model and observation at points in the meta-zone. One map per tidal wave.
+    The ellipsis can be scaled by the user:
+
+    - if one scale is specified it will be the one for all the tidal component.
+
+    - if one scale per tidal wave is specified, each tidal wave will have its own scale.
+
+    - if no scale is specified: the scales are adapted automatically so that the figure is readable.
 
     **These ellipses require to specify the additional parameters : ``analysis_start``, ``analysis_end`` and ``tidal_waves``**.
 * Punctual time series : ``plot_ts_metr_ecart_point``
@@ -248,7 +270,7 @@ Comparison to ADCP measurements.
 
 .. NOTE::
 
-    Some outputs of this functionality require to specify additional parameters to plot tidal constituent: ``analysis_start``, ``analysis_end``, ``tidal_waves`` and ``tide_tool``.
+    Some outputs of this functionality require to specify additional parameters to plot tidal components: ``analysis_start``, ``analysis_end``, ``tidal_waves`` and ``tide_tool``.
 
 
 Variables to plot
@@ -259,7 +281,7 @@ Default variables:
 * Total current : ``attribute = current``
 * Residual current : ``attribute = current_res``
 * Baroclinic current : ``attribute = current_bc``
-* Tidal current harmonic consituents : ``plot = plot_map_current_harmonic`` or ``plot = plot_tide_current_ellipses``
+* Tidal current harmonic components : ``plot = plot_map_current_harmonic`` or ``plot = plot_tide_current_ellipses``
 
 Caution: residual current and harmonic component will be considered only if the temporal interval is long enough.
 
@@ -273,10 +295,19 @@ Available outputs
     Diplays values for observed and modelled current amplitudes and phase and their difference.
 * Tidal current ellipsis : ``plot_tide_current_ellipses``
    Maps of tidal current ellipses from model and observation at points in the meta-zone. One map per tidal wave and per vertical immersion or slice.
+   The ellipsis can be scaled by the user:
+
+   - if one scale is specified it will be the one for all the tidal component.
+
+   - if one scale per tidal wave is specified, each tidal wave will have its own scale.
+
+   - if no scale is specified: the scales are adapted automatically so that the figure is readable.
+
 
 .. NOTE::
 
     These ellipses require to specify the additional parameters : ``analysis_start``, ``analysis_end``, ``tidal_waves`` and ``tide_tool``.
+
 
 8. CURRENTS_VMADCP
 ------------------
@@ -305,6 +336,10 @@ Available outputs
     2D graphs (variable along time and depth) per variable and per section of the *difference* statistical metrics.
 * Stick plots : ``plot_stick_plot``
     Stick plot diagrams per radial and per specified vertical immersion or slice.
+
+.. NOTE::
+
+    The first point of the section is indicated by a red point in the minima
 
 9. DRIFTERS
 -----------

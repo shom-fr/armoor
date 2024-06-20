@@ -58,7 +58,7 @@ def plot(config_obj):
                 depth_diff = np.abs(observation["xarray_meta_coloc"][i_mod]["depth"] - float(depth[0]))
                 nearest_depth_index = np.nanargmin(depth_diff.data)
                 observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].sel(
-                    DEPTH=nearest_depth_index)
+                    depth=nearest_depth_index)
 
         # Removing of the lon-lat dimensions in the model data
         if "lat" not in observation["xarray_meta"].dims and "lat" in models[0]["xarray_meta_coloc"].dims:
@@ -86,7 +86,7 @@ def plot(config_obj):
                                                      flag_slice, output_path=sub_func_output_folder,
                                                      plg=plg)
                 else:
-                    if config_obj['colocate'] == observation:
+                    if "depth" in config_obj["meta_zones"] or 'slice' in config_obj['meta_zones']:
                         for i_depth, depth in enumerate(observation["xarray_meta_coloc"][0].depth.values):
                             if depth > 0:
                                 models_depth, observation_depth = select_depth(models_var, observation_var,
@@ -116,7 +116,7 @@ def plot(config_obj):
                                                      output_path=sub_func_output_folder,
                                                          plg=plg)
                 else:
-                    if config_obj['colocate'] == 'observation':
+                    if "depth" in config_obj["meta_zones"] or 'slice' in config_obj['meta_zones']:
                         for i_depth, depth in enumerate(observation["xarray_meta_coloc"][0].depth.values):
                             if depth > 0:
                                 models_depth, observation_depth = select_depth(models_var, observation_var,
