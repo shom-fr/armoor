@@ -124,3 +124,57 @@ class TestBulletins:
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
+
+    def test_ellipse_courant_utide_FROMVEUR(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_ellipse_courant_utide_FROMVEUR")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ellipse_courant_utide_FROMVEUR.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_ellipses_ADCP_CROCO_ticket124(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_ellipses_ADCP_CROCO_ticket124")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ellipses_ADCP_CROCO_ticket124.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_harmonic_table_ADCP_CROCO(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_harmonic_table_ADCP_CROCO')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/harmonic_table_ADCP_CROCO.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_harmonic_table_ADCP_CROCO_ticket125(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_harmonic_table_ADCP_CROCO_ticket125')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/harmonic_table_ADCP_CROCO_ticket125.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_harmonic_table_FROMVEUR(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_harmonic_table_FROMVEUR')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/harmonic_table_FROMVEUR.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
+
+    def test_hovmoller_FROMVEUR(self):  # OK
+        out_path, logger = change_path(folder_test)
+        logger.info('test_hovmoller_FROMVEUR')
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/hovmoller_FROMVEUR.cfg"])
+        parser.update({'output_path': out_path})
+        dict2call(parser)
+        assert True
