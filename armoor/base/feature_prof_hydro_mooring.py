@@ -86,7 +86,7 @@ def plot(config_obj):
                                                      flag_slice, output_path=sub_func_output_folder,
                                                      plg=plg)
                 else:
-                    if config_obj['colocate'] == observation:
+                    if "depth" in config_obj["meta_zones"] or 'slice' in config_obj['meta_zones']:
                         for i_depth, depth in enumerate(observation["xarray_meta_coloc"][0].depth.values):
                             if depth > 0:
                                 models_depth, observation_depth = select_depth(models_var, observation_var,
@@ -116,7 +116,7 @@ def plot(config_obj):
                                                      output_path=sub_func_output_folder,
                                                          plg=plg)
                 else:
-                    if config_obj['colocate'] == 'observation':
+                    if "depth" in config_obj["meta_zones"] or 'slice' in config_obj['meta_zones']:
                         for i_depth, depth in enumerate(observation["xarray_meta_coloc"][0].depth.values):
                             if depth > 0:
                                 models_depth, observation_depth = select_depth(models_var, observation_var,
