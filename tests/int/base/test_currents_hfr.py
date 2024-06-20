@@ -168,7 +168,7 @@ class TestBulletins:
         out_path, logger = change_path(folder_test)
         logger.info('test_test_ser_temp_uv_ponct_ticket128')
         parser = command_line_interface(
-            ['--cfgfile', f"../single_tests/{folder_test}/test_ser_temp_uv_ponct_ticket128.cfg"])
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_uv_ponct_ticket128.cfg"])
         parser.update({'output_path': out_path})
         dict2call(parser)
         assert True
