@@ -3724,7 +3724,7 @@ def find_var_title(da):
         var_unit = da.attrs['units']
     elif var_name in ['Total current', "Geostrophic current", "Baroclinic current", "Residual current"]:
         var_unit = 'm/s'
-    elif var_name in ['Temperature', 'temperature']:
+    elif var_name in ['Temperature', 'temperature', 'Pot. temperature']:
         var_unit = 'degC'
     elif var_name in ['Salinity']:
         var_unit = '0.001'
