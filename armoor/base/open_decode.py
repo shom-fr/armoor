@@ -878,8 +878,6 @@ def open_decode_basic(path_files):
         dataset = dataset.drop_duplicates(['lon'])
     if 'lat' in dataset.dims:
         dataset = dataset.drop_duplicates(['lat'])
-    if 'DEPTH' in dataset.dims and 'depth' in dataset.coords:
-        dataset = dataset.swap_dims({'DEPTH': 'depth'})
     return dataset
 
 
