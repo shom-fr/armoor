@@ -249,8 +249,13 @@ def vertical_colocation(ds_to_coloc, tgt, coloc_method):
         return ds_to_coloc
     else:
         if np.size(depth_tgt) != 1 and np.size(depth_ds) != 1:
+            # Case ds has lat(lat) dimension
+            if 'lat' in ds_to_coloc.dims and 'lat' not in tgt.dims:
+                ds_to_coloc = ds_to_coloc.squeeze()
+                ds_coloc = ds_to_coloc.interp(depth=depth_tgt, method=coloc_method)
+
             # Case ds and tgt have depth(depth) dimension
-            if 'depth' in depth_tgt.dims and 'depth' in depth_ds.dims:
+            elif 'depth' in depth_tgt.dims and 'depth' in depth_ds.dims:
                 ds_coloc = ds_to_coloc.interp(depth=depth_tgt, method=coloc_method)
 
             # Case ds has depth(lon/lat/time) dimension and tgt has depth(depth) dimension
