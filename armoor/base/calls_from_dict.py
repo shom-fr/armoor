@@ -219,10 +219,10 @@ def set_coloc_flags(config_obj):
 
     # Colocation for functionnality 3
     if config_obj["functionality"] == "prof_hydro_mooring":
-        if 'depth' in config_obj['meta_zones'] or 'slice' in config_obj['meta_zones']:
-            vertical_colocation_flag = True
-        else:
+        if 'depth' in config_obj['meta_zones'] :
             vertical_colocation_flag = False
+        else:
+            vertical_colocation_flag = True
         horizontal_colocation_flag = True
         temporal_colocation_flag = True
 
@@ -295,6 +295,28 @@ def get_method(data, z_dim=False) -> str:
     return method
 
 
+def handle_errors(config_obj: dict) -> Exception:
+    """
+    Function to manage compatibility between parameters and functionalities.
+
+    Parameters
+    ----------
+    config_obj : dict
+        Configuration file dictating the actions to be performed by the armoor library.
+
+    Returns
+    -------
+    Exceptions
+    """
+    # Raise errors for min/max depth/dens
+    if {'min_depth', 'max_depth', 'min_dens', 'max_dens'} & set(config_obj["meta_zones"].keys()):
+        if config_obj["functionality"] == "currents_ADCP":
+            msg = 'For the functionality "currents_ADCP", the use of '\
+                  '"min_depth", "max_depth", "min_dens" or "max_dens" '\
+                  'within the "meta_zones" configuration is not permitted.'
+            logger.error(msg)
+            raise ValueError(msg)
+
 def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
                         mod_obs='obs') -> xr.Dataset:
     """
@@ -323,6 +345,8 @@ def apply_metas2dataset(xarray_obj: xr.Dataset, config_obj: dict, method: str,
     # if config_obj['functionality'] in ["sst", "currents_hfr", 'drifters']:
     #     if 'depth' not in config_obj["meta_zones"]:
     #         logger.warning(f"For feature {config_obj['functionality']}, no depth can be specified !")
+
+    handle_errors(config_obj)
 
     filters = {"quality": lambda obj: obj.meta.quality_filter,
                "min_depth": lambda obj: obj.meta.vertical_selection_min_depth,

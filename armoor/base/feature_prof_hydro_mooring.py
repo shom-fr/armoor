@@ -48,12 +48,21 @@ def plot(config_obj):
         observation = copy.copy(config_obj["observation"])
         models = copy.copy(config_obj["models"])
 
+        # Depth name
+        if 'DEPTH' in observation["xarray_meta"].dims and 'depth' in observation["xarray_meta"].coords and 'depth' not in config_obj['meta_zones']:
+            print(observation["xarray_meta"])
+            observation["xarray_meta"] = observation["xarray_meta"].swap_dims({'DEPTH': 'depth'})
+            for i_mod, mod in enumerate(models):
+                observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].swap_dims({'DEPTH': 'depth'})
+                if 'DEPTH' in mod["xarray_meta_coloc"].dims and 'depth' in mod["xarray_meta_coloc"].coords:
+                    mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].swap_dims({'DEPTH': 'depth'})
+
         # Depth selection
-        if "depth" in config_obj["meta_zones"] and "depth" in observation["xarray_meta"].dims:
+        if "depth" in config_obj["meta_zones"] and "DEPTH" in observation["xarray_meta"].dims:
             depth = config_obj["meta_zones"]["depth"]
             depth_diff = np.abs(observation["xarray_meta"]["depth"] - float(depth[0]))
             nearest_depth_index = np.nanargmin(depth_diff.data)
-            observation["xarray_meta"] = observation["xarray_meta"].isel(depth=nearest_depth_index)
+            observation["xarray_meta"] = observation["xarray_meta"].isel(DEPTH=nearest_depth_index)
             for i_mod, mod in enumerate(models):
                 depth_diff = np.abs(observation["xarray_meta_coloc"][i_mod]["depth"] - float(depth[0]))
                 nearest_depth_index = np.nanargmin(depth_diff.data)
@@ -66,7 +75,6 @@ def plot(config_obj):
                 models[i_mod]["xarray_meta_coloc"] = models[i_mod]["xarray_meta_coloc"].isel(lon=0, lat=0)
 
         vars = [var for var in list(observation["xarray_meta_coloc"][0].keys()) if var in models[0]["xarray_meta_coloc"]]
-
         # PLOTS
         for var in vars:
             observation_var, models_var = sel_one_var(observation, models, var)
@@ -86,7 +94,7 @@ def plot(config_obj):
                                                      flag_slice, output_path=sub_func_output_folder,
                                                      plg=plg)
                 else:
-                    if config_obj['colocate'] == observation:
+                    if "depth" in config_obj["meta_zones"] or 'slice' in config_obj['meta_zones']:
                         for i_depth, depth in enumerate(observation["xarray_meta_coloc"][0].depth.values):
                             if depth > 0:
                                 models_depth, observation_depth = select_depth(models_var, observation_var,
@@ -96,7 +104,7 @@ def plot(config_obj):
                                                                  output_path=sub_func_output_folder,
                                                                  plg=plg)
                         else:
-                            for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
+                            for i_depth, depth in enumerate(observation["xarray_meta"].depth.values):
                                 if depth > 0:
                                     models_depth, observation_depth = select_depth(models_var, observation_var,
                                                                                    depth)
@@ -104,7 +112,7 @@ def plot(config_obj):
                                                                      flag_interval, flag_slice,
                                                                      output_path=sub_func_output_folder,
                                                                      plg=plg)
-############################################################################################
+            ############################################################################################
             # PONCTUAL TIMES SERIES
             plot_ts_metr_f3 = {"plot_ts_metr_f3": 'all_metrics'}
             if output["plot"] in plot_ts_metr_f3:
@@ -116,22 +124,22 @@ def plot(config_obj):
                                                      output_path=sub_func_output_folder,
                                                          plg=plg)
                 else:
-                    if config_obj['colocate'] == 'observation':
-                        for i_depth, depth in enumerate(observation["xarray_meta_coloc"][0].depth.values):
-                            if depth > 0:
-                                models_depth, observation_depth = select_depth(models_var, observation_var,
-                                                                               depth)
-                                plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
-                                                             output_path=sub_func_output_folder,
-                                                                 plg=plg)
-                    else:
-                        for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
-                            if depth > 0:
-                                models_depth, observation_depth = select_depth(models_var, observation_var,
-                                                                               depth)
-                                plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
-                                                              output_path=sub_func_output_folder,
-                                                              plg=plg)
+                    # if "depth" in config_obj["meta_zones"]:
+                    #     for i_depth, depth in enumerate(observation["xarray_meta"].depth.values):
+                    #         if depth > 0:
+                    #             models_depth, observation_depth = select_depth(models_var, observation_var,
+                    #                                                            depth)##models_var, observation_var
+                    #             plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
+                    #                                  output_path=sub_func_output_folder,
+                    #                                      plg=plg)
+                    # else:
+                    for i_depth, depth in enumerate(observation["xarray_meta"].depth.values):
+                        if depth > 0:
+                            models_depth, observation_depth = select_depth(models_var, observation_var,
+                                                                           depth)
+                            plot_features.plot_ts_metr_f3(models_depth, observation_depth, flag_interval, flag_slice,
+                                                          output_path=sub_func_output_folder,
+                                                          plg=plg)
 
 def select_depth(models, observation, depth):
     """

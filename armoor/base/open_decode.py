@@ -92,7 +92,7 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
         return open_decode_hycom_3d(path_files)
     if type == 'CORA':
         logger.info("Opening CORA")
-        return open_decode_cora(path_files[0])
+        return open_decode_cora(path_files)
 
     logger.info("Opening non specific file type")
     return open_decode_basic(path_files)
@@ -167,19 +167,23 @@ def open_decode_cmems(path_files, steps):
      """
     # Open
     if len(path_files) > 1:
-        list_ds_cmems = []
-        for path in path_files:
-            dataset = xr.open_dataset(path)
-            lon_ds = dataset.LONGITUDE.assign_coords(LONGITUDE=dataset.TIME.data).rename(
-                {'LONGITUDE': 'TIME'})
-            lat_ds = dataset.LATITUDE.assign_coords(LATITUDE=dataset.TIME.data).rename(
-                {'LATITUDE': 'TIME'})
-            dataset = dataset.drop_vars(['LONGITUDE', 'LATITUDE'])
-            dataset['LATITUDE'] = lat_ds
-            dataset['LONGITUDE'] = lon_ds
-            list_ds_cmems.append(dataset)
+        #TODO replace this 'try' with a new TYPE
+        try:
+            cmems = xr.open_mfdataset(path_files, combine='nested', concat_dim='TIME')
+        except:
+            list_ds_cmems = []
+            for path in path_files:
+                dataset = xr.open_dataset(path)
+                lon_ds = dataset.LONGITUDE.assign_coords(LONGITUDE=dataset.TIME.data).rename(
+                    {'LONGITUDE': 'TIME'})
+                lat_ds = dataset.LATITUDE.assign_coords(LATITUDE=dataset.TIME.data).rename(
+                    {'LATITUDE': 'TIME'})
+                dataset = dataset.drop_vars(['LONGITUDE', 'LATITUDE'])
+                dataset['LATITUDE'] = lat_ds
+                dataset['LONGITUDE'] = lon_ds
+                list_ds_cmems.append(dataset)
 
-        cmems = concat_cmems(list_ds_cmems)
+            cmems = concat_cmems(list_ds_cmems)
     else:
         cmems = xr.open_dataset(path_files[0])
 
@@ -203,6 +207,7 @@ def open_decode_cmems(path_files, steps):
     # Decode
     cmems = cmems.xoa.decode()
 
+    cmems = cmems.sortby('time')
     # Manage lon(time) and lat(time)
     len_lon = len(cmems.lon)
     len_lat = len(cmems.lat)
@@ -757,31 +762,64 @@ def open_decode_cora(path_files):
          CORA dataset.
      """
     # Open
-    cora = xr.open_dataset(path_files)
-    cora = cora.drop_dims(['N_HISTORY', 'N_CALIB', 'N_PARAM'])
-    # Variables to drop/rename to prevent random behaviours
-    for var in list(cora.keys()):
-        if "POSITION" in var or 'LOCATION' in var:
-            cora = cora.drop_vars(var)
-        elif var[-3:] == "_QC":
-            cora = cora.rename({var: f"QC_{var[:-3]}"})
-        if len(var) == 4:
-            if f"{var}_ADJUSTED" in cora:
-                cora = cora.drop_vars(f"{var}_ADJUSTED")
-            if f"{var}_ADJUSTED_ERROR" in cora:
-                cora = cora.drop_vars(f"{var}_ADJUSTED_ERROR")
+    if len(path_files) > 1:
+        list_ds_cora = []
+        for path in path_files:
+            dataset = xr.open_dataset(path)
+            dataset = dataset.drop_dims(['N_HISTORY', 'N_CALIB', 'N_PARAM'])
+            # Variables to drop/rename to prevent random behaviours
+            for var in list(dataset.keys()):
+                if "POSITION" in var or 'LOCATION' in var:
+                    dataset = dataset.drop_vars(var)
+                elif var[-3:] == "_QC":
+                    dataset = dataset.rename({var: f"QC_{var[:-3]}"})
+                if len(var) == 4:
+                    if f"{var}_ADJUSTED" in dataset:
+                        dataset = dataset.drop_vars(f"{var}_ADJUSTED")
+                    if f"{var}_ADJUSTED_ERROR" in dataset:
+                        dataset = dataset.drop_vars(f"{var}_ADJUSTED_ERROR")
+            for var in list(dataset.keys()):
+                if 'N_PROF' not in list(dataset[var].dims) and 'N_LEVELS' not in list(dataset[var].dims):
+                    dataset = dataset.drop_vars(var)
 
-    for var in list(cora.keys()):
-        if 'N_PROF' not in list(cora[var].dims) and 'N_LEVELS' not in list(cora[var].dims):
-            cora = cora.drop_vars(var)
+            # Decode
+            dataset = dataset.xoa.decode()
 
-    # Decode
-    cora = cora.xoa.decode()
+            # Rename time
+            dataset = dataset.assign_coords({"N_prof": dataset.time.values})
+            dataset = dataset.drop_vars('time')
+            dataset = dataset.rename({'N_prof': 'time'})
 
-    # Rename time
-    cora = cora.assign_coords({"N_prof": cora.time.values})
-    cora = cora.drop_vars('time')
-    cora = cora.rename({'N_prof': 'time'})
+            list_ds_cora.append(dataset)
+
+        cora = concat_cora(list_ds_cora)
+    else:
+        cora = xr.open_dataset(path_files[0])
+
+        cora = cora.drop_dims(['N_HISTORY', 'N_CALIB', 'N_PARAM'])
+        # Variables to drop/rename to prevent random behaviours
+        for var in list(cora.keys()):
+            if "POSITION" in var or 'LOCATION' in var:
+                cora = cora.drop_vars(var)
+            elif var[-3:] == "_QC":
+                cora = cora.rename({var: f"QC_{var[:-3]}"})
+            if len(var) == 4:
+                if f"{var}_ADJUSTED" in cora:
+                    cora = cora.drop_vars(f"{var}_ADJUSTED")
+                if f"{var}_ADJUSTED_ERROR" in cora:
+                    cora = cora.drop_vars(f"{var}_ADJUSTED_ERROR")
+        for var in list(cora.keys()):
+            if 'N_PROF' not in list(cora[var].dims) and 'N_LEVELS' not in list(cora[var].dims):
+                cora = cora.drop_vars(var)
+
+        # Decode
+        cora = cora.xoa.decode()
+
+        # Rename time
+        cora = cora.assign_coords({"N_prof": cora.time.values})
+        cora = cora.drop_vars('time')
+        cora = cora.rename({'N_prof': 'time'})
+
 
     # Convert depths
     cora = cora.rename({'N_levels': 'depth'})
@@ -840,8 +878,6 @@ def open_decode_basic(path_files):
         dataset = dataset.drop_duplicates(['lon'])
     if 'lat' in dataset.dims:
         dataset = dataset.drop_duplicates(['lat'])
-    if 'DEPTH' in dataset.dims and 'depth' in dataset.coords:
-        dataset = dataset.swap_dims({'DEPTH': 'depth'})
     return dataset
 
 
@@ -951,15 +987,21 @@ def decode_profiler(profiler):
         Decoded dataset
     """
     colonnes = profiler.DEPH.values
-    depth_values = np.empty(np.size(colonnes, 1))
-    for i in range(np.size(colonnes, 1)):
-        colonne_test = colonnes[:, i]
-        colonne_test = colonne_test[~np.isnan(colonne_test)]
-        depth_column = set(colonne_test)
-        if len(depth_column) == 1:  # Tests if the depth values are all the same throughout time
-            depth_values[i] = list(depth_column)[0]
-        else:  # if depth is truely depth(time,z)
-            return decode_depths_vmadcp(profiler)
+
+    if len(colonnes.shape) == 2:
+        depth_values = np.empty(np.size(colonnes, 1))
+        for i in range(np.size(colonnes, 1)):
+            colonne_test = colonnes[:, i]
+            colonne_test = colonne_test[~np.isnan(colonne_test)]
+            depth_column = set(colonne_test)
+            if len(depth_column) == 1:  # Tests if the depth values are all the same throughout time
+                depth_values[i] = list(depth_column)[0]
+            else:  # if depth is truely depth(time,z)
+                return decode_depths_vmadcp(profiler)
+    elif len(colonnes.shape) == 1:
+        depth_values = colonnes
+    else:
+        logger.error('please handle this case')
     profiler = profiler.assign_coords({'depth': depth_values})
     profiler = convert_trajectory(profiler)
     return profiler
@@ -1209,3 +1251,57 @@ def concat_cmems(list_ds):
         cmems = cmems.drop_vars(names='DEPTH')
 
     return cmems
+
+def concat_cora(list_ds_cora):
+    """
+    Concat several Datasets from CORA observations
+    Parameters
+    ----------
+    list_ds_cora : list
+        List of xarray.Dataset
+    Returns
+    -------
+    Concatenated observations as one xarray.dataset.
+    """
+    times = np.unique([len(ds.time.data) for ds in list_ds_cora])
+    depths = np.unique([len(ds.N_levels.data) for ds in list_ds_cora])
+
+    # Cas où on concat plusieurs fichiers d'1 instrument, même nombre de depth et time dans tous les fichiers
+    if len(depths) == 1 and len(times) == 1:
+        cora = xr.concat(list_ds_cora, dim='time')
+
+    # Cas où on concat plusieurs instruments
+    else:
+        # Compute same DEPTH
+        nb_depth_max = np.nanmax(depths)
+        common_depths = list(range(nb_depth_max))
+
+        # Compute same TIME
+        common_times = [ds.time.data for ds in list_ds_cora]
+        common_times = np.unique(np.concatenate(common_times))
+
+        for i_ds, ds in enumerate(list_ds_cora):
+            if 'POSITION' in ds.dims:
+                ds = ds.drop_dims('POSITION')
+
+            # Put all datasets on the same depth
+            depths_in_ds = ds.N_levels.data
+            ds = ds.assign_coords({'N_levels': ds.N_levels.data})
+            ds = ds.drop_duplicates('N_levels')
+            ds = ds.sel(N_levels=common_depths, method='nearest')
+            ds = ds.assign_coords({'N_levels': common_depths})
+            ds = ds.where(ds.N_levels.isin(depths_in_ds))
+
+            # Put all TIMES on the same values
+            times_in_ds = ds.time.data
+            ds = ds.assign_coords({'time': ds.time.data})
+            ds = ds.drop_duplicates('time')
+            ds = ds.sel(time=common_times, method='nearest')
+            ds = ds.assign_coords({'time': common_times})
+            ds = ds.where(ds.time.isin(times_in_ds))
+
+            list_ds_cora[i_ds] = ds
+
+        cora = xr.concat(list_ds_cora, dim='instr')
+
+    return cora

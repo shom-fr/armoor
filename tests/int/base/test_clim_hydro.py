@@ -51,3 +51,43 @@ class TestBulletins:
         create_folder(f'tmp')
         dict2call(parser)
         assert True
+
+    def test_ser_temp_ponct_ticket143(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_ser_temp_ponct_ticket143")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_ponct_ticket143.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_map_ticket130(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_map_ticket130")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/map_ticket130.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_map_diff_ticket142(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_map_diff_ticket142")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/map_diff_ticket142.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
+
+    def test_ser_temp_stats_ticket144(self):
+        out_path, logger = change_path(folder_test)
+        logger.info("test_ser_temp_stats_ticket144")
+        parser = command_line_interface(
+            ['--cfgfile', f"../single_tests/{folder_test}/ser_temp_stats_ticket144.cfg"])
+        parser.update({'output_path': out_path})
+        create_folder(f'tmp')
+        dict2call(parser)
+        assert True
