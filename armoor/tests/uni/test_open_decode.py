@@ -1,15 +1,111 @@
+import os, glob
 import xarray as xr
-
+from armoor.__init__ import ROOTDIR
 from armoor.base.open_decode import open_decode
-from armoor.hmi.script_tools import create_folder
-from tests.int.base import change_path
 
-folder_test = 'open_data'
-out_path, logger = change_path(folder_test)
+samples_dir = os.path.join(ROOTDIR, "_samples")
 
+class TestCmemsFormat:
 
-class TestOpenData:
+    def test_argo(self):   
+        ncins = glob.glob(
+            os.path.join(samples_dir, "GL_PR_PF_*.nc")
+        )
+        ds = open_decode(
+            ncins,
+            platform="argo",
+            fmt="cmems_insitu"
+        )
+        assert isinstance(ds, xr.Dataset)
+        assert set(["z", "time"]).issubset(ds.dims)
+        assert set(["depth", "lon", "lat", "time"]).issubset(ds.coords)
+        assert ds.lon.dims == ("time",)
+        assert ds.lat.dims == ("time",)
+        assert ds.depth.dims == ("time", "z")
+    
+    def test_mooring(self):
+        ncins = glob.glob(
+            os.path.join(samples_dir, "GL_TS_MO_*.nc")
+        )
+        dss = open_decode(
+            ncins,
+            platform="mooring",
+            fmt="cmems_insitu"
+        )
+        assert isinstance(dss, list)
+        assert all([isinstance(ds, xr.Dataset) for ds in dss])
+        assert all([set(["z", "time"]).issubset(ds.dims) for ds in dss])
+        assert all([set(
+            ["depth", "lon", "lat", "time"]
+        ).issubset(ds.coords) for ds in dss])
+        assert all(["time" not in ds.lon.dims for ds in dss])
+        assert all(["time" not in ds.lat.dims for ds in dss])
+        
+    def test_drifter(self):
+        ncins = glob.glob(
+            os.path.join(samples_dir, "GL_TS_DB_*.nc")
+        )
+        dss = open_decode(
+            ncins,
+            platform="drifter",
+            fmt="cmems_insitu"
+        )
+        assert isinstance(dss, list)
+        assert all([isinstance(ds, xr.Dataset) for ds in dss])
+        assert all([set(["z", "time"]).issubset(ds.dims) for ds in dss])
+        assert all([set(
+            ["depth", "lon", "lat", "time"]
+        ).issubset(ds.coords) for ds in dss])
+        assert all(["time" in ds.lon.dims for ds in dss])
+        assert all(["time" in ds.lat.dims for ds in dss])
+        assert all(["z" in ds.depth.dims for ds in dss])
+        
+    def test_glider(self):
+        ncins = glob.glob(
+            os.path.join(samples_dir, "GL_TS_GL_*.nc")
+        )
+        dss = open_decode(
+            ncins,
+            platform="glider",
+            fmt="cmems_insitu"
+        )
+        assert isinstance(dss, list)
+        assert all([isinstance(ds, xr.Dataset) for ds in dss])
+        assert all([set(["z", "time"]).issubset(ds.dims) for ds in dss])
+        assert all([set(
+            ["depth", "lon", "lat", "time"]
+        ).issubset(ds.coords) for ds in dss])
+        assert all(["time" in ds.lon.dims for ds in dss])
+        assert all(["time" in ds.lat.dims for ds in dss])
+        assert all(["z" in ds.depth.dims for ds in dss])
 
+class TestModel:
+    
+    def test_cmems_model(self):   
+        ncins = [os.path.join(samples_dir, "cmems_glo12.nc")]
+        ds = open_decode(
+            ncins,
+            fmt="cmems_model",
+        )
+        assert isinstance(ds, xr.Dataset)
+        assert set(["z", "time", "x", "y"]).issubset(ds.dims)
+        assert set(["depth", "time", "lon", "lat"]).issubset(ds.coords)
+        
+    def test_hycom_model(self):   
+        ncins = glob.glob(
+            os.path.join(samples_dir, "hycom_*.nc")
+        )
+        ds = open_decode(
+            ncins,
+            fmt="hycom",
+        )
+        assert isinstance(ds, xr.Dataset)
+        assert set(["z", "time", "x", "y"]).issubset(ds.dims)
+        assert set(["depth", "time", "lon", "lat"]).issubset(ds.coords)
+        
+
+        
+    '''
     def test_open_topaz(self):  # OK
         logger.info('test_open_topaz')
         path_ds = ["../data/test_uni/open_decode/topaz.nc"]
@@ -123,3 +219,4 @@ class TestOpenData:
         path_ds = ["../data/test_uni/open_decode/cora.nc"]
         ds = open_decode(path_ds, type='CORA')
         assert isinstance(ds, xr.Dataset)
+    '''

@@ -30,20 +30,20 @@ class SSTAccessor:
 
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
-        xoa.register_accessors()
-        xoa.register_accessors(decode_sigma=True)
-        xr.set_options(keep_attrs=True)
-        path_cfg = '../../config/cf.cfg'
+        # xoa.register_accessors()
+        # xoa.register_accessors(decode_sigma=True)
+        # xr.set_options(keep_attrs=True)
+        # path_cfg = '../../config/cf.cfg'
 
-        try:
-            rootdir = os.path.abspath(os.path.dirname(__file__))
-            path = os.path.join(rootdir, path_cfg)
-        except:
-            logger.warning('cf.cfg file not found')
-            directory = os.getcwd()
-            logger.warning('using path : %s', directory)
+        # try:
+        #     rootdir = os.path.abspath(os.path.dirname(__file__))
+        #     path = os.path.join(rootdir, path_cfg)
+        # except:
+        #     logger.warning('cf.cfg file not found')
+        #     directory = os.getcwd()
+        #     logger.warning('using path : %s', directory)
 
-        xcf.register_cf_specs(path)
+        # xcf.register_cf_specs(path)
 
     def selection(self, vars, depth=0, filter=None):
         """

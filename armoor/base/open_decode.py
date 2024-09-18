@@ -1,4 +1,5 @@
-"""XrReaderAccessor
+"""
+Open files and decode data.
 """
 import os
 import logging
@@ -15,10 +16,11 @@ import pandas as pd
 import dask
 from pyproj import Geod
 
+from armoor.__init__ import ROOTDIR
+
 logger = logging.getLogger(__name__)
 
-
-def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
+def open_decode(path_files, fmt, platform=None, func=None, type=None, steps=None) -> xr.Dataset:
     """
      Open a netcdf/txt file and store it into a dataset
      Parameters
@@ -38,19 +40,18 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
          Model or observation dataset.
      """
     # Xoa initialisation
-    xoa.register_accessors()
-    xoa.register_accessors(decode_sigma=True)
+    
 
     # Read cfg file
-    try:
-        rootdir = os.path.abspath(os.path.dirname(__file__))
-        path = os.path.join(rootdir, '..', '..', 'config', 'cf.cfg')
-        logger.info('using path : %s', path)
-    except:
-        logger.warning('cf.cfg file not found')
-        directory = os.getcwd()
-        logger.warning('using path : %s', directory)
-    xcf.register_cf_specs(path)
+    # try:
+    #     rootdir = os.path.abspath(os.path.dirname(__file__))
+    #     path = os.path.join(rootdir, '..', '..', 'config', 'cf.cfg')
+    #     logger.info('using path : %s', path)
+    # except:
+    #     logger.warning('cf.cfg file not found')
+    #     directory = os.getcwd()
+    #     logger.warning('using path : %s', directory)
+    # xcf.register_cf_specs(path)
 
     if not isinstance(path_files, (list, dict)):
         raise TypeError("Only list or dict are allowed : %s", path_files)
@@ -63,41 +64,124 @@ def open_decode(path_files, func=None, type=None, steps=None) -> xr.Dataset:
     if type == "WOA18":
         logger.info("Opening WOA18")
         return open_decode_woa18(path_files)
-    if type == "CMEMS":
-        logger.info("Opening CMEMS")
-        return open_decode_cmems(path_files, steps=steps)
-    if type == "scanfish":
-        logger.info("Opening Scanfish")
-        return open_decode_scanfish(path_files[0], steps=steps)
-    if type == "seasoar":
-        logger.info("Opening Seasoar")
-        return open_decode_seasoar(path_files[0], steps=steps)
-    if type == "LADCP":
-        logger.info("Opening L-ADCP")
-        return open_decode_l_adcp(path_files[0])
-    if type == "mouillage":
-        logger.info("Opening Mooring")
-        return open_decode_mouillages(path_files[0])
-    if type == "VMADCP":
-        logger.info("Opening VMADCP")
-        return open_decode_vmadcp(path_files[0], steps=steps)
-    if type in ['CROCO', 'CROCO_currents']:
-        logger.info("Opening CROCO")
-        return open_decode_croco(path_files[0])
-    if type == 'HYCOM_currents':
-        logger.info("Opening HYCOM currents")
-        return open_decode_hycom_currents(path_files)
-    if type == 'HYCOM_3D':
-        logger.info("Opening HYCOM 3D")
-        return open_decode_hycom_3d(path_files)
-    if type == 'CORA':
-        logger.info("Opening CORA")
-        return open_decode_cora(path_files)
+    if fmt == "cmems_insitu":
+        logger.info("Opening/decoding insitu cmems files")
+        return open_decode_cmems_insitu(path_files, platform=platform)
+    elif fmt == "cmems_model":
+        logger.info("Opening/decoding model cmems files")
+        return open_decode_cmems_model(path_files)
+    elif fmt == "hycom":
+        logger.info("Opening/decoding hycom files")
+        return open_decode_hycom(path_files)
+    # if type == "scanfish":
+    #     logger.info("Opening Scanfish")
+    #     return open_decode_scanfish(path_files[0], steps=steps)
+    # if type == "seasoar":
+    #     logger.info("Opening Seasoar")
+    #     return open_decode_seasoar(path_files[0], steps=steps)
+    # if type == "LADCP":
+    #     logger.info("Opening L-ADCP")
+    #     return open_decode_l_adcp(path_files[0])
+    # if type == "mouillage":
+    #     logger.info("Opening Mooring")
+    #     return open_decode_mouillages(path_files[0])
+    # if type == "VMADCP":
+    #     logger.info("Opening VMADCP")
+    #     return open_decode_vmadcp(path_files[0], steps=steps)
+    # if type in ['CROCO', 'CROCO_currents']:
+    #     logger.info("Opening CROCO")
+    #     return open_decode_croco(path_files[0])
+    # if type == 'HYCOM_currents':
+    #     logger.info("Opening HYCOM currents")
+    #     return open_decode_hycom_currents(path_files)
+    # if type == 'HYCOM_3D':
+    #     logger.info("Opening HYCOM 3D")
+    #     return open_decode_hycom_3d(path_files)
+    # if type == 'CORA':
+    #     logger.info("Opening CORA")
+    #     return open_decode_cora(path_files)
 
     logger.info("Opening non specific file type")
     return open_decode_basic(path_files)
 
 
+def open_decode_cmems_model(path_files):
+    """
+     Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
+     Parameters
+     ----------
+     path_files : str, list of str
+         Path to the netcdf files.
+     steps : float
+        Horizontal and vertical steps
+     Returns
+     -------
+     xarray.Dataset
+         CMEMS dataset.
+     """
+    # Open
+    path = os.path.join(ROOTDIR, 'config', 'cmems_model.cfg')
+    xcf.register_cf_specs(path)
+    xoa.register_accessors()
+    ds = xr.open_mfdataset(path_files).xoa.decode()
+    ds = ds.swap_dims({"depth": "z",  "lon": "x", "lat": "y"})
+    lat, lon = xr.broadcast(ds["lat"], ds["lon"])
+    ds = ds.drop(["lon", "lat"])
+    ds["lon"] = lon
+    ds["lat"] = lat
+    ds = ds.set_coords(["lon", "lat"])
+    var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
+    ds["depth"] = ds["depth"].broadcast_like(ds[var])
+    return ds
+        
+
+def open_decode_hycom(path_files):
+    """
+     Open HyCOM netcdf file(s) and store it into a ready-to-use dataset.
+     Parameters
+     ----------
+     path_files : str, list of str
+         Path to the netcdf files.
+     steps : float
+        Horizontal and vertical steps
+     Returns
+     -------
+     xarray.Dataset
+         HyCOM dataset.
+     """
+    # Open
+    path = os.path.join(ROOTDIR, 'config', 'hycom.cfg')
+    xcf.register_cf_specs(path)
+    xoa.register_accessors()
+    xoa.register_accessors(decode_sigma=True)
+    dss = []
+    da_u, da_v = None, None
+    for path in path_files:
+        ds = xr.open_dataset(path).xoa.decode()
+        if ('u' in ds.data_vars) or ('v' in ds.data_vars):
+            if 'u' in ds.data_vars:
+                logger.info("shift u")
+                da_u =  shift(
+                    ds["u"].squeeze(drop=True), {"x": "right"}
+                ).xoa.reloc(u=False)
+            if 'v' in ds.data_vars:
+                logger.info("shift v")
+                da_v =  shift(
+                    ds["v"].squeeze(drop=True), {"y": "top"}
+                ).xoa.reloc(v=False)
+        else:
+            dss.append(ds)
+    ds = xr.merge(dss)
+    if isinstance(da_u, xr.DataArray):
+        ds['u'] = da_u.assign_coords(**ds.coords)
+    if isinstance(da_v, xr.DataArray):
+        ds['v'] = da_v.assign_coords(**ds.coords)
+    ds.coords["depth"] = dz2depth(ds.dz, centered=True)
+    ds = ds.drop(["z", "dz"])
+
+    return ds
+
+        
 def open_decode_woa18(path_files):
     """
      Open WOA18 netcdf files and store it into a ready-to-use dataset.
@@ -150,8 +234,8 @@ def open_decode_woa18(path_files):
 
     return woa18
 
-
-def open_decode_cmems(path_files, steps):
+    
+def open_decode_cmems_insitu(path_files, platform):
     """
      Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
      Parameters
@@ -166,48 +250,100 @@ def open_decode_cmems(path_files, steps):
          CMEMS dataset.
      """
     # Open
-    if len(path_files) > 1:
-        #TODO replace this 'try' with a new TYPE
-        try:
-            cmems = xr.open_mfdataset(path_files, combine='nested', concat_dim='TIME')
-        except:
-            list_ds_cmems = []
-            for path in path_files:
-                dataset = xr.open_dataset(path)
-                lon_ds = dataset.LONGITUDE.assign_coords(LONGITUDE=dataset.TIME.data).rename(
-                    {'LONGITUDE': 'TIME'})
-                lat_ds = dataset.LATITUDE.assign_coords(LATITUDE=dataset.TIME.data).rename(
-                    {'LATITUDE': 'TIME'})
-                dataset = dataset.drop_vars(['LONGITUDE', 'LATITUDE'])
-                dataset['LATITUDE'] = lat_ds
-                dataset['LONGITUDE'] = lon_ds
-                list_ds_cmems.append(dataset)
+    cmems_coords = ["time", "lon", "lat", "depth"]
+    path = os.path.join(ROOTDIR, 'config', f'cmems_{platform}.cfg')
+    xcf.register_cf_specs(path)
+    xoa.register_accessors()
+    #xoa.register_accessors(decode_sigma=True)
+    dss = []
+    for path in path_files:
+        ds = xr.open_dataset(path).xoa.decode()
 
-            cmems = concat_cmems(list_ds_cmems)
+        if "depth" in ds.dims:
+            ds = ds.swap_dims({"depth": "z"})
+        elif "DEPTH" in ds.dims:
+            ds = ds.swap_dims({"DEPTH": "z"})
+        if ((
+            "lon" in ds.lon.dims
+        ) and (
+            ds.dims["time"] == ds.dims["lon"]
+        )) or ((
+            "lat" in ds.lon.dims
+        ) and (
+            ds.dims["time"] == ds.dims["lat"]
+        )):
+            ds = ds.drop_dims("POSITION")
+            lon_ds = ds.lon.assign_coords(lon=ds.time.data).rename(
+                {'lon': 'time'}
+            )
+            lat_ds = ds.lat.assign_coords(lat=ds.time.data).rename(
+                {'lat': 'time'}
+            )
+            ds = ds.drop_vars(['lon', 'lat'])
+            if platform == "mooring":
+                ds['lat'] = lat_ds.isel(time=0)
+                ds['lon'] = lon_ds.isel(time=0)
+            else:
+                ds['lat'] = lat_ds
+                ds['lon'] = lon_ds
+        ds.set_coords(['lon', 'lat'])
+        for coord in ds.coords:
+            if coord not in cmems_coords:
+                ds = ds.reset_coords(coord)
+        if ("depth" not in ds) and ("pres" in ds):            
+            ds = depth_from_pres(ds)
+        for var in ds.data_vars:
+            if var in cmems_coords:
+                ds = ds.set_coords(var)
+        dss.append(ds)
+    if platform == "argo":
+        return concat_argo(dss)
     else:
-        cmems = xr.open_dataset(path_files[0])
-
-    # Variables to drop/rename to prevent random behaviours
-    for var in list(cmems.keys()):
-        if "POSITION" in var or 'LOCATION' in var or '_DM' in var:
-            cmems = cmems.drop_vars(var)
-        elif var[-3:] == "_QC":
-            cmems = cmems.rename({var: f"QC_{var[:-3]}"})
-        if len(var) == 4:
-            if f"{var}_ADJUSTED" in cmems:
-                cmems = cmems.drop_vars(f"{var}_ADJUSTED")
-            if f"{var}_ADJUSTED_ERROR" in cmems:
-                cmems = cmems.drop_vars(f"{var}_ADJUSTED_ERROR")
-            if f"{var}_CNDC" in cmems:
-                cmems = cmems.drop_vars(f"{var}_CNDC")
-        # Remove otherwise interp won't work
-        if var in ['DATA_MODE', 'DIRECTION', 'VERTICAL_SAMPLING_SCHEME']:
-            cmems = cmems.drop_vars(var)
-
-    # Decode
-    cmems = cmems.xoa.decode()
+        return dss
+    
+    '''
+        # Variables to drop/rename to prevent random behaviours
+        for var in list(dataset.keys()):
+            if "POSITION" in var or 'LOCATION' in var or '_DM' in var:
+                dataset = dataset.drop_vars(var)
+            elif var[-3:] == "_QC":
+                dataset = dataset.rename({var: f"QC_{var[:-3]}"})
+            if len(var) == 4:
+                if f"{var}_ADJUSTED" in dataset:
+                    dataset = dataset.drop_vars(f"{var}_ADJUSTED")
+                if f"{var}_ADJUSTED_ERROR" in dataset:
+                    dataset = dataset.drop_vars(f"{var}_ADJUSTED_ERROR")
+                if f"{var}_CNDC" in dataset:
+                    dataset = dataset.drop_vars(f"{var}_CNDC"
+            # Remove otherwise interp won't work
+            if var in ['DATA_MODE', 'DIRECTION', 'VERTICAL_SAMPLING_SCHEME']:
+                dataset = dataset.drop_vars(var)
+        if 'depth' in dataset.coords:
+            print(dataset)
+            #cmems = decode_profiler(cmems)
+            check_fixed_depths = []
+            for ilev in range(dataset.dims["z"]):
+                depths = np.unique(dataset.depth.isel(z=ilev).values)
+                print(depths)
+                if len(depths) == 1:
+                    check_fixed_depths.append(depths[0])
+            if len(check_fixed_depths) == dataset.dims["z"]:
+                dataset["depth"] = xr.DataArray(
+                    data=check_fixed_depths,
+                    dims={"z": dataset.dims["z"]}
+                )
+                dataset = dataset.set_coords('depth')
+                print(dataset)
+        list_ds_cmems.append(dataset)
+    if platform == "argo":
+        cmems = concat_cmems_argo(list_ds_cmems)
+    else:
+        cmems = xr.concat(list_ds_cmems, dim='instr')
+        cmems = cmems.set_coords(["lon", "lat"])
 
     cmems = cmems.sortby('time')
+    
+    a = b
     # Manage lon(time) and lat(time)
     len_lon = len(cmems.lon)
     len_lat = len(cmems.lat)
@@ -245,8 +381,8 @@ def open_decode_cmems(path_files, steps):
     if steps and steps[1]:
         horizontal_step, vertical_step = steps
         cmems = set_hor_vert_step(cmems, horizontal_step, vertical_step)
-
-    return cmems
+    '''
+    return ds
 
 
 def open_decode_l_adcp(path_file):
@@ -1065,7 +1201,7 @@ def convert_depths(dataset):
     return dataset
 
 
-def depth_from_press(dataset):
+def depth_from_pres(ds):
     """
     Calculate depth values from pressure.
 
@@ -1075,14 +1211,12 @@ def depth_from_press(dataset):
         Formatted dataset.
 
     """
-    alat = dataset.lat.broadcast_like(dataset.pres)
-    adepth = gsw.z_from_p(dataset.pres, alat)
-    adepth = adepth.where(adepth.notnull(), adepth.min())
+    alat = ds.lat.broadcast_like(ds.pres)
+    adepth = gsw.z_from_p(ds.pres, alat)
+    #adepth = adepth.where(adepth.notnull(), adepth.min())
     adepth.attrs.update({"long_name": "Depth", "units": "m"})
-    dataset = dataset.rename({'depth': 'z'})
-    adepth = adepth.rename({'depth': 'z'})
-    dataset = dataset.assign_coords(depth=adepth)
-    return dataset
+    ds["depth"] =  adepth
+    return ds 
 
 
 def set_hor_vert_step_radiales(obs, horizontal_step, vertical_step):
@@ -1305,3 +1439,45 @@ def concat_cora(list_ds_cora):
         cora = xr.concat(list_ds_cora, dim='instr')
 
     return cora
+
+def concat_argo(list_ds):
+    dim_z =  np.max([ds.dims["z"] for ds in list_ds])
+    for ids, dsin in enumerate(list_ds):
+        dsin = dsin.reset_coords("depth")
+        if dsin.dims["z"] != dim_z:
+            das = []
+            for var in dsin.data_vars:
+                if ("z" in dsin[var].dims): 
+                    arr1 = dsin[var].values
+                    dim_z_to_fill = dim_z - arr1.shape[1]
+                    arr2 = np.nan * np.ones((arr1.shape[0], dim_z_to_fill))
+                    arr3 = np.concatenate((arr1, arr2), axis=1)
+                    das.append(
+                        xr.DataArray(
+                            data=arr3,
+                            dims=["time", "z"],
+                            name=var,
+                            coords={"time": dsin.time},
+                            attrs=dsin[var].attrs
+                        )
+                    )
+                else:
+                    das.append(dsin[var])
+            ds = xr.merge(das)
+            ds = ds.set_coords("depth")
+            list_ds[ids] = ds
+    ds = xr.combine_nested(list_ds, "time")
+    return ds.sortby('time')
+
+def main():
+    import glob
+    path_files = glob.glob(
+        #os.path.join(ROOTDIR, "_samples", "GL_PR_PF_*.nc")
+        #os.path.join(ROOTDIR, "_samples", "GL_TS_MO_*.nc")
+        #os.path.join(ROOTDIR, "_samples", "GL_TS_DB_*.nc")
+        #os.path.join(ROOTDIR, "_samples", "cmems_glo12.nc")
+        os.path.join(ROOTDIR, "_samples", "hycom_*.nc")
+    )
+    ds = open_decode(path_files, "hycom")
+
+main()

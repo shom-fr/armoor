@@ -1,3 +1,4 @@
+'''
 import os
 import shutil
 import pathlib
@@ -42,3 +43,4 @@ def change_path_p2():
     logger = logging.getLogger(__name__)
 
     return logger
+'''

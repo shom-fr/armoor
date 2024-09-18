@@ -8,3 +8,6 @@ except Exception:
     # Disable minimum version checks on downstream libraries.
     __version__ = "999"
 """
+import os
+
+ROOTDIR = os.path.abspath(os.path.dirname(__file__))
