@@ -14,6 +14,7 @@ from xoa.regrid import regrid1d, grid2loc
 import xoa.coords as xcoords
 import xoa.geo as xgeo
 from matplotlib import path
+from armoor.base.__init__ import FILTERS
 
 R_terre = 6371
 logger = logging.getLogger(__name__)
@@ -231,58 +232,10 @@ class MetazoneAccessor:
             dso = dso.set_coords("depth")
         self._obj = dso
         return self._obj
-        
-
-    def horizontal_selection_radius(self, ds_obs, radius) -> xr.Dataset:
-        """
-        Subset dataset selecting the closest elements to the observations point located
-        within the specified radius.
-
-        Parameters
-        ----------
-        ds_obs : xr.Dataset
-            Dataset containing observation.
-
-        Returns
-        -------
-        xarray.Dataset
-            Dataset with elements around observation points.
-        """
-        
-        ds_model = self._obj
-        ds_model = xcoords.geo_stack(ds_model, "member")
-        dss = []
-        for itime, time in enumerate(ds_obs.time):
-            ds = ds_model.interp(time=time.values)
-            dist_model2obs = xgeo.get_distances(
-                ds,
-                ds_obs.isel(time=itime) if "time" in ds_obs.lon.dims else ds_obs
-            ).squeeze().rename(
-                npts0="member"
-            ).assign_coords(member=ds_model.member)
-
-            ds = ds.where(
-                dist_model2obs < radius * 1e3,
-                drop=True
-            )
-            ds = ds.assign_coords({"time": time})
-            for coord in ["lon_0", "lat_0"]:
-                ds[coord] = ds[coord].expand_dims(dim="time")
-            ds = ds.drop(
-                ["lon", "lat", "lon_1", "lat_1"]
-            )
-            ds = ds.rename({
-                "lon_0": "lon",
-                "lat_0": "lat"
-            })
-            dss.append(ds)
-        self._obj = xr.combine_nested(dss, "time")
-        return self._obj
  
-    
-    def sel_closest(self, lat, lon):
+    def sel_closest(self, ds_obs):
         """
-        Select the nearest point of lat, lon.
+        Select the nearest point around obs.
         Parameters
         ----------
         lon : float
@@ -293,25 +246,19 @@ class MetazoneAccessor:
         xarray.Dataset
             Dataset with elements around (lat, lon).
         """
-        ds_obs = xr.Dataset(
-            coords=dict(
-                lon=("member", [lon]),
-                lat=("member", [lat]),
-            ),
-        )
         if "time" in self._obj.lon.dims:
             dss = []
-            for time in self._obj.time:
-                ds_model = self._obj.sel(time=time)
+            for itime, time in enumerate(self._obj.time):
+                ds_model = self._obj.isel(time=[itime])
                 dist_model2obs = xgeo.get_distances(
                     ds_model,
-                    ds_obs
+                    ds_obs.isel(time=[itime])
                 ).squeeze().rename({"npts0": "member"})
                 dss.append(
                     ds_model.where(
                         dist_model2obs == dist_model2obs.min(),
                         drop=True
-                    )
+                    ).squeeze()
                 )
             return xr.combine_nested(dss, "time")
         else:
@@ -323,7 +270,7 @@ class MetazoneAccessor:
             return ds_model.where(
                 dist_model2obs == dist_model2obs.min(),
                 drop=True
-            )
+            ).squeeze()
     
     def horizontal_selection_bathy(self, minimum: float = None,
                                    maximum: float = None, ) -> xr.Dataset:
@@ -351,17 +298,17 @@ class MetazoneAccessor:
         logger.info("Applying filter - horizontal_selection_bathymetry")
         return self.data_selection(dim='bathy', minimum=minimum, maximum=maximum)
 
-    def vertical_selection_range(self, vranges: list = None, vname: str = "depth") -> xr.Dataset:
+    def vertical_selection_range(self, vname: str, vranges: list) -> xr.Dataset:
         """
         Subset dataset selecting elements whom depth values are included in the specified
         depth ranges.
 
         Parameters
         ----------
-        vranges : list
-            List of vertical range.
         vname : str
             Name of vertical coordinate.
+        vranges : list
+            List of vertical range.
 
         Returns
         -------
@@ -395,7 +342,7 @@ class MetazoneAccessor:
         self._obj = dso
         return self._obj
     
-    def vertical_selection_levels(self, vlevels: list = None, vname: str = "depth", method: str = "linear") -> xr.Dataset:
+    def vertical_selection_levels(self, vname: str, vlevels: list,  method: str = "linear") -> xr.Dataset:
         """
         Subset dataset selecting elements at specific vertical levels.
 
@@ -428,10 +375,9 @@ class MetazoneAccessor:
                 da = dsi[var]
             das.append(da)
         self._obj = xr.merge(das)
-
         return self._obj    
 
-    def time_selection_bounds(self, start=None, end=None) -> xr.Dataset:
+    def time_selection_bounds(self, start, end) -> xr.Dataset:
         """
         Subset dataset selecting elements in a bounded temporal interval.
 
@@ -511,11 +457,7 @@ class MetazoneAccessor:
                 "Use trange=1MS, 2MS... to specify a  monthly sequential range."
             )
             sys.exit(1)
-        time_bins = pd.date_range(
-            start=pd.to_datetime(start),
-            end=pd.to_datetime(end),
-            freq=tbin,
-        )
+        time_bins = get_time_bins(start, end, tbin)
         labels = [
             time_bins[it] + 0.5 * (time_bins[it + 1] - time_bins[it])
             for it in range(len(time_bins) - 1)
@@ -579,3 +521,34 @@ class MetazoneAccessor:
             logger.error(f"Cutting the dataset at {freq} is not implemented.")
             sys.exit(1)
         return self._obj.where((dt >= fmin) & (dt <= fmax), drop=True)
+
+def apply_trange(ds, metazone):
+    
+    #time intervals
+    time_range = ["trange_seq", "trange_clim"]
+    for k in time_range:
+        if k in metazone.keys():
+            ds = FILTERS[k](ds)(
+                metazone["tbound"][0],
+                metazone["tbound"][1],
+                metazone[k]
+            )
+    return ds
+
+
+def apply_vrange(ds, metazone):
+    
+    #vertical intervals
+    if "vrange" in metazone:
+        attrs = ds.attrs
+        ds = FILTERS["vrange"](ds)(*metazone["vrange"].items()[0])
+        ds = ds.assign_attrs({**attrs})
+    return ds
+
+
+def get_time_bins(start, end, tbin):
+    return pd.date_range(
+        start=pd.to_datetime(start),
+        end=pd.to_datetime(end),
+        freq=tbin,
+    )

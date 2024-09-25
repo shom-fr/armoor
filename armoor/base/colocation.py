@@ -2,10 +2,90 @@
 import logging
 import xarray as xr
 import numpy as np
+from xoa.regrid import regrid1d
 import xoa.grid
+import xoa.geo as xgeo
+import xoa.coords as xcoords
 import xesmf as xe
+
 from armoor.base import sel_var
 logger = logging.getLogger(__name__)
+
+
+def vertical(dsi, dsref) -> xr.Dataset:
+    
+    """
+    Subset dataset selecting elements at specific vertical levels.
+
+    Parameters
+    ----------
+    vlevels : list
+        List of vertical levels.
+    vname : str
+        Name of vertical coordinate.
+    method : str
+        Method of interpolation.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
+    das = []
+    for var in dsi.data_vars:
+        if "z" in dsi[var].dims:
+            da = regrid1d(dsi[var], dsref, method="linear")
+        else:
+            da = dsi[var]
+        das.append(da)
+    dso = xr.merge(das)
+
+    return dso
+
+def obs_coords(ds_obs, ds_model, radius) -> xr.Dataset:
+    """
+    Subset dataset selecting the closest elements to the observations point located
+    within the specified radius.
+
+    Parameters
+    ----------
+    ds_obs : xr.Dataset
+        Dataset containing observation.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with elements around observation points.
+    """
+    ds_model = xcoords.geo_stack(ds_model, "member")
+    dss = []
+    for itime, time in enumerate(ds_obs.time):
+        ds = ds_model.reset_coords("depth").interp(time=time.values, method="nearest")
+        dist_model2obs = xgeo.get_distances(
+            ds,
+            ds_obs.isel(time=itime) if "time" in ds_obs.lon.dims else ds_obs
+        ).squeeze().rename(
+            npts0="member"
+        ).assign_coords(member=ds_model.member)
+
+        ds = ds.where(
+            dist_model2obs < radius * 1e3,
+            drop=True
+        )
+        ds = ds.assign_coords({"time": time})
+        for coord in ["lon_0", "lat_0"]:
+            ds[coord] = ds[coord].expand_dims(dim="time")
+        ds = ds.drop(
+            ["lon", "lat", "lon_1", "lat_1"]
+        )
+        ds = ds.rename({
+            "lon_0": "lon",
+            "lat_0": "lat"
+        })
+        dss.append(ds)
+        ds.close()
+    ds = xr.combine_nested(dss, "time")
+    ds = ds.set_coords("depth")
+    return ds
 
 
 def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method_z=None):

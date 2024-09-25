@@ -1,4 +1,4 @@
-import argparse
+ import argparse
 import sys
 import os
 from xoa import cfgm

@@ -213,7 +213,7 @@ def sel_default_vars(config_obj):
         Meta-zone, models and observation from the parser with the selected variables.
     """
     feature = config_obj["functionality"]
-    additional_vars = config_obj['meta_zones']['vars'] if 'vars' in config_obj['meta_zones'] else []
+    additional_vars = config_obj['metazone']['vars'] if 'vars' in config_obj['metazone'] else []
 
     if feature == "sst":  # F1
         default_vars = ['SST']
@@ -261,15 +261,16 @@ def sel_default_vars(config_obj):
                 config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(
                     vars).assign_coords({'time': months})
     else:
-        config_obj['observation']["xarray_meta"] = config_obj['observation'][
-            "xarray_meta"].sel_var.selection(vars)
+        # config_obj['observation']["ds_metazone"] = config_obj['observation'][
+        #     "ds_metazone"].sel_var.selection(vars)
         for i_mod, mod in enumerate(config_obj['models']):
-            mod["xarray_meta"] = mod["xarray_meta"].sel_var.selection(vars)
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel_var.selection(vars)
-            config_obj['observation']["xarray_meta_coloc"][i_mod] = \
-                config_obj['observation']["xarray_meta_coloc"][i_mod].sel_var.selection(vars)
+            #config_obj['models'][mod]["ds_metazone"] = config_obj['models'][mod]["ds_metazone"].sel_var.selection(vars)
+            config_obj['models'][mod]["ds_coloc"] = config_obj['models'][mod]["ds_coloc"].sel_var.selection(vars)
+            config_obj['observation']["ds_coloc"].update({
+                mod: config_obj['observation']["ds_coloc"][mod].sel_var.selection(vars)
+            })
 
-    return config_obj
+    return config_obj, vars
 
 
 def sel_one_var(observation, models, var, depth=None):
@@ -283,7 +284,7 @@ def sel_one_var(observation, models, var, depth=None):
     """
     # Avoid deep copy
     observation_var = dict()
-    observation_var["xarray_meta_coloc"] = []
+    observation_var["ds_coloc"] = []
 
     models_var = [dict() for _ in models]
     for key in ['name', 'method', 'xarray']:
@@ -294,7 +295,7 @@ def sel_one_var(observation, models, var, depth=None):
                 models_var[i_mod][key] = mod[key]
 
     # Select variable and add mod/obs name, in meta products
-    if var in observation['xarray_meta']:
+    if var in observation['ds_metazone']:
         observation_var['xarray_meta'] = observation['xarray_meta'][var].assign_attrs(
             {'name': observation['name']})
         for i_mod, mod in enumerate(models):

@@ -1,7 +1,7 @@
 """
 Open files and decode data.
 """
-import os
+import os, glob, sys
 import logging
 import datetime
 import concurrent.futures
@@ -20,7 +20,7 @@ from armoor.__init__ import ROOTDIR
 
 logger = logging.getLogger(__name__)
 
-def open_decode(path_files, fmt, platform=None, func=None, type=None, steps=None) -> xr.Dataset:
+def open_decode(path_files, fmt, platform=None, func=None, type=None) -> xr.Dataset:
     """
      Open a netcdf/txt file and store it into a dataset
      Parameters
@@ -52,9 +52,22 @@ def open_decode(path_files, fmt, platform=None, func=None, type=None, steps=None
     #     directory = os.getcwd()
     #     logger.warning('using path : %s', directory)
     # xcf.register_cf_specs(path)
-
     if not isinstance(path_files, (list, dict)):
-        raise TypeError("Only list or dict are allowed : %s", path_files)
+        raise TypeError(f"Only list or dict are allowed : {path_files}")
+        
+    if (len(path_files) == 1) & ("*" in path_files[0]):
+        paths = glob.glob(path_files[0])
+        if len(paths) == 0:
+            raise TypeError(
+                f"{path_files[0]} not found."
+            )
+        path_files = paths
+    else:
+        for path in path_files:
+            if not os.path.exists(path):
+                raise TypeError(
+                    f"{path} does not exist."
+                )
 
     # Open file
     if func == 'forecaster':
@@ -67,6 +80,9 @@ def open_decode(path_files, fmt, platform=None, func=None, type=None, steps=None
     if fmt == "cmems_insitu":
         logger.info("Opening/decoding insitu cmems files")
         return open_decode_cmems_insitu(path_files, platform=platform)
+    elif fmt == "cora_insitu":
+        logger.info("Opening/decoding insitu cmems files")
+        return open_decode_cora_insitu(path_files, platform=platform)
     elif fmt == "cmems_model":
         logger.info("Opening/decoding model cmems files")
         return open_decode_cmems_model(path_files)
@@ -234,6 +250,45 @@ def open_decode_woa18(path_files):
 
     return woa18
 
+def open_decode_cora_insitu(path_files, platform):
+    """
+     Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
+     Parameters
+     ----------
+     path_files : str, list of str
+         Path to the netcdf files.
+     steps : float
+        Horizontal and vertical steps
+     Returns
+     -------
+     xarray.Dataset
+         CORA dataset.
+     """
+    # Open
+    cmems_coords = ["time", "lon", "lat", "depth"]
+    path = os.path.join(ROOTDIR, 'config', f'cora_{platform}.cfg')
+    logger.info(path)
+    xcf.register_cf_specs(path)
+    xoa.register_accessors()
+    dss = []
+    for path in path_files:
+        ds = xr.open_dataset(path).xoa.decode()
+        ds = ds.swap_dims({"N_PROF": "time", "level": "z"})
+        for coord in ds.coords:
+            if coord not in cmems_coords:
+                ds = ds.reset_coords(coord)
+        if ("depth" not in ds) and ("pres" in ds):            
+            ds = depth_from_pres(ds)
+        for var in ds.data_vars:
+            if var in cmems_coords:
+                ds = ds.set_coords(var)
+        ds["depth"] = -ds["depth"]
+        dss.append(ds)
+    if platform == "argo":
+        return concat_argo(dss)
+    else:
+        return dss
+
     
 def open_decode_cmems_insitu(path_files, platform):
     """
@@ -252,17 +307,18 @@ def open_decode_cmems_insitu(path_files, platform):
     # Open
     cmems_coords = ["time", "lon", "lat", "depth"]
     path = os.path.join(ROOTDIR, 'config', f'cmems_{platform}.cfg')
+    logger.info(path)
     xcf.register_cf_specs(path)
     xoa.register_accessors()
-    #xoa.register_accessors(decode_sigma=True)
     dss = []
     for path in path_files:
         ds = xr.open_dataset(path).xoa.decode()
-
         if "depth" in ds.dims:
             ds = ds.swap_dims({"depth": "z"})
         elif "DEPTH" in ds.dims:
             ds = ds.swap_dims({"DEPTH": "z"})
+        if "DEPH" in ds.coords:
+            ds = ds.rename({"DEPH": "depth"})
         if ((
             "lon" in ds.lon.dims
         ) and (
@@ -295,6 +351,7 @@ def open_decode_cmems_insitu(path_files, platform):
         for var in ds.data_vars:
             if var in cmems_coords:
                 ds = ds.set_coords(var)
+        ds["depth"] = -ds["depth"]
         dss.append(ds)
     if platform == "argo":
         return concat_argo(dss)
@@ -1472,12 +1529,13 @@ def concat_argo(list_ds):
 def main():
     import glob
     path_files = glob.glob(
+        os.path.join(ROOTDIR, "_samples", "CO_*_PR_PF.nc")
         #os.path.join(ROOTDIR, "_samples", "GL_PR_PF_*.nc")
         #os.path.join(ROOTDIR, "_samples", "GL_TS_MO_*.nc")
         #os.path.join(ROOTDIR, "_samples", "GL_TS_DB_*.nc")
         #os.path.join(ROOTDIR, "_samples", "cmems_glo12.nc")
-        os.path.join(ROOTDIR, "_samples", "hycom_*.nc")
+        #os.path.join(ROOTDIR, "_samples", "hycom_*.nc")
     )
-    ds = open_decode(path_files, "hycom")
+    ds = open_decode(path_files, "cora_insitu", platform="argo")
 
 main()

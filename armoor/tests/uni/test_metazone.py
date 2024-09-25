@@ -80,7 +80,7 @@ def test_horizontal_quality(quality):
             )
         ),
     )
-    dso = dsi.meta.quality_filter(quality)
+    dso = dsi.meta.quality_filter(*quality)
     assert isinstance(dso, xr.Dataset)
     var_qc = quality[0] + "_qc"
     if  var_qc in dsi.data_vars:
@@ -169,140 +169,18 @@ def test_horizontal_coords(dsi, coords):
     dso = dsi.meta.horizontal_selection_coords(coords)
     assert "npts" in dso.dims
     assert dso.dims["npts"] == len(coords)
-    
-@pytest.mark.parametrize(
-    "ds_model, ds_obs", [
-        (xr.Dataset(
-            data_vars=dict(
-                temp=(
-                    ["time", "z", "y", "x"],
-                    15 + 8 * np.random.randn(15, 3, 5, 10),
-                ),
-            ),
-            coords=dict(
-                lon=(
-                    ["y", "x"],
-                    np.meshgrid(
-                        np.arange(0.0, 10, 1),
-                        np.arange(30, 35, 1)
-                    )[0]
-                ),
-                lat=(
-                    ["y", "x"],
-                    np.meshgrid(
-                        np.arange(0.0, 10, 1),
-                        np.arange(30, 35, 1)
-                    )[1]
-                ),
-                depth=(
-                    ["time", "z", "y", "x"],
-                    500 + 200 * np.random.randn(15, 3, 5, 10)
-                ),
-                time=("time", pd.date_range(
-                    start='1999-12-31',
-                    freq='12h',
-                    periods=15
-                )),
-            ),
-        ),
-        xr.Dataset(
-            data_vars=dict(
-                temp=(
-                    ["time", "z"],
-                    15 + 8 * np.random.randn(4, 3),
-                ),
-            ),
-            coords=dict(
-                lon=(
-                    ["time"], np.linspace(5, 8, 4)
-                ),
-                lat=(
-                    ["time"], np.linspace(32, 34, 4)
-                ),
-                depth=(
-                    ["time", "z"],
-                    500 + 200 * np.random.randn(4, 3)
-                ),
-                time=("time", pd.date_range(
-                    start='2000-01-01',
-                    freq='1D',
-                    periods=4
-                )),
-            ),
-        )),
-        (xr.Dataset(
-            data_vars=dict(
-                temp=(
-                    ["time", "z", "y", "x"],
-                    15 + 8 * np.random.randn(15, 3, 5, 10),
-                ),
-            ),
-            coords=dict(
-                lon=(
-                    ["y", "x"],
-                    np.meshgrid(
-                        np.arange(0.0, 10, 1),
-                        np.arange(30, 35, 1)
-                    )[0]
-                ),
-                lat=(
-                    ["y", "x"],
-                    np.meshgrid(
-                        np.arange(0.0, 10, 1),
-                        np.arange(30, 35, 1)
-                    )[1]
-                ),
-                depth=(
-                    ["time", "z", "y", "x"],
-                    500 + 200 * np.random.randn(15, 3, 5, 10)
-                ),
-                time=("time", pd.date_range(
-                    start='1999-12-31',
-                    freq='12h',
-                    periods=15
-                )),
-            ),
-        ),
-        xr.Dataset(
-            data_vars=dict(
-                temp=(
-                    ["time", "z"],
-                    15 + 8 * np.random.randn(4, 3),
-                ),
-            ),
-            coords=dict(
-                lon=6.0,
-                lat=33.0,
-                depth=(
-                    ["time", "z"],
-                    500 + 200 * np.random.randn(4, 3)
-                ),
-                time=("time", pd.date_range(
-                    start='2000-01-01',
-                    freq='1D',
-                    periods=4
-                )),
-            ),
-        )),
-    ],
-)
-def test_horizontal_radius(ds_model, ds_obs):
-    radius = 100 #km
-    dso = ds_model.meta.horizontal_selection_radius(ds_obs, radius)
-    assert isinstance(dso, xr.Dataset)
-    assert set(["time", "z", "member"]).issubset(dso.dims)
 
 @pytest.mark.parametrize(
-    "ds, lon, lat", [
+    "ds, obs", [
         (xr.Dataset(
             coords=dict(
                 lon=(
-                    "member",
-                    5 + 2 * np.random.randn(2)
+                    ["time", "member"],
+                    5 + 2 * np.random.randn(4, 2)
                 ),
                 lat=(
-                    "member",
-                    30 + 2 * np.random.randn(2)
+                    ["time", "member"],
+                    30 + 2 * np.random.randn(4, 2)
                 ),
                 depth=(
                     ["time", "z", "member"],
@@ -314,7 +192,23 @@ def test_horizontal_radius(ds_model, ds_obs):
                     periods=4
                 )),
             ),
-        ), 30.0, 5.0),
+        ), xr.Dataset(
+            coords=dict(
+                lon=(
+                    "time",
+                    5 + 2 * np.random.randn(4)
+                ),
+                lat=(
+                    "time",
+                    30 + 2 * np.random.randn(4)
+                ),
+                time=("time", pd.date_range(
+                    start='1999-12-31',
+                    freq='12h',
+                    periods=4
+                )),
+            ),
+        )),
         (xr.Dataset(
             coords=dict(
                 lon=(
@@ -326,13 +220,18 @@ def test_horizontal_radius(ds_model, ds_obs):
                     30 + 2 * np.random.randn(2)
                 ),
             ),
-        ), 30.0, 5.0)
+        ), xr.Dataset(
+            coords=dict(
+                lon=5.5,
+                lat=31.0
+            ),  
+        ))
     ],
 )
-def test_horizontal_closest(ds, lat, lon):
-    dso = ds.meta.sel_closest(lat, lon)
+def test_horizontal_closest(ds, obs):
+    dso = ds.meta.sel_closest(obs)
     assert isinstance(dso, xr.Dataset)
-    assert dso.dims["member"] == 1
+    assert "member" not in dso.dims
 
 @pytest.mark.parametrize(
     "ds, vrange, var", [
@@ -390,7 +289,7 @@ def test_horizontal_closest(ds, lat, lon):
     ],
 )
 def test_vertical_range(ds, vrange, var):
-    dso = ds.meta.vertical_selection_range(vrange, var)
+    dso = ds.meta.vertical_selection_range(var, vrange)
     assert isinstance(dso, xr.Dataset)
     assert dso.sizes["vrange"] == len(vrange)
     assert dso.sizes["vbin"] == 2
@@ -468,7 +367,7 @@ def test_vertical_range(ds, vrange, var):
     ],
 )
 def test_vertical_levels(ds, vlevels, var, method):
-    dso = ds.meta.vertical_selection_levels(vlevels, var, method)
+    dso = ds.meta.vertical_selection_levels(var, vlevels, method=method)
     assert isinstance(dso, xr.Dataset)
     assert dso.sizes["z"] == len(vlevels)
     assert set(ds.dims).issubset(dso.dims)

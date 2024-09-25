@@ -62,15 +62,15 @@ class SSTAccessor:
                 dataset = dataset.rename('sst') if dataset is not None else dataset
             elif var == 'temp':
                 dataset = self._obj.sel_var.sel_temp()
-                dataset = dataset.rename('temp') if dataset is not None else dataset
+                #dataset = dataset.rename('temp') if dataset is not None else dataset
             elif var == 'ptemp':
                 dataset = self._obj.sel_var.sel_ptemp()
-                dataset = dataset.rename('ptemp') if dataset is not None else dataset
+                #dataset = dataset.rename('ptemp') if dataset is not None else dataset
             elif var == 'ssh':
                 dataset = self._obj.sel_var.sel_ssh()
             elif var == 'sal':
                 dataset = self._obj.sel_var.sel_sal()
-                dataset = dataset.rename('sal') if dataset is not None else dataset
+                #dataset = dataset.rename('sal') if dataset is not None else dataset
             elif var == 'dens':
                 dataset = self._obj.sel_var.sel_density()
             elif var == 'pdens':
@@ -91,7 +91,7 @@ class SSTAccessor:
                 dataset = self._obj.sel_var.sel_pres()
             elif var == 'sound_speed':
                 dataset = self._obj.sel_var.sel_sound_speed()
-                dataset = dataset.rename('sound_speed') if dataset is not None else dataset
+                #dataset = dataset.rename('sound_speed') if dataset is not None else dataset
             else:
                 if var in self._obj:
                     dataset = self._obj[var]
@@ -101,23 +101,23 @@ class SSTAccessor:
             liste_ds.append(dataset)
 
         # Remove None datasets and datasets already in coords (pdens)
-        liste_ds = [dataset for dataset in liste_ds if dataset is not None]
-        liste_ds = [dataset for dataset in liste_ds if dataset.name not in self._obj.coords]
-        # Merge
-        if len(liste_ds) == 1:
-            ds_all = liste_ds[0]
-        elif len(liste_ds) > 1:
-            ds_all = xr.merge(liste_ds, compat='minimal')
+        # liste_ds = [dataset for dataset in liste_ds if dataset is not None]
+        # liste_ds = [dataset for dataset in liste_ds if dataset.name not in self._obj.coords]
+        # # Merge
+        # if len(liste_ds) == 1:
+        #     ds_all = liste_ds[0]
+        # elif len(liste_ds) > 1:
+        #     ds_all = xr.merge(liste_ds, compat='minimal')
 
-        # Convert to dataset for homogeneous processing
-        if not isinstance(ds_all, xr.Dataset):
-            ds_all = ds_all.to_dataset()
+        # # Convert to dataset for homogeneous processing
+        # if not isinstance(ds_all, xr.Dataset):
+        #     ds_all = ds_all.to_dataset()
 
         # Assign attributes (name especially)
-        ds_all = ds_all.assign_attrs(self._obj.attrs)
+        #ds_all = ds_all.assign_attrs(self._obj.attrs)
 
-        return ds_all
-
+        return self._obj
+    
     def convert_current(self):
         """
         convert current speed / direction into u /v
@@ -403,23 +403,23 @@ class SSTAccessor:
             Data array containing temperature.
         """
         if 'temp' in self._obj:
-            ds_temp = self._obj.temp.sel_var.convert_K_C()
-            ds_temp = ds_temp.rename('temp')
-            return ds_temp
+            temp = self._obj.temp.sel_var.convert_K_C()
+            self._obj["temp"] = temp
+            return self._obj
         if 'ptemp' in self._obj:
             sal = self._obj.sel_var.sel_sal()
             ptemp = self._obj.ptemp
             pres = self._obj.sel_var.sel_pres()
             cons_temp = gsw.CT_from_pt(sal, ptemp)
             temp = gsw.t_from_CT(sal, cons_temp, pres)
-            ds_temp = temp.rename('temp')
-            if np.isnan(ds_temp.min(skipna=True).data):  # If all nans, try the ptemp
-                logger.warning(
-                    'Temperature computation returned all nans : pot. temp. will be used.')
-                ds_temp = self._obj.sel_var.sel_ptemp()
-                ds_temp = ds_temp.rename('temp')
-            ds_temp.attrs['units'] = 'degC'
-            return ds_temp
+            temp.attrs['units'] = 'degC'
+            # if np.isnan(ds_temp.min(skipna=True).data):  # If all nans, try the ptemp
+            #     logger.warning(
+            #         'Temperature computation returned all nans : pot. temp. will be used.')
+            #     ds_temp = self._obj.sel_var.sel_ptemp()
+            #     ds_temp = ds_temp.rename('temp')
+            self._obj["temp"] = temp
+            return self._obj
 
     def sel_ptemp(self):
         """
@@ -443,9 +443,9 @@ class SSTAccessor:
                 self._obj['ptemp'] = ptemp
                 return self._obj['ptemp'].sel_var.convert_K_C()
 
-            logging.warning(
-                'The potential temperature could not be calculated, sea temperature will be used')
-            return self._obj.temp
+            raise TypeError(
+                'The potential temperature could not be calculated.'
+            )
 
     def sel_sound_speed(self):
         """
@@ -464,7 +464,7 @@ class SSTAccessor:
         if sal is not None and cons_temp is not None and pres is not None:
             snd_speed = gsw.sound_speed(sal, cons_temp, pres)
             snd_speed.attrs["units"] = "m/s"
-            return snd_speed
+            self._obj["sound_speed"] = snd_speed
 
         logger.warning("To compute sound speed you need to have salinity, "
                        "potential temperature and depth in your dataset.")
@@ -539,26 +539,29 @@ class SSTAccessor:
         """
         ds_dens = self._obj.xoa.pdens
         if ds_dens is None:
-            sal = self._obj.sel_var.sel_sal()
-            temp = self._obj.sel_var.sel_temp()
-            if not sal is None and not temp is None:
+            pres = gsw.conversions.p_from_z(-self._obj.depth, self._obj.lat)
+            asal = gsw.conversions.SA_from_SP(self._obj.sal, pres, self._obj.lon,self._obj.lat)
+            #sal = self._obj.sel_var.sel_sal().sal #should be absolute sal
+            #temp = self._obj.sel_var.sel_temp().temp #should be conservative temp
+            ctemp = gsw.CT_from_pt(asal, self._obj.sel_var.sel_ptemp())
+            if not asal is None and not ctemp is None:
                 if ref_dens is None or ref_dens not in [0, 1000, 2000, 3000, 4000]:
                     logger.warning(
                         'You did not specify the vertical reference to compute the potential density. '
                         'Please define reference_density in the configuration file, with values among 0, 1000, 2000, 3000 and 4000 dbar.'
                         'The reference will be 0 dbar here.')
-                    pdens = gsw.sigma0(sal, temp)
+                    func = gsw.sigma0
                 elif ref_dens == 0:
-                    pdens = gsw.sigma0(sal, temp)
+                    func = gsw.sigma0
                 elif ref_dens == 1000:
-                    pdens = gsw.sigma1(sal, temp)
+                    func = gsw.sigma1
                 elif ref_dens == 2000:
-                    pdens = gsw.sigma2(sal, temp)
+                    func = gsw.sigma2
                 elif ref_dens == 3000:
-                    pdens = gsw.sigma3(sal, temp)
+                    func = gsw.sigma3
                 elif ref_dens == 4000:
-                    pdens = gsw.sigma4(sal, temp)
-
+                    func = gsw.sigma4
+                pdens = func(asal, ctemp)
                 self._obj['pdens'] = pdens
                 self._obj['pdens'] = self._obj['pdens'].assign_attrs({'units': 'kg/m3'})
                 return self._obj['pdens']
