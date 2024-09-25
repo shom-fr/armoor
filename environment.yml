@@ -4,6 +4,7 @@ channels:
   - defaults
 dependencies:
   - python=3.11.6
+  - ipython
   - uvicorn=0.23.2
   - pycryptodome=3.19.0
   - sphinx
