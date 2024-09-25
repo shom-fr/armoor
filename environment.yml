@@ -8,6 +8,7 @@ dependencies:
   - uvicorn=0.23.2
   - pycryptodome=3.19.0
   - sphinx
+  - nbsphinx
   - sphinx-argparse
   - sphinx_rtd_theme
   - sphinxcontrib-applehelp
