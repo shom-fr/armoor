@@ -246,6 +246,7 @@ class MetazoneAccessor:
         xarray.Dataset
             Dataset with elements around (lat, lon).
         """
+        logger.info("Applying filter - sel_closest")
         if "time" in self._obj.lon.dims:
             dss = []
             for itime, time in enumerate(self._obj.time):
@@ -254,12 +255,11 @@ class MetazoneAccessor:
                     ds_model,
                     ds_obs.isel(time=[itime])
                 ).squeeze().rename({"npts0": "member"})
-                dss.append(
-                    ds_model.where(
+                ds = ds_model.where(
                         dist_model2obs == dist_model2obs.min(),
                         drop=True
                     ).squeeze()
-                )
+                dss.append(ds)
             return xr.combine_nested(dss, "time")
         else:
             ds_model = self._obj
@@ -315,6 +315,7 @@ class MetazoneAccessor:
         xarray.Dataset
              Dataset with vertical ranges.
         """
+        logger.info("Applying filter - vertical_selection_range")
         dsi = self._obj
         if "dens" in self._obj.coords:
             dsi = dsi.reset_coords("dens")
@@ -359,6 +360,7 @@ class MetazoneAccessor:
         -------
         xarray.Dataset
         """
+        logger.info("Applying filter - vertical_selection_levels")
         dsi = self._obj
         if (vname == "depth") and  ("dens" in self._obj.coords):
             dsi = dsi.reset_coords("dens")
@@ -392,6 +394,7 @@ class MetazoneAccessor:
         -------
         xarray.Dataset
         """
+        logger.info("Applying filter - time_selection_bounds")
         if not start:
             logger.error("Giving a begindate is mandatory.")
             sys.exit(1)
@@ -424,6 +427,7 @@ class MetazoneAccessor:
         -------
         xarray.Dataset
         """
+        logger.info("Applying filter - time_selection_terms")
         if dates:
             time = [pd.to_datetime(date) for date in dates]
         else:
@@ -451,6 +455,7 @@ class MetazoneAccessor:
         -------
         xarray.core.groupby.DatasetGroupBy
         """
+        logger.info("Applying filter - time_selection_range_seq")
         regex = re.compile(r"[0-9][M-Y]")
         if regex.fullmatch(tbin):
             logger.error(
@@ -482,6 +487,7 @@ class MetazoneAccessor:
         -------
         xarray.core.groupby.DatasetGroupBy
         """
+        logger.info("Applying filter - time_selection_range_clim")
         if isinstance(tbin, dict):
             months = self._obj.time.dt.month
             clim = xr.full_like(months, fill_value="none", dtype="U4")
@@ -510,6 +516,7 @@ class MetazoneAccessor:
         -------
         xarray.Dataset
         """
+        logger.info("Applying filter - time_selection_cut")
         dt = self._obj.time.dt
         if freq == "hour":
             dt = dt.hour

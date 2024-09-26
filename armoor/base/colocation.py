@@ -56,21 +56,29 @@ def obs_coords(ds_obs, ds_model, radius) -> xr.Dataset:
     xarray.Dataset
         Dataset with elements around observation points.
     """
+    ds_model = ds_model.reset_coords("depth").interp(
+        time=ds_obs.time,
+        method="nearest"
+    )
+
+    
     ds_model = xcoords.geo_stack(ds_model, "member")
-    dss = []
+
+    dss_model = []
+    dss_obs = []
     for itime, time in enumerate(ds_obs.time):
-        ds = ds_model.reset_coords("depth").interp(time=time.values, method="nearest")
         dist_model2obs = xgeo.get_distances(
-            ds,
+            ds_model.isel(time=itime),
             ds_obs.isel(time=itime) if "time" in ds_obs.lon.dims else ds_obs
         ).squeeze().rename(
             npts0="member"
         ).assign_coords(member=ds_model.member)
-
-        ds = ds.where(
+        ds = ds_model.isel(time=itime).where(
             dist_model2obs < radius * 1e3,
             drop=True
         )
+        if ds.sizes["member"] == 0:
+            continue
         ds = ds.assign_coords({"time": time})
         for coord in ["lon_0", "lat_0"]:
             ds[coord] = ds[coord].expand_dims(dim="time")
@@ -81,11 +89,13 @@ def obs_coords(ds_obs, ds_model, radius) -> xr.Dataset:
             "lon_0": "lon",
             "lat_0": "lat"
         })
-        dss.append(ds)
+        dss_model.append(ds)
+        dss_obs.append(ds_obs.isel(time=[itime]))
         ds.close()
-    ds = xr.combine_nested(dss, "time")
-    ds = ds.set_coords("depth")
-    return ds
+    ds_model = xr.combine_nested(dss_model, "time")
+    ds_obs = xr.combine_nested(dss_obs, "time")
+    ds_model = ds_model.set_coords("depth")
+    return ds_obs, ds_model
 
 
 def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method_z=None):

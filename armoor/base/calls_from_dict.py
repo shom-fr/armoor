@@ -75,7 +75,7 @@ def get_observation_models_meta(cfg: dict):
     logger.info("Reading observation files")
 
     # Open observation dataset from path then decode dataset and apply meta-zone
-    logger.info("Opening observation from file(s)")
+    logger.info("Opening and decode observation from file(s)")
     ds =  open_decode(
         observation.pop("path"),
         cfg['observation'].get('fmt'),
@@ -86,7 +86,7 @@ def get_observation_models_meta(cfg: dict):
     observation.update({"ds": ds})
     ds.close()
 
-    logger.info("Applying : decode and meta zone on observation")
+    logger.info("Applying : meta zone on observation")
     ds = apply_metas2dataset(
         observation["ds"],
         cfg,
@@ -105,17 +105,16 @@ def get_observation_models_meta(cfg: dict):
             models[model].get("path"),
             models[model].get("fmt")
         )
-        ds = ds.assign_attrs({'name': models[model].get("name")})
-        models[model].update({"ds": ds})
 
         logger.info("Applying meta zone on model")
         ds = apply_metas2dataset(
-            models[model]["ds"],
+            ds,
             cfg,
         )
-        models[model].update({"ds_metazone": ds})
+        models[model].update({
+            "ds_metazone": ds.assign_attrs({'name': models[model].get("name")})
+        })
         del ds
-        del models[model]["ds"]
     del observation["ds"]
     #colocation
     logger.info("Colocation")
@@ -124,27 +123,27 @@ def get_observation_models_meta(cfg: dict):
             "ds_coloc": {},
         })
         for model in models:
-            observation["ds_coloc"].update(
-                {model: observation["ds_metazone"]}
-            )
-            ds = coloc.obs_coords(
+            
+            ds_obs, ds_model = coloc.obs_coords(
                 observation["ds_metazone"],
                 models[model]["ds_metazone"],
                 cfg["metazone"]["radius"]
             )
             models[model].update({
-                "ds_coloc": ds.assign_attrs({
+                "ds_coloc": ds_model.assign_attrs({
                     'name': models[model].get("name"),
                     "radius": cfg["metazone"]["radius"],
                 })
             })
-            del ds
+            del ds_model
             observation["ds_coloc"].update(
-                {model: observation["ds_metazone"].assign_attrs({
+                {model: ds_obs.assign_attrs({
                     "tbound": cfg["metazone"]["tbound"],
                     "radius": cfg["metazone"]["radius"],
+                    'name': observation.get("name"),
                 })}
             )
+            del ds_obs
             vrange = cfg["metazone"].get("vrange")
             if vrange:
                 if "depth" in vrange:
@@ -484,7 +483,11 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
     ]
     for k in horizontal_meta:
         if k in metazone.keys():
-            ds = FILTERS[k](ds)(*metazone[k])
+            if k == "polygon":
+                args = metazone["polygon"]
+            else:
+                args = (*metazone[k],)
+            ds = FILTERS[k](ds)(args)
     #vertical
     vertical_meta = [
         "vlevel",

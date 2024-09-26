@@ -16,7 +16,7 @@ import cmocean
 from armoor.algo import calculation
 import armoor.base.meta_zone
 from xoa.geo import haversine
-from xoa.plot import plot_double_minimap
+from xoa.plot import plot_double_minimap, plot_minimap
 import xoa.plot as xplot
 from armoor.base.tools_features import manage_output, angle_between_vectors, calcul_mean_angle
 from armoor.base.meta_zone import apply_trange, apply_vrange, get_time_bins
@@ -39,8 +39,8 @@ LABELS_DIFF = ['Obs Co-located ', 'Model Co-located', 'Difference']
 
 LABELS_PROFILE = ['Observation profile / Model profiles']
 LABELS_STICKPLOT = ['Current stick plot - models / observation']
-LABELS_MAP = ['Observation - Meta-zone', 'Observation - Co-located', 'Model - Meta-zone',
-              'Model - Co-located', 'Comparison Model / Obs']
+LABELS_MAP = ['Observation', 'Observation', 'Model',
+              'Model', 'Comparison Model / Obs']
 
 LABELS_MAP_HARM = ['Model - Amplitude [m/s]', 'Model - Phase [°]', 'Observation - Amplitude [m/s]',
                    'Observation - Phase [°]', 'Difference - Amplitude [m/s]',
@@ -301,7 +301,7 @@ def figure_5_maps(ds):
         gl.xlabel_style = {'size': 12}
         gl.ylabel_style = {'size': 12}
         ax.add_feature(cfeature.LAND, zorder=1, edgecolor='k')
-        ax.set_title(label, fontsize=13)
+        ax.set_title(label, fontsize=10)
     f.subplots_adjust(left=0.02, bottom=0.02, right=0.99, top=0.87, hspace=0.25)
 
     return f, axs
@@ -338,7 +338,7 @@ def figure_6_maps(ds):
         gl.xlabel_style = {'size': 12}
         gl.ylabel_style = {'size': 12}
         ax.add_feature(cfeature.LAND, zorder=1, edgecolor='k')
-        ax.set_title(label, fontsize=13)
+        ax.set_title(label, fontsize=10)
     f.subplots_adjust(left=0.03, bottom=0.03, right=0.98, top=0.9, hspace=0.2)
     return f, axs
 
@@ -399,7 +399,7 @@ def figure_3_maps(ds, type):
         gl.xlabel_style = {'size': 12}
         gl.ylabel_style = {'size': 12}
         ax.add_feature(cfeature.LAND, zorder=1, edgecolor='k')
-        ax.set_title(label, fontsize=13)
+        ax.set_title(label, fontsize=10)
     f.subplots_adjust(left=0.03, bottom=0.03, right=0.98, top=0.9, hspace=0.2)
 
     return f, axs
@@ -457,7 +457,7 @@ def figure_3lin_ts():
 
     for ax, label in zip(axs, labels):
         ax.grid()
-        ax.set_title(label, fontsize=10)
+        ax.set_title(label, fontsize=6)
         ax.set_ylabel('Depth [m]', fontsize=10)
     f.subplots_adjust(left=0.1, bottom=0.03, right=0.98, top=0.9, hspace=0.4)
 
@@ -483,7 +483,7 @@ def figure_2lin_ts():
 
     for ax, label in zip(axs, labels):
         ax.grid()
-        ax.set_title(label, fontsize=15)
+        ax.set_title(label, fontsize=6)
     f.subplots_adjust(top=1, bottom=0.75, wspace=0.5, hspace=0.5)
 
     return f, axs
@@ -504,7 +504,7 @@ def figure_1_profile():
     label = LABELS_PROFILE[0]
 
     ax.grid()
-    ax.set_title(label, fontsize=15)
+    #ax.set_title(label, fontsize=6)
     f.subplots_adjust(left=0.1, bottom=0.03, right=0.98, top=0.85, wspace=0.25, hspace=0.15)
     return f, ax
 
@@ -524,7 +524,7 @@ def figure_1_stickplot():
     label = LABELS_STICKPLOT[0]
 
     ax.grid()
-    ax.set_title(label, fontsize=20)
+    ax.set_title(label, fontsize=6)
     f.subplots_adjust(left=0.1, bottom=0.03, right=0.9, top=0.85, wspace=0.25, hspace=0.15)
     return f, ax
 
@@ -696,7 +696,7 @@ def diag_disp(trange, vrange, diag_type, mod, obs, output_path=None):
         title, figname = get_title_figname('Dispersion diagram', obs, mod.attrs['name'],
                                            obs.attrs['name'])
         diag_disp_figure(mod, obs, varname, title)
-        plot_double_minimap(obs)
+        plot_minimap(obs, plot_coords="points")
         manage_output(figname, output_path)
 
     # elif diag_type == "diag_disp":
@@ -837,7 +837,7 @@ def diag_disp(trange, vrange, diag_type, mod, obs, output_path=None):
                     title, figname = get_title_figname('Dispersion diagram', obsi,
                                                         modi.attrs['name'], obsi.attrs['name'])
                     diag_disp_figure(modi, obsi, varname, title)
-                    plot_double_minimap(obsi)
+                    plot_minimap(obsi, plot_coords="points")
                     manage_output(figname, output_path)
             else:
                 title, figname = get_title_figname('Dispersion diagram', obsz,
@@ -848,7 +848,7 @@ def diag_disp(trange, vrange, diag_type, mod, obs, output_path=None):
                     varname,
                     title
                 )
-                plot_double_minimap(obsz)
+                plot_minimap(obsz, plot_coords="points")
                 manage_output(figname, output_path)
                 
 
@@ -1229,7 +1229,7 @@ def plot_map_metr_profiles_figure(mod_coloc, obs_coloc, comparison, title, vmin,
     f.colorbar(im0, ax=axs[0], orientation='horizontal', fraction=0.046, pad=0.1)
     f.colorbar(im1, ax=axs[1], orientation='horizontal', fraction=0.046, pad=0.1)
     f.colorbar(im2, ax=axs[2], orientation='horizontal', fraction=0.046, pad=0.1)
-    f.suptitle(title, fontsize=17, fontweight='bold')
+    f.suptitle(title, fontsize=10, fontweight='bold')
 
 
 def plot_map_metr(flag_interval, flag_slice, mod_meta, mod_coloc, obs_meta, obs_coloc, metric,
@@ -3091,9 +3091,9 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None, plg=None):
                 else:
                     axs[iax].set_xlabel("Time")
         f.suptitle(title, 
-                   #x=0.4, y=1.01, 
-                   fontsize=15, fontweight='bold')
-        plot_double_minimap(obs)
+                   x=0.4, y=1.01, 
+                   fontsize=6, fontweight='bold')
+        plot_minimap(obs, plot_coords="points")
         manage_output(figname, output_path)
 
 
@@ -3232,12 +3232,12 @@ def plot_profile_unique(varname, models, observation, output_path=None):
             modi_closest = mod_closest[imod].isel(time=itime)
             # Plot the observation profile
             if imod == 0:
-                ax.plot(obsi[varname].values, -1 * obsi.depth.values, '-ok', label=f'{obs.attrs["name"]}')
+                ax.plot(obsi[varname].values, -1 * obsi.depth.values, 'red', label=f'{obs.attrs["name"]}')
             
             # Plot the model profiles
             #mod_nearest = mod["xarray_meta"].sel(lon=obs.lon, lat=obs.lat, time=time,
             #                                     method='nearest').squeeze()
-            ax.plot(modi_closest[varname].values, -1 * modi_closest.depth.values, '-^', label=f'{modi.attrs["name"]}')
+            ax.plot(modi_closest[varname].values, -1 * modi_closest.depth.values, 'blue', label=f'{modi.attrs["name"]}')
 
             # Plot the standard deviation
             modi = modi.reset_coords("depth")
@@ -3264,7 +3264,7 @@ def plot_profile_unique(varname, models, observation, output_path=None):
         f.suptitle(title, fontsize=17, fontweight='bold', x=0.35, y=1.01)
 
         # Add the mini-map
-        plot_double_minimap(obsi)
+        plot_minimap(obs, plot_coords="points")
         manage_output(figname, output_path)
 
 
@@ -3335,32 +3335,32 @@ def plot_profile_multi(trange, varname, models, observation, output_path=None):
         obsi.attrs['radius'] = r
         obs_mean = obsi.mean(dim="time")
         obs_std = obsi.std(dim="time")
-        ax.plot(
-            obs_mean[varname].values,
-            -1 * obs_mean.depth.values,
-            '-r', label=f'mean {obs.attrs["name"]}', linewidth=4
-        )
-        ax.fill_betweenx(
-            -1 * obs_mean.depth.values,
-            (obs_mean[varname] - obs_std[varname]).squeeze(),
-            (obs_mean[varname] + obs_std[varname]).squeeze(),
-            alpha=0.2, label=f'mean +/- std {obs.attrs["name"]}', color="red"
-        )
+        # ax.plot(
+        #     obs_mean[varname].values,
+        #     -1 * obs_mean.depth.values,
+        #     '-r', label=f'mean {obs.attrs["name"]}', linewidth=4
+        # )
+        # ax.fill_betweenx(
+        #     -1 * obs_mean.depth.values,
+        #     (obs_mean[varname] - obs_std[varname]).squeeze(),
+        #     (obs_mean[varname] + obs_std[varname]).squeeze(),
+        #     alpha=0.2, label=f'mean +/- std {obs.attrs["name"]}', color="red"
+        # )
         modi = mod.reset_coords("depth")
         mod_std = modi.std(['member', 'time'])
         mod_mean = modi.mean(['member', 'time'])
         modi = modi.set_coords("depth")
-        ax.plot(
-            mod_mean[varname].values,
-            -1 * mod_mean.depth.values,
-            '-b', label=f'mean {mod.attrs["name"]}', linewidth=4
-        )
-        ax.fill_betweenx(
-            -1 * mod_mean.depth.values,
-            (mod_mean[varname] - mod_std[varname]).squeeze(),
-            (mod_mean[varname] + mod_std[varname]).squeeze(),
-            alpha=0.2, label=f'mean +/- std {mod.attrs["name"]}' , color="blue"
-        )
+        # ax.plot(
+        #     mod_mean[varname].values,
+        #     -1 * mod_mean.depth.values,
+        #     '-b', label=f'mean {mod.attrs["name"]}', linewidth=4
+        # )
+        # ax.fill_betweenx(
+        #     -1 * mod_mean.depth.values,
+        #     (mod_mean[varname] - mod_std[varname]).squeeze(),
+        #     (mod_mean[varname] + mod_std[varname]).squeeze(),
+        #     alpha=0.2, label=f'mean +/- std {mod.attrs["name"]}' , color="blue"
+        # )
 
         # Add the plot features
         plt.legend()
@@ -3375,7 +3375,7 @@ def plot_profile_multi(trange, varname, models, observation, output_path=None):
         f.suptitle(title, fontsize=17, fontweight='bold', x=0.35, y=1.01)
     
         # Add the mini-map
-        plot_double_minimap(obsi)
+        plot_minimap(obsi, plot_coords="points")
     
         manage_output(figname, output_path)
 
@@ -3465,32 +3465,32 @@ def plot_profile_multi_trange(trange, varname, models, observation, output_path=
             obsi = obsi.reset_coords("depth")
             obs_mean = obsi.mean(dim="time")
             obs_std = obsi.std(dim="time")
-            ax.plot(
-                obs_mean[varname].values,
-                -1 * obs_mean.depth.values,
-                '-r', label=f'mean {obs.attrs["name"]}', linewidth=4
-            )
-            ax.fill_betweenx(
-                -1 * obs_mean.depth.values,
-                (obs_mean[varname] - obs_std[varname]).squeeze(),
-                (obs_mean[varname] + obs_std[varname]).squeeze(),
-                alpha=0.2, label=f'mean +/- std {obs.attrs["name"]}', color="red"
-            )
+            # ax.plot(
+            #     obs_mean[varname].values,
+            #     -1 * obs_mean.depth.values,
+            #     '-r', label=f'mean {obs.attrs["name"]}', linewidth=4
+            # )
+            # ax.fill_betweenx(
+            #     -1 * obs_mean.depth.values,
+            #     (obs_mean[varname] - obs_std[varname]).squeeze(),
+            #     (obs_mean[varname] + obs_std[varname]).squeeze(),
+            #     alpha=0.2, label=f'mean +/- std {obs.attrs["name"]}', color="red"
+            # )
             modi = modi.reset_coords("depth")
             mod_std = modi.std(['member', 'time'])
             mod_mean = modi.mean(['member', 'time'])
             modi = modi.set_coords("depth")
-            ax.plot(
-                mod_mean[varname].values,
-                -1 * mod_mean.depth.values,
-                '-b', label=f'mean {mod.attrs["name"]}', linewidth=4
-            )
-            ax.fill_betweenx(
-                -1 * mod_mean.depth.values,
-                (mod_mean[varname] - mod_std[varname]).squeeze(),
-                (mod_mean[varname] + mod_std[varname]).squeeze(),
-                alpha=0.2, label=f'mean +/- std {mod.attrs["name"]}' , color="blue"
-            )
+            # ax.plot(
+            #     mod_mean[varname].values,
+            #     -1 * mod_mean.depth.values,
+            #     '-b', label=f'mean {mod.attrs["name"]}', linewidth=4
+            # )
+            # ax.fill_betweenx(
+            #     -1 * mod_mean.depth.values,
+            #     (mod_mean[varname] - mod_std[varname]).squeeze(),
+            #     (mod_mean[varname] + mod_std[varname]).squeeze(),
+            #     alpha=0.2, label=f'mean +/- std {mod.attrs["name"]}' , color="blue"
+            # )
     
             # Add the plot features
             plt.legend()
@@ -3507,7 +3507,7 @@ def plot_profile_multi_trange(trange, varname, models, observation, output_path=
             f.suptitle(title, fontsize=17, fontweight='bold', x=0.35, y=1.01)
         
             # Add the mini-map
-            plot_double_minimap(obsi)
+            plot_minimap(obsi, plot_coords="points")
             manage_output(figname, output_path)
 
 
@@ -3691,24 +3691,31 @@ def plot_diag_ts_multi(trange, models, observation, output_path=None):
         obs.attrs['tbin'] = tbin_attrs
         obs.attrs['radius'] = r
         xplot.plot_ts(
-            obs.ptemp,
-            obs.sal,
-            potential=False,
-            scatter_c=-obs.depth,
-            scatter_cmap="Reds",
-            axes=ax,
-        )
-        xplot.plot_ts(
             mod.ptemp,
             mod.sal,
+            dens=True,
+            contour_linewidths=0.2,
             potential=True,
             scatter_c=-mod.depth,
             scatter_cmap="Blues",
             axes=ax,
+            colorbar_kwargs={'label': f"{mod.attrs['name']} depth [m]"},
+            alpha=0.5
+        )
+        xplot.plot_ts(
+            obs.ptemp,
+            obs.sal,
+            dens=False,
+            potential=True,
+            scatter_c=-obs.depth,
+            scatter_cmap="Reds",
+            axes=ax,
+            colorbar_kwargs={'label': f"{obs.attrs['name']} depth [m]"},
+            kwargs={'alpha': 0.5}
         )
         title, figname = get_title_figname('Theta-S diagram', obs, mod.attrs['name'], obs.attrs['name'])
         f.suptitle(title, x=0.35, y=1.01, fontsize=17, fontweight='bold')        
-        plot_double_minimap(obs)
+        plot_minimap(obs, plot_coords="points")
         manage_output(figname, output_path)
 
 
@@ -3761,24 +3768,31 @@ def plot_diag_ts_multi_trange(trange, models, observation, output_path=None):
             obsi.attrs['radius'] = r
             f, ax = figure_1_profile()
             xplot.plot_ts(
-                obsi.ptemp,
-                obsi.sal,
-                potential=False,
-                scatter_c=-obsi.depth,
-                scatter_cmap="Reds",
-                axes=ax,
-            )
-            xplot.plot_ts(
                 modi.ptemp,
                 modi.sal,
+                dens=True,
+                contour_linewidths=0.2,
                 potential=True,
                 scatter_c=-modi.depth,
                 scatter_cmap="Blues",
                 axes=ax,
+                colorbar_kwargs={'label': f"{mod.attrs['name']} depth [m]"},
+                alpha=0.75
+            )
+            xplot.plot_ts(
+                obsi.ptemp,
+                obsi.sal,
+                dens=False,
+                potential=True,
+                scatter_c=-obsi.depth,
+                scatter_cmap="Reds",
+                axes=ax,
+                colorbar_kwargs={'label': f"{obs.attrs['name']} depth [m]"},
+                alpha=0.75
             )
             title, figname = get_title_figname('Theta-S diagram', obsi, mod.attrs['name'], obs.attrs['name'])
             f.suptitle(title, x=0.35, y=1.01, fontsize=17, fontweight='bold')        
-            plot_double_minimap(obs)
+            plot_minimap(obsi, plot_coords="points")
             manage_output(figname, output_path)
 
 # def plot_diag_ts_multi(models, observation, config_obj, output_path=None):
@@ -3987,23 +4001,32 @@ def plot_diag_ts_unique(models, observation, output_path=None):
             # vmin, vmax = obs.depth.min(skipna=True).data, obs.depth.max(skipna=True).data
 
             # Plot the profile
-            f, ax = figure_1_profile()
+            
             xplot.plot_ts(
-                obsi.temp,
-                obsi.sal,
-                potential=False,
-                scatter_c=-obsi.depth,
-                scatter_cmap="Reds",
-                axes=ax,
-            )
-            xplot.plot_ts(
-                modi.temp,
+                modi.ptemp,
                 modi.sal,
+                dens=True,
                 potential=True,
                 scatter_c=-modi.depth,
                 scatter_cmap="Blues",
                 axes=ax,
+                colorbar_kwargs={'label': f"{mod.attrs['name']} depth [m]"},
+                alpha=0.75
             )
+            
+            f, ax = figure_1_profile()
+            xplot.plot_ts(
+                obsi.ptemp,
+                obsi.sal,
+                dens=False,
+                potential=True,
+                scatter_c=-obsi.depth,
+                scatter_cmap="Reds",
+                axes=ax,
+                colorbar_kwargs={'label': f"{obs.attrs['name']} depth [m]"},
+                alpha=0.75
+            )
+            
             # im_obs = ax.scatter(obsi.sal, obsi.temp, 30, obsi.depth, marker="^", edgecolors="black",
             #                     linewidth=0.1, label=f'{obsi.attrs["name"]}', cmap='autumn',
             #                     vmin=vmin, vmax=vmax)
@@ -4016,8 +4039,9 @@ def plot_diag_ts_unique(models, observation, output_path=None):
             # plt.legend(handles=[im_obs, im_mod])
             # diag_ts_plot_features(f, ax, im_mod, im_obs, modi, obsi, output_path)
             title, figname = get_title_figname('Theta-S diagram', obsi, mod.attrs['name'], obs.attrs['name'])
-            f.suptitle(title, x=0.35, y=1.01, fontsize=17, fontweight='bold')
-            plot_double_minimap(obsi)
+            #f.suptitle(title, x=0.35, y=1.01, fontsize=8, fontweight='bold')
+            f.suptitle(title, fontsize=8, fontweight='bold')
+            plot_minimap(obsi, plot_coords="points")
             manage_output(figname, output_path)
 
 
@@ -4066,7 +4090,7 @@ def diag_ts_plot_features(f, ax, im_mod, im_obs, mod, obs, output_path=None):
     # Add the mini-map
     #ax_mini_map = add_mini_map(f, obs)
     #ax_mini_map.scatter(obs.lon, obs.lat, 30, c='navy', transform=ccrs.PlateCarree())
-    plot_double_minimap(obs)
+    plot_minimap(iobs, plot_coords="points")
     manage_output(figname, output_path)
 
 

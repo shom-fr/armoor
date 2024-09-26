@@ -154,40 +154,40 @@ def format_cofig_obj2dict(config: dict) -> dict:
     # print('config   IN :::')
     # pprint(config.dict())
     # Clean observation if method_z not provided
-    observation = remove_keys_with_none_value(config.pop("observation"))
-    config.update({"observation": observation})
+    # observation = remove_keys_with_none_value(config.pop("observation"))
+    # config.update({"observation": observation})
 
     # models
-    if "models" in config:
-        models = config.pop("models")
-        new_models = []
-        for model in models:
-            if isinstance(model, list):
-                new_models.append(remove_keys_with_none_value(models[model]))
-            else:
-                new_models.append(remove_keys_with_none_value(models[model]))
-        config.update({"models": new_models})
-    else:
-        logger.error('No model provided')
-        raise VdtTypeError('no model provided')
+    # if "models" in config:
+    #     models = config.pop("models")
+    #     new_models = []
+    #     for model in models:
+    #         if isinstance(model, list):
+    #             new_models.append(remove_keys_with_none_value(models[model]))
+    #         else:
+    #             new_models.append(remove_keys_with_none_value(models[model]))
+    #     config.update({"models": new_models})
+    # else:
+    #     logger.error('No model provided')
+    #     raise VdtTypeError('no model provided')
 
     # outputs
-    if "outputs" in config:
-        outputs = config.pop("outputs")
-        new_outputs = []
-        for output in outputs:
-            outputs[output].update({"folder_name": output})
-            new_outputs.append(remove_keys_with_none_value(outputs[output]))
-        config.update({"outputs": new_outputs})
-    else:
-        logger.error('No output provided')
-        raise VdtTypeError(f'no outputs provided')
+    # if "outputs" in config:
+    #     outputs = config.pop("outputs")
+    #     new_outputs = []
+    #     for output in outputs:
+    #         outputs[output].update({"folder_name": output})
+    #         new_outputs.append(remove_keys_with_none_value(outputs[output]))
+    #     config.update({"outputs": new_outputs})
+    # else:
+    #     logger.error('No output provided')
+    #     raise VdtTypeError(f'no outputs provided')
 
     # clean meta-zones from None values
-    if "meta_zone" in config:
-        meta_zones = remove_keys_with_none_value(config.pop("meta_zone"))
-        if meta_zones:
-            config.update({"meta_zones": meta_zones})
+    # if "meta_zone" in config:
+    #     meta_zones = remove_keys_with_none_value(config.pop("meta_zone"))
+    #     if meta_zones:
+    #         config.update({"meta_zones": meta_zones})
 
     return config
 

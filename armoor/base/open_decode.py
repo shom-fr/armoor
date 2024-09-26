@@ -177,21 +177,27 @@ def open_decode_hycom(path_files):
         if ('u' in ds.data_vars) or ('v' in ds.data_vars):
             if 'u' in ds.data_vars:
                 logger.info("shift u")
+                #ds = ds.isel(x_u=slice(None, None, ), y_u=slice(None, None, 5))
                 da_u =  shift(
                     ds["u"].squeeze(drop=True), {"x": "right"}
                 ).xoa.reloc(u=False)
             if 'v' in ds.data_vars:
                 logger.info("shift v")
+                #ds = ds.isel(x_v=slice(None, None, 5), y_v=slice(None, None, 5))
                 da_v =  shift(
                     ds["v"].squeeze(drop=True), {"y": "top"}
                 ).xoa.reloc(v=False)
         else:
+            #ds = ds.isel(x=slice(None, None, 10), y=slice(None, None, 10))
             dss.append(ds)
+        ds.close()
     ds = xr.merge(dss)
     if isinstance(da_u, xr.DataArray):
         ds['u'] = da_u.assign_coords(**ds.coords)
+        del da_u
     if isinstance(da_v, xr.DataArray):
         ds['v'] = da_v.assign_coords(**ds.coords)
+        del da_v
     ds.coords["depth"] = dz2depth(ds.dz, centered=True)
     ds = ds.drop(["z", "dz"])
 
@@ -313,6 +319,11 @@ def open_decode_cmems_insitu(path_files, platform):
     dss = []
     for path in path_files:
         ds = xr.open_dataset(path).xoa.decode()
+        vars2drop = []
+        for var in ds.data_vars:
+            if var.isupper():
+                vars2drop.append(var)
+        ds = ds.drop_vars(vars2drop)
         if "depth" in ds.dims:
             ds = ds.swap_dims({"depth": "z"})
         elif "DEPTH" in ds.dims:
@@ -328,7 +339,7 @@ def open_decode_cmems_insitu(path_files, platform):
         ) and (
             ds.dims["time"] == ds.dims["lat"]
         )):
-            ds = ds.drop_dims("POSITION")
+            #ds = ds.drop_dims("POSITION")
             lon_ds = ds.lon.assign_coords(lon=ds.time.data).rename(
                 {'lon': 'time'}
             )
@@ -348,11 +359,20 @@ def open_decode_cmems_insitu(path_files, platform):
                 ds = ds.reset_coords(coord)
         if ("depth" not in ds) and ("pres" in ds):            
             ds = depth_from_pres(ds)
+        dssi = []
+        for itime in range(ds.sizes["time"]):
+            dsi = ds.isel(time=[itime])
+            if dsi.depth.min() < -10.0:
+                dssi.append(dsi)
+        if len(dssi) == 0:
+            continue
+        ds = xr.combine_nested(dssi, 'time')
         for var in ds.data_vars:
             if var in cmems_coords:
                 ds = ds.set_coords(var)
         ds["depth"] = -ds["depth"]
         dss.append(ds)
+        ds.close()
     if platform == "argo":
         return concat_argo(dss)
     else:
@@ -1514,7 +1534,11 @@ def concat_argo(list_ds):
                             data=arr3,
                             dims=["time", "z"],
                             name=var,
-                            coords={"time": dsin.time},
+                            coords={
+                                "time": dsin.time,
+                                "lon": dsin.lon,
+                                "lat": dsin.lat
+                            },
                             attrs=dsin[var].attrs
                         )
                     )
