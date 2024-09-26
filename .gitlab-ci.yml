@@ -48,7 +48,7 @@ pages:
     - make html
     - cd ..
     - rm -rf public
-    - cp -r docs/build/html public
+    - cp -r docs/_build/html public
   artifacts:
     paths:
       - public
