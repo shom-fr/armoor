@@ -216,7 +216,7 @@ def sel_default_vars(config_obj):
     additional_vars = config_obj['metazone']['vars'] if 'vars' in config_obj['metazone'] else []
 
     if feature == "sst":  # F1
-        default_vars = ['SST']
+        default_vars = ['ptemp']
 
     elif feature == "prof_hydro_vessel":  # F2
         default_vars = ['ptemp', 'sal', 'pdens']

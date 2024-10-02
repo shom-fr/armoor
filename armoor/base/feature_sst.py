@@ -28,31 +28,42 @@ def plot(config_obj):
     output_path = config_obj.get("output_path")
 
     # Set the flags
-    flag_interval = 'interval' in config_obj["meta_zones"].keys()
-    flag_slice = 'slice' in config_obj["meta_zones"].keys()
+    flag_interval = 'trange' in config_obj["metazone"]
+    flag_slice = 'vrange' in config_obj["metazone"]
 
+    if "trange_seq" in config_obj["metazone"]:
+        trange = {
+            "trange_seq": config_obj["metazone"]["trange_seq"],
+            "tbound": config_obj["metazone"]["tbound"],
+        }
+    elif 'trange_clim' in config_obj["metazone"]:
+        trange = {
+            "trange_clim": config_obj["metazone"]["trange_clim"],
+            "tbound": config_obj["metazone"]["tbound"],
+        }
+    else:
+        trange = None
+    
+    if "tfreq" in config_obj["metazone"]:
+        tfreq = config_obj["metazone"]["tfreq"]
+    else:
+        tfreq = None
+    
     # Select the variables
-    config_obj = sel_default_vars(config_obj)
+    config_obj, vars = sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
     # Remove missing values
-    vars = ['sst']
-    for i_mod, mod in enumerate(models):
-        models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
+    #vars = ['ptemp']
+    # for i_mod, mod in enumerate(models):
+    #     models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
     # Plot the outputs
-    for output in outputs:
-        logger.info('Generating plot :: %s ', output["plot"])
-        if output_path:
-            sub_func_output_folder = os.path.join(output_path, output["folder_name"])
-            logger.info('Storing in folder :: %s', sub_func_output_folder)
-            create_folder(sub_func_output_folder)
-        else:
-            sub_func_output_folder = output_path
-
-        if 'attribute' in output and output['attribute'] != 'SST':
-            logger.debug('%s should be used for SST only.', config_obj["functionality"])
+    for oname in outputs:
+        output = outputs[oname]
+        sub_func_output_folder = os.path.join(output_path, oname)
+        create_folder(sub_func_output_folder)
 
         # Get parameters from config obj
         vmin = output.get('vmin')
@@ -64,18 +75,34 @@ def plot(config_obj):
 
         # PLOTS
         for var in vars:
-            observation_var, models_var = sel_one_var(observation, models, var)
+            mods = [
+                models[mod]["ds_coloc"][[var]].assign_attrs({
+                    "varname": var,
+                    **models[mod]["ds_coloc"][var].attrs,
+                    **models[mod]["ds_coloc"].attrs
+                }) for mod in models
+            ]
+            obss = [
+                observation["ds_coloc"][mod][[var]].assign_attrs({
+                    "varname": var,
+                    **observation["ds_coloc"][mod][var].attrs,
+                    **observation["ds_coloc"][mod].attrs
+                }) for mod in models
+            ]
             ########################################################################################
             # TIME SERIES POINT
-            plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point',
+            plot_ts_metr_point = {"plot_ts_metr_cloud": 'difference_point',
                                   "plot_ts_metr_bias_point": 'bias_point',
                                   "plot_ts_metr_RMSE_point": 'RMSEc_point',
                                   "plot_ts_metr_point": 'all_metrics'
                                   }
             if output["plot"] in plot_ts_metr_point:
-                plot_features.plot_ts_metr_point(models_var, observation_var, flag_interval,
-                                                 flag_slice, output_path=sub_func_output_folder)
-
+                plot_features.plot_ts_metr_cloud(
+                    trange,
+                    mods,
+                    obss,
+                    output_path=sub_func_output_folder,
+                )
             ########################################################################################
             # TIME SERIES STATS
             plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
@@ -84,11 +111,14 @@ def plot(config_obj):
                                   "plot_ts_metr_stats": 'all_metrics'
                                   }
             if output["plot"] in plot_ts_metr_stats:
-                plg = config_obj["meta_zones"].get("polygon")
-
-                plot_features.plot_ts_metr_stats(models_var, observation_var, flag_interval,
-                                                 flag_slice, output_path=sub_func_output_folder,
-                                                 plg=plg)
+                plg = config_obj["metazone"].get("polygon")
+                plot_features.plot_ts_metr_stats(
+                    trange,
+                    None,
+                    mods,
+                    obss,
+                    output_path=sub_func_output_folder,
+                )
 
             ########################################################################################
             # MAP METRIC
@@ -96,22 +126,40 @@ def plot(config_obj):
                              "plot_map_metr_ecart": 'difference', "plot_map_metr_biais": 'bias',
                              "plot_map_metr_RMSE": 'RMSE', "plot_map_metr_RMSEc": 'RMSEc'
                              }
-            if output["plot"] in plot_map_metr:
-                for i, mod in enumerate(models_var):
+            # if output["plot"] in plot_map_metr:
+            #     for i, mod in enumerate(mods):
 
-                    plot_features.plot_map_metr(flag_interval, flag_slice, mod["xarray_meta"],
-                                                mod["xarray_meta_coloc"],
-                                                observation_var["xarray_meta"],
-                                                observation_var["xarray_meta_coloc"][i],
-                                                plot_map_metr[output["plot"]], cmap, vmin, vmax,
-                                                output_path=sub_func_output_folder, dvmin=dvmin,
-                                                dvmax=dvmax)
+            #         plot_features.plot_map_metr(flag_interval, flag_slice, mod["xarray_meta"],
+            #                                     mod["xarray_meta_coloc"],
+            #                                     observation_var["xarray_meta"],
+            #                                     observation_var["xarray_meta_coloc"][i],
+            #                                     plot_map_metr[output["plot"]], cmap, vmin, vmax,
+            #                                     output_path=sub_func_output_folder, dvmin=dvmin,
+            #                                     dvmax=dvmax)
+                    
+            if output["plot"] in plot_map_metr:
+                for i, mod in enumerate(mods):
+                    plot_features.plot_map_metr_profiles(
+                        trange,
+                        None,
+                        mod,
+                        obss[i],
+                        plot_map_metr[output["plot"]],
+                        cmap, vmin, vmax,
+                        output_path=sub_func_output_folder,
+                        dvmin=dvmin, dvmax=dvmax
+                    )        
 
             ########################################################################################
             # DISP DIAG
             if "diag_disp" in output["plot"]:
-                for i, mod in enumerate(models_var):
-                    plot_features.diag_disp(flag_interval, flag_slice, output["plot"],
-                                            mod["xarray_meta_coloc"],
-                                            observation_var["xarray_meta_coloc"][i],
-                                            output_path=sub_func_output_folder)
+                for i, mod in enumerate(mods):
+                    plot_features.diag_disp(
+                        trange,
+                        None,
+                        output["plot"],
+                        mod,
+                        obss[i],
+                        tfreq=tfreq,
+                        output_path=sub_func_output_folder
+                    )

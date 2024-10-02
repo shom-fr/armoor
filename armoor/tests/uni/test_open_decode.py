@@ -5,6 +5,56 @@ from armoor.base.open_decode import open_decode
 
 samples_dir = os.path.join(ROOTDIR, "_samples")
 
+class TestSSTFormat:
+
+    def test_cmems_l4(self):   
+        ncins = glob.glob(
+            os.path.join(samples_dir, "*L4_*.nc")
+        )
+        ds = open_decode(
+            ncins,
+            "cmems_sst_l4",
+        )
+        assert isinstance(ds, xr.Dataset)
+        assert set(["time", "y", "x"]).issubset(ds.dims)
+        assert set(["lon", "lat", "time"]).issubset(ds.coords)
+        assert ds.lon.dims == ("y", "x")
+        assert ds.lat.dims == ("y", "x")
+        assert ds.time.dims == ("time",)
+        assert "ptemp" in ds.data_vars
+        
+    def test_cmems_l3(self):   
+        ncins = glob.glob(
+            os.path.join(samples_dir, "*IFR-L3C_*.nc")
+        )
+        ds = open_decode(
+            ncins,
+            "cmems_sst_l3",
+        )
+        assert isinstance(ds, xr.Dataset)
+        assert set(["time", "y", "x"]).issubset(ds.dims)
+        assert set(["lon", "lat", "time"]).issubset(ds.coords)
+        assert ds.lon.dims == ("y", "x")
+        assert ds.lat.dims == ("y", "x")
+        assert ds.time.dims == ("time",)
+        assert "ptemp" in ds.data_vars
+        
+    def test_cersat_l3(self):   
+        ncins = glob.glob(
+            os.path.join(samples_dir, "*OSISAF-L3C_*.nc")
+        )
+        ds = open_decode(
+            ncins,
+            "cersat_sst_l3",
+        )
+        assert isinstance(ds, xr.Dataset)
+        assert set(["time", "y", "x"]).issubset(ds.dims)
+        assert set(["lon", "lat", "time"]).issubset(ds.coords)
+        assert ds.lon.dims == ("y", "x")
+        assert ds.lat.dims == ("y", "x")
+        assert ds.time.dims == ("time",)
+        assert "ptemp" in ds.data_vars
+
 class TestCoraFormat:
 
     def test_argo(self):   
@@ -104,8 +154,9 @@ class TestModel:
         ncins = [os.path.join(samples_dir, "cmems_glo12.nc")]
         ds = open_decode(
             ncins,
-            fmt="cmems_model",
+            fmt="model",
         )
+        print(ds)
         assert isinstance(ds, xr.Dataset)
         assert set(["z", "time", "x", "y"]).issubset(ds.dims)
         assert set(["depth", "time", "lon", "lat"]).issubset(ds.coords)

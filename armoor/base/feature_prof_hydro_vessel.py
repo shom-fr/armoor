@@ -161,14 +161,12 @@ def plot(config_obj):
                         else:
                             m = obs
                         obbss.append(m)
-                    plg = config_obj["metazone"].get("polygon")
                     plot_features.plot_ts_metr_stats(
                         trange,
                         vrange,
                         modds,
                         obbss,
                         output_path=sub_func_output_folder,
-                        plg=plg
                     )
 
                 ####################################################################################
@@ -183,7 +181,7 @@ def plot(config_obj):
                             trange,
                             vrange,
                             mod.reset_coords(
-                                "depth"
+                                "depth",
                             ).mean("member").set_coords(
                                 "depth"
                             ).assign_attrs({**mod.attrs})[[var]] if "member" in mod.dims else mod,

@@ -2,7 +2,6 @@ Welcome to [SHOM] Validation and reports tools's documentation!
 ===============================================================
 
 .. toctree::
-   :caption: Getting Started
    :hidden:
    :maxdepth: 1
 

@@ -26,29 +26,29 @@ def get_cfg(cfg):
     
     return cfg
 
-# def test():
-#     cfg = dict2call(get_cfg(
-#         os.path.join(
-#             INT_TESTS_DIR,
-#             "cmems_vs_HyCOM.cfg"
-#         )
-#     ))
+def test():
+    cfg = dict2call(get_cfg(
+        os.path.join(
+            INT_TESTS_DIR,
+            "cmems_vs_HyCOM.cfg"
+        )
+    ))
 
-# def test_immersions():
-#     cfg = dict2call(get_cfg(
-#         os.path.join(
-#             INT_TESTS_DIR,
-#             "cmems_vs_HyCOM_immersions.cfg"
-#         )
-#     ))
+def test_immersions():
+    cfg = dict2call(get_cfg(
+        os.path.join(
+            INT_TESTS_DIR,
+            "cmems_vs_HyCOM_immersions.cfg"
+        )
+    ))
     
-# def test_immersions_intervals():
-#     cfg = dict2call(get_cfg(
-#         os.path.join(
-#             INT_TESTS_DIR,
-#             "cmems_vs_HyCOM_immersions_intervals.cfg"
-#         )
-#     ))
+def test_immersions_intervals():
+    cfg = dict2call(get_cfg(
+        os.path.join(
+            INT_TESTS_DIR,
+            "cmems_vs_HyCOM_immersions_intervals.cfg"
+        )
+    ))
 
 def test_intervals():
     cfg = dict2call(get_cfg(
@@ -58,13 +58,13 @@ def test_intervals():
         )
     ))
     
-# def test_layers():
-#     cfg = dict2call(get_cfg(
-#         os.path.join(
-#             INT_TESTS_DIR,
-#             "cmems_vs_HyCOM_layers.cfg"
-#         )
-#     ))
+def test_layers():
+    cfg = dict2call(get_cfg(
+        os.path.join(
+            INT_TESTS_DIR,
+            "cmems_vs_HyCOM_layers.cfg"
+        )
+    ))
     
 def test_layers_intervals():
     cfg = dict2call(get_cfg(

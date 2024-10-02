@@ -62,11 +62,6 @@ def get_observation_models_meta(cfg: dict):
 
     # Open dataset from path then decode dataset and apply meta-zone
 
-    if cfg["metazone"]["radius"] == None:
-        raise TypeError(
-            "armoor needs a radius."
-            "Please, fill your configuration file."
-        )
     observation = cfg["observation"]
     models = cfg["models"]
 
@@ -119,6 +114,11 @@ def get_observation_models_meta(cfg: dict):
     #colocation
     logger.info("Colocation")
     if cfg["functionality"] == "prof_hydro_vessel":
+        if cfg["metazone"]["radius"] == None:
+            raise TypeError(
+                "armoor needs a radius."
+                "Please, fill your configuration file."
+            )
         observation.update({
             "ds_coloc": {},
         })
@@ -151,7 +151,7 @@ def get_observation_models_meta(cfg: dict):
                 vref = cfg["metazone"]["vref"]
                 if not vref:
                     raise TypeError(
-                    f"armoor needs a vref to perform vertical ranging : model or obs"
+                        "armoor needs a vref to perform vertical ranging : model or obs"
                         "Please, fill your configuration file."
                     )
 
@@ -184,6 +184,118 @@ def get_observation_models_meta(cfg: dict):
             del models[model]["ds_metazone"]
         del observation["ds_metazone"]
             
+    elif cfg["functionality"] == "sst":        
+        if (
+            cfg["metazone"].get("href") != None
+        ) & (
+            cfg["metazone"].get("coord") != None
+        ):
+            raise TypeError(
+                "Please, choose href or coord colocation."
+                "Both colocation is not possible."
+            )
+        if (
+            cfg["metazone"].get("tfreq") != None
+        ) & (
+            cfg["metazone"].get("tref") != None
+        ):
+            raise TypeError(
+                "Please, choose tfreq or tref colocation."
+                "Both colocation is not possible."
+            )
+        if (
+            cfg["metazone"].get("href") == None
+        ) & (
+            cfg["metazone"].get("coord") == None
+        ):
+            raise TypeError(
+                "Please, choose href or coord colocation."
+            )
+        if (
+            cfg["metazone"].get("tref") == None
+        ) & (
+            cfg["metazone"].get("tfreq") == None
+        ):
+            raise TypeError(
+                "Please, choose tref or tfreq colocation."
+            )
+        observation.update({
+            "ds_coloc": {},
+        })
+        for model in models:
+            ds_model = models[model]["ds_metazone"]
+            ds_obs =  observation["ds_metazone"]
+            if "z" in models[model]["ds_metazone"].dims:
+                ds_model = ds_model.isel(z=0).squeeze()
+            if cfg["metazone"].get("tfreq"):
+                ds_model = ds_model.meta.time_selection_terms(
+                    start=cfg["metazone"].get("tbound")[0],
+                    end=cfg["metazone"].get("tbound")[-1],
+                    freq=cfg["metazone"].get("tfreq")
+                )
+                ds_obs = ds_obs.meta.time_selection_terms(
+                    start=cfg["metazone"].get("tbound")[0],
+                    end=cfg["metazone"].get("tbound")[-1],
+                    freq=cfg["metazone"].get("tfreq")
+                )
+            elif cfg["metazone"].get("tref") in ("obs", "model"):
+                if cfg["metazone"].get("tref") == "obs":
+                    ds_model = ds_model.interp(
+                        time=ds_obs.time,
+                        method="linear"
+                    )
+                elif cfg["metazone"].get("tref") == "model":
+                    ds_obs = ds_obs.interp(
+                        time=ds_model.time,
+                        method="linear"
+                    )
+            if cfg["metazone"].get("href") in ("obs", "model"):
+                logger.info("Regrid :")
+                if cfg["metazone"].get("href") == "obs":
+                    logger.info("model on obs")
+                    ds_model, ds_obs = coloc.horizontal_regrid(
+                        ds_model,
+                        ds_obs
+                    )
+                elif cfg["metazone"].get("href") == "model":
+                    logger.info("obs on model")
+                    ds_obs, ds_model = coloc.horizontal_regrid(
+                        ds_obs,
+                        ds_model
+                    )
+            elif cfg["metazone"].get("coord"):
+                coord = cfg["metazone"].get("coord")
+                logger.info(f"Grid2loc obs on coords: {coord}")
+                ds_obs = ds_obs.meta.horizontal_selection_coords(coord)
+                ds_model = ds_model.meta.horizontal_selection_coords(coord)
+            observation["ds_coloc"].update(
+                {model: ds_obs.assign_attrs({
+                    "tbound": cfg["metazone"]["tbound"],
+                    'name': observation.get("name"),
+                })}
+            )
+            models[model].update({
+                "ds_coloc": ds_model.assign_attrs({
+                    'name': models[model].get("name"),
+                })
+            })
+            del ds_model
+            del ds_obs
+            # elif cfg["metazone"].get("coord"):
+            #     observation["ds_coloc"].update(
+            #         {model: ds_obs.assign_attrs({
+            #             "tbound": cfg["metazone"]["tbound"],
+            #             'name': observation.get("name"),
+            #         })}
+            #     )
+            #     logger.info(f"Grid2loc model on coords: {coord}")
+            #     ds_model = models[model]["ds_metazone"].meta.horizontal_selection_coords(coord)
+            #     models[model].update({
+            #         "ds_coloc": ds_model.assign_attrs({
+            #             'name': models[model].get("name"),
+            #         })
+            #     })
+            #     del ds_model
     # #vrange
     # for model in models:
     #     ds = apply_vrange(observation["ds_coloc"][model], cfg["metazone"])
@@ -453,18 +565,21 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
             "Please, fill your configuration file."
         )
     if cfg["functionality"] == "prof_hydro_vessel":
-        # if ("vlevel" not in metazone) and ("vrange" not in metazone):
-        #     raise TypeError(
-        #         "pro_hydro_vessel needs to have depth or vrange to be processed."
-        #         "Please, fill your configuration file."
-        #     )
-        
+
         meta = [
             "tbound", "trange_seq",
             "polygon", "radius",
             "vlevel", "vrange", "vref",
             "vars"
         ]
+    elif cfg["functionality"] == "sst":
+        
+        meta = [
+            "tbound", "trange_seq", "tfreq", "tref",
+            "polygon", "href", "coord",
+            "vars"
+        ]
+    
     for k, v in metazone.items():
         if (k != "name") and (k not in meta):
             raise TypeError(
@@ -479,7 +594,7 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
             ds = FILTERS[k](ds)(*metazone[k])
     #horizontal
     horizontal_meta = [
-        "polygon", "bathy", "coords",
+        "polygon", "bathy",
     ]
     for k in horizontal_meta:
         if k in metazone.keys():
