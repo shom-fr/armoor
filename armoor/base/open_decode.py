@@ -83,9 +83,12 @@ def open_decode(path_files, fmt, platform=None, func=None, type=None) -> xr.Data
     elif fmt == "cora_insitu":
         logger.info("Opening/decoding insitu cmems files")
         return open_decode_cora_insitu(path_files, platform=platform)
-    elif fmt == "cmems_model":
+    elif fmt == "model":
         logger.info("Opening/decoding model cmems files")
-        return open_decode_cmems_model(path_files)
+        return open_decode_model(path_files)
+    elif "_sst_l" in fmt:
+        logger.info("Opening/decoding sst satellite files")
+        return open_decode_sst_satellite(path_files, fmt)
     elif fmt == "hycom":
         logger.info("Opening/decoding hycom files")
         return open_decode_hycom(path_files)
@@ -117,11 +120,39 @@ def open_decode(path_files, fmt, platform=None, func=None, type=None) -> xr.Data
     #     logger.info("Opening CORA")
     #     return open_decode_cora(path_files)
 
-    logger.info("Opening non specific file type")
-    return open_decode_basic(path_files)
+    #logger.info("Opening non specific file type")
+    return None#open_decode_basic(path_files)
 
 
-def open_decode_cmems_model(path_files):
+def open_decode_sst_satellite(path_files, fmt):
+    """
+     Open SST satellite netcdf file(s) and store it into a ready-to-use dataset.
+     Parameters
+     ----------
+     path_files : str, list of str
+         Path to the netcdf files.
+     steps : float
+        Horizontal and vertical steps
+     Returns
+     -------
+     xarray.Dataset
+         CMEMS dataset.
+     """
+    # Open
+    path = os.path.join(ROOTDIR, 'config', f'{fmt}.cfg')
+    xcf.register_cf_specs(path)
+    xoa.register_accessors()
+    ds = xr.open_mfdataset(path_files).xoa.decode()
+    ds = ds.swap_dims({"lon": "x", "lat": "y"})
+    lat, lon = xr.broadcast(ds["lat"], ds["lon"])
+    ds = ds.drop(["lon", "lat"])
+    ds["lon"] = lon
+    ds["lat"] = lat
+    ds = ds.set_coords(["lon", "lat"])
+    return ds[["ptemp"]]
+
+
+def open_decode_model(path_files):
     """
      Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
      Parameters
@@ -141,11 +172,12 @@ def open_decode_cmems_model(path_files):
     xoa.register_accessors()
     ds = xr.open_mfdataset(path_files).xoa.decode()
     ds = ds.swap_dims({"depth": "z",  "lon": "x", "lat": "y"})
-    lat, lon = xr.broadcast(ds["lat"], ds["lon"])
-    ds = ds.drop(["lon", "lat"])
-    ds["lon"] = lon
-    ds["lat"] = lat
-    ds = ds.set_coords(["lon", "lat"])
+    if len(ds.lon.dims) == 1:
+        lat, lon = xr.broadcast(ds["lat"], ds["lon"])
+        ds = ds.drop(["lon", "lat"])
+        ds["lon"] = lon
+        ds["lat"] = lat
+        ds = ds.set_coords(["lon", "lat"])
     var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
     ds["depth"] = ds["depth"].broadcast_like(ds[var])
     ds = ds.load()
@@ -199,8 +231,9 @@ def open_decode_hycom(path_files):
     if isinstance(da_v, xr.DataArray):
         ds['v'] = da_v.assign_coords(**ds.coords)
         del da_v
-    ds.coords["depth"] = dz2depth(ds.dz, centered=True)
-    ds = ds.drop(["z", "dz"])
+    if "dz" in ds:
+        ds.coords["depth"] = dz2depth(ds.dz, centered=True)
+        ds = ds.drop(["z", "dz"])
 
     return ds
 
@@ -360,18 +393,19 @@ def open_decode_cmems_insitu(path_files, platform):
                 ds = ds.reset_coords(coord)
         if ("depth" not in ds) and ("pres" in ds):            
             ds = depth_from_pres(ds)
-        dssi = []
-        for itime in range(ds.sizes["time"]):
-            dsi = ds.isel(time=[itime])
-            if dsi.depth.min() < -10.0:
-                dssi.append(dsi)
-        if len(dssi) == 0:
-            continue
-        ds = xr.combine_nested(dssi, 'time')
+        if "depth" in ds:
+            dssi = []
+            for itime in range(ds.sizes["time"]):
+                dsi = ds.isel(time=[itime])
+                if dsi.depth.min() < -10.0:
+                    dssi.append(dsi)
+            if len(dssi) == 0:
+                continue
+            ds = xr.combine_nested(dssi, 'time')
+            ds["depth"] = -ds["depth"]
         for var in ds.data_vars:
             if var in cmems_coords:
                 ds = ds.set_coords(var)
-        ds["depth"] = -ds["depth"]
         dss.append(ds)
         ds.close()
     if platform == "argo":

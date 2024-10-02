@@ -12,6 +12,39 @@ from armoor.base import sel_var
 logger = logging.getLogger(__name__)
 
 
+def horizontal_regrid(dsi, dso) -> xr.Dataset:
+        """
+        Regrid a variable
+
+        Parameters
+        ----------
+        dai : xarray.DataArray
+            Single variable to regrid.
+
+        Returns
+        -------
+        xarray.DataArray
+            Regridded variable.
+
+        """
+        
+        dlon = dso.lon.diff("x").max()
+        dlat = dso.lat.diff("y").max()
+        
+        dso = dso.where((
+            dso.lat > dso.lat.min() + dlat
+        ) & (
+            dso.lat < dso.lat.max() - dlat
+        ) & (
+            dso.lon > dso.lon.min() + dlon
+        ) &(
+            dso.lon < dso.lon.max() - dlon
+        ), drop=True)
+        regridder = xe.Regridder(dsi, dso, "bilinear")
+        dsi = regridder(dsi)
+        return dsi, dso
+
+
 def vertical(dsi, dsref) -> xr.Dataset:
     
     """
@@ -60,7 +93,6 @@ def obs_coords(ds_obs, ds_model, radius) -> xr.Dataset:
         time=ds_obs.time,
         method="nearest"
     )
-
     
     ds_model = xcoords.geo_stack(ds_model, "member")
 
@@ -202,7 +234,7 @@ def coloc_var(obj_coloc):
                 obj_coloc = obj_coloc.sel_var.get_norm_dir(type=type)
     return obj_coloc
 
-def temporal_colocation(ds_to_coloc, tgt, coloc_method):
+def temporal_colocation(ds_to_coloc, time, coloc_method="linear"):
     """
     Temporal colocation of the model and observation.
     Parameters
@@ -221,11 +253,8 @@ def temporal_colocation(ds_to_coloc, tgt, coloc_method):
 
     """
     logger.info('Time colocation')
-    time_values = np.unique(tgt.time.values)
     if len(ds_to_coloc.time.data) > 1:
-        ds_to_coloc = ds_to_coloc.interp(time=time_values, method=coloc_method)
-    else:
-        ds_to_coloc = pick_time(ds_to_coloc, time_values)
+        ds_to_coloc = ds_to_coloc.interp(time=times, method=coloc_method)
 
     ds_to_coloc = ds_to_coloc.assign_coords(time=tgt.time.data)
 

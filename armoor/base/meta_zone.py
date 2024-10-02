@@ -198,7 +198,10 @@ class MetazoneAccessor:
                 )
                 for itime in range(dsi.dims['time']):
                     for iz in range(dsi.dims["z"]):
-                        arr[itime, iz, :] = grid2loc(dsi[var].isel(time=itime, z=iz), loc)
+                        arr[itime, iz, :] = grid2loc(
+                            dsi[var].isel(time=itime, z=iz),
+                            loc
+                        )
                 dss.append(
                     xr.Dataset(
                         data_vars={
@@ -215,7 +218,10 @@ class MetazoneAccessor:
                     (dsi.dims['time'], len(lon))
                 )
                 for itime in range(dsi.dims['time']):
-                    arr[itime, :] = grid2loc(dsi[var].isel(time=itime), loc)
+                    arr[itime, :] = grid2loc(
+                        dsi[var].isel(time=itime),
+                        loc
+                    )
                 dss.append(
                     xr.Dataset(
                         data_vars={

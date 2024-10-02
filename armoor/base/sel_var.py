@@ -384,14 +384,12 @@ class SSTAccessor:
         xarray.DataArray
             Data array containing salinity.
         """
+        if 'sal' not in self._obj:
+            raise TypeError(
+                'No salinity found.'
+            )
+        return self._obj
 
-        if "sal" in self._obj.variables:
-            return self._obj.sal
-        elif 'psal' in self._obj:
-            if "pres" in self._obj:
-                sal = gsw.conversions.SA_from_SP(self._obj.psal, self._obj.pres, self._obj.lon,
-                                                 self._obj.lat)
-                return sal
 
     def sel_temp(self):
         """
@@ -403,13 +401,13 @@ class SSTAccessor:
             Data array containing temperature.
         """
         if 'temp' in self._obj:
-            temp = self._obj.temp.sel_var.convert_K_C()
+            temp = convert_K_C(self._obj.temp)
             self._obj["temp"] = temp
             return self._obj
         if 'ptemp' in self._obj:
-            sal = self._obj.sel_var.sel_sal()
-            ptemp = self._obj.ptemp
-            pres = self._obj.sel_var.sel_pres()
+            sal = self._obj.sel_var.sel_sal()["sal"]
+            ptemp = self._obj["ptemp"]
+            pres = self._obj.sel_var.sel_pres()["pres"]
             cons_temp = gsw.CT_from_pt(sal, ptemp)
             temp = gsw.t_from_CT(sal, cons_temp, pres)
             temp.attrs['units'] = 'degC'
@@ -431,17 +429,17 @@ class SSTAccessor:
             Data array containing temperature.
         """
         if 'ptemp' in self._obj:
-            return self._obj['ptemp'].sel_var.convert_K_C()
+            self._obj["ptemp"] = convert_K_C(self._obj["ptemp"])
+            return self._obj
         if 'temp' in self._obj:
             # verify salinity and pressure are also included
-            if ('sal' in self._obj or 'psal' in self._obj) and 'pres' in self._obj:
-                sal = self._obj.sel_var.sel_sal()
-                ptemp = gsw.conversions.pt0_from_t(sal, self._obj.temp, self._obj.pres)
+            if 'sal' in self._obj and 'pres' in self._obj:
+                ptemp = gsw.conversions.pt0_from_t(self._obj.sal, self._obj.temp, self._obj.pres)
                 ptemp.attrs['standard_name'] = "sea_water_potential_temperature"
                 ptemp.attrs['units'] = "degrees_celsius"
                 ptemp.attrs['long_name'] = "Potential temperature"
-                self._obj['ptemp'] = ptemp
-                return self._obj['ptemp'].sel_var.convert_K_C()
+                self._obj['ptemp'] = convert_K_C(ptemp)
+                return self._obj
 
             raise TypeError(
                 'The potential temperature could not be calculated.'
@@ -457,15 +455,23 @@ class SSTAccessor:
             Data array containing the sound speed.
         """
         # Verify all the required variables are included in the dataset
-        sal = self._obj.sel_var.sel_sal()
-        ptemp = self._obj.sel_var.sel_ptemp()
-        cons_temp = gsw.CT_from_pt(sal, ptemp)
-        pres = self._obj.sel_var.sel_pres()
+        ptemp = self._obj.sel_var.sel_ptemp()["ptemp"]
+        cons_temp = gsw.CT_from_pt(self._obj.sal, ptemp)
+        pres = self._obj.sel_var.sel_pres()["pres"]
+        sal = gsw.conversions.SA_from_SP(
+            self._obj.sal,
+            pres,
+            self._obj.lon,
+            self._obj.lat
+        )
         if sal is not None and cons_temp is not None and pres is not None:
             snd_speed = gsw.sound_speed(sal, cons_temp, pres)
             snd_speed.attrs["units"] = "m/s"
             self._obj["sound_speed"] = snd_speed
-
+        else:
+            raise TypeError(
+                'The sound speed cannot be calculated.'
+            )
         logger.warning("To compute sound speed you need to have salinity, "
                        "potential temperature and depth in your dataset.")
         return self._obj
@@ -504,10 +510,11 @@ class SSTAccessor:
 
     def sel_pres(self):
         if 'pres' in self._obj:
-            return self._obj['pres']
+            return self._obj
         elif 'depth' in self._obj:
             pres = gsw.conversions.p_from_z(-self._obj.depth, self._obj.lat)
-            return pres
+            self._obj["pres"] = pres
+            return self._obj
 
     def sel_density(self):
         """
@@ -543,7 +550,7 @@ class SSTAccessor:
             asal = gsw.conversions.SA_from_SP(self._obj.sal, pres, self._obj.lon,self._obj.lat)
             #sal = self._obj.sel_var.sel_sal().sal #should be absolute sal
             #temp = self._obj.sel_var.sel_temp().temp #should be conservative temp
-            ctemp = gsw.CT_from_pt(asal, self._obj.sel_var.sel_ptemp())
+            ctemp = gsw.CT_from_pt(asal, self._obj.sel_var.sel_ptemp()["ptemp"])
             if not asal is None and not ctemp is None:
                 if ref_dens is None or ref_dens not in [0, 1000, 2000, 3000, 4000]:
                     logger.warning(
@@ -564,12 +571,12 @@ class SSTAccessor:
                 pdens = func(asal, ctemp)
                 self._obj['pdens'] = pdens
                 self._obj['pdens'] = self._obj['pdens'].assign_attrs({'units': 'kg/m3'})
-                return self._obj['pdens']
+                return self._obj
             else:
                 logger.warning(
                     'Caution, potential density could not be computed, ptemp or sal are missing.')
-
-        return ds_dens
+        self._obj["pdens"] = ds_dens
+        return self._obj
 
     def sel_ssh(self):
         """
@@ -582,20 +589,17 @@ class SSTAccessor:
         """
         return self._obj.ssh
 
-    def convert_K_C(self):
-        """
-        Convert temperature units into Celcius degrees.
+def convert_K_C(da):
+    """
+    Convert temperature units into Celcius degrees.
 
-        Returns
-        -------
-        xarray.DataArray
-            Data array containing SST in Celcius degrees.
-        """
-
-        if 'units' in self._obj.attrs and self._obj.attrs[
-            'units'] == 'kelvin' or self._obj.max() > 200:
-            self._obj = self._obj - 273.15
-            self._obj.attrs['units'] = 'degC'
-            return self._obj
-        self._obj.attrs['units'] = 'degC'
-        return self._obj
+    Returns
+    -------
+    xarray.DataArray
+        Data array containing SST in Celcius degrees.
+    """
+    if 'units' in da.attrs and da.attrs[
+        'units'] == 'kelvin' or da.max() > 200:
+        da = da - 273.15
+    da.attrs['units'] = 'degC'
+    return da

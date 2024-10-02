@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 /docs/build/
+/docs/_build/
 build/
 .eggs/
 armoor.egg-info/
