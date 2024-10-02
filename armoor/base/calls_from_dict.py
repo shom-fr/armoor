@@ -182,7 +182,7 @@ def get_observation_models_meta(cfg: dict):
                     {model: observation["ds_coloc"][model]}
                 )
             del models[model]["ds_metazone"]
-            del observation["ds_metazone"]
+        del observation["ds_metazone"]
             
     # #vrange
     # for model in models:

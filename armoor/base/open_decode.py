@@ -148,6 +148,7 @@ def open_decode_cmems_model(path_files):
     ds = ds.set_coords(["lon", "lat"])
     var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
     ds["depth"] = ds["depth"].broadcast_like(ds[var])
+    ds = ds.load()
     return ds
         
 
