@@ -3032,7 +3032,8 @@ def plot_ts_metr_cloud(trange, mods, obss, output_path=None):
                 mstd = mg.std(dim=dims_stat)
                 bias = diffz.mean(dim=dims_stat)
                 rmse = np.sqrt(diffz2.mean(dim=dims_stat))
-                rmsec = np.sqrt((((mg.fillna(0) - mg.mean(dim=dims_stat)) - (og.fillna(0) - og.mean(dim=dims_stat))) ** 2).mean(dim=dims_stat))
+                rmsec0 = (mg.map(anom, args=(dims_stat,)) - og.map(anom, args=(dims_stat,))) ** 2
+                rmsec = np.sqrt(apply_trange(rmsec0, trange).mean(dim=dims_stat))
                 if imod == 0:
                     omean[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
                     ostd[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[2])
@@ -3185,8 +3186,8 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None):
             mstd = mg.std(dim=dims_stat)
             bias = diffz.mean(dim=dims_stat)
             rmse = np.sqrt(diffz2.mean(dim=dims_stat))
-            #rmsec = np.sqrt((((mg.map(anom, args=(dims_stat,)) - (og.fillna(0) - og.mean(dim=dims_stat))) ** 2).mean(dim=dims_stat))
-            rmsec = np.sqrt(((mg.map(anom, args=(dims_stat,)) - og.map(anom, args=(dims_stat,))) ** 2).mean(dim=dims_stat))
+            rmsec0 = (mg.map(anom, args=(dims_stat,)) - og.map(anom, args=(dims_stat,))) ** 2
+            rmsec = np.sqrt(apply_trange(rmsec0, trange).mean(dim=dims_stat))
             if imod == 0:
                 omean[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
                 ostd[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[2])
