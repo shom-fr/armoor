@@ -7,8 +7,7 @@ Inputs
 ......
 
 Hydrological profiles data from 
-`CMEMS <https://data.marine.copernicus.eu/product/INSITU_GLO_PHYBGCWAV_DISCRETE_MYNRT_013_030/description>`_
-or `CORA <https://www.seanoe.org/data/00351/46219/>`_ base can be used (`PR_PF`).
+`CMEMS <https://data.marine.copernicus.eu/product/INSITU_GLO_PHYBGCWAV_DISCRETE_MYNRT_013_030/description>`_ base can be used (`TS_MO`).
 
 
 Outputs
