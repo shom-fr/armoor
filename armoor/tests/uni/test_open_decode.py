@@ -15,6 +15,8 @@ class TestSSTFormat:
             ncins,
             "cmems_sst_l4",
         )
+        assert len(ds) == 1
+        ds = ds[0]
         assert isinstance(ds, xr.Dataset)
         assert set(["time", "y", "x"]).issubset(ds.dims)
         assert set(["lon", "lat", "time"]).issubset(ds.coords)
@@ -31,6 +33,8 @@ class TestSSTFormat:
             ncins,
             "cmems_sst_l3",
         )
+        assert len(ds) == 1
+        ds = ds[0]
         assert isinstance(ds, xr.Dataset)
         assert set(["time", "y", "x"]).issubset(ds.dims)
         assert set(["lon", "lat", "time"]).issubset(ds.coords)
@@ -47,6 +51,8 @@ class TestSSTFormat:
             ncins,
             "cersat_sst_l3",
         )
+        assert len(ds) == 1
+        ds = ds[0]
         assert isinstance(ds, xr.Dataset)
         assert set(["time", "y", "x"]).issubset(ds.dims)
         assert set(["lon", "lat", "time"]).issubset(ds.coords)
@@ -66,6 +72,8 @@ class TestCoraFormat:
             "cora_insitu",
             platform="argo",
         )
+        assert len(ds) == 1
+        ds = ds[0]
         assert isinstance(ds, xr.Dataset)
         assert set(["z", "time"]).issubset(ds.dims)
         assert set(["depth", "lon", "lat", "time"]).issubset(ds.coords)
@@ -85,6 +93,8 @@ class TestCmemsFormat:
             "cmems_insitu",
             platform="argo",
         )
+        assert len(ds) == 1
+        ds = ds[0]
         assert isinstance(ds, xr.Dataset)
         assert set(["z", "time"]).issubset(ds.dims)
         assert set(["depth", "lon", "lat", "time"]).issubset(ds.coords)

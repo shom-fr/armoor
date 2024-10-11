@@ -385,7 +385,7 @@ class SSTAccessor:
             Data array containing salinity.
         """
         if 'sal' not in self._obj:
-            raise TypeError(
+            logger.warning(
                 'No salinity found.'
             )
         return self._obj
@@ -433,17 +433,22 @@ class SSTAccessor:
             return self._obj
         if 'temp' in self._obj:
             # verify salinity and pressure are also included
-            if 'sal' in self._obj and 'pres' in self._obj:
-                ptemp = gsw.conversions.pt0_from_t(self._obj.sal, self._obj.temp, self._obj.pres)
+            if 'sal' in self._obj:
+                if 'pres' not in self._obj:
+                     pres = self._obj.sel_var.sel_pres()["pres"]   
+                else:
+                    pres = self._obj["pres"]
+                ptemp = gsw.conversions.pt0_from_t(self._obj.sal, self._obj.temp, pres)
                 ptemp.attrs['standard_name'] = "sea_water_potential_temperature"
                 ptemp.attrs['units'] = "degrees_celsius"
                 ptemp.attrs['long_name'] = "Potential temperature"
                 self._obj['ptemp'] = convert_K_C(ptemp)
                 return self._obj
-
-            raise TypeError(
-                'The potential temperature could not be calculated.'
-            )
+            else:
+                logger.warning(
+                    'No salinity found, potential temperature cannot be computed.'
+                )
+                return self._obj
 
     def sel_sound_speed(self):
         """
@@ -455,25 +460,23 @@ class SSTAccessor:
             Data array containing the sound speed.
         """
         # Verify all the required variables are included in the dataset
-        ptemp = self._obj.sel_var.sel_ptemp()["ptemp"]
-        cons_temp = gsw.CT_from_pt(self._obj.sal, ptemp)
-        pres = self._obj.sel_var.sel_pres()["pres"]
-        sal = gsw.conversions.SA_from_SP(
-            self._obj.sal,
-            pres,
-            self._obj.lon,
-            self._obj.lat
-        )
-        if sal is not None and cons_temp is not None and pres is not None:
+        if "sal" in self._obj:
+            ptemp = self._obj.sel_var.sel_ptemp()["ptemp"]
+            cons_temp = gsw.CT_from_pt(self._obj.sal, ptemp)
+            pres = self._obj.sel_var.sel_pres()["pres"]
+            sal = gsw.conversions.SA_from_SP(
+                self._obj.sal,
+                pres,
+                self._obj.lon,
+                self._obj.lat
+            )
             snd_speed = gsw.sound_speed(sal, cons_temp, pres)
             snd_speed.attrs["units"] = "m/s"
             self._obj["sound_speed"] = snd_speed
         else:
-            raise TypeError(
+            logger.warning(
                 'The sound speed cannot be calculated.'
             )
-        logger.warning("To compute sound speed you need to have salinity, "
-                       "potential temperature and depth in your dataset.")
         return self._obj
 
     def sel_mixed_layer_depth(self, var: str):
@@ -546,6 +549,11 @@ class SSTAccessor:
         """
         ds_dens = self._obj.xoa.pdens
         if ds_dens is None:
+            if 'sal' not in self._obj:
+                logger.warning(
+                    "No salinity found, potential density cannot be computed"
+                )
+                return self._obj
             pres = gsw.conversions.p_from_z(-self._obj.depth, self._obj.lat)
             asal = gsw.conversions.SA_from_SP(self._obj.sal, pres, self._obj.lon,self._obj.lat)
             #sal = self._obj.sel_var.sel_sal().sal #should be absolute sal

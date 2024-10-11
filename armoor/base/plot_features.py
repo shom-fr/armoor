@@ -218,6 +218,9 @@ def get_title_figname(figtitle, obs, mod_name, obs_name):
         else:
             title_depth = f"Depth: {obs.depth.min().values:.1f} m to {obs.depth.max().values:.1f} m"
             depth = f"{obs.depth.min().values:.1f}m_to_{obs.depth.max().values:.1f}m"
+    elif 'depth' in obs.coords and np.size(obs.depth) == 1:
+        title_depth = f"Depth: {obs.depth.values[0]:.1f} m"
+        depth = f"{obs.depth.values[0]:.1f}m"
     elif 'pdens' in obs.coords and np.size(obs.pdens) > 1:
         title_depth = f"P. Density obs: {obs.pdens.min().values:.1f} to {obs.pdens.max().values:.1f} kg/m3"
         depth = f"{obs.pdens.min().values:.1f}_to_{obs.pdens.max().values:.1f}kgm-3"
@@ -477,16 +480,18 @@ def figure_2lin_ts():
     axs : list
         2 axes for observation, model and comparison time series.
     """
-    f = plt.figure(figsize=(15, 9))
-    ax0 = plt.subplot2grid((2, 1), (0, 0))
-    ax1 = plt.subplot2grid((2, 1), (1, 0))
+    # f = plt.figure(figsize=(15, 9))
+    # ax0 = plt.subplot2grid((2, 1), (0, 0))
+    # ax1 = plt.subplot2grid((2, 1), (1, 0))
 
-    axs = [ax0, ax1]
+    f, axs = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(12, 5))
+
+    #axs = [ax0, ax1]
     labels = LABELS_TS[5:7]
 
     for ax, label in zip(axs, labels):
         ax.grid()
-        ax.set_title(label, fontsize=6)
+        #ax.set_title(label, fontsize=6)
     f.subplots_adjust(top=1, bottom=0.75, wspace=0.5, hspace=0.5)
 
     return f, axs
@@ -3123,7 +3128,6 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None):
         Polygon coordinates list to display on the minimap.
     """
     logger.info('Statistical time series of model and observation.')
-
     varname = obss[0].attrs['varname']
     mod_name = [mod.attrs['name'] for mod in mods]
     if vrange:
@@ -3141,8 +3145,6 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None):
     #     hdim = None, 1
     #for ipt in range(hdim[1]):
     for iz in range(vdim[1]):
-        f, axs = figure_5lin_ts()
-        f.autofmt_xdate(rotation=5)
         for imod, mod in enumerate(mods):
             obs = obss[imod]
             # if hdim[0]:
@@ -3175,51 +3177,90 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None):
                 mg = apply_trange(modz, trange)
                 diffz = apply_trange(modz - obsz, trange)
                 diffz2 = apply_trange((modz - obsz) ** 2, trange)
+                rmsec0 = apply_trange((
+                    mg.map(
+                        anom, args=(dims_stat,)
+                    ) - og.map(
+                        anom, args=(dims_stat,)
+                    )
+                ) ** 2, trange)
             else:
                 og = obsz
                 mg = modz
                 diffz = modz - obsz
                 diffz2 = (modz - obsz) ** 2
-            omean = og.mean(dim=dims_stat)
-            ostd = og.std(dim=dims_stat)
-            mmean = mg.mean(dim=dims_stat)
-            mstd = mg.std(dim=dims_stat)
-            bias = diffz.mean(dim=dims_stat)
-            rmse = np.sqrt(diffz2.mean(dim=dims_stat))
-            rmsec0 = (mg.map(anom, args=(dims_stat,)) - og.map(anom, args=(dims_stat,))) ** 2
-            rmsec = np.sqrt(apply_trange(rmsec0, trange).mean(dim=dims_stat))
-            if imod == 0:
-                omean[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
-                ostd[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[2])
-                title, figname = get_title_figname(
-                    'Statistics',
-                    obsz,
-                    mod_name,
-                    obsz.attrs['name']
-                )
-            mmean[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0])
-            bias[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1])
-            mstd[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[2])
-            rmse[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[3])
-            rmsec[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[4])
-            for iax, subtitle in enumerate(["mean", "bias", "standard deviation",
-                                         "rmse", "centered rmse"]):
-                axs[iax].set_title(subtitle, fontsize=10, fontweight="bold")
-                axs[iax].set_ylabel("")
-                if iax < 5:
-                    axs[iax].set_xlabel("")
-                else:
-                    axs[iax].set_xlabel("Time")                    
-                if (trange == None) and (imod == 0):
+                rmsec0 = (
+                    (og - og.mean(dim=dims_stat).broadcast_like(og)) -
+                    (mg - mg.mean(dim=dims_stat).broadcast_like(mg))
+                ) ** 2
+            if len(dims_stat) > 0:
+                omean = og.mean(dim=dims_stat)
+                ostd = og.std(dim=dims_stat)
+                mmean = mg.mean(dim=dims_stat)
+                mstd = mg.std(dim=dims_stat)
+                bias = diffz.mean(dim=dims_stat)
+                rmse = np.sqrt(diffz2.mean(dim=dims_stat))
+                rmsec = np.sqrt(rmsec0.mean(dim=dims_stat))
+                if imod == 0:
+                    f, axs = figure_5lin_ts()
+                    f.autofmt_xdate(rotation=5)
+                    omean[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
+                    ostd[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[2])
+                    title, figname = get_title_figname(
+                        'Statistics',
+                        obsz,
+                        mod_name,
+                        obsz.attrs['name']
+                    )
+                    f.suptitle(title, 
+                               x=0.4, y=1.25, 
+                               fontsize=10, fontweight='bold')
+                mmean[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0])
+                bias[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1])
+                mstd[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[2])
+                rmse[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[3])
+                rmsec[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[4])
+                for iax, subtitle in enumerate(["mean", "bias", "standard deviation",
+                                             "rmse", "centered rmse"]):
+                    axs[iax].set_title(" ")
+                    axs[iax].set_ylabel(subtitle)
+                    if iax < 5:
+                        axs[iax].set_xlabel("")
+                    else:
+                        axs[iax].set_xlabel("Time")                    
+                    if (trange == None) and (imod == 0):
+                        axs[iax].xaxis.set_ticks(og.time)
+                        if iax == 4:
+                            axs[iax].xaxis.set_major_formatter(
+                                DateFormatter("%Y-%m-%d %H:%M")
+                            )    
+            else:
+                if imod == 0:
+                    f, axs = figure_2lin_ts()
+                    f.autofmt_xdate(rotation=5)
+                    title, figname = get_title_figname(
+                        ' ',
+                        obsz,
+                        mod_name,
+                        obsz.attrs['name']
+                    )
+                    f.suptitle(title, 
+                               x=0.4, y=1.25, 
+                               fontsize=10, fontweight='bold')
+                    og[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
+                mg[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0])
+                diffz[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1])
+                for iax, subtitle in enumerate([varname, "difference"]):
+                    axs[iax].set_title(" ")
+                    axs[iax].set_ylabel(subtitle)
+                for iax in range(len(axs)):
+                    if iax == 0:
+                        axs[iax].set_xlabel("")
                     axs[iax].xaxis.set_ticks(og.time)
-                    if iax == 4:
-                        axs[iax].xaxis.set_major_formatter(
-                            DateFormatter("%Y-%m-%d")
-                        )
-                        
-        f.suptitle(title, 
-                   x=0.4, y=1.01, 
-                   fontsize=6, fontweight='bold')
+                    axs[iax].xaxis.set_major_formatter(
+                        DateFormatter("%Y-%m-%d %H:%M")
+                    )      
+        
         axs[0].legend()
         plot_minimap(obsz, plot_coords="points")
         manage_output(figname, output_path)

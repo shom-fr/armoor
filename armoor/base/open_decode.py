@@ -149,7 +149,7 @@ def open_decode_sst_satellite(path_files, fmt):
     ds["lon"] = lon
     ds["lat"] = lat
     ds = ds.set_coords(["lon", "lat"])
-    return ds[["ptemp"]]
+    return [ds[["ptemp"]]]
 
 
 def open_decode_model(path_files):
@@ -325,7 +325,8 @@ def open_decode_cora_insitu(path_files, platform):
         ds["depth"] = -ds["depth"]
         dss.append(ds)
     if platform == "argo":
-        return concat_argo(dss)
+        ds = concat_argo(dss)
+        return [ds]
     else:
         return dss
 
@@ -394,23 +395,27 @@ def open_decode_cmems_insitu(path_files, platform):
         if ("depth" not in ds) and ("pres" in ds):            
             ds = depth_from_pres(ds)
         if "depth" in ds:
-            dssi = []
-            for itime in range(ds.sizes["time"]):
-                dsi = ds.isel(time=[itime])
-                if dsi.depth.min() < -10.0:
-                    dssi.append(dsi)
-            if len(dssi) == 0:
-                continue
-            ds = xr.combine_nested(dssi, 'time')
-            ds["depth"] = -ds["depth"]
+            if platform == "argo":
+                dssi = []
+                for itime in range(ds.sizes["time"]):
+                    dsi = ds.isel(time=[itime])
+                    if dsi.depth.min() < -10.0:
+                        dssi.append(dsi)
+                if len(dssi) == 0:
+                    continue
+                ds = xr.combine_nested(dssi, 'time')
+                ds["depth"] = -ds["depth"]
         for var in ds.data_vars:
             if var in cmems_coords:
                 ds = ds.set_coords(var)
         dss.append(ds)
         ds.close()
     if platform == "argo":
-        return concat_argo(dss)
+        ds = concat_argo(dss)
+        return [ds]
     else:
+        for ids in range(len(dss)):
+            dss[ids].attrs["name"] = dss[ids].attrs["platform_code"]
         return dss
     
     '''
