@@ -89,10 +89,6 @@ def obs_coords(ds_obs, ds_model, radius) -> xr.Dataset:
     xarray.Dataset
         Dataset with elements around observation points.
     """
-    ds_model = ds_model.reset_coords("depth").interp(
-        time=ds_obs.time,
-        method="nearest"
-    )
     
     ds_model = xcoords.geo_stack(ds_model, "member")
 
@@ -126,7 +122,8 @@ def obs_coords(ds_obs, ds_model, radius) -> xr.Dataset:
         ds.close()
     ds_model = xr.combine_nested(dss_model, "time")
     ds_obs = xr.combine_nested(dss_obs, "time")
-    ds_model = ds_model.set_coords("depth")
+    if "depth" not in ds_model.coords and "depth" in ds_model.data_vars:
+        ds_model = ds_model.set_coords("depth")
     return ds_obs, ds_model
 
 

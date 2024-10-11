@@ -10,3 +10,4 @@ Armoor comparison
 
    comparison_sst
    comparison_prof_hydro_vessel
+   comparison_prof_hydro_mooring

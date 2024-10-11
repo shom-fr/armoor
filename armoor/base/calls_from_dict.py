@@ -71,46 +71,39 @@ def get_observation_models_meta(cfg: dict):
 
     # Open observation dataset from path then decode dataset and apply meta-zone
     logger.info("Opening and decode observation from file(s)")
-    ds =  open_decode(
+    dss_obs =  open_decode(
         observation.pop("path"),
         cfg['observation'].get('fmt'),
         platform=cfg['observation'].get('platform'),
         
     )
-    ds = ds.assign_attrs({'name': observation.get("name")})
-    observation.update({"ds": ds})
-    ds.close()
-
+    for ids in range(len(dss_obs)):
+        if not "name" in dss_obs[ids].attrs:
+            dss_obs[ids].attrs["name"] = observation.get("name")
     logger.info("Applying : meta zone on observation")
-    ds = apply_metas2dataset(
-        observation["ds"],
-        cfg,
-    )
-    observation.update({
-        "ds_metazone": ds.assign_attrs({'name': observation.get("name")})
-    })
-    del ds
+    for ids, ds in enumerate(dss_obs):
+        ds0 = apply_metas2dataset(ds, cfg)
+        dss_obs[ids] = ds0.assign_attrs({'name': ds.attrs["name"]})
+        ds0.close()
+
     logger.info("File(s) read for observation")
     # Open model dataset from path then decode dataset and apply meta-zone
+    dss_model = []
     for imod, model in enumerate(models):
         logger.info(f"Reading model : {imod}")
 
         logger.info("Opening and decode model from file(s)")
-        ds = open_decode(
+        ds0 = open_decode(
             models[model].get("path"),
             models[model].get("fmt")
         )
 
         logger.info("Applying meta zone on model")
-        ds = apply_metas2dataset(
-            ds,
-            cfg,
-        )
-        models[model].update({
-            "ds_metazone": ds.assign_attrs({'name': models[model].get("name")})
-        })
-        del ds
-    del observation["ds"]
+        ds0 = apply_metas2dataset(ds0, cfg)
+        ds0 = ds0.assign_attrs({'name': models[model].get("name")})
+        dss_model.append(ds0)
+        ds0.close()
+
     #colocation
     logger.info("Colocation")
     if cfg["functionality"] == "prof_hydro_vessel":
@@ -122,11 +115,16 @@ def get_observation_models_meta(cfg: dict):
         observation.update({
             "ds_coloc": {},
         })
-        for model in models:
-            
+        for imodel, model in enumerate(models):
+            ds_model = dss_model[imodel]
+            ds_obs = dss_obs[0]
+            ds_model = ds_model.reset_coords("depth").interp(
+                time=ds_obs.time,
+                method="nearest"
+            )
             ds_obs, ds_model = coloc.obs_coords(
-                observation["ds_metazone"],
-                models[model]["ds_metazone"],
+                ds_obs,
+                ds_model,
                 cfg["metazone"]["radius"]
             )
             models[model].update({
@@ -180,10 +178,7 @@ def get_observation_models_meta(cfg: dict):
             else:
                 observation["ds_coloc"].update(
                     {model: observation["ds_coloc"][model]}
-                )
-            del models[model]["ds_metazone"]
-        del observation["ds_metazone"]
-            
+                )           
     elif cfg["functionality"] == "sst":        
         if (
             cfg["metazone"].get("href") != None
@@ -222,10 +217,10 @@ def get_observation_models_meta(cfg: dict):
         observation.update({
             "ds_coloc": {},
         })
-        for model in models:
-            ds_model = models[model]["ds_metazone"]
-            ds_obs =  observation["ds_metazone"]
-            if "z" in models[model]["ds_metazone"].dims:
+        for imodel, model in enumerate(models):
+            ds_model = dss_model[imodel]
+            ds_obs =  dss_obs[0]
+            if "z" in ds_model.dims:
                 ds_model = ds_model.isel(z=0).squeeze()
             if cfg["metazone"].get("tfreq"):
                 ds_model = ds_model.meta.time_selection_terms(
@@ -281,6 +276,108 @@ def get_observation_models_meta(cfg: dict):
             })
             del ds_model
             del ds_obs
+    elif cfg["functionality"] == "prof_hydro_mooring":
+        if cfg["metazone"]["radius"] == None:
+            raise TypeError(
+                "armoor needs a radius."
+                "Please, fill your configuration file."
+            )
+        if (
+            cfg["metazone"].get("tref") == None
+        ) & (
+            cfg["metazone"].get("tfreq") == None
+        ):
+            raise TypeError(
+                "Please, choose tref or tfreq colocation."
+            )
+        dss_obs_coloc = []
+        dss_model_coloc = []
+        for iobs in range(len(dss_obs)):
+            dss_obs_coloc.append([])
+            dss_model_coloc.append([])
+            ds0_obs = dss_obs[iobs]
+            for imodel, model in enumerate(models):
+                ds0_model = dss_model[imodel]
+                if cfg["metazone"].get("tfreq"):
+                    ds_model = ds0_model.meta.time_selection_terms(
+                        start=cfg["metazone"].get("tbound")[0],
+                        end=cfg["metazone"].get("tbound")[-1],
+                        freq=cfg["metazone"].get("tfreq")
+                    )
+                    ds_obs = ds0_obs.meta.time_selection_terms(
+                        start=cfg["metazone"].get("tbound")[0],
+                        end=cfg["metazone"].get("tbound")[-1],
+                        freq=cfg["metazone"].get("tfreq")
+                    )
+                elif cfg["metazone"].get("tref") in ("obs", "model"):
+                    if cfg["metazone"].get("tref") == "obs":
+                        ds_model = ds0_model.interp(
+                            time=ds0_obs.time,
+                            method="linear"
+                        )
+                        ds_obs = ds0_obs
+                    elif cfg["metazone"].get("tref") == "model":
+                        ds_obs = ds0_obs.interp(
+                            time=ds0_model.time,
+                            method="linear"
+                        )
+                        ds_model = ds0_model
+                ds_obs, ds_model = coloc.obs_coords(
+                    ds_obs,
+                    ds_model,
+                    cfg["metazone"]["radius"]
+                )
+                ds_model = coloc.vertical(
+                    ds_model,
+                    ds_obs.depth#.isel(time=0)
+                )
+                dss_model_coloc[iobs].append(
+                    ds_model.assign_attrs({
+                        'name': models[model].get("name"),
+                        "radius": cfg["metazone"]["radius"],
+                    })
+                )
+                dss_obs_coloc[iobs].append(
+                    ds_obs.assign_attrs({
+                        "tbound": cfg["metazone"]["tbound"],
+                        "radius": cfg["metazone"]["radius"],
+                        'name': ds0_obs.attrs["name"],
+                    })
+                )
+                del ds0_model
+            del ds0_obs
+        nobs = len(dss_obs)
+        del dss_model
+        del dss_obs
+        observation["ds_coloc"] = {}
+        for imodel, model in enumerate(models):
+            for iobs in range(nobs):
+                if iobs == 0:
+                    models[model]["ds_coloc"] = []
+                    observation["ds_coloc"].update({model: []})
+                models[model]["ds_coloc"].append(
+                    dss_model_coloc[iobs][imodel].assign_attrs({
+                        'name': models[model].get("name"),
+                    })
+                )
+                observation["ds_coloc"][model].append(
+                    dss_obs_coloc[iobs][imodel].assign_attrs({
+                        "tbound": cfg["metazone"]["tbound"],
+                    })
+                )
+        del dss_obs_coloc
+        del dss_model_coloc
+                
+        # for iobs in range(len(dss_obs)):
+        #     print(iobs)
+        #     for model in cfg["models"].keys():
+        #         print(models[model]["ds_coloc"][iobs])
+        #         print("---")
+        #     print("=======")
+                
+            
+        ##
+    
             # elif cfg["metazone"].get("coord"):
             #     observation["ds_coloc"].update(
             #         {model: ds_obs.assign_attrs({
@@ -579,6 +676,13 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
             "polygon", "href", "coord",
             "vars"
         ]
+    elif cfg["functionality"] == "prof_hydro_mooring":
+
+        meta = [
+            "tbound", "trange_seq", "tfreq", "tref",
+            "polygon", "radius",
+            "vars"
+        ]
     
     for k, v in metazone.items():
         if (k != "name") and (k not in meta):
@@ -592,6 +696,7 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
     for k in time_meta:
         if k in metazone.keys():
             ds = FILTERS[k](ds)(*metazone[k])
+            
     #horizontal
     horizontal_meta = [
         "polygon", "bathy",

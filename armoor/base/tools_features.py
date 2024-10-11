@@ -269,8 +269,17 @@ def sel_default_vars(config_obj):
             config_obj['observation']["ds_coloc"].update({
                 mod: config_obj['observation']["ds_coloc"][mod].sel_var.selection(vars)
             })
+        
+    vars_out = []
+    for var in vars:
+        if (
+            var in config_obj['observation']["ds_coloc"][mod]
+        ) and (
+            var in config_obj['models'][mod]["ds_coloc"]
+        ):
+            vars_out.append(var)
 
-    return config_obj, vars
+    return config_obj, vars_out
 
 
 def sel_one_var(observation, models, var, depth=None):
