@@ -20,6 +20,29 @@ from armoor.__init__ import ROOTDIR
 
 logger = logging.getLogger(__name__)
 
+
+def get_paths(path_files):
+    
+    if not isinstance(path_files, (list, dict)):
+        raise TypeError(f"Only list or dict are allowed : {path_files}")
+        
+    if (len(path_files) == 1) & ("*" in path_files[0]):
+        paths = glob.glob(path_files[0])
+        if len(paths) == 0:
+            raise TypeError(
+                f"{path_files[0]} not found."
+            )
+        path_files = paths
+    else:
+        for path in path_files:
+            if not os.path.exists(path):
+                raise TypeError(
+                    f"{path} does not exist."
+                )
+    
+    return path_files
+
+
 def open_decode(path_files, fmt, platform=None, func=None, type=None) -> xr.Dataset:
     """
      Open a netcdf/txt file and store it into a dataset
@@ -41,34 +64,8 @@ def open_decode(path_files, fmt, platform=None, func=None, type=None) -> xr.Data
      """
     # Xoa initialisation
     
-
-    # Read cfg file
-    # try:
-    #     rootdir = os.path.abspath(os.path.dirname(__file__))
-    #     path = os.path.join(rootdir, '..', '..', 'config', 'cf.cfg')
-    #     logger.info('using path : %s', path)
-    # except:
-    #     logger.warning('cf.cfg file not found')
-    #     directory = os.getcwd()
-    #     logger.warning('using path : %s', directory)
-    # xcf.register_cf_specs(path)
-    if not isinstance(path_files, (list, dict)):
-        raise TypeError(f"Only list or dict are allowed : {path_files}")
-        
-    if (len(path_files) == 1) & ("*" in path_files[0]):
-        paths = glob.glob(path_files[0])
-        if len(paths) == 0:
-            raise TypeError(
-                f"{path_files[0]} not found."
-            )
-        path_files = paths
-    else:
-        for path in path_files:
-            if not os.path.exists(path):
-                raise TypeError(
-                    f"{path} does not exist."
-                )
-
+    path_files = get_paths(path_files)
+                
     # Open file
     if func == 'forecaster':
         logger.info("forecaster")
@@ -206,7 +203,17 @@ def open_decode_hycom(path_files):
     dss = []
     da_u, da_v = None, None
     for path in path_files:
-        ds = xr.open_dataset(path).xoa.decode()
+        # ds = xr.open_dataset(
+        #     path, chunks={"time": 24}
+        # ).isel(
+        #     X=slice(None, None, 4), Y=slice(None, None, 4)
+        # ).load(scheduler="processes").xoa.decode()
+        ds = xr.open_dataset(
+                path, chunks={"time": 24}
+            ).load(scheduler="processes").xoa.decode()
+        print(ds)
+        if ("dz" not in ds) and ("bathy" in ds):
+            ds = ds.drop("bathy")
         if ('u' in ds.data_vars) or ('v' in ds.data_vars):
             if 'u' in ds.data_vars:
                 logger.info("shift u")
@@ -224,7 +231,7 @@ def open_decode_hycom(path_files):
             #ds = ds.isel(x=slice(None, None, 10), y=slice(None, None, 10))
             dss.append(ds)
         ds.close()
-    ds = xr.merge(dss)
+    ds = xr.merge(dss)#, compat="override")#.compute()
     if isinstance(da_u, xr.DataArray):
         ds['u'] = da_u.assign_coords(**ds.coords)
         del da_u
@@ -234,10 +241,9 @@ def open_decode_hycom(path_files):
     if "dz" in ds:
         ds.coords["depth"] = dz2depth(ds.dz, centered=True)
         ds = ds.drop(["z", "dz"])
-
+    #ds = ds.compute()#scheduler="processes")
     return ds
 
-        
 def open_decode_woa18(path_files):
     """
      Open WOA18 netcdf files and store it into a ready-to-use dataset.
@@ -353,7 +359,8 @@ def open_decode_cmems_insitu(path_files, platform):
     xoa.register_accessors()
     dss = []
     for path in path_files:
-        ds = xr.open_dataset(path).xoa.decode()
+        logger.info(f"Open {path}")
+        ds = xr.open_dataset(path).load().xoa.decode()
         vars2drop = []
         for var in ds.data_vars:
             if var.isupper():
@@ -394,6 +401,8 @@ def open_decode_cmems_insitu(path_files, platform):
                 ds = ds.reset_coords(coord)
         if ("depth" not in ds) and ("pres" in ds):            
             ds = depth_from_pres(ds)
+            if platform == "glider":
+                ds = ds.drop("pres")
         if "depth" in ds:
             if platform == "argo":
                 dssi = []
@@ -404,7 +413,28 @@ def open_decode_cmems_insitu(path_files, platform):
                 if len(dssi) == 0:
                     continue
                 ds = xr.combine_nested(dssi, 'time')
-                ds["depth"] = -ds["depth"]
+                ds["depth"] = -1 * ds["depth"]
+            if platform == "glider":
+                if ds["depth"].dims == ("z",):
+                    ds["depth"] = ds["depth"].broadcast_like(ds["temp"])
+                if ds.depth.min() < 0:
+                    ds["depth"] = -1 * ds["depth"]
+            if platform == "mooring":
+                if "time" in ds.depth.dims:
+                    continue
+                iz2keep = []
+                for iz in range(ds.sizes["z"]):
+                    if (
+                        np.isfinite(ds.isel(z=iz).depth)
+                    ) and (
+                        ds.isel(z=iz).depth > 0.
+                    ) and (
+                        np.all(np.isfinite(ds.isel(z=iz).temp))
+                    ):
+                        iz2keep.append(iz)
+                ds = ds.isel(z=iz2keep)
+                if ds.depth.sizes["z"] == 0:
+                    continue
         for var in ds.data_vars:
             if var in cmems_coords:
                 ds = ds.set_coords(var)
@@ -1558,10 +1588,10 @@ def concat_cora(list_ds_cora):
     return cora
 
 def concat_argo(list_ds):
-    dim_z =  np.max([ds.dims["z"] for ds in list_ds])
+    dim_z =  np.max([ds.sizes["z"] for ds in list_ds])
     for ids, dsin in enumerate(list_ds):
         dsin = dsin.reset_coords("depth")
-        if dsin.dims["z"] != dim_z:
+        if dsin.sizes["z"] != dim_z:
             das = []
             for var in dsin.data_vars:
                 if ("z" in dsin[var].dims): 

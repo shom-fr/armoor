@@ -102,3 +102,26 @@ Hereafter, we propose a list of configuration files that can be used as template
     .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_vessel/cmems_vs_HyCOM_immersions_intervals.cfg
     
     .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_vessel/cmems_vs_HyCOM_layers_intervals.cfg
+    
+Examples
+........
+
+    .. image::  images/prof_hydro_vessel/Theta-S_diagram_sloop_oper_cmems_argo_2023-04-13_to_2023-04-14__interval_1D_4.98_42.12_radius_2.0km_0.4m_to_569.0m.png
+        :width: 600
+        :alt: example of theta-s diagram
+        
+    .. image::  images/prof_hydro_vessel/Multi_profiles_sound_speed_sloop_oper_cmems_argo_2023-04-14_to_2023-04-15__interval_1D_4.90_42.04_radius_2.0km_0.4m_to_614.3m.png
+        :width: 600
+        :alt: example of multi-profiles
+        
+    .. image::  images/prof_hydro_vessel/Statistics_Pot._temperature_sloop_oper_cmems_argo_interval_1D_radius_2.0km_50.0m.png
+        :width: 600
+        :alt: example of statistics time series
+        
+    .. image::  images/prof_hydro_vessel/Dispersion_diagram_sound_speed_sloop_oper_cmems_argo_2023-04-12T00-00-00_to_2023-04-19T00-00-00__radius_2.0km_50.0m_to_1500.0m.png
+        :width: 600
+        :alt: example of dispersion diagram
+    
+    .. image::  images/prof_hydro_vessel/bias_Salinity_sloop_oper_cmems_argo_2023-04-18_to_2023-04-19__interval_1D_7.02_39.58_radius_2.0km_200_to_500_m.png
+        :width: 600
+        :alt: example of map profil

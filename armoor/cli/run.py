@@ -19,7 +19,6 @@ def main(functionality :str = None):
     logger.info('Applying configuration to generate plots')
     dict2call(parser)
 
-
 def script_p_sst():
     main('sst')
 

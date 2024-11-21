@@ -3,7 +3,6 @@
 """
 Armoor executable script
 """
-
 import sys
 import os
 

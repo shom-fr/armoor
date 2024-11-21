@@ -1,15 +1,8 @@
 """
 Tools for the command line interface
 """
-import json
 import os
 from argparse import ArgumentTypeError
-from pprint import pprint
-from xoa import cfgm
-
-from configobj import ConfigObj
-from validate import Validator, VdtTypeError
-
 import logging
 
 logger = logging.getLogger(__name__)

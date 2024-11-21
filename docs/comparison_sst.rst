@@ -75,3 +75,18 @@ Hereafter, we propose a list of configuration files that can be used as template
     .. literalinclude:: ../armoor/tests/uni/test_sst/L4_vs_HyCOM_href_intervals.cfg
     
     .. literalinclude:: ../armoor/tests/uni/test_sst/L4_vs_HyCOM_href_terms.cfg
+    
+Examples
+........
+
+    .. image::  images/sst/Map_difference_Pot._temperature_sloop_oper_cmems_l4_2023-04-19T00-00.png
+        :width: 600
+        :alt: example of sst maps
+
+    .. image::  images/sst/Dispersion_diagram_Pot._temperature_sloop_oper_cmems_l4_2023-04-16T00-00.png
+        :width: 600
+        :alt: example of dispersion diagram
+        
+    .. image::  images/sst/Statistics_Pot._temperature_sloop_oper_cmems_l4_interval_1D.png
+        :width: 600
+        :alt: example of statistics time series
