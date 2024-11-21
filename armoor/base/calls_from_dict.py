@@ -1,16 +1,27 @@
 """Decode the config file to plot the required outputs"""
-
-import logging, sys
-import copy
+import logging
 import xarray as xr
+import numpy as np
+#import xesmf as xe
+# print(xe)
+from armoor.base.colocation import obs_coords_radius, vertical, horizontal_regrid, obs_coords
 from armoor.base.__init__ import FILTERS
-from armoor.base import feature_sst, feature_prof_hydro_vessel, feature_prof_hydro_mooring, \
-    feature_section_hydro, feature_clim_hydro, feature_currents_hfr, feature_currents_ADCP, \
-    feature_currents_VMADCP, feature_drifters
+from armoor.algo.calculation import ensemble_mean
 from armoor.base.open_decode import open_decode
-import armoor.base.colocation as coloc
+from armoor.base import (
+    feature_sst,
+    feature_prof_hydro_vessel,
+    feature_prof_hydro_mooring,
+    feature_section_hydro,
+    # feature_clim_hydro,
+    # feature_currents_hfr,
+    # feature_currents_ADCP,
+    # feature_currents_VMADCP,
+    # feature_drifters
+)
 import armoor.base.meta_zone
 import armoor.base.sel_var
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +39,17 @@ def dict2call(config_obj: dict):
     """
     config_obj = get_observation_models_meta(config_obj)
 
-    features = {"sst": feature_sst, "prof_hydro_vessel": feature_prof_hydro_vessel,
-                "prof_hydro_mooring": feature_prof_hydro_mooring,
-                "section_hydro": feature_section_hydro, "clim_hydro": feature_clim_hydro,
-                "currents_hfr": feature_currents_hfr, "currents_ADCP": feature_currents_ADCP,
-                "currents_VMADCP": feature_currents_VMADCP, "drifters": feature_drifters
-                }
+    features = {
+        "sst": feature_sst,
+        "prof_hydro_vessel": feature_prof_hydro_vessel,
+        "prof_hydro_mooring": feature_prof_hydro_mooring,
+        "section_hydro": feature_section_hydro,
+        # "clim_hydro": feature_clim_hydro,
+        # "currents_hfr": feature_currents_hfr,
+        # "currents_ADCP": feature_currents_ADCP,
+        # "currents_VMADCP": feature_currents_VMADCP,
+        # "drifters": feature_drifters
+    }
 
     selected_feature = config_obj["functionality"]
 
@@ -43,7 +59,6 @@ def dict2call(config_obj: dict):
     else:
         logger.debug('Feature %s not found', selected_feature)
     
-
 def get_observation_models_meta(cfg: dict):
     """
     Replace the path to a netCDF into the actual xarray, then apply the meta-zone filters,
@@ -82,10 +97,30 @@ def get_observation_models_meta(cfg: dict):
             dss_obs[ids].attrs["name"] = observation.get("name")
     logger.info("Applying : meta zone on observation")
     for ids, ds in enumerate(dss_obs):
+        logger.info(f"{ds.attrs['name']}")
+        logger.info(
+            f'Time bounds: [{ds.time.min().values}, {ds.time.max().values}]'
+        )
+        logger.info(
+            f'Lon bounds: [{ds.lon.min().values}, {ds.lon.max().values}]'
+        )
+        logger.info(
+            f'Lat bounds: [{ds.lat.min().values}, {ds.lat.max().values}]'
+        )
+        if "depth" in ds:
+            logger.info(
+                f'Depth bounds: [{ds.depth.min().values}, {ds.depth.max().values}]'
+            )
         ds0 = apply_metas2dataset(ds, cfg)
-        dss_obs[ids] = ds0.assign_attrs({'name': ds.attrs["name"]})
-        ds0.close()
-
+        dss_obs[ids] = ds0
+        if ds0 != None:
+            dss_obs[ids].assign_attrs({'name': ds.attrs["name"]})
+            ds0.close()
+    dss_obs = [ds for ds in dss_obs if ds != None]
+    if len(dss_obs) == 0:
+        raise TypeError(
+            "Metazone filters on observation leads to None."
+        )
     logger.info("File(s) read for observation")
     # Open model dataset from path then decode dataset and apply meta-zone
     dss_model = []
@@ -97,12 +132,29 @@ def get_observation_models_meta(cfg: dict):
             models[model].get("path"),
             models[model].get("fmt")
         )
-
+        logger.info(
+            f'Time bounds: [{ds0.time.min().values}, {ds0.time.max().values}]'
+        )
+        logger.info(
+            f'Lon bounds: [{ds0.lon.min().values}, {ds0.lon.max().values}]'
+        )
+        logger.info(
+            f'Lat bounds: [{ds0.lat.min().values}, {ds0.lat.max().values}]'
+        )
+        if "depth" in ds0:
+            logger.info(
+                f'Depth bounds: [{ds0.depth.min().values}, {ds0.depth.max().values}]'
+            )
         logger.info("Applying meta zone on model")
         ds0 = apply_metas2dataset(ds0, cfg)
-        ds0 = ds0.assign_attrs({'name': models[model].get("name")})
-        dss_model.append(ds0)
-        ds0.close()
+        if ds0 != None:
+            ds0 = ds0.assign_attrs({'name': models[model].get("name")})
+            dss_model.append(ds0)
+            ds0.close()
+        else:
+            raise TypeError(
+                "Metazone filters on {model} leads to None."
+            )
 
     #colocation
     logger.info("Colocation")
@@ -122,7 +174,7 @@ def get_observation_models_meta(cfg: dict):
                 time=ds_obs.time,
                 method="nearest"
             )
-            ds_obs, ds_model = coloc.obs_coords(
+            ds_obs, ds_model = obs_coords_radius(
                 ds_obs,
                 ds_model,
                 cfg["metazone"]["radius"]
@@ -155,7 +207,7 @@ def get_observation_models_meta(cfg: dict):
 
                 logger.info(f"Vertical reference is {vref}")
                 if vref == "model":
-                    ds = coloc.vertical(
+                    ds = vertical(
                         observation["ds_coloc"][model],
                         models[model]["ds_coloc"][vlevel]
                     )
@@ -166,7 +218,7 @@ def get_observation_models_meta(cfg: dict):
                         )}
                     )
                 else:
-                    ds = coloc.vertical(
+                    ds = vertical(
                         models[model]["ds_coloc"],
                         observation["ds_coloc"][model][vlevel]
                     )
@@ -248,13 +300,13 @@ def get_observation_models_meta(cfg: dict):
                 logger.info("Regrid :")
                 if cfg["metazone"].get("href") == "obs":
                     logger.info("model on obs")
-                    ds_model, ds_obs = coloc.horizontal_regrid(
+                    ds_model, ds_obs = horizontal_regrid(
                         ds_model,
                         ds_obs
                     )
                 elif cfg["metazone"].get("href") == "model":
                     logger.info("obs on model")
-                    ds_obs, ds_model = coloc.horizontal_regrid(
+                    ds_obs, ds_model = horizontal_regrid(
                         ds_obs,
                         ds_model
                     )
@@ -263,6 +315,7 @@ def get_observation_models_meta(cfg: dict):
                 logger.info(f"Grid2loc obs on coords: {coord}")
                 ds_obs = ds_obs.meta.horizontal_selection_coords(coord)
                 ds_model = ds_model.meta.horizontal_selection_coords(coord)
+            print(ds_obs["ptemp"].attrs)
             observation["ds_coloc"].update(
                 {model: ds_obs.assign_attrs({
                     "tbound": cfg["metazone"]["tbound"],
@@ -277,6 +330,9 @@ def get_observation_models_meta(cfg: dict):
             del ds_model
             del ds_obs
     elif cfg["functionality"] == "prof_hydro_mooring":
+        logger.info(
+            "Colocation for prof_hydro_mooring"
+        )
         if cfg["metazone"]["radius"] == None:
             raise TypeError(
                 "armoor needs a radius."
@@ -296,6 +352,9 @@ def get_observation_models_meta(cfg: dict):
             dss_obs_coloc.append([])
             dss_model_coloc.append([])
             ds0_obs = dss_obs[iobs]
+            logger.info(
+                f"Start colocation for observation: {ds0_obs.attrs['name']}"
+            )
             for imodel, model in enumerate(models):
                 ds0_model = dss_model[imodel]
                 if cfg["metazone"].get("tfreq"):
@@ -322,12 +381,13 @@ def get_observation_models_meta(cfg: dict):
                             method="linear"
                         )
                         ds_model = ds0_model
-                ds_obs, ds_model = coloc.obs_coords(
+                ds_obs, ds_model = obs_coords_radius(
                     ds_obs,
                     ds_model,
                     cfg["metazone"]["radius"]
                 )
-                ds_model = coloc.vertical(
+                ds_model = ensemble_mean(ds_model)
+                ds_model = vertical(
                     ds_model,
                     ds_obs.depth#.isel(time=0)
                 )
@@ -346,6 +406,83 @@ def get_observation_models_meta(cfg: dict):
                 )
                 del ds0_model
             del ds0_obs
+        logger.info("End of colocation")
+        nobs = len(dss_obs_coloc)
+        del dss_model
+        del dss_obs
+        observation["ds_coloc"] = {}
+        for imodel, model in enumerate(models):
+            for iobs in range(nobs):
+                if iobs == 0:
+                    models[model]["ds_coloc"] = []
+                    observation["ds_coloc"].update({model: []})
+                models[model]["ds_coloc"].append(
+                    dss_model_coloc[iobs][imodel]
+                    .assign_attrs({
+                        'name': models[model].get("name"),
+                    })
+                )
+                observation["ds_coloc"][model].append(
+                    dss_obs_coloc[iobs][imodel]
+                    .assign_attrs({
+                        "tbound": cfg["metazone"]["tbound"],
+                    })
+                )
+        del dss_obs_coloc
+        del dss_model_coloc
+    elif cfg["functionality"] == "section_hydro":
+        vfreq = cfg["metazone"].get("vfreq")
+        vfreq = [k for k in vfreq.items()][0]
+        vfreq_name, vfreq = vfreq[0], vfreq[1]
+        if (
+             vfreq_name not in ("depth", "pdens")
+        ):
+            raise TypeError(
+                f"{vfreq_name} vertical colocation not implemented."
+            )
+        if (
+            isinstance(vfreq, float) == False
+        ):
+            raise TypeError(
+                f"{vfreq} is expected to be a float."
+            )
+        dss_obs_coloc = []
+        dss_model_coloc = []
+        for iobs in range(len(dss_obs)):
+            dss_obs_coloc.append([])
+            dss_model_coloc.append([])
+            ds0_obs = dss_obs[iobs]
+            logger.info(f"Obs: {ds0_obs.name}")
+            dav = xr.DataArray(
+                np.arange(
+                    ds0_obs[vfreq_name].min(),
+                    ds0_obs[vfreq_name].max(),
+                    vfreq
+                ),
+                dims="z",
+                name="depth"
+            )
+            ds_obs = vertical(ds0_obs, dav)
+            ds_obs = ds_obs.isel(z=slice(None, None, -1))
+            for imodel, model in enumerate(models):
+                logger.info(f"Model: {model}")
+                ds0_model = dss_model[imodel]
+                ds_model = obs_coords(ds0_obs, ds0_model)
+                ds_model = vertical(ds_model, dav)
+                ds_model = ds_model.isel(z=slice(None, None, -1))
+                dss_model_coloc[iobs].append(
+                    ds_model.assign_attrs({
+                        'name': models[model].get("name"),
+                    })
+                )
+                dss_obs_coloc[iobs].append(
+                    ds_obs.assign_attrs({
+                        'name': ds0_obs.attrs["name"],
+                    })
+                )
+                del ds0_model
+            del ds0_obs    
+        
         nobs = len(dss_obs)
         del dss_model
         del dss_obs
@@ -363,248 +500,20 @@ def get_observation_models_meta(cfg: dict):
                 observation["ds_coloc"][model].append(
                     dss_obs_coloc[iobs][imodel].assign_attrs({
                         "tbound": cfg["metazone"]["tbound"],
+                        "name": dss_obs_coloc[iobs][imodel].attrs["name"]
                     })
                 )
         del dss_obs_coloc
         del dss_model_coloc
-                
-        # for iobs in range(len(dss_obs)):
-        #     print(iobs)
-        #     for model in cfg["models"].keys():
-        #         print(models[model]["ds_coloc"][iobs])
-        #         print("---")
-        #     print("=======")
-                
-            
-        ##
     
-            # elif cfg["metazone"].get("coord"):
-            #     observation["ds_coloc"].update(
-            #         {model: ds_obs.assign_attrs({
-            #             "tbound": cfg["metazone"]["tbound"],
-            #             'name': observation.get("name"),
-            #         })}
-            #     )
-            #     logger.info(f"Grid2loc model on coords: {coord}")
-            #     ds_model = models[model]["ds_metazone"].meta.horizontal_selection_coords(coord)
-            #     models[model].update({
-            #         "ds_coloc": ds_model.assign_attrs({
-            #             'name': models[model].get("name"),
-            #         })
-            #     })
-            #     del ds_model
-    # #vrange
-    # for model in models:
-    #     ds = apply_vrange(observation["ds_coloc"][model], cfg["metazone"])
-    #     observation["ds_coloc"].update({model: ds})
-    #     ds = apply_vrange(models[model]["ds_coloc"], cfg["metazone"])
-    #     models[model].update({"ds_coloc": ds})
-    #     del ds
-
-    # #trange
-    # for model in models:
-    #     ds = apply_trange(observation["ds_coloc"][model], cfg["metazone"])
-    #     observation["ds_coloc"].update({model: ds})
-    #     ds = apply_trange(models[model]["ds_coloc"], cfg["metazone"])
-    #     models[model].update({"ds_coloc": ds})
-
     
+    cfg["observation"] = observation
+    cfg["models"] = models
     
     return cfg
+  
 
 
-
-    # # Set colocation flags
-    # steps = config_obj.get('horizontal_step'), config_obj.get('vertical_step')
-    # flags = set_coloc_flags(config_obj)
-    # _, horizontal_colocation_flag, vertical_colocation_flag = flags
-
-    # # Colocate
-    # observation.update({"xarray_meta_coloc": []})
-    # logger.info("Collocating model(s) and observation")
-    # for index_model, model in enumerate(models):
-    #     # Colocation per model
-    #     obs_coloc, mod_coloc = colocate_all(observation["xarray_meta"], model["xarray_meta"], flags,
-    #                                         tgt_grid=config_obj["colocate"],
-    #                                         coloc_method=get_method(model),
-    #                                         coloc_method_z=get_method(model, z_dim=True))
-    #     observation["xarray_meta_coloc"].append(obs_coloc)
-    #     model.update({"xarray_meta_coloc": mod_coloc})
-
-    #     logger.info("Collocation done for model %s", index_model)
-
-    #     # Interval temporels successifs
-    #     if 'interval' in config_obj["meta_zones"]:
-    #         if 'start' not in config_obj["meta_zones"] or 'end' not in config_obj["meta_zones"]:
-    #             start = observation["xarray"].time.data[0]
-    #             end = observation["xarray"].time.data[-1]
-    #         else:
-    #             start = config_obj["meta_zones"]["start"]
-    #             end = config_obj["meta_zones"]["end"]
-
-    #         logger.info('Temporal interval segmentation...')
-    #         interval = config_obj["meta_zones"]["interval"]
-    #         model["xarray_meta"] = model["xarray_meta"].meta.time_selection_interval(interval, start, end)
-    #         model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.time_selection_interval(
-    #             interval, start, end)
-    #         observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
-    #             index_model].meta.time_selection_interval(interval, start, end)
-
-    #         # Tranches verticales
-    #     if 'slice' in config_obj["meta_zones"]:
-    #         if 'depth' in config_obj["meta_zones"]:
-    #             var_slice = 'depth'
-    #         elif 'dens' in config_obj["meta_zones"]:
-    #             var_slice = 'dens'
-    #         else:
-    #             var_slice = 'depth'
-
-    #         logger.info('Vertical slicing on variable %s', var_slice)
-
-    #         vert_slice = config_obj["meta_zones"]["slice"]
-    #         model["xarray_meta"] = model["xarray_meta"].meta.vertical_selection_slice(vert_slice,
-    #                                                                                   var_slice)
-    #         model["xarray_meta_coloc"] = model["xarray_meta_coloc"].meta.vertical_selection_slice(
-    #             vert_slice, var_slice)
-    #         observation["xarray_meta_coloc"][index_model] = observation["xarray_meta_coloc"][
-    #             index_model].meta.vertical_selection_slice(vert_slice, var_slice)
-            
-    #     outputs = config_obj['outputs']
-    #     vars_to_plot = [output['attribute'][0] for output in outputs if 'attribute' in output]
-    #     mld_var = False
-    #     if 'mld_ptemp' in vars_to_plot:
-    #         mld_var = 'ptemp'
-    #     elif 'mld_pdens' in vars_to_plot:
-    #         mld_var = 'pdens'
-    #     if mld_var:
-    #         observation["xarray_meta_coloc"][index_model] = merge_no_fail([observation["xarray_meta_coloc"][index_model], observation["xarray_meta_coloc"][index_model].sel_var.sel_mixed_layer_depth(mld_var)])
-    #         if model.get("type") == 'CROCO':
-    #             model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].drop_vars(["x", "y", "level"]).sel_var.sel_mixed_layer_depth(mld_var)])
-    #         else:
-    #             model["xarray_meta_coloc"] = merge_no_fail([model["xarray_meta_coloc"], model["xarray_meta_coloc"].sel_var.sel_mixed_layer_depth(mld_var)])
-
-    # # Obs meta is out of the loop for each mod
-    # if 'interval' in config_obj["meta_zones"]:
-    #     observation["xarray_meta"] = observation["xarray_meta"].meta.time_selection_interval(
-    #         interval, start, end)
-
-    # if 'slice' in config_obj["meta_zones"]:
-    #     vert_slice = config_obj["meta_zones"]["slice"]
-    #     observation["xarray_meta"] = observation["xarray_meta"].meta.vertical_selection_slice(
-    #         vert_slice, var_slice)
-
-    # return config_obj
-
-
-def set_coloc_flags(config_obj):
-    """
-    Set the colocation flags from the config obj that indicate if the dimension on which to colocate
-    the model and observation .
-    Parameters
-    ----------
-    config_obj : dict
-        Dictionary specifying the observation, models, functionality, output etc.
-        Can be formatted out of a json file using cli.command_line_interface.
-
-    Returns
-    -------
-    flags : list of bools
-        time, vertical and horizontal colocation flags.
-
-    """
-    # Set initial colocation flags
-    temporal_colocation_flag = True
-    vertical_colocation_flag = True
-    horizontal_colocation_flag = True
-
-    # Colocation for functionality 1
-    if config_obj["functionality"] == "sst":
-        vertical_colocation_flag = False
-        horizontal_colocation_flag = True
-        temporal_colocation_flag = True
-
-    # Colocation for functionality 2
-    if config_obj["functionality"] == "prof_hydro_vessel":
-        vertical_colocation_flag = True
-        horizontal_colocation_flag = True
-        temporal_colocation_flag = True
-
-    # Colocation for functionnality 3
-    if config_obj["functionality"] == "prof_hydro_mooring":
-        if 'depth' in config_obj['meta_zones'] :
-            vertical_colocation_flag = False
-        else:
-            vertical_colocation_flag = True
-        horizontal_colocation_flag = True
-        temporal_colocation_flag = True
-
-    # Colocation for functionnality 4
-    if config_obj["functionality"] == "section_hydro":
-        vertical_colocation_flag = True
-        horizontal_colocation_flag = True
-        temporal_colocation_flag = True
-
-    # Colocation for functionnality 5
-    if config_obj["functionality"] == "clim_hydro":
-        temporal_colocation_flag = False
-
-    # Colocation for functionnality 6
-    if config_obj["functionality"] == "currents_hfr":
-        vertical_colocation_flag = False
-
-    # Colocation for functionnality 7
-    if config_obj["functionality"] == "currents_ADCP":
-        temporal_colocation_flag = True
-        vertical_colocation_flag = True
-        horizontal_colocation_flag = True
-
-    # Colocation for functionnality 9
-    if config_obj["functionality"] == "drifters":
-        temporal_colocation_flag = True
-        vertical_colocation_flag = True
-        horizontal_colocation_flag = True
-
-    if 'tide' in config_obj['outputs'][0]["plot"] or 'harm' in config_obj['outputs'][0]["plot"]:
-        temporal_colocation_flag = False
-
-    if 'depth' in config_obj['meta_zones']:
-        vertical_colocation_flag = False
-    if 'dens' in config_obj['meta_zones']:
-        vertical_colocation_flag = False
-    if 'cloud' in config_obj['meta_zones']:
-        horizontal_colocation_flag = False
-    if 'times' in config_obj['meta_zones'] and config_obj["functionality"] != "prof_hydro_mooring":
-        temporal_colocation_flag = False
-
-    flags = temporal_colocation_flag, horizontal_colocation_flag, vertical_colocation_flag
-
-    return flags
-
-
-def get_method(data, z_dim=False) -> str:
-    """
-    Get the method to use.
-    Parameters
-    ----------
-    data : dict
-        Parser.
-    z_dim : bool
-        If True, the vertical method is retrieved.
-    Returns
-    -------
-        str
-        Method to use.
-    """
-    if z_dim:
-        method = data.get('method_z')
-
-    else:
-        method = data.get('method')
-
-    if method is None:
-        logger.warning('No method provided for %s', data.get("name"))
-        method = 'linear'
-    return method
 
 
 def handle_errors(config_obj: dict) -> Exception:
@@ -683,6 +592,14 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
             "polygon", "radius",
             "vars"
         ]
+    elif cfg["functionality"] == "section_hydro":
+
+        meta = [
+            "tbound",
+            "polygon",
+            "vfreq",
+            "vars",
+        ]
     
     for k, v in metazone.items():
         if (k != "name") and (k not in meta):
@@ -695,32 +612,37 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
     ]
     for k in time_meta:
         if k in metazone.keys():
+            logger.info(k)
             ds = FILTERS[k](ds)(*metazone[k])
-            
+            if ds is None:
+                return None
+
     #horizontal
     horizontal_meta = [
         "polygon", "bathy",
     ]
     for k in horizontal_meta:
         if k in metazone.keys():
+            logger.info(k)
             if k == "polygon":
                 args = metazone["polygon"]
             else:
                 args = (*metazone[k],)
             ds = FILTERS[k](ds)(args)
+            if ds is None:
+                return None
     #vertical
     vertical_meta = [
         "vlevel",
     ]
     for k in vertical_meta:
         if k in metazone.keys():
+            logger.info(k)
             ds = FILTERS[k](ds)(*metazone[k].items()[0])
+            if ds is None:
+                return None
     
     return ds
-
-
-
-
 
 
     # filters = {"quality": lambda obj: obj.meta.quality_filter,
@@ -837,22 +759,3 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
     #         logger.error("You've indicated a max depth, please indicate min depth in meta zone. By default entire dataset is considered.")
 
     # return xarray_obj
-
-
-def merge_no_fail(list_ds):
-    """
-    list_ds : list of xr.dataset
-        First dataset must contain the correct attributes
-    """
-
-    xarray_obj_tmp = xr.Dataset()
-    for ds in list_ds:
-        if isinstance(ds, xr.DataArray):
-            xarray_obj_tmp[ds.name] = ds
-        else:
-            for var in ds:
-                xarray_obj_tmp[var] = ds[var]
-    attrs = list_ds[0].attrs
-    xarray_obj = xarray_obj_tmp.assign_attrs(attrs)
-
-    return xarray_obj

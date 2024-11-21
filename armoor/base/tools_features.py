@@ -212,6 +212,7 @@ def sel_default_vars(config_obj):
     config_obj : dict
         Meta-zone, models and observation from the parser with the selected variables.
     """
+    logger.info("Sel vars")
     feature = config_obj["functionality"]
     additional_vars = config_obj['metazone']['vars'] if 'vars' in config_obj['metazone'] else []
 
@@ -265,11 +266,12 @@ def sel_default_vars(config_obj):
         #     "ds_metazone"].sel_var.selection(vars)
         for i_mod, mod in enumerate(config_obj['models']):
             #config_obj['models'][mod]["ds_metazone"] = config_obj['models'][mod]["ds_metazone"].sel_var.selection(vars)
+            logger.info(f"{mod}")
             config_obj['models'][mod]["ds_coloc"] = config_obj['models'][mod]["ds_coloc"].sel_var.selection(vars)
+            logger.info("obs associated")
             config_obj['observation']["ds_coloc"].update({
                 mod: config_obj['observation']["ds_coloc"][mod].sel_var.selection(vars)
             })
-        
     vars_out = []
     for var in vars:
         if (
@@ -278,7 +280,6 @@ def sel_default_vars(config_obj):
             var in config_obj['models'][mod]["ds_coloc"]
         ):
             vars_out.append(var)
-
     return config_obj, vars_out
 
 

@@ -126,7 +126,7 @@ from armoor.hmi.script_tools import create_folder
 )
 def test_horizontal_radius(ds_model, ds_obs):
     radius = 100 #km
-    dso, dsm = coloc.obs_coords(ds_obs, ds_model, radius)
+    dso, dsm = coloc.obs_coords_radius(ds_obs, ds_model, radius)
     assert isinstance(dsm, xr.Dataset)
     assert set(["time", "z", "member"]).issubset(dsm.dims)
 

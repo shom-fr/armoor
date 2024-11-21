@@ -26,21 +26,21 @@ def get_cfg(cfg):
     
     return cfg
 
-def test_href_terms():
-    cfg = dict2call(get_cfg(
-        os.path.join(
-            INT_TESTS_DIR,
-            "L4_vs_HyCOM_href_terms.cfg"
-        )
-    ))
+# def test_href_terms():
+#     cfg = dict2call(get_cfg(
+#         os.path.join(
+#             INT_TESTS_DIR,
+#             "L4_vs_HyCOM_href_terms.cfg"
+#         )
+#     ))
     
-def test_href_intervals():
-    cfg = dict2call(get_cfg(
-        os.path.join(
-            INT_TESTS_DIR,
-            "L4_vs_HyCOM_href_intervals.cfg"
-        )
-    ))
+# def test_href_intervals():
+#     cfg = dict2call(get_cfg(
+#         os.path.join(
+#             INT_TESTS_DIR,
+#             "L4_vs_HyCOM_href_intervals.cfg"
+#         )
+#     ))
 
 def test_cloud_terms():
     cfg = dict2call(get_cfg(

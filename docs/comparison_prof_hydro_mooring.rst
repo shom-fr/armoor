@@ -57,3 +57,13 @@ Hereafter, we propose a list of configuration files that can be used as template
     
     .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_mooring/cmems_vs_HyCOM_terms.cfg
     
+Examples
+........
+
+     .. image::  images/prof_hydro_mooring/__Salinity_sloop_oper_LION_2023-04-12_to_2023-04-19__4.69_42.04_radius_2.0km_1100.0m.png
+         :width: 600
+         :alt: example of time series
+         
+    .. image::  images/prof_hydro_mooring/Statistics_Pot._density_sloop_oper_LION_interval_6h_4.69_42.04_radius_2.0km_1100.0m.png
+        :width: 600
+        :alt: example of time series

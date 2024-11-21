@@ -5,6 +5,17 @@ import xoa
 import logging
 logger = logging.getLogger(__name__)
 
+
+def ensemble_mean(ds):
+    coords = []
+    for coord in ds.coords:
+        if ("member" in ds[coord].dims) and (coord != "member"):
+            ds = ds.reset_coords(coord)
+            coords.append(coord)
+    ds = ds.mean("member")
+    ds = ds.set_coords(coords)
+    return ds
+
 def rmse_generic(observation, model, dims):
     """
     Calculate the RMSE between model and observation.

@@ -51,6 +51,7 @@ def plot(config_obj):
     for k in config_obj["models"].keys():
         nb_mooring = len(config_obj["observation"]["ds_coloc"][k])
     for iobs in range(nb_mooring):
+        logger.info(f"Process mooring: {iobs}")
         cfg = copy.deepcopy(config_obj)
         observation = copy.copy(cfg["observation"])
         models = copy.copy(cfg["models"])
@@ -66,7 +67,7 @@ def plot(config_obj):
         cfg, vars = sel_default_vars(cfg)
         observation = copy.copy(cfg["observation"])
         models = copy.copy(cfg["models"])
-    
+        
         # Plot the outputs
         for oname in outputs:
             output = outputs[oname]
@@ -75,6 +76,7 @@ def plot(config_obj):
             
             # PLOTS
             for var in vars:
+                logger.info(f"Plot {var}")
                 # TIME SERIES STATS
                 obs = [
                     observation["ds_coloc"][mod][[var]].assign_attrs({
@@ -84,11 +86,12 @@ def plot(config_obj):
                     }) for mod in models
                 ]
                 mods = [
-                    models[mod]["ds_coloc"][[var]].mean("member").assign_attrs({
+                    #models[mod]["ds_coloc"][[var]].mean("member").assign_attrs({
+                    models[mod]["ds_coloc"][[var]].assign_attrs({
                         "varname": var,
                         **models[mod]["ds_coloc"][var].attrs,
                         **models[mod]["ds_coloc"].attrs
-                    }) for mod in models
+                    })for mod in models
                 ]
                 plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
                                       "plot_ts_metr_bias_stats": 'bias_stats',
