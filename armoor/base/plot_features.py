@@ -47,7 +47,8 @@ LABELS_MAP_HARM = ['Model - Amplitude [m/s]', 'Model - Phase [°]', 'Observation
                    'Observation - Phase [°]', 'Difference - Amplitude [m/s]',
                    'Difference - Phase [°]']
 
-COLORS = ["tab:blue", "tab:green", "tab:orange", "tab:red", "tab:purple"]
+COLORS = ["slateblue", "coral", "seagreen", "aqua", "darkgrey", "navy", "aqua"]
+
 xr.set_options(keep_attrs=True)
 
 
@@ -2693,19 +2694,19 @@ def plot_ts_metr_cloud(trange, mods, obss, output_path=None):
                 rmsec0 = (mg.map(anom, args=(dims_stat,)) - og.map(anom, args=(dims_stat,))) ** 2
                 rmsec = np.sqrt(apply_trange(rmsec0, trange).mean(dim=dims_stat))
                 if imod == 0:
-                    omean[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
-                    ostd[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[2])
+                    omean[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0], color="k", linewidth=2)
+                    ostd[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[2], color="k", linewidth=2)
                     title, figname = get_title_figname(
                         'Statistics',
                         obsz,
                         mod_name,
                         obsz.attrs['name']
                     )
-                mmean[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0])
-                bias[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1])
-                mstd[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[2])
-                rmse[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[3])
-                rmsec[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[4])
+                mmean[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0], color=COLORS[imod], linewidth=2)
+                bias[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1], color=COLORS[imod], linewidth=2)
+                mstd[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[2], color=COLORS[imod], linewidth=2)
+                rmse[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[3], color=COLORS[imod], linewidth=2)
+                rmsec[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[4], color=COLORS[imod], linewidth=2)
                 for iax, subtitle in enumerate(["mean", "bias", "standard deviation",
                                              "rmse", "centered rmse"]):
                     axs[iax].set_title(" ")
@@ -2725,15 +2726,15 @@ def plot_ts_metr_cloud(trange, mods, obss, output_path=None):
                 mg = modz
                 diffz = modz - obsz  
                 if imod == 0:
-                    og[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
+                    og[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0], color="k", linewidth=2)
                     title, figname = get_title_figname(
                         ' ',
                         obsz,
                         mod_name,
                         obsz.attrs['name']
                     )
-                mg[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0])
-                diffz[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1])
+                mg[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0], color=COLORS[imod], linewidth=2)
+                diffz[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1], color=COLORS[imod], linewidth=2)
                 for iax, subtitle in enumerate(["", "difference"]):
                     axs[iax].set_title(" ")
                     axs[iax].set_ylabel(subtitle)
@@ -2865,8 +2866,8 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None):
                     f, axs = figure_5lin_ts()
                     f.autofmt_xdate(rotation=45)
                     ax_minimap = [0.8, 1.015, 0.09]
-                    omean[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
-                    ostd[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[2])
+                    omean[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0], color="k", linewidth=2)
+                    ostd[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[2], color="k", linewidth=2)
                     title, figname = get_title_figname(
                         'Statistics',
                         obsz,
@@ -2876,11 +2877,11 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None):
                     f.suptitle(title, 
                                y=1.125, 
                                fontsize=12, fontweight='bold')
-                mmean[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0])
-                bias[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1])
-                mstd[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[2])
-                rmse[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[3])
-                rmsec[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[4])
+                mmean[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0], color=COLORS[imod], linewidth=2)
+                bias[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1], color=COLORS[imod], linewidth=2)
+                mstd[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[2], color=COLORS[imod], linewidth=2)
+                rmse[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[3], color=COLORS[imod], linewidth=2)
+                rmsec[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[4], color=COLORS[imod], linewidth=2)
                 for iax, subtitle in enumerate(["mean", "bias", "standard deviation",
                                              "rmse", "centered rmse"]):
                     axs[iax].set_title(" ")
@@ -2912,10 +2913,10 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None):
                                x=0.4, y=1.2, 
                                fontsize=10, fontweight='bold')
                     logger.info("plot observation")
-                    og[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0])
-                mg[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0])
+                    og[varname].plot(label=f'{obs.attrs["name"]}', ax=axs[0], color="k", linewidth=2)
+                mg[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[0], color=COLORS[imod], linewidth=2)
                 diffz[varname].load()
-                diffz[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1])
+                diffz[varname].plot(label=f'{mod.attrs["name"]}', ax=axs[1], color=COLORS[imod], linewidth=2)
                 for iax, subtitle in enumerate(["", "difference"]):
                     axs[iax].set_title(" ")
                     axs[iax].set_ylabel(subtitle)
@@ -3070,15 +3071,13 @@ def plot_profile_unique(varname, models, observation, output_path=None):
                 ax.plot(
                     obsi[varname].squeeze().values,
                     -1 * obsi.depth.squeeze().values,
-                    'red',
-                    label=f'{obs.attrs["name"]}'
+                    label=f'{obs.attrs["name"]}', color="k", linewidth=2
                 )
             # Plot the model profiles
             ax.plot(
                 modi_closest[varname].values,
                 -1 * modi_closest.depth.values,
-                'blue',
-                label=f'{modi.attrs["name"]}'
+                label=f'{modi.attrs["name"]}', color=COLORS[imod], linewidth=2
             )
             # Plot the standard deviation
             modi = modi.reset_coords("depth")
@@ -3087,19 +3086,19 @@ def plot_profile_unique(varname, models, observation, output_path=None):
             modi = modi.set_coords("depth")
             ax.plot(
                 (modi_mean[varname] + modi_std[varname]).squeeze(),
-                -1 * modi_mean.depth.values,
+                -1 * modi_mean.depth.values, color=COLORS[imod],
                 linewidth=0.01
             )
             ax.plot(
                 (modi_mean[varname] - modi_std[varname]).squeeze(),
-                -1 * modi_mean.depth.values,
+                -1 * modi_mean.depth.values, color=COLORS[imod],
                 linewidth=0.01
             )
             ax.fill_betweenx(
                 -1 * modi_mean.depth.squeeze().values,
                 (modi_mean[varname] - modi_std[varname]).squeeze().values,
                 (modi_mean[varname] + modi_std[varname]).squeeze().values,
-                alpha=0.2,
+                alpha=0.2, color=COLORS[imod],
                 label='mean +/- std'
             )
 
