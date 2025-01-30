@@ -1,15 +1,16 @@
 """
 Tools for the command line interface
 """
+
+import logging
 import os
 from argparse import ArgumentTypeError
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 def int_or_string_configobj(value):
-    """ @1
+    """@1
     check "absolute_or_relative_time" type : in the configObj file provided by the user.
 
     Parameters
@@ -118,9 +119,9 @@ def coords_config_obj(coordinates) -> list:
             lon = coordinates[i + 1]
 
             # remove unwanted characters
-            for blacklistchar in '{([)]}':
-                lat = lat.replace(blacklistchar, '')
-                lon = lon.replace(blacklistchar, '')
+            for blacklistchar in "{([)]}":
+                lat = lat.replace(blacklistchar, "")
+                lon = lon.replace(blacklistchar, "")
             coordinate = float(lat), float(lon)
             new_coordinates.append(coordinate)
         return new_coordinates
@@ -208,7 +209,7 @@ def remove_keys_with_none_value(dictionary: dict) -> dict:
 # function to check if the coordinates provided are well formatted
 def coords(s):
     try:
-        lat, lon = map(float, s.split(','))
+        lat, lon = map(float, s.split(","))
         return lat, lon
     except:
         raise ArgumentTypeError("Coordinates must be lat,lon")

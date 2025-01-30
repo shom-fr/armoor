@@ -9,8 +9,6 @@ Welcome to [SHOM] Validation and reports tools's documentation!
    comparison
    bull
    tick
-   hmi_install
-   hmi
    fish
 
 
@@ -31,6 +29,7 @@ Indices and tables
 * :doc:`comparison`: Description of the different comparison functions of the tool.
 * :doc:`bull`: Description of the generation of a comparison report based on the 9 functionalities described above
 * :doc:`tick`: Presentation of the tool to create, search and read issues from Gitlab.
+* :doc:`fish` : Forecaster interface of Shom.
 * :doc:`hmi_install` : Installation process for the forecaster interface.
 * :doc:`hmi` : Presentation of the script to generate images for the forecaster interface.
 * :doc:`fish` : Installation process for fish interface

@@ -1,22 +1,29 @@
 import os
+
 from xoa.cfgm import register_validation_functions
 
-from armoor.cli.cli_tools import int_or_string_configobj, coords_config_obj, format_cofig_obj2dict
 from armoor.__init__ import ROOTDIR
+from armoor.cli.cli_tools import (
+    coords_config_obj,
+    format_cofig_obj2dict,
+    int_or_string_configobj,
+)
 
 SAMPLE_DIR = os.path.join(ROOTDIR, "_samples")
 INI_FILE = os.path.join(ROOTDIR, "cli", "cli.ini")
 
 if "TMPDIR" not in os.environ:
-    TMP_DIR = os.path.join(os.getenv("HOME"), 'tmp', 'armoor', 'uni')
+    TMP_DIR = os.path.join(os.getenv("HOME"), "tmp", "armoor", "uni")
     if not os.path.exists(TMP_DIR):
         os.makedirs(TMP_DIR)
 else:
     TMP_DIR = os.environ["TMPDIR"]
-    
-register_validation_functions(absolute_or_relative_time=int_or_string_configobj)
+
+register_validation_functions(
+    absolute_or_relative_time=int_or_string_configobj
+)
 register_validation_functions(coordinates=coords_config_obj)
-'''
+"""
 import os
 import shutil
 import pathlib
@@ -61,4 +68,4 @@ def change_path_p2():
     logger = logging.getLogger(__name__)
 
     return logger
-'''
+"""

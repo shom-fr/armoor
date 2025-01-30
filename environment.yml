@@ -25,30 +25,29 @@ dependencies:
   - ldap3=2.9.1
   - fastapi=0.104.1
   - python-gitlab=3.15.0
-  - cartopy=0.22.0
-  - matplotlib=3.8.0
-  - xesmf=0.8.1
-  - xarray=2023.8.0
-  - xoa=0.6.1
-  - dask=2022.12.1
-  - geojson=2.5.0
-  - configobj=5.0.6
-  - opendrift=1.10.5
-  - cfgrib=0.9.10.4
-  - scipy=1.11.3
-  - numpy=1.24.4
-  - pandas=1.5.3
-  - shapely=2.0.2
-  - gsw=3.6.17
-  - cmocean=2.0
-  - pytz=2023.3.post1
-  - requests=2.31.0
-  - pytest=7.4.3
-  - pylint=3.0.2
-  - utide=0.3.0
+  - cartopy
+  - matplotlib
+  - xesmf
+  - xarray
+  - dask
+  - geojson
+  - configobj
+  - opendrift
+  - cfgrib
+  - scipy
+  - numpy
+  - pandas
+  - shapely
+  - gsw
+  - cmocean
+  - pytz
+  - requests
+  - pytest
+  - pylint
+  - utide
   - pip
   - pip:
     - build
     - setuptools
-    - xoa-0.7.2.dev9+g6253f7d-py3-none-any.whl
     - ttide-0.3.dev1-py3-none-any.whl
+    - git+https://github.com/shom-fr/xoa.git@develop

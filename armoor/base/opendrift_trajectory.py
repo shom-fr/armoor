@@ -1,11 +1,12 @@
 """Calculate trajectories with OpenDrift"""
+
 import logging
-from opendrift.readers import reader_netCDF_CF_generic
-from opendrift.readers import reader_shape
-from opendrift.models.oceandrift import OceanDrift
+
 import cartopy.io.shapereader as shpreader
-import xarray as xr
 import numpy as np
+import xarray as xr
+from opendrift.models.oceandrift import OceanDrift
+from opendrift.readers import reader_netCDF_CF_generic, reader_shape
 
 logger = logging.getLogger(__name__)
 
@@ -23,23 +24,31 @@ def format_opendrift(mod, path_model):
     """
     logger.info("Formatting dataset")
 
-    mod = mod['xarray_meta'].rename({'u': 'x_sea_water_velocity', 'v': 'y_sea_water_velocity'})
-    mod['x_sea_water_velocity'].attrs = {'standard_name': "eastward_sea_water_velocity",
-                                         'long_name': "Eastward velocity", 'units': "m s-1"
-                                         }
-    mod['y_sea_water_velocity'].attrs = {'standard_name': "northward_sea_water_velocity",
-                                         'long_name': "Northward velocity", 'units': "m s-1"
-                                         }
-    
-    blacklist = [var for var in mod.variables if var in ['dir', 'norm']]
+    mod = mod["xarray_meta"].rename(
+        {"u": "x_sea_water_velocity", "v": "y_sea_water_velocity"}
+    )
+    mod["x_sea_water_velocity"].attrs = {
+        "standard_name": "eastward_sea_water_velocity",
+        "long_name": "Eastward velocity",
+        "units": "m s-1",
+    }
+    mod["y_sea_water_velocity"].attrs = {
+        "standard_name": "northward_sea_water_velocity",
+        "long_name": "Northward velocity",
+        "units": "m s-1",
+    }
+
+    blacklist = [var for var in mod.variables if var in ["dir", "norm"]]
     if blacklist:
         mod = mod.drop_vars(blacklist)
 
     if not check_delta_constant(mod):
         mod = regrid_constant_delta(mod)
 
-    mod.squeeze().to_netcdf(path_model,
-                            encoding={'time': {'units': "seconds since 1900-01-01 00:00:00"}})
+    mod.squeeze().to_netcdf(
+        path_model,
+        encoding={"time": {"units": "seconds since 1900-01-01 00:00:00"}},
+    )
 
 
 def check_delta_constant(mod):
@@ -87,7 +96,9 @@ def regrid_constant_delta(mod):
     return mod
 
 
-def calculate_trajectory(path_model, lons, lats, times, time_step, nb_step, output_file):
+def calculate_trajectory(
+    path_model, lons, lats, times, time_step, nb_step, output_file
+):
     """
     Calculate the trajectories of the drifting particules with OpenDrift.
     The particules are dropped at each observation
@@ -122,12 +133,15 @@ def calculate_trajectory(path_model, lons, lats, times, time_step, nb_step, outp
 
     # Read the model
     reader_analysis = reader_netCDF_CF_generic.Reader(path_model)
-    shpfilename = shpreader.natural_earth(resolution='110m', category='cultural',
-                                          name='admin_0_countries')
+    shpfilename = shpreader.natural_earth(
+        resolution="110m", category="cultural", name="admin_0_countries"
+    )
     reader_natural = reader_shape.Reader.from_shpfiles(shpfilename)
     o.add_reader([reader_natural, reader_analysis])
-    o.set_config('general:use_auto_landmask', False)  # Disabling the automatic GSHHG landmask
-    o.set_config('general:coastline_action', 'stranding')
+    o.set_config(
+        "general:use_auto_landmask", False
+    )  # Disabling the automatic GSHHG landmask
+    o.set_config("general:coastline_action", "stranding")
 
     # Run calculation for every position of the drifter on the entire time period of the observation
     o.seed_elements(lons, lats, time=times)
@@ -135,6 +149,6 @@ def calculate_trajectory(path_model, lons, lats, times, time_step, nb_step, outp
 
     # Open file result in dataset
     trajectory = xr.open_dataset(output_file)
-    trajectory = trajectory.where(trajectory.lon < 1e+30, drop=True)
+    trajectory = trajectory.where(trajectory.lon < 1e30, drop=True)
 
     return trajectory
