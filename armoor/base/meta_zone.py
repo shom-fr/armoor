@@ -1,16 +1,20 @@
 """MetazonAccessor
 """
-import logging, re
+
 import copy
+import logging
 import math
-from datetime import datetime
+import re
 import sys
+from datetime import datetime
+
+import numpy as np
 import pandas as pd
 import xarray as xr
-import numpy as np
-from xoa.regrid import regrid1d, grid2loc
 import xoa.geo as xgeo
 from matplotlib import path
+from xoa.regrid import grid2loc, regrid1d
+
 from armoor.base.__init__ import FILTERS
 
 R_terre = 6371
@@ -40,7 +44,7 @@ class MetazoneAccessor:
         Parameters
         ----------
         qname : str
-            Name of the variable quality name. 
+            Name of the variable quality name.
         qmin : int
             Minimum value of quality.
         qmax : int
@@ -52,12 +56,10 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - quality_filter")
         qname += "_qc"
-        
+
         if qname in self._obj:
             if qmin and qmax:
-                selection = (
-                    self._obj[qname] >= int(qmin)
-                ) & (
+                selection = (self._obj[qname] >= int(qmin)) & (
                     self._obj[qname] <= int(qmax)
                 )
             elif qmin:
@@ -78,8 +80,10 @@ class MetazoneAccessor:
             )
             return self._obj
 
-
-    def horizontal_selection_polygon(self, coords: [(float, float)], ) -> xr.Dataset:
+    def horizontal_selection_polygon(
+        self,
+        coords: [(float, float)],
+    ) -> xr.Dataset:
         """
         Subset dataset selecting elements located within the polygon geometry.
 
@@ -105,21 +109,18 @@ class MetazoneAccessor:
         dims_nb = ()
         for dim in self._obj.dims:
             if (dim in self._obj.lon.dims) or (dim in self._obj.lat.dims):
-                dims_name += (dim, )
-                dims_nb += (self._obj.sizes[dim], )
+                dims_name += (dim,)
+                dims_nb += (self._obj.sizes[dim],)
         coords = np.vstack((lats, lons)).T
         del lats, lons
         flags = polygon.contains_points(coords)
         if np.all(flags == False):
             return None
         mask_poly = xr.DataArray(
-            data=np.reshape(
-                flags,
-                dims_nb
-            ),
+            data=np.reshape(flags, dims_nb),
             dims=dims_name,
         )
-        
+
         if "depth" in self._obj.coords:
             self._obj = self._obj.reset_coords("depth")
         self._obj = self._obj.where(mask_poly, drop=True)
@@ -130,8 +131,13 @@ class MetazoneAccessor:
                 return None
         return self._obj
 
-    def data_selection(self, dim: str, minimum: float = None, maximum: float = None,
-                       value: float = None) -> xr.Dataset:
+    def data_selection(
+        self,
+        dim: str,
+        minimum: float = None,
+        maximum: float = None,
+        value: float = None,
+    ) -> xr.Dataset:
         """
         Subset dataset filtering elements values along the specified dimension.
 
@@ -156,7 +162,9 @@ class MetazoneAccessor:
         if value is not None:
             selection = self._obj[dim] == value
         elif minimum is not None and maximum is not None:
-            selection = (self._obj[dim] >= minimum) & (self._obj[dim] <= maximum)
+            selection = (self._obj[dim] >= minimum) & (
+                self._obj[dim] <= maximum
+            )
         elif minimum is not None:
             selection = self._obj[dim] >= minimum
         elif maximum is not None:
@@ -165,7 +173,9 @@ class MetazoneAccessor:
             selection = None
         return self._obj.where(selection)
 
-    def horizontal_selection_coords(self, coordinates: [(float, float)]) -> xr.Dataset:
+    def horizontal_selection_coords(
+        self, coordinates: [(float, float)]
+    ) -> xr.Dataset:
         """
         Subset dataset selecting elements interpolated at specific coordinates.
 
@@ -184,17 +194,12 @@ class MetazoneAccessor:
         lat, lon = zip(*coordinates)
         loc = xr.Dataset(
             coords={
-                'lon': ('npts', list(lon)),
-                'lat': ('npts', list(lat)),
+                "lon": ("npts", list(lon)),
+                "lat": ("npts", list(lat)),
             }
         )
         dsi = self._obj.copy()
-        dso = xr.Dataset(
-            coords=dict(
-                time=dsi.time,
-                **loc.coords
-            )
-        )
+        dso = xr.Dataset(coords=dict(time=dsi.time, **loc.coords))
         if "depth" in dsi.coords:
             if "time" in dsi.depth.dims:
                 dsi = dsi.reset_coords("depth")
@@ -202,50 +207,28 @@ class MetazoneAccessor:
         for var in dsi.data_vars:
             if ("time" in dsi[var].dims) and ("z" in dsi[var].dims):
                 arr = np.nan * np.zeros(
-                    (dsi.dims['time'], dsi.dims['z'], len(lon))
+                    (dsi.dims["time"], dsi.dims["z"], len(lon))
                 )
-                for itime in range(dsi.dims['time']):
+                for itime in range(dsi.dims["time"]):
                     for iz in range(dsi.dims["z"]):
                         arr[itime, iz, :] = grid2loc(
-                            dsi[var].isel(time=itime, z=iz),
-                            loc
+                            dsi[var].isel(time=itime, z=iz), loc
                         )
                 dims = ["time", "z", "npts"]
-                coords = dict(
-                    time=dsi.time,
-                    **loc.coords
-                )
+                coords = dict(time=dsi.time, **loc.coords)
             elif ("time" in dsi[var].dims) and ("z" not in dsi[var].dims):
-                arr = np.nan * np.zeros(
-                    (dsi.dims['time'], len(lon))
-                )
-                for itime in range(dsi.dims['time']):
-                    arr[itime, :] = grid2loc(
-                        dsi[var].isel(time=itime),
-                        loc
-                    )
+                arr = np.nan * np.zeros((dsi.dims["time"], len(lon)))
+                for itime in range(dsi.dims["time"]):
+                    arr[itime, :] = grid2loc(dsi[var].isel(time=itime), loc)
                 dims = ["time", "npts"]
-                coords = dict(
-                    time=dsi.time,
-                    **loc.coords
-                )
+                coords = dict(time=dsi.time, **loc.coords)
             else:
-                arr = grid2loc(
-                    dsi[var],
-                    loc
-                )
+                arr = grid2loc(dsi[var], loc)
                 dims = ["npts"]
-                coords = dict(
-                    **loc.coords
-                )
+                coords = dict(**loc.coords)
                 if isinstance(arr, xr.DataArray):
                     arr = arr.data
-            dsvar = xr.Dataset(
-                data_vars={
-                    var: (dims, arr)
-                },
-                coords=coords
-            )
+            dsvar = xr.Dataset(data_vars={var: (dims, arr)}, coords=coords)
             dsvar[var] = dsvar[var].assign_attrs(**dsi[var].attrs)
             dss.append(dsvar)
         dso = xr.merge(dss)
@@ -253,7 +236,7 @@ class MetazoneAccessor:
             dso = dso.set_coords("depth")
         self._obj = dso
         return self._obj
- 
+
     def sel_closest(self, ds_obs):
         """
         Select the nearest point around obs.
@@ -272,29 +255,32 @@ class MetazoneAccessor:
             dss = []
             for itime, time in enumerate(self._obj.time):
                 ds_model = self._obj.isel(time=[itime])
-                dist_model2obs = xgeo.get_distances(
-                    ds_model,
-                    ds_obs.isel(time=[itime])
-                ).squeeze().rename({"npts0": "member"})
+                dist_model2obs = (
+                    xgeo.get_distances(ds_model, ds_obs.isel(time=[itime]))
+                    .squeeze()
+                    .rename({"npts0": "member"})
+                )
                 ds = ds_model.where(
-                        dist_model2obs == dist_model2obs.min(),
-                        drop=True
-                    ).squeeze()
+                    dist_model2obs == dist_model2obs.min(), drop=True
+                ).squeeze()
                 dss.append(ds)
             return xr.combine_nested(dss, "time")
         else:
             ds_model = self._obj
-            dist_model2obs = xgeo.get_distances(
-                ds_model,
-                ds_obs
-            ).squeeze().rename({"npts0": "member"})
+            dist_model2obs = (
+                xgeo.get_distances(ds_model, ds_obs)
+                .squeeze()
+                .rename({"npts0": "member"})
+            )
             return ds_model.where(
-                dist_model2obs == dist_model2obs.min(),
-                drop=True
+                dist_model2obs == dist_model2obs.min(), drop=True
             ).squeeze()
-    
-    def horizontal_selection_bathy(self, minimum: float = None,
-                                   maximum: float = None, ) -> xr.Dataset:
+
+    def horizontal_selection_bathy(
+        self,
+        minimum: float = None,
+        maximum: float = None,
+    ) -> xr.Dataset:
         """
         Subset dataset selecting elements whom bathymetry values are included in the specified
         bathymetry range.
@@ -317,9 +303,13 @@ class MetazoneAccessor:
         """
 
         logger.info("Applying filter - horizontal_selection_bathymetry")
-        return self.data_selection(dim='bathy', minimum=minimum, maximum=maximum)
+        return self.data_selection(
+            dim="bathy", minimum=minimum, maximum=maximum
+        )
 
-    def vertical_selection_range(self, vname: str, vranges: list) -> xr.Dataset:
+    def vertical_selection_range(
+        self, vname: str, vranges: list
+    ) -> xr.Dataset:
         """
         Subset dataset selecting elements whom depth values are included in the specified
         depth ranges.
@@ -340,17 +330,15 @@ class MetazoneAccessor:
         dsi = self._obj
         if "dens" in self._obj.coords:
             dsi = dsi.reset_coords("dens")
-        if "depth" in self._obj.coords: 
+        if "depth" in self._obj.coords:
             dsi = dsi.reset_coords("depth")
-        dss= []
+        dss = []
         for ivrange, vrange in enumerate(vranges):
-            ds = dsi.where((
-                dsi[vname] >= vrange[0]
-            ) & (
-                dsi[vname] <= vrange[1]
-            ))
+            ds = dsi.where(
+                (dsi[vname] >= vrange[0]) & (dsi[vname] <= vrange[1])
+            )
             dso = ds.expand_dims(dim="vrange")
-            
+
             dso["vrange"] = xr.DataArray(
                 data=[vrange],
                 dims=("vrange", "vbin"),
@@ -359,12 +347,14 @@ class MetazoneAccessor:
         dso = xr.combine_nested(dss, "vrange")
         if "dens" in self._obj.coords:
             dso = dso.set_coords("dens")
-        if "depth" in self._obj.coords: 
+        if "depth" in self._obj.coords:
             dso = dso.set_coords("depth")
         self._obj = dso
         return self._obj
-    
-    def vertical_selection_levels(self, vname: str, vlevels: list,  method: str = "linear") -> xr.Dataset:
+
+    def vertical_selection_levels(
+        self, vname: str, vlevels: list, method: str = "linear"
+    ) -> xr.Dataset:
         """
         Subset dataset selecting elements at specific vertical levels.
 
@@ -383,22 +373,28 @@ class MetazoneAccessor:
         """
         logger.info("Applying filter - vertical_selection_levels")
         dsi = self._obj
-        if (vname == "depth") and  ("dens" in self._obj.coords):
+        if (vname == "depth") and ("dens" in self._obj.coords):
             dsi = dsi.reset_coords("dens")
-        elif (vname == "dens") and  ("depth" in self._obj.coords):
+        elif (vname == "dens") and ("depth" in self._obj.coords):
             dsi = dsi.reset_coords("depth")
-            if 'dens' not in self._obj.coords:
+            if "dens" not in self._obj.coords:
                 dsi = dsi.set_coords("dens")
         vlevels = xr.DataArray(vlevels, dims="z", name=vname)
         das = []
         for var in dsi.data_vars:
             if "z" in dsi[var].dims:
-                da = regrid1d(dsi[var].chunk(dict(z=-1)), vlevels, method=method)
+                da = regrid1d(
+                    dsi[var].chunk(dict(z=-1)),
+                    vlevels,
+                    method=method,
+                    extrap="bottom"
+                )
             else:
                 da = dsi[var]
             das.append(da)
         self._obj = xr.merge(das)
-        return self._obj    
+        self._obj = self._obj.set_xindex(vname)
+        return self._obj
 
     def time_selection_bounds(self, start, end) -> xr.Dataset:
         """
@@ -419,11 +415,11 @@ class MetazoneAccessor:
         if not start:
             logger.error("Giving a begindate is mandatory.")
             sys.exit(1)
-            
-        #start = pd.to_datetime(start)
+
+        # start = pd.to_datetime(start)
         if isinstance(end, int):
             end = pd.to_datetime(start) + pd.to_timedelta(end, "D")
-            end = end.strftime('%Y-%m-%d')
+            end = end.strftime("%Y-%m-%d")
         # else:
         #     end = pd.to_datetime(end)
         if self._obj.time.max().values <= pd.to_datetime(start):
@@ -434,8 +430,10 @@ class MetazoneAccessor:
             return None
         else:
             return self._obj.sel(time=slice(start, end))
-        
-    def time_selection_terms(self, start=None, end=None, freq=None, dates=None):
+
+    def time_selection_terms(
+        self, start=None, end=None, freq=None, dates=None
+    ):
         """
         Subset dataset selecting elements at specific terms.
 
@@ -458,11 +456,9 @@ class MetazoneAccessor:
         else:
             time = pd.date_range(start=start, end=end, freq=freq)
         return self._obj.interp(
-            time=time,
-            method="linear",
-            kwargs={"fill_value": "extrapolate"}
+            time=time, method="linear", kwargs={"fill_value": "extrapolate"}
         )
-        
+
     def time_selection_range_seq(self, start, end, tbin: str) -> xr.Dataset:
         """
         Subset dataset selecting elements by temporal bin.
@@ -493,12 +489,9 @@ class MetazoneAccessor:
             for it in range(len(time_bins) - 1)
         ]
         return self._obj.groupby_bins(
-            "time",
-            time_bins,
-            labels=labels,
-            right=False
+            "time", time_bins, labels=labels, right=False
         )
-    
+
     def time_selection_range_clim(self, tbin: str = None) -> xr.Dataset:
         """
         Subset dataset selecting elements by climatological bin.
@@ -522,8 +515,10 @@ class MetazoneAccessor:
         else:
             clim = f"time.{tbin}"
         return self._obj.groupby(clim)
-    
-    def time_selection_cut(self, freq: str, fmin: float, fmax: float) -> xr.Dataset:
+
+    def time_selection_cut(
+        self, freq: str, fmin: float, fmax: float
+    ) -> xr.Dataset:
         """
         Subset dataset selecting elements in a temporal bin sequentially.
 
@@ -536,7 +531,7 @@ class MetazoneAccessor:
             Minimum value of freq.
         fmax : float
             Maximum value of freq.
-        
+
         Returns
         -------
         xarray.Dataset
@@ -554,23 +549,22 @@ class MetazoneAccessor:
             sys.exit(1)
         return self._obj.where((dt >= fmin) & (dt <= fmax), drop=True)
 
+
 def apply_trange(ds, metazone):
-    
-    #time intervals
+
+    # time intervals
     time_range = ["trange_seq", "trange_clim"]
     for k in time_range:
         if k in metazone.keys():
             ds = FILTERS[k](ds)(
-                metazone["tbound"][0],
-                metazone["tbound"][1],
-                metazone[k]
+                metazone["tbound"][0], metazone["tbound"][1], metazone[k]
             )
     return ds
 
 
 def apply_vrange(ds, metazone):
-    
-    #vertical intervals
+
+    # vertical intervals
     if "vrange" in metazone:
         attrs = ds.attrs
         ds = FILTERS["vrange"](ds)(*metazone["vrange"].items()[0])

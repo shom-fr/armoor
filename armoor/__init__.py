@@ -1,4 +1,3 @@
-
 # Taken from xarray
 """
 try:

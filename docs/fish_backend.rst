@@ -1,5 +1,5 @@
-Forecasters Interface installation
-==================================
+Backend install
+===============
 
 Armoor API
 ----------
@@ -74,8 +74,8 @@ You can verify that the API is responding correctly by accessing host:port_api/p
 ``curl --noproxy '*' -x GET host:port_api/ping/`` and expecting a "pong" response.
 
 
-Forecasters Interface
----------------------
+Fish
+----
 
 Here are the instructions to launch the front-end of the forecasters interface:
 

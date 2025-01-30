@@ -1,45 +1,48 @@
 """Colocate models and obs"""
-import logging, os
-import xesmf as xe
-import xarray as xr
-import numpy as np
+
+import logging
+import os
+
 import dask
-from dask.distributed import Client, LocalCluster
-from xoa.regrid import regrid1d, grid2loc
-import xoa.geo as xgeo
+import numpy as np
+import xarray as xr
+import xesmf as xe
 import xoa.coords as xcoords
+import xoa.geo as xgeo
+from dask.distributed import Client, LocalCluster
+from xoa.regrid import grid2loc, regrid1d
 
 logger = logging.getLogger(__name__)
 
+
 def horizontal_regrid(dsi, dso) -> xr.Dataset:
-        """
-        Regrid a variable.
+    """
+    Regrid a variable.
 
-        Parameters
-        ----------
-        dai : xarray.DataArray
-            Single variable to regrid.
+    Parameters
+    ----------
+    dai : xarray.DataArray
+        Single variable to regrid.
 
-        Returns
-        -------
-        xarray.DataArray
-            Regridded variable.
-        """
-        dlon = dso.lon.diff("x").max()
-        dlat = dso.lat.diff("y").max()
-        
-        dso = dso.where((
-            dso.lat > dso.lat.min() + dlat
-        ) & (
-            dso.lat < dso.lat.max() - dlat
-        ) & (
-            dso.lon > dso.lon.min() + dlon
-        ) &(
-            dso.lon < dso.lon.max() - dlon
-        ), drop=True)
-        regridder = xe.Regridder(dsi, dso, "bilinear")
-        dsi = regridder(dsi)
-        return dsi, dso
+    Returns
+    -------
+    xarray.DataArray
+        Regridded variable.
+    """
+    dlon = dso.lon.diff("x").max()
+    dlat = dso.lat.diff("y").max()
+
+    dso = dso.where(
+        (dso.lat > dso.lat.min() + dlat)
+        & (dso.lat < dso.lat.max() - dlat)
+        & (dso.lon > dso.lon.min() + dlon)
+        & (dso.lon < dso.lon.max() - dlon),
+        drop=True,
+    )
+    regridder = xe.Regridder(dsi, dso, "bilinear")
+    dsi = regridder(dsi)
+    return dsi, dso
+
 
 def vertical(dsi, dsref) -> xr.Dataset:
     """
@@ -62,7 +65,11 @@ def vertical(dsi, dsref) -> xr.Dataset:
     das = []
     for var in dsi.data_vars:
         if "z" in dsi[var].dims:
-            da = regrid1d(dsi[var].chunk(dict(z=-1)), dsref.chunk(dict(z=-1)), method="linear")
+            da = regrid1d(
+                dsi[var].chunk(dict(z=-1)),
+                dsref.chunk(dict(z=-1)),
+                method="linear",
+            )
         else:
             da = dsi[var]
         da.attrs = dsi[var].attrs
@@ -71,15 +78,12 @@ def vertical(dsi, dsref) -> xr.Dataset:
     dso.attrs = dsi.attrs
     return dso.load()
 
+
 def obs_coords_radius_postproc(ds):
-    ds = ds.drop(
-        ["lon", "lat", "lon_1", "lat_1"]
-    )
-    ds = ds.rename({
-        "lon_0": "lon",
-        "lat_0": "lat"
-    })
+    ds = ds.drop(["lon", "lat", "lon_1", "lat_1"])
+    ds = ds.rename({"lon_0": "lon", "lat_0": "lat"})
     return ds
+
 
 def obs_coords_radius(ds_obs, ds_model, radius) -> xr.Dataset:
     """
@@ -101,29 +105,27 @@ def obs_coords_radius(ds_obs, ds_model, radius) -> xr.Dataset:
     dss_model = []
     dss_obs = []
     if "time" not in ds_obs.lon.dims:
-        dist_model2obs = xgeo.get_distances(
-            ds_model,
-            ds_obs
-        ).squeeze().rename(
-            npts0="member"
-        ).assign_coords(member=ds_model.member)
-        ds = ds_model.where(
-            dist_model2obs < radius * 1e3,
-            drop=True
+        dist_model2obs = (
+            xgeo.get_distances(ds_model, ds_obs)
+            .squeeze()
+            .rename(npts0="member")
+            .assign_coords(member=ds_model.member)
         )
+        ds = ds_model.where(dist_model2obs < radius * 1e3, drop=True)
         ds_model = obs_coords_radius_postproc(ds)
     else:
         for itime, time in enumerate(ds_obs.time):
-            dist_model2obs = xgeo.get_distances(
-                ds_model.isel(time=itime),
-                ds_obs.isel(time=itime)
-            ).squeeze().rename(
-                npts0="member"
-            ).assign_coords(member=ds_model.member)
-            #print(dist_model2obs)
+            dist_model2obs = (
+                xgeo.get_distances(
+                    ds_model.isel(time=itime), ds_obs.isel(time=itime)
+                )
+                .squeeze()
+                .rename(npts0="member")
+                .assign_coords(member=ds_model.member)
+            )
+            # print(dist_model2obs)
             ds = ds_model.isel(time=itime).where(
-                dist_model2obs < radius * 1e3,
-                drop=True
+                dist_model2obs < radius * 1e3, drop=True
             )
             if ds.sizes["member"] == 0:
                 continue
@@ -139,6 +141,7 @@ def obs_coords_radius(ds_obs, ds_model, radius) -> xr.Dataset:
     if "depth" not in ds_model.coords and "depth" in ds_model.data_vars:
         ds_model = ds_model.set_coords("depth")
     return ds_obs, ds_model
+
 
 def obs_coords(ds_obs, ds_model) -> xr.Dataset:
     """
@@ -161,7 +164,7 @@ def obs_coords(ds_obs, ds_model) -> xr.Dataset:
     #     (ds_model.lon > ds_obs.lon.min().values - 2 * dlon) &
     #     (ds_model.lon < ds_obs.lon.max().values + 2 * dlon) &
     #     (ds_model.lat > ds_obs.lat.min().values - 2 * dlat) &
-    #     (ds_model.lat < ds_obs.lat.max().values + 2 * dlat) 
+    #     (ds_model.lat < ds_obs.lat.max().values + 2 * dlat)
     # ).compute()
     # ds_model = ds_model.where(
     #     mask,
@@ -176,16 +179,16 @@ def obs_coords(ds_obs, ds_model) -> xr.Dataset:
         if "time" in dain.dims:
             loc = xr.Dataset(
                 coords={
-                    "time": ('time', ds_obs.time.values),
-                    "lon": ('time', ds_obs.lon.values),
-                    "lat": ('time', ds_obs.lat.values),
+                    "time": ("time", ds_obs.time.values),
+                    "lon": ("time", ds_obs.lon.values),
+                    "lat": ("time", ds_obs.lat.values),
                 }
             )
         else:
             loc = xr.Dataset(
                 coords={
-                    "lon": ('time', ds_obs.lon.values),
-                    "lat": ('time', ds_obs.lat.values),
+                    "lon": ("time", ds_obs.lon.values),
+                    "lat": ("time", ds_obs.lat.values),
                 }
             )
         if "z" in dain.dims:
@@ -196,7 +199,7 @@ def obs_coords(ds_obs, ds_model) -> xr.Dataset:
                     time=(["time"], ds_obs.time.values),
                     lat=(["time"], ds_obs.lat.values),
                     lon=(["time"], ds_obs.lon.values),
-                )
+                ),
             )
             cluster = LocalCluster(
                 n_workers=os.cpu_count(),
@@ -206,7 +209,7 @@ def obs_coords(ds_obs, ds_model) -> xr.Dataset:
             client = Client(cluster)
             logger.info(client)
             futures = []
-            for iz in range(dain.sizes['z']):
+            for iz in range(dain.sizes["z"]):
                 clargs = (dain.isel(z=iz).load(), loc)
                 futures.append(dask.delayed(grid2loc)(*clargs))
             del clargs
@@ -226,6 +229,7 @@ def obs_coords(ds_obs, ds_model) -> xr.Dataset:
     if "depth" in dso:
         dso = dso.set_coords("depth")
     return dso
+
 
 # def colocate_all(obs, mod, flags, tgt_grid, coloc_method='nearest', coloc_method_z=None):
 #     """
