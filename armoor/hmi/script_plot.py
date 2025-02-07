@@ -322,6 +322,7 @@ def stream_wind(data: xr.Dataset, legend: dict, path2save: str):
         pivot="middle",
         length=barbs_length,
         linewidth=barbs_linewidth,
+        color="lightgray",
         transform=ccrs.PlateCarree(),
     )
 
