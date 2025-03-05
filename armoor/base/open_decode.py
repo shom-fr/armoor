@@ -243,60 +243,78 @@ def open_decode_hycom(path_files):
         HyCOM dataset.
     """
     
-        
     # Open
     cfspecs = xcf.get_cf_specs("hycom")
-    # xoa.register_accessors()
-    # xoa.register_accessors(decode_sigma=True)
-    dss = []
-    da_u, da_v = None, None
+
+    dss_var = {}
+    bathy = None
+
+    path_files.sort()
     for path in path_files:
-        # ds = xr.open_dataset(
-        #     path, chunks={"time": 24}
-        # ).isel(
-        #     X=slice(None, None, 4), Y=slice(None, None, 4)
-        # ).load(scheduler="processes").xoa.decode()
+
         with xcf.set_cf_specs(cfspecs):
             ds = (
                 xr.open_dataset(
-                    path, chunks="auto",#{"time": 24}
-                # ).isel(
-                #     X=slice(None, None, 10), Y=slice(None, None, 10)
-                # ).compute(
-                #     #scheduler="synchronous"
+                    path, chunks="auto",
                 )
                 .xoa.decode()
             )
-        if ("dz" not in ds) and ("bathy" in ds):
+
+        test = any(i in ['u', 'v'] for i in ds.data_vars)
+        if (bathy is None) and (test is False) and ("bathy" in ds):
+            bathy = ds.bathy
+
+        if "bathy" in ds:
             ds = ds.drop("bathy")
-        if ("u" in ds.data_vars) or ("v" in ds.data_vars):
-            if "u" in ds.data_vars:
-                logger.info("shift u")
-                # ds = ds.isel(x_u=slice(None, None, ), y_u=slice(None, None, 5))
-                da_u = shift(
-                    ds["u"].squeeze(drop=True), {"x": "right"}
-                ).xoa.reloc(u=False)
-            if "v" in ds.data_vars:
-                logger.info("shift v")
-                # ds = ds.isel(x_v=slice(None, None, 5), y_v=slice(None, None, 5))
-                da_v = shift(
-                    ds["v"].squeeze(drop=True), {"y": "top"}
-                ).xoa.reloc(v=False)
+
+        varname = [var for var in ds.data_vars][0]
+        if varname not in dss_var.keys():
+            dss_var[varname] = []
+        if varname == "u":
+            logger.info("shift u")
+            da_u = shift(
+                ds["u"].squeeze(drop=True), {"x": "right"}
+            ).xoa.reloc(u=False)
+            dss_var[varname].append(da_u)
+        elif varname == "v":
+            logger.info("shift v")
+            da_v = shift(
+                ds["v"].squeeze(drop=True), {"y": "top"}
+            ).xoa.reloc(v=False)
+            dss_var[varname].append(da_v)
         else:
-            # ds = ds.isel(x=slice(None, None, 10), y=slice(None, None, 10))
-            dss.append(ds)
+            dss_var[varname].append(ds)
+
         ds.close()
-    ds = xr.merge(dss)  # , compat="override")#.compute()
-    if isinstance(da_u, xr.DataArray):
-        ds["u"] = da_u.assign_coords(**ds.coords)
-        del da_u
-    if isinstance(da_v, xr.DataArray):
-        ds["v"] = da_v.assign_coords(**ds.coords)
-        del da_v
+
+    dss = []
+    for var in dss_var.keys():
+        ds_concat = xr.concat(dss_var[var], dim='time')
+        if var == 'u':
+           dsu = ds_concat
+        elif var == 'v':
+           dsv = ds_concat
+        else:
+            dss.append(ds_concat)
+        ds_concat.close()
+    del dss_var
+    ds = xr.merge(dss)
+    if bathy is not None:
+        ds = xr.merge([ds, bathy])
+
+    if isinstance(dsu, xr.DataArray):
+        ds["u"] = dsu.assign_coords(**ds.coords)
+        del dsu
+    if isinstance(dsv, xr.DataArray):
+        ds["v"] = dsv.assign_coords(**ds.coords)
+        del dsv
     if "dz" in ds:
         ds.coords["depth"] = dz2depth(ds.dz, centered=True)
         ds = ds.drop(["z", "dz"])
-    # ds = ds.compute()#scheduler="processes")
+
+    ds = ds.sel(time=~ds.get_index("time").duplicated())
+    logger.info(ds)       
+
     return ds
 
 
