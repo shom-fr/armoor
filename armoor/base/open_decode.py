@@ -248,6 +248,7 @@ def open_decode_hycom(path_files):
 
     dss_var = {}
     bathy = None
+    dsu, dsv = None, None
 
     path_files.sort()
     for path in path_files:
