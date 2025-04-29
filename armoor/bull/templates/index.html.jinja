@@ -103,6 +103,23 @@
             height: 5px;
             width: 50px;
         }
+                .special-paragraph {
+          font-size: 24px;
+          font-weight: bold;
+          color: #002554;
+          position: relative;
+        }
+
+        .special-paragraph::after {
+          content: ''; /* Required for pseudo-element content */
+          display: block; /* Ensures the pseudo-element behaves as a block element */
+          height: 8px;
+          width: 80px;
+          background-color: #5bc2e7; /* Just for demonstration */
+          position: absolute; /* Position the pseudo-element */
+          bottom: -10px; /* Adjust as needed to position the pseudo-element */
+          left: 0; /* Adjust as needed to position the pseudo-element */
+        }
     </style>
 </head>
 
@@ -118,36 +135,34 @@
                 <h2 class="underline">
                     {{report.title}} - {{report.date}}
                 </h2>
-                <h3>
+                <p style="color: #002554; font-size: 16px; font-weight: bold; margin-bottom: 15px;">
                     Index
-                </h3>
+                </p>
             </div>
         </header>
 
         <div class="body">
-
-            <h2 class="underline">
-                Liste des méta-zones
-            </h2>
+                <p class="special-paragraph">
+                    Liste des méta-zones
+                </p>
             <ul>
                 {% for metazone in report.metazones %}
                 <li>
-                    <h4 class="small-margin-bottom">{{metazone.properties.name}}</h4>
+                    <p style="color: #002554; font-size: 16px; font-weight: bold; margin-bottom: 15px;">
+                        {{metazone.properties.name}}
+                    </p>
                 </li>
                 {% endfor %}
             </ul>
 
-            <h2 class="underline">
-                Metazones
-            </h2>
             {% for metazone in report.metazones %}
-            <h3>
+            <p class="special-paragraph">
                 {{metazone.properties.name}}
-            </h3>
+            </p>
             <ul>
                 {% for functionality in metazone.functionalities %}
                 <li>
-                    <h5 class="no-margin">{{functionalities_desc[functionality.functionality]}}</h5>
+                    <p class="no-margin" style="color: #002554; font-size: 16px; font-weight: bold;">{{functionalities_desc[functionality.functionality]}}</p>
                     <ul>
                         {% for output in functionality.outputs %}
                         <li>

@@ -1,12 +1,17 @@
 """
 Ticket class created when using gitlab
 """
+
+import logging
 import os
+import pathlib
 import sys
 
 import gitlab
 import requests
 from xoa import cfgm
+
+logger = logging.getLogger(__name__)
 
 
 class Ticket:
@@ -16,15 +21,16 @@ class Ticket:
 
     def __init__(self, data=None):
         self.ticket = data
-        self.gitlab_token = ''
-        self.gitlab_url = ''
+        self.gitlab_token = ""
+        self.gitlab_url = ""
         self.gitlab_project_id = -1
+        self.gitlab_proxies = None
         self.project = None
         self.rootdir = os.path.abspath(os.path.dirname(__file__))
-        cfgm_auth = cfgm.ConfigManager(os.path.join(
-            self.rootdir, "config/auth_spec.ini"))
-        self.cfg_auth = cfgm_auth.load(
-            os.path.join(self.rootdir, "config/auth.ini"))
+        cfgm_auth = cfgm.ConfigManager(os.path.join(self.rootdir, "auth.ini"))
+
+        current_dir = pathlib.Path().resolve()
+        self.cfg_auth = cfgm_auth.load(os.path.join(current_dir, "auth.cfg"))
 
         self.try_connection_to_project()
 
@@ -35,18 +41,22 @@ class Ticket:
         -------
 
         """
-        more_info = 'More information with : armoor-tick-authentication -h'
+        more_info = "More information with : armoor-tick-authentication -h"
         try:
             self.project = self.connect_to_project()
-        except gitlab.exceptions.GitlabGetError:
-            print('--- Error : Please update gitlab project id ---')
-            print(more_info)
-        except gitlab.exceptions.GitlabAuthenticationError:
-            print('--- Error : Please update gitlab token ---')
-            print(more_info)
-        except requests.exceptions.ConnectionError:
-            print('--- Error : Please update gitlab url ---')
-            print(more_info)
+            logger.info("Connection to project : OK.")
+        except gitlab.exceptions.GitlabGetError as e:
+            logger.error("--- Error : Please update gitlab project id ---")
+            logger.error(more_info)
+            logger.error(e)
+        except gitlab.exceptions.GitlabAuthenticationError as e:
+            logger.error("--- Error : Please update gitlab token ---")
+            logger.error(more_info)
+            logger.error(e)
+        except requests.exceptions.ConnectionError as e:
+            logger.error("--- Error : Please update gitlab url ---")
+            logger.error(more_info)
+            logger.error(e)
 
     def connect_to_project(self):
         """
@@ -57,7 +67,14 @@ class Ticket:
         """
         self.get_gitlab_authentication_information()
 
-        gitlab_project = gitlab.Gitlab(self.gitlab_url, self.gitlab_token)
+        session = None
+        if self.gitlab_proxies:
+            session = requests.Session()
+            session.proxies.update(self.gitlab_proxies)
+
+        gitlab_project = gitlab.Gitlab(
+            self.gitlab_url, self.gitlab_token, session=session
+        )
         gitlab_project.auth()
 
         return gitlab_project.projects.get(self.gitlab_project_id)
@@ -69,9 +86,16 @@ class Ticket:
         -------
 
         """
-        self.gitlab_token = self.cfg_auth['gitlab']['token']
-        self.gitlab_url = self.cfg_auth['gitlab']['url']
-        self.gitlab_project_id = self.cfg_auth['gitlab']['project']
+        self.gitlab_token = self.cfg_auth["gitlab"]["token"]
+        self.gitlab_url = self.cfg_auth["gitlab"]["url"]
+        self.gitlab_project_id = self.cfg_auth["gitlab"]["project"]
+        self.gitlab_proxies = self.cfg_auth["gitlab"].get("proxies")
+        if self.gitlab_proxies:
+            for proxy in self.gitlab_proxies:
+                self.gitlab_proxies[proxy] = (
+                    f"{self.gitlab_proxies[proxy]['address']}:{self.gitlab_proxies[proxy]['port']}"
+                )
+            logger.info(f"Proxies : {self.gitlab_proxies}")
 
     def format_ticket_for_gitlab(self, data: dict) -> str:
         """
@@ -87,8 +111,10 @@ class Ticket:
         title_column_1 = "Champ"
         title_column_2 = "Description"
         alignment = ":---"
-        gitlab_ticket = f"| {title_column_1 : <20} | {title_column_2 : <100} |\n" \
-                        f"| {alignment : <20} | {alignment : <100} |"
+        gitlab_ticket = (
+            f"| {title_column_1 : <20} | {title_column_2 : <100} |\n"
+            f"| {alignment : <20} | {alignment : <100} |"
+        )
         for field in data:
             gitlab_ticket += f"\n| {field : <20} | {data[field] : <100} |"
 
@@ -101,9 +127,10 @@ class Ticket:
         -------
         None
         """
-        print(f'token : {self.gitlab_token}')
-        print(f'url : {self.gitlab_url}')
-        print(f'id : {self.gitlab_project_id}')
+        print(f"token : {self.gitlab_token}")
+        print(f"url : {self.gitlab_url}")
+        print(f"id : {self.gitlab_project_id}")
+        print(f"proxies : {self.gitlab_proxies}")
 
     def get_template(self, kind: str) -> dict:
         """
@@ -116,14 +143,23 @@ class Ticket:
         -------
         Template
         """
-        cfgm_fields = cfgm.ConfigManager(os.path.join(
-            self.rootdir, "config/fields_spec.ini"))
+        cfgm_fields = cfgm.ConfigManager(
+            os.path.join(self.rootdir, "fields.ini")
+        )
 
-        kinds = {'numeric': os.path.join(self.rootdir, 'config/numeric.ini'),
-                 'nodata': os.path.join(self.rootdir, 'config/nodata.ini'),
-                 'field_value': os.path.join(self.rootdir, 'config/field_value.ini')}
+        kinds = {
+            "numeric": os.path.join(
+                self.rootdir, "..", "..", "config", "numeric.cfg"
+            ),
+            "nodata": os.path.join(
+                self.rootdir, "..", "..", "config", "nodata.cfg"
+            ),
+            "field_value": os.path.join(
+                self.rootdir, "..", "..", "config", "field_value.cfg"
+            ),
+        }
         cfg_fields = cfgm_fields.load(kinds[kind])
-        cfg_fields.update({'kind': kind})
+        cfg_fields.update({"kind": kind})
 
         return self.format_template(cfg_fields)
 
@@ -139,7 +175,7 @@ class Ticket:
         Formatted template
         """
         for field in template:
-            if template[field] == 'inactive_field':
+            if template[field] == "inactive_field":
                 template.pop(field)
         return template
 
@@ -155,37 +191,59 @@ class Ticket:
         issue id of the ticket created
         """
         # title with labels and T0
-        title = ' - '.join([ticket_data[field] for field in ['config',
-                                                             'production_time',
-                                                             'title']])
+        model = ticket_data.get("model" "")
+        config = ticket_data.get("config", "")
+        production_time = ticket_data.get("production_time", "")
+        issue_title = ticket_data.get("title", "")
+        if issue_title == "":
+            logger.warning(
+                'The "title" parameter is required and must be provided.'
+            )
+        if production_time == "":
+            logger.warning(
+                'The "production_time" parameter is essential and needs to be specified.'
+            )
+        if config == "":
+            logger.warning(
+                'It is mandatory to include the "config" parameter in your input.'
+            )
+        if "" in [issue_title, production_time, config]:
+            sys.exit()
+
+        title = f"{model}_{config} - "
+        title += " - ".join([production_time, issue_title])
 
         # retrieve linked issues
-        related = ticket_data.get('related')
+        related = ticket_data.get("related")
         if related:
             if isinstance(related, list):
-                links = [f'#{link}' for link in related]
-                ticket_data.update({'related': " ".join(links)})
+                links = [f"#{link}" for link in related]
+                ticket_data.update({"related": " ".join(links)})
             else:  # instance of string
                 # clean the string
-                for char in [',', ';', ':', '.', '/', '-', '|']:
-                    related = related.replace(char, ' ')
+                for char in [",", ";", ":", ".", "/", "-", "|"]:
+                    related = related.replace(char, " ")
                 related = related.split()
-                links = [f'#{link}' for link in related]
-                ticket_data.update({'related': " ".join(links)})
+                links = [f"#{link}" for link in related]
+                ticket_data.update({"related": " ".join(links)})
 
         else:
             related = []
 
         # Create ticket
         issue = self.project.issues.create(
-            {'title': title, 'description': self.format_ticket_for_gitlab(ticket_data)})
+            {
+                "title": title,
+                "description": self.format_ticket_for_gitlab(ticket_data),
+            }
+        )
 
         # Create links to freshly created issue
         issue_id = issue.get_id()
         self.create_links(issue_id, related)
         return issue_id
 
-    def search_tickets(self, config_reg, request, state='opened') -> dict:
+    def search_tickets(self, config_reg, request, state="opened") -> dict:
         """
         Search for tickets
         Parameters
@@ -200,11 +258,15 @@ class Ticket:
         state, labels, created at, linked issues.
         """
 
-        full_request = ' '.join([config_reg, request])
+        full_request = " ".join([config_reg, request])
 
-        print(f'Searching... in GitLab : {full_request}')
+        print(f"Searching... in GitLab : {full_request}")
         tickets = self.project.search(
-            gitlab.const.SearchScope.ISSUES, full_request, state=state, all=True)
+            gitlab.const.SearchScope.ISSUES,
+            full_request,
+            state=state,
+            all=True,
+        )
         return self.format_input_issues(tickets)
 
     def format_input_issues(self, issues) -> dict:
@@ -220,11 +282,16 @@ class Ticket:
         """
         new_issues = {}
         for issue in issues:
-            new_issues.update({issue['iid']: {'title': issue['title'],
-                                              'state': issue['state'],
-                                              'created_at': issue['created_at'][:-5],
-                                              'linked_issues': self.get_links(issue['iid'])}
-                               })
+            new_issues.update(
+                {
+                    issue["iid"]: {
+                        "title": issue["title"],
+                        "state": issue["state"],
+                        "created_at": issue["created_at"][:-5],
+                        "linked_issues": self.get_links(issue["iid"]),
+                    }
+                }
+            )
         return new_issues
 
     def get_description(self, target_id):
@@ -254,18 +321,17 @@ class Ticket:
         # Get the ticket's description
         description = self.get_description(target_id)
         # Split it into lines
-        lines = description.split('\n')
+        lines = description.split("\n")
         # Remove the first two lines (header and ---)
         lines = lines[2:]
         # For each line, remove the first two characters (that are '| ')
         # Then separate field and description and remove the last element which is empty
-        lines = [line[2:].split('|')[:-1] for line in lines]
+        lines = [line[2:].split("|")[:-1] for line in lines]
         # Strip the whitespaces of the field and description
         lines = [list(map(lambda word: word.strip(), line)) for line in lines]
         # Convert the list [[field0, description0], [field1, description1], ...] to
         # a list of dicts [{'field': field0, 'description': description0}, ...]
-        result = [{'field': line[0], 'description': line[1]}
-                  for line in lines]
+        result = [{"field": line[0], "description": line[1]} for line in lines]
         return result
 
         # One line version
@@ -304,8 +370,8 @@ class Ticket:
         link = self.project.issues.get(link_id)
 
         data = {
-            'target_project_id': link.project_id,
-            'target_issue_iid': link.iid
+            "target_project_id": link.project_id,
+            "target_issue_iid": link.iid,
         }
 
         target.links.create(data)
@@ -372,4 +438,5 @@ class Ticket:
                 return valid[choice]
 
             sys.stdout.write(
-                "Please respond with 'yes' or 'no' (or 'y' or 'n').\n")
+                "Please respond with 'yes' or 'no' (or 'y' or 'n').\n"
+            )

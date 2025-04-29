@@ -1,11 +1,20 @@
 """Create figures for feature 5:clim_hydro"""
-import copy
-from armoor import base
-import calendar
-import armoor.hmi.script_tools as st
 
+import copy
 import logging
+import os
+
+import armoor.hmi.script_tools as st
+from armoor.base import plot_features
+from armoor.base.tools_features import (
+    remove_missing_values_ds,
+    sel_default_vars,
+    sel_one_var,
+)
+from armoor.hmi.script_tools import create_folder
+
 logger = logging.getLogger(__name__)
+
 
 def plot(config_obj):
     """
@@ -25,143 +34,94 @@ def plot(config_obj):
     outputs = config_obj["outputs"]
     output_path = config_obj.get("output_path")
 
-    # SET THE FLAGS
-    flag_interval = False
+    flag_interval = True
     flag_slice = False
 
+    trange = {
+        "trange_clim": config_obj["metazone"]["trange_clim"],
+        "tbound": config_obj["metazone"]["tbound"],
+    }
+
+    config_obj, vars = sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
+    # Plot the outputs
+    for oname in outputs:
+        output = outputs[oname]
+        sub_func_output_folder = os.path.join(output_path, oname)
+        create_folder(sub_func_output_folder)
 
-    for index_output, output in enumerate(outputs):
-        if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
-            st.create_folder(sub_func_output_folder)
-        else:
-            sub_func_output_folder = output_path
-
-        # Get the figure parameters from config obj
-        if 'vmin' in output:
-            vmin = output["vmin"]
-        else:
-            vmin = None
-
-        if 'vmax' in output:
-            vmax = output["vmax"]
-        else:
-            vmax = None
-
-        if 'colormap' in output:
-            cmap = 'cmo.' + output["colormap"]
-        else:
-            cmap = None
-
-        # Select the variables in the model and in the observations
-        if "attribute" in output:
-            var0 = output['attribute']
-            if "list" not in str(type(var0)):  # si une seule var
-                var = [var0]
-            else:
-                var = var0
-        else:
-            raise Exception(
-                "Oops, vous devriez fournir au moins une variable à laquelle appliquer le tracé demandé :"
-                " 'attribute' ...")
-
-        observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(var)
-
-        # Select the variables and calculate the climatology for the models
-        for i_mod, mod in enumerate(models):
-            mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(var).groupby("time.month") \
-                .mean("time").rename({'month': 'time'})
-
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read_sst.sel(var).groupby("time.month") \
-                .mean("time").rename({'month': 'time'}).assign_coords({'time': calendar.month_name[1:13]})
-            observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(var) \
-                .assign_coords({'time': calendar.month_name[1:13]})
-
-            # Remove missing values
-            models, observation = base.remove_missing_values_ds(models, observation, i_mod, var, var)
+        # Get parameters from config obj
+        vmin = output.get("vmin")
+        vmax = output.get("vmax")
+        dvmin = output.get("dvmin")
+        dvmax = output.get("dvmax")
+        cmap = output.get("colormap")
+        cmap = cmap if cmap is None else f"cmo.{cmap}"
 
         # PLOTS
-        ################################################################################################################
-        # TIME SERIES POINT
-        plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point'}
-        if output["plot"] in plot_ts_metr_point:
-            base.plot_features.plot_ts_metr_point(models,
-                                                  observation,
-                                                  plot_ts_metr_point[output["plot"]],
-                                                  flag_interval,
-                                                  flag_slice,
-                                                  output_path=sub_func_output_folder)
-
-        ################################################################################################################
-        # TIME SERIES STATS
-        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
-                              "plot_ts_metr_bias_stats": 'bias_stats',
-                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats',
-                              "plot_ts_metr_stats": 'all_metrics'
-                              }
-        if output["plot"] in plot_ts_metr_stats:
-            # for i, mod in enumerate(models):
-            #     base.plot_features.plot_ts_metr(mod["xarray_meta"],
-            #                                      mod["xarray_meta_coloc"],
-            #                                      observation["xarray_meta"],
-            #                                      observation["xarray_meta_coloc"][i],
-            #                                      plot_ts_metr[output["plot"]])
-
-            base.plot_features.plot_ts_metr_stats(models,
-                                                  observation,
-                                                  flag_interval,
-                                                  flag_slice,
-                                                  output_path=sub_func_output_folder)
-
-        ################################################################################################################
-        # MAP METRIC
-        plot_map_metr = {"plot_map_metr_ecart": 'difference'}
-        if output["plot"] in plot_map_metr:
-            for i, mod in enumerate(models):
-                if 'depth' not in mod["xarray_meta_coloc"].dims:
-                    base.plot_features.plot_map_metr(flag_interval, flag_slice,
-                                                     mod["xarray_meta"],
-                                                     mod["xarray_meta_coloc"],
-                                                     observation["xarray_meta"],
-                                                     observation["xarray_meta_coloc"][i],
-                                                     plot_map_metr[output["plot"]],
-                                                     cmap,
-                                                     vmin,
-                                                     vmax,
-                                                     output_path=sub_func_output_folder)
-                else:
-                    for depth in [float(mod["xarray_meta_coloc"].depth.values)]:
-                        try:
-                            mod["xarray_meta"] = mod["xarray_meta"].sel(depth=depth,
-                                                                        method='nearest')
-                        except:
-                            logger.warning("model-meta depth selection : Failed")
-                        try:
-                            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel(depth=depth,
-                                                                                    method='nearest')
-                        except:
-                            logger.warning("model-meta-coloc depth selection : Failed")
-                        try:
-                            observation["xarray_meta"] = observation["xarray_meta"].sel(depth=depth,
-                                                                                        method='nearest')
-                        except:
-                            logger.warning("obs-meta depth selection : Failed")
-                        try:
-                            observation["xarray_meta_coloc"][i] = observation["xarray_meta_coloc"][i] \
-                                .sel(depth=depth, method='nearest')
-                        except:
-                            logger.warning("obs-meta-coloc depth selection : Failed")
-
-                        base.plot_features.plot_map_metr(flag_interval,
-                                                         flag_slice,
-                                                         mod["xarray_meta"],
-                                                         mod["xarray_meta_coloc"],
-                                                         observation["xarray_meta"],
-                                                         observation["xarray_meta_coloc"][i],
-                                                         plot_map_metr[output["plot"]],
-                                                         cmap,
-                                                         vmin,
-                                                         vmax,
-                                                         output_path=sub_func_output_folder)
+        for var in vars:
+            mods = [
+                models[mod]["ds_coloc"][[var]].assign_attrs(
+                    {
+                        "varname": var,
+                        **models[mod]["ds_coloc"][var].attrs,
+                        **models[mod]["ds_coloc"].attrs,
+                    }
+                )
+                for mod in models
+            ]
+            obss = [
+                observation["ds_coloc"][mod][[var]].assign_attrs(
+                    {
+                        "varname": var,
+                        **observation["ds_coloc"][mod][var].attrs,
+                        **observation["ds_coloc"][mod].attrs,
+                    }
+                )
+                for mod in models
+            ]
+            plot_ts_metr_point = {
+                "plot_ts_metr_cloud": "difference_point",
+            }
+            if output["plot"] in plot_ts_metr_point:
+                plot_features.plot_ts_metr_cloud(
+                    trange,
+                    mods,
+                    obss,
+                    output_path=sub_func_output_folder,
+                )
+            plot_ts_metr_stats = {
+                "plot_ts_metr_ecart_stats": "difference_stats",
+                "plot_ts_metr_bias_stats": "bias_stats",
+                "plot_ts_metr_RMSE_stats": "RMSEc_stats",
+                "plot_ts_metr_stats": "all_metrics",
+            }
+            if output["plot"] in plot_ts_metr_stats:
+                plot_features.plot_ts_metr_stats(
+                    trange,
+                    None,
+                    mods,
+                    obss,
+                    output_path=sub_func_output_folder,
+                )
+                
+            plot_map_metr = {
+                "plot_map_metr_ecart_interval": "difference",
+                "plot_map_metr_ecart": "difference",
+            }
+            if output["plot"] in plot_map_metr:
+                for i, mod in enumerate(mods):
+                    plot_features.plot_map_metr_profiles(
+                        trange,
+                        None,
+                        mod,
+                        obss[i],
+                        plot_map_metr[output["plot"]],
+                        cmap,
+                        vmin,
+                        vmax,
+                        output_path=sub_func_output_folder,
+                        dvmin=dvmin,
+                        dvmax=dvmax,
+                    )

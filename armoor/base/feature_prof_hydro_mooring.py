@@ -1,10 +1,21 @@
 """Create figures for feature 3:prof_hydro_mooring"""
-import copy
-from armoor import base
-import armoor.hmi.script_tools as st
 
+import copy
 import logging
+import os
+
+import numpy as np
+
+from armoor.base import plot_features
+from armoor.base.tools_features import (
+    remove_missing_values_ds,
+    sel_default_vars,
+    sel_one_var,
+)
+from armoor.hmi.script_tools import create_folder
+
 logger = logging.getLogger(__name__)
+
 
 def plot(config_obj):
     """
@@ -25,93 +36,87 @@ def plot(config_obj):
     outputs = config_obj["outputs"]
     output_path = config_obj.get("output_path")
 
-    list_config_job = []
+    if "trange_seq" in config_obj["metazone"]:
+        trange = {
+            "trange_seq": config_obj["metazone"]["trange_seq"],
+            "tbound": config_obj["metazone"]["tbound"],
+        }
+    elif "trange_clim" in config_obj["metazone"]:
+        trange = {
+            "trange_clim": config_obj["metazone"]["trange_clim"],
+            "tbound": config_obj["metazone"]["tbound"],
+        }
+    else:
+        trange = None
 
-    # set flag_interval
-    flag_interval = 'interval' in config_obj["meta_zones"].keys()
-    flag_slice = 'slice' in config_obj["meta_zones"].keys()
+    if "tfreq" in config_obj["metazone"]:
+        tfreq = config_obj["metazone"]["tfreq"]
+    else:
+        tfreq = None
 
-    for output in outputs:
-        list_config_job.append(copy.copy(config_obj))
+    # Select the variables
+    for k in config_obj["models"].keys():
+        nb_mooring = len(config_obj["observation"]["ds_coloc"][k])
+    for iobs in range(nb_mooring):
+        logger.info(f"Process mooring: {iobs}")
+        cfg = copy.deepcopy(config_obj)
+        observation = copy.copy(cfg["observation"])
+        models = copy.copy(cfg["models"])
+        for model in config_obj["models"].keys():
+            models[model].update(
+                {"ds_coloc": config_obj["models"][model]["ds_coloc"][iobs]}
+            )
+            observation["ds_coloc"].update(
+                {model: config_obj["observation"]["ds_coloc"][model][iobs]}
+            )
+        cfg["observation"] = observation
+        cfg["models"] = models
+        cfg, vars = sel_default_vars(cfg)
+        observation = copy.copy(cfg["observation"])
+        models = copy.copy(cfg["models"])
 
-    for output in outputs:
-        if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
-            st.create_folder(sub_func_output_folder)
-        else:
-            sub_func_output_folder = output_path
+        # Plot the outputs
+        for oname in outputs:
+            output = outputs[oname]
+            sub_func_output_folder = os.path.join(output_path, oname)
+            create_folder(sub_func_output_folder)
 
-        # get parameters from config obj
-        if 'vmin' in output:
-            vmin = output["vmin"]
-        else:
-            vmin = None
-
-        if 'vmax' in output:
-            vmax = output["vmax"]
-        else:
-            vmax = None
-
-        if 'colormap' in output:
-            cmap = 'cmo.' + output["colormap"]
-        else:
-            cmap = None
-        observation = copy.copy(config_obj["observation"])
-        models = copy.copy(config_obj["models"])
-
-        # SELECT VAR
-        if 'attribute' in output:
-            var = [output['attribute']]
-        else:
-            logger.info("You should indicate which variable you want to plot with keyword : attribute = ")
-            var = None
-        observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(var)
-        for i_mod, mod in enumerate(models):
-            mod["xarray_meta"] = mod["xarray_meta"].read_sst.sel(var)
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read.decode().read_sst.sel(var)
-            observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(var)
-
-            # Remove missing values
-            models, observation = base.remove_missing_values_ds(models, observation, i_mod, var, var)
-
-        # PLOTS
-
-        ################################################################################################################
-        # TIME SERIES STATS
-        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
-                              "plot_ts_metr_bias_stats": 'bias_stats',
-                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats',
-                              "plot_ts_metr_stats": 'all_metrics'}
-        if output["plot"] in plot_ts_metr_stats:
-            if 'depth' not in models[0]["xarray_meta_coloc"].dims:
-                models_depth, observation_depth = models, observation
-                base.plot_features.plot_ts_metr_stats(models_depth,
-                                                      observation_depth,
-                                                      flag_interval,
-                                                      flag_slice,
-                                                      output_path=sub_func_output_folder)
-            else:
-                for i_depth, depth in enumerate(models[0]["xarray_meta_coloc"].depth.values):
-                    models_depth, observation_depth = select_depth(models, observation, depth)
-                    base.plot_features.plot_ts_metr_stats(models_depth,
-                                                          observation_depth,
-                                                          flag_interval,
-                                                          flag_slice,
-                                                          output_path=sub_func_output_folder)
-
-
-def select_depth(models, observation, depth):
-    observation_depth = dict()
-    observation_depth["xarray_meta"] = observation["xarray_meta"].sel(depth=depth, method='nearest')
-    observation_depth['name'] = observation['name']
-    models_depth = []
-    for i_mod, mod in enumerate(models):
-        models_depth.append(dict())
-        observation_depth["xarray_meta_coloc"] = []
-        models_depth[i_mod]["xarray_meta"] = mod["xarray_meta"].sel(depth=depth, method='nearest')
-        models_depth[i_mod]['name'] = mod['name']
-        models_depth[i_mod]["xarray_meta_coloc"] = mod["xarray_meta_coloc"].sel(depth=depth)
-        observation_depth["xarray_meta_coloc"].append(observation["xarray_meta_coloc"][i_mod].sel(depth=depth,
-                                                                                                  method='nearest'))
-
-    return models_depth, observation_depth
+            # PLOTS
+            for var in vars:
+                logger.info(f"Plot {var}")
+                # TIME SERIES STATS
+                obs = [
+                    observation["ds_coloc"][mod][[var]].assign_attrs(
+                        {
+                            "varname": var,
+                            **observation["ds_coloc"][mod][var].attrs,
+                            **observation["ds_coloc"][mod].attrs,
+                        }
+                    )
+                    for mod in models
+                ]
+                mods = [
+                    # models[mod]["ds_coloc"][[var]].mean("member").assign_attrs({
+                    models[mod]["ds_coloc"][[var]].assign_attrs(
+                        {
+                            "varname": var,
+                            **models[mod]["ds_coloc"][var].attrs,
+                            **models[mod]["ds_coloc"].attrs,
+                        }
+                    )
+                    for mod in models
+                ]
+                plot_ts_metr_stats = {
+                    "plot_ts_metr_ecart_stats": "difference_stats",
+                    "plot_ts_metr_bias_stats": "bias_stats",
+                    "plot_ts_metr_RMSE_stats": "RMSEc_stats",
+                    "plot_ts_metr_stats": "all_metrics",
+                }
+                if output["plot"] in plot_ts_metr_stats:
+                    plot_features.plot_ts_metr_stats(
+                        trange,
+                        None,
+                        mods,
+                        obs,
+                        output_path=sub_func_output_folder,
+                    )
