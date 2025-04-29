@@ -1,19 +1,8 @@
-from .meta_zone import *
-from .read import *
-from .read_sst import *
-from .open_data import *
-from .calls_from_dict import *
-from .feature_tools import *
-from .feature_sst import *
-from .feature_prof_hydro_vessel import *
-from .feature_prof_hydro_mooring import *
-from .feature_section_hydro import *
-from .feature_clim_hydro import *
-from .feature_currents_hfr import *
-from .feature_currents_ADCP import *
-from .feature_currents_VMADCP import *
-from .feature_drifters import *
-from .comodo_tide_feature import *
-from .opendrift_trajectory import *
-from .colocation import *
-from .plot_features import *
+FILTERS = {
+    "tbound": lambda obj: obj.meta.time_selection_bounds,
+    "trange_seq": lambda obj: obj.meta.time_selection_range_seq,
+    "trange_clim": lambda obj: obj.meta.time_selection_range_clim,
+    "polygon": lambda obj: obj.meta.horizontal_selection_polygon,
+    "vrange": lambda obj: obj.meta.vertical_selection_range,
+    "vlevel": lambda obj: obj.meta.vertical_selection_levels,
+}

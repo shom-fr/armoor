@@ -1,12 +1,19 @@
-"""Create figures for feature 4:section_hydro"""
+"""Create figures for section_hydro."""
+
 import copy
-from armoor import base
-import armoor.hmi.script_tools as st
+import logging
+import os
+
+from armoor.base import plot_features
+from armoor.base.tools_features import sel_default_vars
+from armoor.hmi.script_tools import create_folder
+
+logger = logging.getLogger(__name__)
 
 
 def plot(config_obj):
     """
-    Plot figures required in functionality 4 : section_hydro.
+    Plot figures required in functionality section_hydro.
 
     Parameters
     ----------
@@ -19,55 +26,88 @@ def plot(config_obj):
         Path to the generated figures.
 
     """
+    # Select the variables
     outputs = config_obj["outputs"]
     output_path = config_obj.get("output_path")
 
-    # SELECT THE VARIABLES
-    observation = copy.copy(config_obj["observation"])
-    models = copy.copy(config_obj["models"])
+    # Select the variables
+    for k in config_obj["models"].keys():
+        nb_mooring = len(config_obj["observation"]["ds_coloc"][k])
+    for iobs in range(nb_mooring):
+        cfg = copy.deepcopy(config_obj)
+        observation = copy.copy(cfg["observation"])
+        models = copy.copy(cfg["models"])
+        for model in config_obj["models"].keys():
+            models[model].update(
+                {"ds_coloc": config_obj["models"][model]["ds_coloc"][iobs]}
+            )
+            observation["ds_coloc"].update(
+                {model: config_obj["observation"]["ds_coloc"][model][iobs]}
+            )
+        cfg["observation"] = observation
+        cfg["models"] = models
+        cfg, vars = sel_default_vars(cfg)
+        observation = copy.copy(cfg["observation"])
+        models = copy.copy(cfg["models"])
 
-    if 'attribute' in outputs[0]:
-        var0 = outputs[0]['attribute']
-    else:
-        raise Exception(
-            "Oops, pour utiliser cette fonctionnalité, vous devriez spécifier un attribut...")
-    if "list" not in str(type(var0)):
-        vars = [var0]
-    else:
-        vars = var0
-    observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(vars)
+        # PLOT THE OUTPUTS
+        for oname in outputs:
+            output = outputs[oname]
+            sub_func_output_folder = os.path.join(output_path, oname)
+            create_folder(sub_func_output_folder)
 
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read.decode().read_sst.sel(vars)
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read.decode().read_sst.sel(vars)
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(vars)
+            # get parameters from config obj
+            vmin = output.get("vmin")
+            vmax = output.get("vmax")
+            dvmin = output.get("dvmin")
+            dvmax = output.get("dvmax")
+            cmap = output.get("colormap")
+            cmap = cmap if cmap is None else f"cmo.{cmap}"
 
-    # Set horizontal and vertical steps
-    models, observation = base.set_hor_vert_step(config_obj, models, observation)
-
-    # Remove missing values
-    for i_mod, mod in enumerate(models):
-        models, observation = base.remove_missing_values_ds(models, observation, i_mod, vars, vars)
-
-    # PLOTS
-    for index_output, output in enumerate(outputs):
-        if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
-            st.create_folder(sub_func_output_folder)
-        else:
-            sub_func_output_folder = output_path
-        ################################################################################################################
-        # VARIABLE 3D SECTION
-        plot_variable_3d = {"plot_variable_3d": 'variable_3d'}
-        if output["plot"] in plot_variable_3d:
-            base.plot_features.plot_variable_3d(models,
-                                                observation,
-                                                output_path=sub_func_output_folder)
-
-        ################################################################################################################
-        # TIMESERIES
-        plot_variable_2d = {"plot_variable_2d": 'variable_2d'}
-        if output["plot"] in plot_variable_2d:
-            base.plot_features.plot_variable_2d(models,
-                                                observation,
-                                                output_path=sub_func_output_folder)
+            for var in vars:
+                if var == "current_geos":
+                    vmin = -0.5
+                    vmax = 0.5
+                else:
+                    vmin = None
+                    vmax = None
+                mods = [
+                    models[mod]["ds_coloc"][var].assign_attrs(
+                        {
+                            "varname": var,
+                            **models[mod]["ds_coloc"][var].attrs,
+                            **models[mod]["ds_coloc"].attrs,
+                        }
+                    )
+                    for mod in models
+                ]
+                obss = [
+                    observation["ds_coloc"][mod][var].assign_attrs(
+                        {
+                            "varname": var,
+                            **observation["ds_coloc"][mod][var].attrs,
+                            **observation["ds_coloc"][mod].attrs,
+                        }
+                    )
+                    for mod in models
+                ]
+                for idx in range(len(models)):
+                    if "z" in obss[idx].dims:
+                        vmin = obss[idx].min()
+                        vmax = obss[idx].max()
+                        plot_features.plot_variable_3d(
+                            obss[idx],
+                            mods[idx],
+                            output_path=sub_func_output_folder,
+                            vmin=vmin,
+                            vmax=vmax,
+                            dvmin=dvmin,
+                            dvmax=dvmax,
+                            cmap=cmap,
+                        )
+                    else:
+                        plot_features.plot_variable_2d(
+                            obss[idx],
+                            mods[idx],
+                            output_path=sub_func_output_folder,
+                        )

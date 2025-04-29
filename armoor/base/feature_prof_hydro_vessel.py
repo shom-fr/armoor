@@ -1,11 +1,19 @@
 """Create figures for feature 2:prof_hydro_vessel"""
-import copy
-from armoor import base
-import armoor.base.feature_tools as ft
-import armoor.hmi.script_tools as st
 
+import copy
 import logging
+import os
+
+from armoor.base import plot_features
+from armoor.base.tools_features import (
+    remove_missing_values_ds,
+    sel_default_vars,
+    sel_one_var,
+)
+from armoor.hmi.script_tools import create_folder
+
 logger = logging.getLogger(__name__)
+
 
 def plot(config_obj):
     """
@@ -25,154 +33,252 @@ def plot(config_obj):
     outputs = config_obj["outputs"]
     output_path = config_obj.get("output_path")
 
-    # SET THE FLAGS
-    flag_interval = 'interval' in config_obj["meta_zones"]
-    flag_slice = 'slice' in config_obj["meta_zones"]
+    # Set the flags
+    flag_interval = "trange" in config_obj["metazone"]
+    flag_slice = "vrange" in config_obj["metazone"]
 
-    # SELECT THE VARIABLES
+    if "trange_seq" in config_obj["metazone"]:
+        trange = {
+            "trange_seq": config_obj["metazone"]["trange_seq"],
+            "tbound": config_obj["metazone"]["tbound"],
+        }
+    elif "trange_clim" in config_obj["metazone"]:
+        trange = {
+            "trange_clim": config_obj["metazone"]["trange_clim"],
+            "tbound": config_obj["metazone"]["tbound"],
+        }
+    else:
+        trange = None
+
+    if "vrange" in config_obj["metazone"]:
+        vrange = config_obj["metazone"]["vrange"]
+    else:
+        vrange = None
+    # Select the variables
+    config_obj, vars = sel_default_vars(config_obj)
     observation = copy.copy(config_obj["observation"])
     models = copy.copy(config_obj["models"])
 
-    if 'attribute' in outputs[0]:
-        var0 = outputs[0]['attribute']
-    else:
-        raise Exception(
-            "Oops, pour utiliser cette fonctionnalité, vous devriez spécifier un attribut...")
-    if "list" not in str(type(var0)):
-        vars = [var0]
-    else:
-        vars = var0
+    # # Remove missing values
+    # vars = [var for var in list(observation["ds_metazone"].keys()) if var in models[0]["ds_metazone"]]
 
-    observation["xarray_meta"] = observation["xarray_meta"].read_sst.sel(vars)
-
-    # For the models, we select the potential values
-    var_mod = []
-    for i_var, var in enumerate(vars):
-        if var == 'temp':
-            var_mod.append('ptemp')
-            logger.info("For this feature, the potential temperature is used in the model")
-        elif var == 'dens':
-            var_mod.append('pdens')
-            logger.info("For this feature, the potential density is used in the model")
-        else:
-            var_mod.append(var)
-
-    for i_mod, mod in enumerate(models):
-        mod["xarray_meta"] = mod["xarray_meta"].read.decode().read_sst.sel(var_mod)
-        mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].read.decode().read_sst.sel(var_mod)
-        observation["xarray_meta_coloc"][i_mod] = observation["xarray_meta_coloc"][i_mod].read_sst.sel(vars)
-
-        # Remove missing values
-        models, observation = base.remove_missing_values_ds(models, observation, i_mod, var_mod, vars)
+    # for i_mod, mod in enumerate(models):
+    #      models, observation = remove_missing_values_ds(models, observation, i_mod, vars)
 
     # PLOT THE OUTPUTS
-    for index_output, output in enumerate(outputs):
-        if output_path:
-            sub_func_output_folder = f'{output_path}{output["folder_name"]}/'
-            st.create_folder(sub_func_output_folder)
-        else:
-            sub_func_output_folder = output_path
+    for oname in outputs:
+        output = outputs[oname]
+        sub_func_output_folder = os.path.join(output_path, oname)
+        create_folder(sub_func_output_folder)
+
         # get parameters from config obj
-        vmin = ft.get_output('vmin', output)
-        vmax = ft.get_output('vmax', output)
-        cmap = ft.get_output("colormap", output)
-        cmap = cmap if cmap is None else f'cmo.{cmap}'
+        vmin = output.get("vmin")
+        vmax = output.get("vmax")
+        dvmin = output.get("dvmin")
+        dvmax = output.get("dvmax")
+        cmap = output.get("colormap")
+        cmap = cmap if cmap is None else f"cmo.{cmap}"
 
         # PLOTS
 
-        ################################################################################################################
-        # TIME SERIES POINT
-        plot_ts_metr_point = {"plot_ts_metr_ecart_point": 'difference_point',
-                              "plot_ts_metr_bias_point": 'bias_point',
-                              "plot_ts_metr_RMSE_point": 'RMSEc_point',
-                              "plot_ts_metr_point": 'all_metrics'}
-        if output["plot"] in plot_ts_metr_point:
-            base.plot_features.plot_ts_metr_point(models,
-                                                  observation,
-                                                  plot_ts_metr_point[output["plot"]],
-                                                  flag_interval,
-                                                  output_path=sub_func_output_folder)
+        if (
+            "diag_ts" in output["plot"]
+        ):  # Plots with several variables (temp sal here)
+            ########################################################################################
 
-        ################################################################################################################
-        # TIME SERIES STATS
-        plot_ts_metr_stats = {"plot_ts_metr_ecart_stats": 'difference_stats',
-                              "plot_ts_metr_bias_stats": 'bias_stats',
-                              "plot_ts_metr_RMSE_stats": 'RMSEc_stats',
-                              "plot_ts_metr_stats": 'all_metrics'}
-        if output["plot"] in plot_ts_metr_stats:
-            base.plot_features.plot_ts_metr_stats(models,
-                                                  observation,
-                                                  flag_interval,
-                                                  flag_slice,
-                                                  output_path=sub_func_output_folder)
+            mods = [
+                models[mod]["ds_coloc"].assign_attrs(
+                    {**models[mod]["ds_coloc"].attrs}
+                )
+                for mod in models
+            ]
+            obss = [
+                observation["ds_coloc"][mod].assign_attrs(
+                    {**observation["ds_coloc"][mod].attrs}
+                )
+                for mod in models
+            ]
 
-        ################################################################################################################
-        # MAP METRIC
-        plot_map_metr = {"plot_map_metr_ecart_interval": 'difference',
-                         "plot_map_metr_ecart": 'difference',
-                         "plot_map_metr_biais": 'bias',
-                         "plot_map_metr_RMSEc": 'RMSEc',
-                         "plot_map_metr_RMSEcentree": 'RMSEcentree'}
+            # DIAG TS PROFIL UNIQUE
+            plot_profile_u = {"diag_ts_unique": "diag_ts_unique"}
+            if output["plot"] in plot_profile_u:
+                plot_features.plot_diag_ts_unique(
+                    mods, obss, output_path=sub_func_output_folder
+                )
 
-        if output["plot"] in plot_map_metr:
-            for i, mod in enumerate(models):
-                base.plot_features.plot_map_metr_profiles(flag_interval,
-                                                          flag_slice,
-                                                          mod["xarray_meta_coloc"],
-                                                          observation["xarray_meta_coloc"][i],
-                                                          plot_map_metr[output["plot"]],
-                                                          cmap,
-                                                          vmin,
-                                                          vmax,
-                                                          output_path=sub_func_output_folder)
+            ########################################################################################
+            # DIAG_TS_MULTI
+            diag_ts_multi = {"diag_ts_multi": "diag_ts_multi"}
 
-        ################################################################################################################
-        # DISP DIAG
-        if "diag_disp" in output["plot"]:
-            models_name = [m['name'] for m in models]
-            obs_name = observation['name']
-            for i, mod in enumerate(models):
-                base.plot_features.diag_disp(flag_interval,
-                                             flag_slice,
-                                             obs_name,
-                                             models_name[i],
-                                             output["plot"],
-                                             mod["xarray_meta_coloc"],
-                                             observation["xarray_meta_coloc"][i],
-                                             output_path=sub_func_output_folder)
+            if output["plot"] in diag_ts_multi:
+                plot_features.plot_diag_ts_multi(
+                    trange, mods, obss, output_path=sub_func_output_folder
+                )
+                plot_features.plot_diag_ts_multi_trange(
+                    trange, mods, obss, output_path=sub_func_output_folder
+                )
 
-        ################################################################################################################
-        # COURBE PROFIL UNIQUE
-        plot_profile_u = {"plot_profile_u": 'profile_u'}
-        if output["plot"] in plot_profile_u:
-            base.plot_features.plot_profile_unique(models,
-                                                   observation["xarray_meta"],
-                                                   config_obj["meta_zones"]["radius"],
-                                                   output_path=sub_func_output_folder)
+        else:
+            for var in vars:
+                mods = [
+                    models[mod]["ds_coloc"][[var]].assign_attrs(
+                        {
+                            "varname": var,
+                            **models[mod]["ds_coloc"][var].attrs,
+                            **models[mod]["ds_coloc"].attrs,
+                        }
+                    )
+                    for mod in models
+                ]
+                obss = [
+                    observation["ds_coloc"][mod][[var]].assign_attrs(
+                        {
+                            "varname": var,
+                            **observation["ds_coloc"][mod][var].attrs,
+                            **observation["ds_coloc"][mod].attrs,
+                        }
+                    )
+                    for mod in models
+                ]
 
-        ################################################################################################################
-        # COURBE MULTI PROFILS
-        plot_profile_multi = {"plot_profile_multi": 'profile_multi'}
-        if output["plot"] in plot_profile_multi:
-            base.plot_features.plot_profile_multi(models,
-                                                  observation["xarray_meta"],
-                                                  config_obj["meta_zones"]["radius"],
-                                                  output_path=sub_func_output_folder)
+                # observation_var, models_var = observationsel_one_var(observation, models, var)
+                ####################################################################################
+                # TIME SERIES STATS
+                plot_ts_metr_stats = {"plot_ts_metr_stats": "all_metrics"}
+                if output["plot"] in plot_ts_metr_stats:
+                    modds = []
+                    for mod in mods:
+                        if mod.xindexes.get("depth") == None:
+                            mod = mod.reset_coords("depth")
+                        if "member" in mod.dims:
+                            m = (
+                                mod
+                                .mean("member")
+                                .set_coords("depth")
+                                .assign_attrs({**mod.attrs})[[var]]
+                            )
+                        else:
+                            m = mod
+                        modds.append(m)
+                    obbss = []
+                    for obs in obss:
+                        if "member" in obs.dims:
+                            m = (
+                                obs.reset_coords("depth")
+                                .mean("member")
+                                .set_coords("depth")
+                                .assign_attrs({**obs.attrs})[[var]]
+                            )
+                        else:
+                            m = obs
+                        obbss.append(m)
+                    plot_features.plot_ts_metr_stats(
+                        trange,
+                        vrange,
+                        modds,
+                        obbss,
+                        output_path=sub_func_output_folder,
+                    )
 
-        ################################################################################################################
-        # DIAG TS PROFIL UNIQUE
-        plot_profile_u = {"diag_ts_unique": 'diag_ts_unique'}
-        if output["plot"] in plot_profile_u:
-            base.plot_features.plot_diag_ts_unique(models,
-                                                   observation["xarray_meta"],
-                                                   output_path=sub_func_output_folder)
+                ####################################################################################
+                # MAP METRIC
+                plot_map_metr = {
+                    "plot_map_metr_ecart": "difference",
+                    "plot_map_metr_biais": "bias",
+                    "plot_map_metr_RMSE": "RMSE",
+                    "plot_map_metr_RMSEc": "RMSEc",
+                }
 
-        ################################################################################################################
-        # DIAG_TS_MULTI
-        diag_ts_multi = {"diag_ts_multi": 'diag_ts_multi'}
+                if output["plot"] in plot_map_metr:
+                    for i, mod in enumerate(mods):
+                        if mod.xindexes.get("depth") == None:
+                            mod = mod.reset_coords("depth")
+                        plot_features.plot_map_metr_profiles(
+                            trange,
+                            vrange,
+                            (
+                                mod
+                                .mean("member")
+                                .set_coords("depth")
+                                .assign_attrs({**mod.attrs})[[var]]
+                                if "member" in mod.dims
+                                else mod
+                            ),
+                            (
+                                obss[i]
+                                .reset_coords("depth")
+                                .mean("member")
+                                .set_coords("depth")
+                                .assign_attrs({**obss[i].attrs})[[var]]
+                                if "member" in obss[i].dims
+                                else obss[i]
+                            ),
+                            plot_map_metr[output["plot"]],
+                            cmap,
+                            vmin,
+                            vmax,
+                            output_path=sub_func_output_folder,
+                            dvmin=dvmin,
+                            dvmax=dvmax,
+                        )
 
-        if output["plot"] in diag_ts_multi:
-            base.plot_features.plot_diag_ts_multi(models,
-                                                  observation["xarray_meta"],
-                                                  config_obj["meta_zones"]["radius"],
-                                                  output_path=sub_func_output_folder)
+                ####################################################################################
+                # DISP DIAG
+                diag_disp = {
+                    "diag_disp": "diag_disp",
+                    "diag_disp_g": "diag_disp_g",
+                }
+                if output["plot"] in diag_disp:
+                    for i, mod in enumerate(mods):
+                        if mod.xindexes.get("depth") == None:
+                            mod = mod.reset_coords("depth")
+                        plot_features.diag_disp(
+                            trange,
+                            vrange,
+                            output["plot"],
+                            (
+                                mod
+                                .mean("member")
+                                .set_coords("depth")
+                                .assign_attrs({**mod.attrs})[[var]]
+                                if "member" in mod.dims
+                                else mod
+                            ),
+                            (
+                                obss[i]
+                                .reset_coords("depth")
+                                .mean("member")
+                                .set_coords("depth")
+                                .assign_attrs({**obss[i].attrs})[[var]]
+                                if "member" in obss[i].dims
+                                else obss[i]
+                            ),
+                            output_path=sub_func_output_folder,
+                        )
+
+                ####################################################################################
+                # COURBE PROFIL UNIQUE
+                plot_profile_u = {"plot_profile_u": "profile_u"}
+                if output["plot"] in plot_profile_u:
+                    plot_features.plot_profile_unique(
+                        var, mods, obss, output_path=sub_func_output_folder
+                    )
+
+                ####################################################################################
+                # COURBE MULTI PROFILS
+                plot_profile_multi = {"plot_profile_multi": "profile_multi"}
+                if output["plot"] in plot_profile_multi:
+                    plot_features.plot_profile_multi(
+                        trange,
+                        var,
+                        mods,
+                        obss,
+                        output_path=sub_func_output_folder,
+                    )
+                    plot_features.plot_profile_multi_trange(
+                        trange,
+                        var,
+                        mods,
+                        obss,
+                        output_path=sub_func_output_folder,
+                    )

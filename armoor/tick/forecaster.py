@@ -1,13 +1,17 @@
 """
 Forecaster class created when using the forecasting web interface
 """
-import os
+
 import json
-
+import logging
+import os
+import pathlib
 from datetime import datetime
-import pytz
 
+import pytz
 from xoa import cfgm
+
+logger = logging.getLogger(__name__)
 
 
 class Forecaster:
@@ -16,31 +20,49 @@ class Forecaster:
     """
 
     def __init__(self):
-        self.approval_path = ''
+        self.approval_path = ""
         self.origins = []
-        self.ldap_server_url = ''
-        self.domain = ''
-        self.search_base = ''
-        self.authorized_user_group = ''
+        self.ldap_server_url = ""
+        self.search_base = ""
+        self.authorized_user_group = ""
+        self.ldap_user_object_class = ""
+        self.ldap_user_attribute = ""
+        self.ldap_bind_user = ""
+        self.ldap_bind_password = ""
 
         rootdir = os.path.abspath(os.path.dirname(__file__))
-        cfgm_forecaster = cfgm.ConfigManager(os.path.join(rootdir, "config/forecaster_spec.ini"))
-        self.cfg_forecaster = cfgm_forecaster.load(os.path.join(rootdir, "config/forecaster.ini"))
+        cfgm_forecaster = cfgm.ConfigManager(
+            os.path.join(rootdir, "forecaster.ini")
+        )
+
+        current_dir = pathlib.Path().resolve()
+        self.cfg_forecaster = cfgm_forecaster.load(
+            os.path.join(current_dir, "forecaster.cfg")
+        )
+
         self.initialization()
 
     def initialization(self):
         """
-        Initializing class attributes from configuration file : forecaster.ini
+        Initializing class attributes from configuration file : forecaster.cfg
         Returns
         -------
         None
         """
-        self.approval_path = self.cfg_forecaster['approval_path']
-        self.origins = self.cfg_forecaster['origins']
-        self.ldap_server_url = self.cfg_forecaster['ldap_server_url']
-        self.domain = self.cfg_forecaster['domain']
-        self.search_base = self.cfg_forecaster['search_base']
-        self.authorized_user_group = self.cfg_forecaster['authorized_user_group']
+        logger.info("Forecaster initialization")
+        self.approval_path = self.cfg_forecaster["approval_path"]
+        self.origins = self.cfg_forecaster["origins"]
+        self.ldap_server_url = self.cfg_forecaster["ldap_server_url"]
+        self.search_base = self.cfg_forecaster["search_base"]
+        self.authorized_user_group = self.cfg_forecaster[
+            "authorized_user_group"
+        ]
+        self.ldap_user_object_class = self.cfg_forecaster[
+            "ldap_user_object_class"
+        ]
+        self.ldap_user_attribute = self.cfg_forecaster["ldap_user_attribute"]
+        self.ldap_bind_user = self.cfg_forecaster["ldap_bind_user"]
+        self.ldap_bind_password = self.cfg_forecaster["ldap_bind_password"]
 
     def get_status(self, config_reg, production_time) -> dict:
         """
@@ -59,9 +81,14 @@ class Forecaster:
         -------
         status of the approbation
         """
+        logger.info("get_status")
+        logger.info(f"Regional configuration : {config_reg}")
+        logger.info(f"Production time : {production_time}")
         status = {"status": "no_production", "last_update": "", "reporter": ""}
-        approbation_file = f'{self.approval_path}/{config_reg}_{production_time}/data.json'
-
+        approbation_file = os.path.join(
+            self.approval_path, f"{config_reg}_{production_time}", "data.json"
+        )
+        logger.info(f"Reading status from : {approbation_file}")
         if os.path.isfile(approbation_file):
             status = self.read_status(approbation_file)
 
@@ -81,10 +108,13 @@ class Forecaster:
         -------
         None
         """
-        approbation_file = f'{self.approval_path}/{config_reg}_{production_time}/data.json'
+        logger.info("set_status")
+        approbation_file = os.path.join(
+            self.approval_path, f"{config_reg}_{production_time}", "data.json"
+        )
 
-        protected_status = ['validated', 'refused']
-        old_status = self.get_status(config_reg, production_time)['status']
+        protected_status = ["validated", "refused"]
+        old_status = self.get_status(config_reg, production_time)["status"]
         status_not_protected = old_status not in protected_status
 
         production_exist = os.path.isfile(approbation_file)
@@ -103,6 +133,7 @@ class Forecaster:
         -------
         The approval status data
         """
+        logger.info("read_status")
         # Opening JSON file
         with open(status_file_path, "r", encoding="utf-8") as status_file:
             # returns JSON object as
@@ -111,7 +142,7 @@ class Forecaster:
 
             # Closing file
             status_file.close()
-            return data['approval']
+            return data["approval"]
 
     def write_status(self, status_file_path, status, reporter):
         """
@@ -126,17 +157,18 @@ class Forecaster:
         -------
         None
         """
+        logger.info("write_status")
         with open(status_file_path, "r", encoding="utf-8") as status_file:
             data = json.load(status_file)
 
         # new status
-        data['approval']["status"] = status
+        data["approval"]["status"] = status
         # who updated the status
-        data['approval']["reporter"] = reporter
+        data["approval"]["reporter"] = reporter
         # when was the status updated
-        tz_paris = pytz.timezone('Europe/Paris')
+        tz_paris = pytz.timezone("Europe/Paris")
         now = datetime.now(tz_paris)
-        data['approval']["last_update"] = now.strftime("%d/%m/%Y %H:%M:%S")
+        data["approval"]["last_update"] = now.strftime("%d/%m/%Y %H:%M:%S")
 
         with open(status_file_path, "w", encoding="utf-8") as status_file:
             json.dump(data, status_file)

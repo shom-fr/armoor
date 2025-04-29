@@ -76,7 +76,13 @@
 
         h2,
         h3,
+        h4,
         h5 {
+            color: #002554;
+            position: relative;
+        }
+
+        h6 {
             color: #002554;
             position: relative;
         }
@@ -104,52 +110,84 @@
             height: 5px;
             width: 50px;
         }
+
+        h4.underline::after,
+        li.underline::after {
+            height: 5px;
+            width: 50px;
+        }
+        .special-paragraph {
+          font-size: 24px;
+          font-weight: bold;
+          color: #002554;
+          position: relative;
+        }
+
+        .special-paragraph::after {
+          content: ''; /* Required for pseudo-element content */
+          display: block; /* Ensures the pseudo-element behaves as a block element */
+          height: 8px;
+          width: 80px;
+          background-color: #5bc2e7; /* Just for demonstration */
+          position: absolute; /* Position the pseudo-element */
+          bottom: -10px; /* Adjust as needed to position the pseudo-element */
+          left: 0; /* Adjust as needed to position the pseudo-element */
+        }
+        .hidden-title {
+          position: absolute;
+          left: -9999px;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+        }
     </style>
 </head>
 
-<body>
+    {% for functionality in metazone.functionalities %}
+    <body>
 
-    <div class='break'>
-        <header>
-            <div class="logo">
-                <img src="logo_shom.png">
-            </div>
+        <div class='break'>
+            <header>
+                <div class="logo">
+                    <img src="logo_shom.png">
+                </div>
 
-            <div class="title">
-                <h2 class="underline">
-                    {{metazone.properties.name}}
-                </h2>
-                <h3>
-                    {{functionalities_desc[functionality.functionality]}}
-                </h3>
-            </div>
+                <div class="title">
 
-            <div class="metazone-img">
-                <img src="{{metazone.properties.path}}" class="meta-zone-header-image">
-            </div>
+                    <p class="special-paragraph">
+                        {{metazone.properties.name}}</p>
+                    <p style="color: #002554; font-size: 16px; font-weight: bold; margin-bottom: 15px;">
+                        {{functionalities_desc[functionality.functionality]}}
+                    </p>
+                </div>
 
-        </header>
+                <div class="metazone-img">
+                    <img src="{{metazone.properties.path}}" class="meta-zone-header-image">
+                </div>
 
-        <div class="body">
-            <h5 class="no-margin">{{functionalities_desc[functionality.functionality]}}</h5>
-            {% for output in functionality.outputs %}
-            {% if loop.index != 1 %}
-            <div style="break-before: always;">
-                {% else %}
-                <div>
+            </header>
+
+            <div class="body">
+                <h4 class="hidden-title">{{functionalities_desc[functionality.functionality]}}</h4>
+                {% for output in functionality.outputs %}
+                    <h5 class="hidden-title">{{sub_functionalities_desc[output.plot]}}</h5>
+                    {% if loop.index != 1 %}
+                        <div style="break-before: always;">
+                    {% else %}
+                        <div>
                     {% endif %}
-                    <span>{{sub_functionalities_desc[output.plot]}}</span>
-                    {% for file in output.files %}
-                    <div class="output-img">
-                        <img src="{{functionality.output_path + output.folder_name + '/' + file}}" class="property-image">
+                        {% for file in output.files %}
+                        <h6 class="hidden-title">{{file.replace(".png", "").replace("_", " ")}}</h6>
+                        <div class="output-img">
+                            <img src="{{functionality.output_path + '/' + output.folder_name + '/' + file}}" class="property-image">
+                        </div>
+                        {% endfor %}
+                        <br>
                     </div>
                     {% endfor %}
-                    <br>
                 </div>
-                {% endfor %}
             </div>
-        </div>
 
-</body>
-
+    </body>
+    {% endfor %}
 </html>
