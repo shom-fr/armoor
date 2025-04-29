@@ -68,13 +68,13 @@ Templates
 
 Hereafter, we propose a list of configuration files that can be used as templates:
     
-    .. literalinclude:: ../armoor/tests/uni/test_sst/L4_vs_HyCOM_cloud_intervals.cfg
+    .. literalinclude:: ../armoor/tests/uni/sst/L4_vs_HyCOM_cloud_intervals.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_sst/L4_vs_HyCOM_cloud_terms.cfg
+    .. literalinclude:: ../armoor/tests/uni/sst/L4_vs_HyCOM_cloud_terms.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_sst/L4_vs_HyCOM_href_intervals.cfg
+    .. literalinclude:: ../armoor/tests/uni/sst/L4_vs_HyCOM_href_intervals.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_sst/L4_vs_HyCOM_href_terms.cfg
+    .. literalinclude:: ../armoor/tests/uni/sst/L4_vs_HyCOM_href_terms.cfg
     
 Examples
 ........

@@ -52,7 +52,7 @@ Templates
 
 Hereafter, we propose a list of configuration files that can be used as templates:
     
-    .. literalinclude:: ../armoor/tests/uni/test_section_hydro/cmems_vs_HyCOM.cfg
+    .. literalinclude:: ../armoor/tests/uni/section_hydro/cmems_vs_HyCOM.cfg
 
 Example
 .......

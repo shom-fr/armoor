@@ -20,7 +20,7 @@ from armoor.hmi.script_tools import create_folder
                     time=(
                         "time",
                         pd.date_range(
-                            start="2000-01-01", freq="1H", periods=6
+                            start="2000-01-01", freq="1h", periods=6
                         ),
                     ),
                 ),
@@ -46,7 +46,7 @@ from armoor.hmi.script_tools import create_folder
                     time=(
                         "time",
                         pd.date_range(
-                            start="2000-01-01", freq="1H", periods=6
+                            start="2000-01-01", freq="1h", periods=6
                         ),
                     ),
                 ),
@@ -127,7 +127,7 @@ def test_horizontal_quality(quality):
                     time=(
                         "time",
                         pd.date_range(
-                            start="2000-01-01", freq="1H", periods=6
+                            start="2000-01-01", freq="1h", periods=6
                         ),
                     ),
                 ),
@@ -166,7 +166,7 @@ def test_horizontal_quality(quality):
                     time=(
                         "time",
                         pd.date_range(
-                            start="2000-01-01", freq="1H", periods=6
+                            start="2000-01-01", freq="1h", periods=6
                         ),
                     ),
                 ),
@@ -178,7 +178,7 @@ def test_horizontal_quality(quality):
 def test_horizontal_coords(dsi, coords):
     dso = dsi.meta.horizontal_selection_coords(coords)
     assert "npts" in dso.dims
-    assert dso.dims["npts"] == len(coords)
+    assert dso.sizes["npts"] == len(coords)
 
 
 @pytest.mark.parametrize(
@@ -714,7 +714,7 @@ def test_time_range_seq(ds, start, end, trange, res):
     ],
 )
 def test_time_range_clim(ds, trange, res):
-    dso = ds.meta.time_selection_range_clim(trange)
+    dso = ds.meta.time_selection_range_clim(None, None, trange)
     assert isinstance(dso, xr.core.groupby.DatasetGroupBy)
     if isinstance(trange, dict):
         trange = "season"
@@ -748,7 +748,7 @@ def test_time_range_clim(ds, trange, res):
                         pd.date_range(
                             start="2000-01-01",
                             end="2002-01-03",
-                            freq="1m",
+                            freq="1ME",
                         ),
                     ),
                 ),
@@ -764,7 +764,7 @@ def test_time_range_clim(ds, trange, res):
                         pd.date_range(
                             start="1999-01-01",
                             end="2002-01-03",
-                            freq="1y",
+                            freq="1YE",
                         ),
                     ),
                 ),
@@ -777,4 +777,4 @@ def test_time_range_clim(ds, trange, res):
 def test_time_cut(ds, trange, res):
     dso = ds.meta.time_selection_cut(*trange)
     assert isinstance(dso, xr.Dataset)
-    assert dso.dims["time"] == res
+    assert dso.sizes["time"] == res

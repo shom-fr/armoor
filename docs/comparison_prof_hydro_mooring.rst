@@ -53,9 +53,9 @@ Templates
 Hereafter, we propose a list of configuration files that can be used as templates:
     
     
-    .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_mooring/cmems_vs_HyCOM_intervals.cfg
+    .. literalinclude:: ../armoor/tests/uni/prof_hydro_mooring/cmems_vs_HyCOM_intervals.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_mooring/cmems_vs_HyCOM_terms.cfg
+    .. literalinclude:: ../armoor/tests/uni/prof_hydro_mooring/cmems_vs_HyCOM_terms.cfg
     
 Examples
 ........

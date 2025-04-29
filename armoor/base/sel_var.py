@@ -416,7 +416,7 @@ class SSTAccessor:
             if "sal" in self._obj:
                 if "pres" not in self._obj:
                     pres = self._obj.sel_var.sel_pres()["pres"]
-                    pres = pres.transpose()
+                    #pres = pres.transpose()
                 else:
                     pres = self._obj["pres"]
                 ptemp = gsw.conversions.pt0_from_t(
