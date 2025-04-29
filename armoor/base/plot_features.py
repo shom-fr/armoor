@@ -69,6 +69,10 @@ LABELS_MAP_HARM = [
 
 COLORS = ["slateblue", "coral", "seagreen", "aqua", "darkgrey", "navy", "aqua"]
 
+MONTHS_NAME = [
+    None, "jan", "feb", "mar", "apr", "may", "june", "july", "aug", "sep", "oct", "nov", "dec"
+]
+
 xr.set_options(keep_attrs=True)
 
 
@@ -1013,12 +1017,16 @@ def plot_map_metr_profiles(
         plot_func = plot_map_metr_profiles_figure
     else:
         plot_func = plot_map_metr_figure
-
     # Plot the figures
     if trange:
-        tbins = get_time_bins(
-            trange["tbound"][0], trange["tbound"][1], trange["trange_seq"]
-        )
+        if "trange_seq" in trange:
+            tbins = get_time_bins(
+                trange["tbound"][0], trange["tbound"][1], trange["trange_seq"]
+            )
+            interval = 'trange_seq'
+        elif "trange_clim" in trange:
+            tbins = range(13)
+            interval = 'trange_clim'
         for itime, _ in enumerate(tbins[:-1]):
             obsi = obs_coloc.where(
                 (obs_coloc["time"] >= tbins[itime])
@@ -1030,15 +1038,25 @@ def plot_map_metr_profiles(
                 & (mod_coloc["time"] < tbins[itime + 1]),
                 drop=True,
             )
-            if obsi.sizes["time"] == 0:
+            if (obsi.sizes["time"] == 0) or (modi.sizes["time"] == 0):
                 continue
-            tbin_attrs = [
-                pd.to_datetime(tbins[itime]).strftime("%Y-%m-%d"),
-                pd.to_datetime(tbins[itime + 1]).strftime("%Y-%m-%d"),
-            ]
-            tbin_attrs = " ".join(
-                [" to ".join(tbin_attrs), f" interval {trange['trange_seq']}"]
-            )
+            if "trange_clim" in trange:
+                tbin_attrs = [
+                    trange["tbound"][0],
+                    trange["tbound"][1],
+                ]
+                tbin_attrs = " ".join([
+                    " to ".join(tbin_attrs),
+                    f" climato {MONTHS_NAME[itime]}"
+                ])
+            else:
+                tbin_attrs = [
+                    pd.to_datetime(tbins[itime]).strftime("%Y-%m-%d"),
+                    pd.to_datetime(tbins[itime + 1]).strftime("%Y-%m-%d"),
+                ]
+                tbin_attrs = " ".join(
+                    [" to ".join(tbin_attrs), f" interval {trange[interval]}"]
+                )
             if vrange != None:
                 obsi = apply_vrange(obsi, {"vrange": vrange})
                 modi = apply_vrange(modi, {"vrange": vrange})
@@ -1330,6 +1348,7 @@ def plot_map_metr_profiles_figure(
 ):
     """
     Plot the map of the profiles for functionality 2. Display the figures.
+    
     Parameters
     ----------
     mod_coloc : xarray.dataset
@@ -1435,6 +1454,7 @@ def plot_map_metr_figure(
 ):
     """
     Plot the map figures with comparison metric.
+    
     Parameters
     ----------
     mod_meta : xarray.DataArray
@@ -3385,156 +3405,172 @@ def plot_ts_metr_cloud(trange, mods, obss, output_path=None):
     varname = obss[0].attrs["varname"]
     mod_name = [mod.attrs["name"] for mod in mods]
 
+    if trange == None:
+        trange = [None]
     hdim = "npts", obss[0].sizes["npts"]
-    for ipt in range(hdim[1]):
-        if trange:
-            f, axs = figure_5lin_ts()
-            ax_minimap = [0.8, 1.015, 0.09]
-        else:
-            f, axs = figure_2lin_ts()
-            ax_minimap = [0.9, 0.92, 0.18]
-        f.autofmt_xdate(rotation=45)
-        for imod, mod in enumerate(mods):
-            obs = obss[imod]
-            modz = mod.isel({hdim[0]: [ipt]})
-            obsz = obs.isel({hdim[0]: [ipt]})
-            if trange:
-                obsz = obsz.assign_attrs(
-                    {
-                        "tbin": f"interval {trange['trange_seq']}",
-                    }
-                )
-                dims_stat = "time"
-                og = apply_trange(obsz, trange)
-                mg = apply_trange(modz, trange)
-                diffz = apply_trange(modz - obsz, trange)
-                diffz2 = apply_trange((modz - obsz) ** 2, trange)
-                omean = og.mean(dim=dims_stat)
-                ostd = og.std(dim=dims_stat)
-                mmean = mg.mean(dim=dims_stat)
-                mstd = mg.std(dim=dims_stat)
-                bias = diffz.mean(dim=dims_stat)
-                rmse = np.sqrt(diffz2.mean(dim=dims_stat))
-                rmsec0 = (
-                    mg.map(anom, args=(dims_stat,))
-                    - og.map(anom, args=(dims_stat,))
-                ) ** 2
-                rmsec = np.sqrt(
-                    apply_trange(rmsec0, trange).mean(dim=dims_stat)
-                )
-                if imod == 0:
-                    omean[varname].plot(
-                        label=f'{obs.attrs["name"]}',
-                        ax=axs[0],
-                        color="k",
-                        linewidth=2,
-                    )
-                    ostd[varname].plot(
-                        label=f'{obs.attrs["name"]}',
-                        ax=axs[2],
-                        color="k",
-                        linewidth=2,
-                    )
-                    title, figname = get_title_figname(
-                        "Statistics", obsz, mod_name, obsz.attrs["name"]
-                    )
-                mmean[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[0],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                bias[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[1],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                mstd[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[2],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                rmse[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[3],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                rmsec[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[4],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                for iax, subtitle in enumerate(
-                    [
-                        "mean",
-                        "bias",
-                        "standard deviation",
-                        "rmse",
-                        "centered rmse",
-                    ]
-                ):
-                    axs[iax].set_title(" ")
-                    axs[iax].set_ylabel(subtitle)
-                    if iax < 5:
-                        axs[iax].set_xlabel("")
-                    else:
-                        axs[iax].set_xlabel("Time")
-                    if (trange == None) and (imod == 0):
-                        axs[iax].xaxis.set_ticks(og.time)
-                        if iax == 4:
-                            axs[iax].xaxis.set_major_formatter(
-                                DateFormatter("%Y-%m-%d")
-                            )
+    if "z" in obss[0].dims:
+        zdim = "z",  obss[0].sizes["z"]
+    else:
+        zdim = None, 1
+    for iz in range(zdim[1]):
+        for ipt in range(hdim[1]):
+            if "trange_seq" in trange:
+                f, axs = figure_5lin_ts()
+                ax_minimap = [0.8, 1.015, 0.09]
             else:
-                og = obsz
-                mg = modz
-                diffz = modz - obsz
-                if imod == 0:
-                    og[varname].plot(
-                        label=f'{obs.attrs["name"]}',
+                f, axs = figure_2lin_ts()
+                ax_minimap = [0.9, 0.92, 0.18]
+            f.autofmt_xdate(rotation=45)
+            for imod, mod in enumerate(mods):
+                obs = obss[imod]
+                modz = mod.isel({hdim[0]: [ipt]})
+                obsz = obs.isel({hdim[0]: [ipt]})
+                if zdim[0]:
+                    obsz = obsz.isel(z=[iz])
+                    modz = modz.isel(z=[iz])
+                if "trange_seq" in trange:
+                    obsz = obsz.assign_attrs(
+                        {
+                            "tbin": f"interval {trange['trange_seq']}",
+                        }
+                    )
+                    dims_stat = "time"
+                    og = apply_trange(obsz, trange)
+                    mg = apply_trange(modz, trange)
+                    diffz = apply_trange(modz - obsz, trange)
+                    diffz2 = apply_trange((modz - obsz) ** 2, trange)
+                    omean = og.mean(dim=dims_stat)
+                    ostd = og.std(dim=dims_stat)
+                    mmean = mg.mean(dim=dims_stat)
+                    mstd = mg.std(dim=dims_stat)
+                    bias = diffz.mean(dim=dims_stat)
+                    rmse = np.sqrt(diffz2.mean(dim=dims_stat))
+                    rmsec0 = (
+                        mg.map(anom, args=(dims_stat,))
+                        - og.map(anom, args=(dims_stat,))
+                    ) ** 2
+                    rmsec = np.sqrt(
+                        apply_trange(rmsec0, trange).mean(dim=dims_stat)
+                    )
+                    if imod == 0:
+                        omean[varname].plot(
+                            label=f'{obs.attrs["name"]}',
+                            ax=axs[0],
+                            color="k",
+                            linewidth=2,
+                        )
+                        ostd[varname].plot(
+                            label=f'{obs.attrs["name"]}',
+                            ax=axs[2],
+                            color="k",
+                            linewidth=2,
+                        )
+                        title, figname = get_title_figname(
+                            "Statistics", obsz, mod_name, obsz.attrs["name"]
+                        )
+                    mmean[varname].plot(
+                        label=f'{mod.attrs["name"]}',
                         ax=axs[0],
-                        color="k",
+                        color=COLORS[imod],
                         linewidth=2,
                     )
-                    title, figname = get_title_figname(
-                        " ", obsz, mod_name, obsz.attrs["name"]
+                    bias[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[1],
+                        color=COLORS[imod],
+                        linewidth=2,
                     )
-                mg[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[0],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                diffz[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[1],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                for iax, subtitle in enumerate(["", "difference"]):
-                    axs[iax].set_title(" ")
-                    axs[iax].set_ylabel(subtitle)
-                    if iax < 2:
-                        axs[iax].set_xlabel("")
-                    else:
-                        axs[iax].set_xlabel("Time")
-                    if (trange == None) and (imod == 0):
-                        axs[iax].xaxis.set_ticks(og.time)
-                        if iax == 1:
-                            axs[iax].xaxis.set_major_formatter(
-                                DateFormatter("%Y-%m-%d")
-                            )
-        if trange:
-            f.suptitle(title, y=1.125, fontsize=12, fontweight="bold")
-        else:
-            f.suptitle(title, x=0.4, y=1.2, fontsize=10, fontweight="bold")
-        axs[0].legend()
-        plot_minimap(obsz, plot_coords="points", ax=ax_minimap)
-        manage_output(figname, output_path)
+                    mstd[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[2],
+                        color=COLORS[imod],
+                        linewidth=2,
+                    )
+                    rmse[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[3],
+                        color=COLORS[imod],
+                        linewidth=2,
+                    )
+                    rmsec[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[4],
+                        color=COLORS[imod],
+                        linewidth=2,
+                    )
+                    for iax, subtitle in enumerate(
+                        [
+                            "mean",
+                            "bias",
+                            "standard deviation",
+                            "rmse",
+                            "centered rmse",
+                        ]
+                    ):
+                        axs[iax].set_title(" ")
+                        axs[iax].set_ylabel(subtitle)
+                        if iax < 5:
+                            axs[iax].set_xlabel("")
+                        else:
+                            axs[iax].set_xlabel("Time")
+                        if (trange == None) and (imod == 0):
+                            axs[iax].xaxis.set_ticks(og.time)
+                            if iax == 4:
+                                axs[iax].xaxis.set_major_formatter(
+                                    DateFormatter("%Y-%m-%d")
+                                )
+                else:
+                    if "trange_clim" in trange:
+                        obsz = obsz.assign_attrs(
+                            {
+                                "tbin": f"climato {trange['trange_clim']}",
+                            }
+                        )
+                    og = obsz
+                    mg = modz
+                    diffz = mg - og
+                    if imod == 0:
+                        og[varname].plot(
+                            label=f'{obs.attrs["name"]}',
+                            ax=axs[0],
+                            color="k",
+                            linewidth=2,
+                        )
+                        title, figname = get_title_figname(
+                            " ", obsz, mod_name, obsz.attrs["name"]
+                        )
+                    mg[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[0],
+                        color=COLORS[imod],
+                        linewidth=2,
+                    )
+                    diffz[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[1],
+                        color=COLORS[imod],
+                        linewidth=2,
+                    )
+                    for iax, subtitle in enumerate(["", "difference"]):
+                        axs[iax].set_title(" ")
+                        axs[iax].set_ylabel(subtitle)
+                        if iax < 2:
+                            axs[iax].set_xlabel("")
+                        else:
+                            axs[iax].set_xlabel("Time")
+                        if imod == 0:
+                            axs[iax].xaxis.set_ticks(og.time)
+                            if (iax == 1) and ("trange_clim" not in trange):
+                                axs[iax].xaxis.set_major_formatter(
+                                    DateFormatter("%Y-%m-%d")
+                                )
+            if "trange_seq" in trange:
+                f.suptitle(title, y=1.125, fontsize=12, fontweight="bold")
+            else:
+                f.suptitle(title, x=0.4, y=1.2, fontsize=10, fontweight="bold")
+            axs[0].legend()
+            plot_minimap(obsz, plot_coords="points", ax=ax_minimap)
+            manage_output(figname, output_path)
 
 
 def anom(x, dim):
@@ -3575,191 +3611,193 @@ def plot_ts_metr_stats(trange, vrange, mods, obss, output_path=None):
             vdim = "z", obss[0].sizes["z"]
         else:
             vdim = None, 1
-    # if "npts" in obss[0].dims:
-    #     hdim = "npts", obss[0].sizes["npts"]
-    # else:
-    #     hdim = None, 1
-    # for ipt in range(hdim[1]):
-    for iz in range(vdim[1]):
-        logger.info(f"{vdim}: {iz}")
-        for imod, mod in enumerate(mods):
-            obs = obss[imod]
-            # if hdim[0]:
-            #     modz = mod.isel({hdim[0]: [ipt]})
-            #     obsz = obs.isel({hdim[0]: [ipt]})
-            # else:
-            #     modz =  mod
-            #     obsz = obs
-            if vdim[0]:
-                modz = mod.isel({vdim[0]: [iz]})
-                obsz = obs.isel({vdim[0]: [iz]})
-            else:
-                modz = mod
-                obsz = obs
-            if trange:
-                obsz = obsz.assign_attrs(
-                    {
-                        "tbin": f"interval {trange['trange_seq']}",
-                    }
-                )
-            dims_stat = []
-            if vdim[0] == "vrange":
-                dims_stat.append("z")
-            if trange:
-                dims_stat.append("time")
-            if obs.lon.dims == ("y", "x"):
-                dims_stat += ["y", "x"]
-            if obs.lon.dims == ("npts",):
-                dims_stat.append("npts")
-            logger.info(f"Compute statistics on {dims_stat} dimensions")
-            if trange:
-                og = apply_trange(obsz, trange)
-                mg = apply_trange(modz, trange)
-                diffz = apply_trange(modz - obsz, trange)
-                diffz2 = apply_trange((modz - obsz) ** 2, trange)
-                rmsec0 = apply_trange(
-                    (
-                        mg.map(anom, args=(dims_stat,))
-                        - og.map(anom, args=(dims_stat,))
+    if trange:
+        if "trange_seq" in trange:
+            interval = 'trange_seq'
+        elif "trange_clim" in trange:
+            interval = 'trange_clim'
+    else:
+        interval = None
+    if "npts" in obss[0].dims:
+        hdim = "npts", obss[0].sizes["npts"]
+    else:
+        hdim = None, 1
+    for ipt in range(hdim[1]):
+        for iz in range(vdim[1]):
+            logger.info(f"{vdim}: {iz}")
+            for imod, mod in enumerate(mods):
+                obs = obss[imod]
+                if hdim[0]:
+                    mod = mod.isel({hdim[0]: [ipt]})
+                    obs = obs.isel({hdim[0]: [ipt]})
+                if vdim[0]:
+                    modz = mod.isel({vdim[0]: [iz]})
+                    obsz = obs.isel({vdim[0]: [iz]})
+                else:
+                    modz = mod
+                    obsz = obs
+                if trange:
+                    obsz = obsz.assign_attrs({
+                        "tbin": f"interval {trange[interval]}" if "trange_seq" in trange else f"climato {trange[interval]}",
+                    })
+                dims_stat = []
+                if vdim[0] == "vrange":
+                    dims_stat.append("z")
+                if interval == "trange_seq":
+                    dims_stat.append("time")
+                if obs.lon.dims == ("y", "x"):
+                    dims_stat += ["y", "x"]
+                if obs.lon.dims == ("npts",):
+                    dims_stat.append("npts")
+                logger.info(f"Compute statistics on {dims_stat} dimensions")
+                if interval == "trange_seq":
+                    og = apply_trange(obsz, trange)
+                    mg = apply_trange(modz, trange)
+                    diffz = apply_trange(modz - obsz, trange)
+                    diffz2 = apply_trange((modz - obsz) ** 2, trange)
+                    rmsec0 = apply_trange(
+                        (
+                            mg.map(anom, args=(dims_stat,))
+                            - og.map(anom, args=(dims_stat,))
+                        )
+                        ** 2,
+                        trange,
                     )
-                    ** 2,
-                    trange,
-                )
-            else:
-                og = obsz
-                mg = modz
-                diffz = modz - obsz
-                diffz2 = (modz - obsz) ** 2
-                rmsec0 = (
-                    (og - og.mean(dim=dims_stat).broadcast_like(og))
-                    - (mg - mg.mean(dim=dims_stat).broadcast_like(mg))
-                ) ** 2
-            if len(dims_stat) > 0:
-                omean = og.mean(dim=dims_stat)
-                ostd = og.std(dim=dims_stat)
-                mmean = mg.mean(dim=dims_stat)
-                mstd = mg.std(dim=dims_stat)
-                bias = diffz.mean(dim=dims_stat)
-                rmse = np.sqrt(diffz2.mean(dim=dims_stat))
-                rmsec = np.sqrt(rmsec0.mean(dim=dims_stat))
-                if imod == 0:
-                    f, axs = figure_5lin_ts()
-                    f.autofmt_xdate(rotation=45)
-                    ax_minimap = [0.8, 1.015, 0.09]
-                    omean[varname].plot(
-                        label=f'{obs.attrs["name"]}',
-                        ax=axs[0],
-                        color="k",
-                        linewidth=2,
-                    )
-                    ostd[varname].plot(
-                        label=f'{obs.attrs["name"]}',
-                        ax=axs[2],
-                        color="k",
-                        linewidth=2,
-                    )
-                    title, figname = get_title_figname(
-                        "Statistics", obsz, mod_name, obsz.attrs["name"]
-                    )
-                    f.suptitle(title, y=1.125, fontsize=12, fontweight="bold")
-                mmean[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[0],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                bias[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[1],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                mstd[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[2],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                rmse[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[3],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                rmsec[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[4],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                for iax, subtitle in enumerate(
-                    [
-                        "mean",
-                        "bias",
-                        "standard deviation",
-                        "rmse",
-                        "centered rmse",
-                    ]
-                ):
-                    axs[iax].set_title(" ")
-                    axs[iax].set_ylabel(subtitle)
-                    if iax < 5:
-                        axs[iax].set_xlabel("")
-                    else:
-                        axs[iax].set_xlabel("Time")
-                    if (trange == None) and (imod == 0):
-                        axs[iax].xaxis.set_ticks(og.time)
-                        if iax == 4:
-                            axs[iax].xaxis.set_major_formatter(
-                                DateFormatter("%Y-%m-%d %H:%M")
+                else:
+                    mg = modz
+                    og = obsz
+                    diffz = modz - obsz
+                    diffz2 = (modz - obsz) ** 2
+                    rmsec0 = (
+                        (og - og.mean(dim=dims_stat).broadcast_like(og))
+                        - (mg - mg.mean(dim=dims_stat).broadcast_like(mg))
+                    ) ** 2
+                if len(dims_stat) > 0:
+                    omean = og.mean(dim=dims_stat)
+                    ostd = og.std(dim=dims_stat)
+                    mmean = mg.mean(dim=dims_stat)
+                    mstd = mg.std(dim=dims_stat)
+                    bias = diffz.mean(dim=dims_stat)
+                    rmse = np.sqrt(diffz2.mean(dim=dims_stat))
+                    rmsec = np.sqrt(rmsec0.mean(dim=dims_stat))
+                    if imod == 0:
+                        f, axs = figure_5lin_ts()
+                        f.autofmt_xdate(rotation=45)
+                        ax_minimap = [0.8, 1.015, 0.09]
+                        omean[varname].plot(
+                            label=f'{obs.attrs["name"]}',
+                            ax=axs[0],
+                            color="k",
+                            linewidth=2,
                             )
-                        axs[iax].tick_params(labelsize=8)
-            else:
-                if imod == 0:
-                    logger.info("Set figure axes")
-                    f, axs = figure_2lin_ts()
-                    f.autofmt_xdate(rotation=45)
-                    ax_minimap = [0.9, 0.92, 0.18]
-                    title, figname = get_title_figname(
-                        " ", obsz, mod_name, obsz.attrs["name"]
-                    )
-                    f.suptitle(
-                        title, x=0.4, y=1.2, fontsize=10, fontweight="bold"
-                    )
-                    logger.info("plot observation")
-                    og[varname].plot(
-                        label=f'{obs.attrs["name"]}',
+                        ostd[varname].plot(
+                            label=f'{obs.attrs["name"]}',
+                            ax=axs[2],
+                            color="k",
+                            linewidth=2,
+                            )
+                        title, figname = get_title_figname(
+                            "Statistics", obsz, mod_name, obsz.attrs["name"]
+                            )
+                        f.suptitle(title, y=1.125, fontsize=12, fontweight="bold")
+                    mmean[varname].plot(
+                        label=f'{mod.attrs["name"]}',
                         ax=axs[0],
-                        color="k",
+                        color=COLORS[imod],
+                        linewidth=2,
+                        )
+                    bias[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[1],
+                        color=COLORS[imod],
+                        linewidth=2,
+                        )
+                    mstd[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[2],
+                        color=COLORS[imod],
+                        linewidth=2,
+                        )
+                    rmse[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[3],
+                        color=COLORS[imod],
+                        linewidth=2,
+                        )
+                    rmsec[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[4],
+                        color=COLORS[imod],
+                        linewidth=2,
+                        )
+                    for iax, subtitle in enumerate(
+                        [
+                            "mean",
+                            "bias",
+                            "standard deviation",
+                            "rmse",
+                            "centered rmse",
+                        ]
+                    ):
+                        axs[iax].set_title(" ")
+                        axs[iax].set_ylabel(subtitle)
+                        if iax < 5:
+                            axs[iax].set_xlabel("")
+                        else:
+                            axs[iax].set_xlabel("Time")
+                        if (trange == None) and (imod == 0):
+                            axs[iax].xaxis.set_ticks(og.time)
+                            if iax == 4:
+                                axs[iax].xaxis.set_major_formatter(
+                                    DateFormatter("%Y-%m-%d %H:%M")
+                                )
+                            axs[iax].tick_params(labelsize=8)
+                else:
+                    if imod == 0:
+                        logger.info("Set figure axes")
+                        f, axs = figure_2lin_ts()
+                        f.autofmt_xdate(rotation=45)
+                        ax_minimap = [0.9, 0.92, 0.18]
+                        title, figname = get_title_figname(
+                            " ", obsz, mod_name, obsz.attrs["name"]
+                        )
+                        f.suptitle(
+                            title, x=0.4, y=1.2, fontsize=10, fontweight="bold"
+                        )
+                        logger.info("plot observation")
+                        og[varname].plot(
+                            label=f'{obs.attrs["name"]}',
+                            ax=axs[0],
+                            color="k",
+                            linewidth=2,
+                        )
+                    mg[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[0],
+                        color=COLORS[imod],
                         linewidth=2,
                     )
-                mg[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[0],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                diffz[varname].load()
-                diffz[varname].plot(
-                    label=f'{mod.attrs["name"]}',
-                    ax=axs[1],
-                    color=COLORS[imod],
-                    linewidth=2,
-                )
-                for iax, subtitle in enumerate(["", "difference"]):
-                    axs[iax].set_title(" ")
-                    axs[iax].set_ylabel(subtitle)
-                for iax in range(len(axs)):
-                    if iax == 0:
-                        axs[iax].set_xlabel("")
-                    axs[iax].xaxis.set_ticks(og.time)
-                    axs[iax].xaxis.set_major_formatter(
-                        DateFormatter("%Y-%m-%d %H:%M")
+                    diffz[varname].load()
+                    diffz[varname].plot(
+                        label=f'{mod.attrs["name"]}',
+                        ax=axs[1],
+                        color=COLORS[imod],
+                        linewidth=2,
                     )
-                    axs[iax].tick_params(labelsize=8)
-        axs[0].legend()
-        plot_minimap(obsz, plot_coords="points", ax=ax_minimap)
-        manage_output(figname, output_path)
+                    for iax, subtitle in enumerate(["", "difference"]):
+                        axs[iax].set_title(" ")
+                        axs[iax].set_ylabel(subtitle)
+                    for iax in range(len(axs)):
+                        if iax == 0:
+                            axs[iax].set_xlabel("")
+                        axs[iax].xaxis.set_ticks(og.time)
+                        axs[iax].xaxis.set_major_formatter(
+                            DateFormatter("%Y-%m-%d %H:%M")
+                        )
+                        axs[iax].tick_params(labelsize=8)
+            axs[0].legend()
+            plot_minimap(obsz, plot_coords="points", ax=ax_minimap)
+            manage_output(figname, output_path)
 
 
 def plot_ts_metr_stats_figure(
@@ -5295,7 +5333,6 @@ def find_var_title(da):
         var_name = "Total current u"
     if var_name == "v":
         var_name = "Total current v"
-
     if "units" in da.attrs:
         var_unit = da.attrs["units"]
     elif var_name in [

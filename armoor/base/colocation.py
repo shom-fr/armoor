@@ -15,6 +15,28 @@ from xoa.regrid import grid2loc, regrid1d
 logger = logging.getLogger(__name__)
 
 
+def geo_vars(ds):
+
+    geo_vars = [
+        var
+        for var in ds.data_vars
+        if ("x" in ds[var].dims) and ("y" in ds[var].dims)
+    ]
+
+    return geo_vars
+
+
+def nongeo_vars(ds):
+
+    nongeo_vars = [
+        var
+        for var in ds.data_vars
+        if ("x" not in ds[var].dims) and ("y" not in ds[var].dims)
+    ]
+
+    return nongeo_vars
+
+
 def horizontal_regrid(dsi, dso) -> xr.Dataset:
     """
     Regrid a variable.
@@ -29,19 +51,30 @@ def horizontal_regrid(dsi, dso) -> xr.Dataset:
     xarray.DataArray
         Regridded variable.
     """
-    dlon = dso.lon.diff("x").max()
-    dlat = dso.lat.diff("y").max()
-
-    dso = dso.where(
-        (dso.lat > dso.lat.min() + dlat)
-        & (dso.lat < dso.lat.max() - dlat)
-        & (dso.lon > dso.lon.min() + dlon)
-        & (dso.lon < dso.lon.max() - dlon),
-        drop=True,
+    dlon = dsi.lon.diff("x").max().values
+    dlat = dsi.lat.diff("y").max().values
+    
+    vars2sub = geo_vars(dsi)
+    dsi = dsi[vars2sub].where(
+        (dsi.lat >= dso.lat.min().values - 2 * dlat)
+        & (dsi.lat <= dso.lat.max().values + 2 * dlat)
+        & (dsi.lon >= dso.lon.min().values - 2 * dlon)
+        & (dsi.lon <= dso.lon.max().values + 2 * dlon),
+        # drop=True,
     )
-    regridder = xe.Regridder(dsi, dso, "bilinear")
-    dsi = regridder(dsi)
-    return dsi, dso
+    regridder = xe.Regridder(dsi, dso, "bilinear", parallel=False)
+    dss = []
+    for var in vars2sub:
+        daio = regridder(dsi[var])
+        dsio = daio.to_dataset(name=var)
+        dss.append(dsio)
+    dsio = xr.merge(dss)
+    # dsio = regridder(dsi)
+    regridder.grid_in.destroy()
+    regridder.grid_out.destroy()
+    # for var in dsi.data_vars:
+    #     dsio[var].assign_attrs(**dsi[var].attrs)
+    return dsio, dso
 
 
 def vertical(dsi, dsref) -> xr.Dataset:
@@ -80,7 +113,7 @@ def vertical(dsi, dsref) -> xr.Dataset:
 
 
 def obs_coords_radius_postproc(ds):
-    ds = ds.drop(["lon", "lat", "lon_1", "lat_1"])
+    ds = ds.drop_vars(["lon", "lat", "lon_1", "lat_1"])
     ds = ds.rename({"lon_0": "lon", "lat_0": "lat"})
     return ds
 

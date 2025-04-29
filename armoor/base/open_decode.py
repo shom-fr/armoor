@@ -37,10 +37,15 @@ def get_paths(path_files):
             raise TypeError(f"{path_files[0]} not found.")
         path_files = paths
     else:
+        paths = []
         for path in path_files:
-            if not os.path.exists(path):
+            if "*" in path:
+                paths += glob.glob(path)
+            elif not os.path.exists(path):
                 raise TypeError(f"{path} does not exist.")
-
+            else:
+                paths.append(path)
+        path_files = paths
     return path_files
 
 
@@ -188,11 +193,11 @@ def open_decode_sst_satellite(path_files, fmt):
     # path = os.path.join(ROOTDIR, "config", f"{fmt}.cfg")
     cfspecs = xcf.get_cf_specs(f"{fmt}")
     with xcf.set_cf_specs(cfspecs):
-        ds = xr.open_mfdataset(path_files).chunk(chunks=None).xcf.decode()
+        ds = xr.open_mfdataset(path_files).chunk(chunks={}).xcf.decode()
     #.xoa.decode()
     ds = ds.swap_dims({"lon": "x", "lat": "y"})
     lat, lon = xr.broadcast(ds["lat"], ds["lon"])
-    ds = ds.drop(["lon", "lat"])
+    ds = ds.drop_vars(["lon", "lat"])
     ds["lon"] = lon
     ds["lat"] = lat
     ds = ds.set_coords(["lon", "lat"])
@@ -218,7 +223,7 @@ def open_decode_model(path_files):
     ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
     if len(ds.lon.dims) == 1:
         lat, lon = xr.broadcast(ds["lat"], ds["lon"])
-        ds = ds.drop(["lon", "lat"])
+        ds = ds.drop_vars(["lon", "lat"])
         ds["lon"] = lon
         ds["lat"] = lat
         ds = ds.set_coords(["lon", "lat"])
@@ -266,7 +271,7 @@ def open_decode_hycom(path_files):
             bathy = ds.bathy
 
         if "bathy" in ds:
-            ds = ds.drop("bathy")
+            ds = ds.drop_vars("bathy")
 
         varname = [var for var in ds.data_vars][0]
         if varname not in dss_var.keys():
@@ -311,7 +316,7 @@ def open_decode_hycom(path_files):
         del dsv
     if "dz" in ds:
         ds.coords["depth"] = dz2depth(ds.dz, centered=True)
-        ds = ds.drop(["z", "dz"])
+        ds = ds.drop_vars(["z", "dz"])
 
     ds = ds.sel(time=~ds.get_index("time").duplicated())
     logger.info(ds)       
@@ -332,9 +337,13 @@ def open_decode_woa18(path_files):
         WOA18 dataset.
     """
     # Open
-    woa18 = xr.open_mfdataset(path_files, decode_times=False)
+    woa18 = xr.open_mfdataset(
+        path_files,
+        decode_times=False,
+        combine_attrs="drop_conflicts"
+    )
     # Decode
-    vars_to_drop = ["_dd", "_gp", "_oa", "_sd", "_se", "bnds", "bounds"]
+    vars_to_drop = ["_dd", "_gp", "_oa", "_sd", "_se", "_ma", "bnds", "bounds", "crs"]
     for var in list(woa18.keys()):
         if any(item in var for item in vars_to_drop):
             woa18 = woa18.drop_vars(var)
@@ -347,35 +356,43 @@ def open_decode_woa18(path_files):
         woa18 = woa18.rename({"s_mn": "sal"})
 
     if "t_an" in woa18:
-        woa18 = woa18.rename({"t_an": "ptemp"})
+        woa18 = woa18.rename({"t_an": "temp"})
         if "t_mn" in woa18:
             woa18 = woa18.drop_vars({"t_mn"})
     elif "t_mn" in woa18:
-        woa18 = woa18.rename({"t_mn": "ptemp"})
-    # try:
-    #     woa18 = woa18.xoa.decode()
-    # except:
-    #     pass
+        woa18 = woa18.rename({"t_mn": "temp"})
 
     # Convert lons
     woa18 = convert_lons(woa18)
 
     # Convert long names
-    for var in list(woa18.keys()):
-        if var == "sal":
-            woa18["sal"] = woa18["sal"].assign_attrs(
-                {"long_name": "Average salinity"}
-            )
-        if var == "temp":
-            woa18["temp"] = woa18["temp"].assign_attrs(
-                {"long_name": "Average  sea temperature"}
-            )
+    # for var in list(woa18.keys()):
+    #     if var == "sal":
+    #         kw_attrs = {
+    #             "long_name": "Average salinity",
+    #             "units": "psu"
+    #         }
+    #     if var == "temp":
+    #         kw_attrs = {
+    #             "long_name": "Average  sea temperature",
+    #             "units": "degC"
+    #         }
+    #     woa18[var].assign_attrs(kw_attrs)
     woa18 = woa18.swap_dims({
         "lon": "x",
         "lat": "y",
         "depth": "z"
     })
-    return woa18
+    lon, lat = np.meshgrid(woa18["lon"], woa18["lat"])
+    woa18 = woa18.drop_vars(["lon", "lat"])
+    woa18["lon"] = xr.DataArray(lon, dims=["y", "x"])
+    woa18["lat"] = xr.DataArray(lat, dims=["y", "x"])
+    woa18 = woa18.set_coords(["lon", "lat"])
+    woa18["time"] = np.ceil(woa18["time"]) - 12.0 * np.trunc(
+        np.ceil(woa18["time"]) / 12.0
+    )
+    woa18["time"] = woa18.time.where(woa18.time != 0., 12.)
+    return [woa18]
 
 
 def open_decode_cora_insitu(path_files, platform):
@@ -451,8 +468,8 @@ def open_decode_cmems_insitu(path_files, platform):
         if "DEPH" in ds.coords:
             ds = ds.rename({"DEPH": "depth"})
         if (
-            ("lon" in ds.lon.dims) and (ds.dims["time"] == ds.dims["lon"])
-        ) or (("lat" in ds.lon.dims) and (ds.dims["time"] == ds.dims["lat"])):
+            ("lon" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lon"])
+        ) or (("lat" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lat"])):
             # ds = ds.drop_dims("POSITION")
             lon_ds = ds.lon.assign_coords(lon=ds.time.data).rename(
                 {"lon": "time"}
@@ -474,7 +491,7 @@ def open_decode_cmems_insitu(path_files, platform):
         if ("depth" not in ds) and ("pres" in ds):
             ds = depth_from_pres(ds)
             if platform == "glider":
-                ds = ds.drop("pres")
+                ds = ds.drop_vars("pres")
         if "depth" in ds:
             if platform == "argo":
                 dssi = []
@@ -871,7 +888,7 @@ def open_decode_mouillages(path_file):
     ):
         lon = np.unique(mouillage.lon.data)
         lat = np.unique(mouillage.lat.data)
-        mouillage = mouillage.drop(["lon", "lat"]).assign_coords(
+        mouillage = mouillage.drop_vars(["lon", "lat"]).assign_coords(
             {"lon": lon, "lat": lat}
         )
     return mouillage
@@ -1015,7 +1032,7 @@ def open_decode_croco(path_file):
             angle = croco["angle"]
             da_u = croco["u"] * np.cos(angle) - croco["v"] * np.sin(angle)
             da_v = croco["v"] * np.cos(angle) + croco["u"] * np.sin(angle)
-            croco = croco.drop(["u", "v", "angle"])
+            croco = croco.drop_vars(["u", "v", "angle"])
             croco["u"] = da_u
             croco["v"] = da_v
 
@@ -1776,7 +1793,7 @@ def concat_cmems(list_ds):
             ds = ds.assign_coords({"DEPTH": ds.DEPTH.data})
             ds = ds.sel(DEPTH=common_depths, method="nearest")
             ds = ds.assign_coords({"DEPTH": common_depths})
-            ds = ds.drop(["LONGITUDE", "LATITUDE"])
+            ds = ds.drop_vars(["LONGITUDE", "LATITUDE"])
             ds = ds.where(ds.DEPTH.isin(depths_in_ds))
             ds = ds.assign_coords({"LONGITUDE": lon, "LATITUDE": lat})
             # Put all TIMES on the same values

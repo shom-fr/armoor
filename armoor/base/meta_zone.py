@@ -203,22 +203,23 @@ class MetazoneAccessor:
         if "depth" in dsi.coords:
             if "time" in dsi.depth.dims:
                 dsi = dsi.reset_coords("depth")
+
         dss = []
         for var in dsi.data_vars:
             if ("time" in dsi[var].dims) and ("z" in dsi[var].dims):
                 arr = np.nan * np.zeros(
-                    (dsi.dims["time"], dsi.dims["z"], len(lon))
+                    (dsi.sizes["time"], dsi.sizes["z"], len(lon))
                 )
-                for itime in range(dsi.dims["time"]):
-                    for iz in range(dsi.dims["z"]):
+                for itime in range(dsi.sizes["time"]):
+                    for iz in range(dsi.sizes["z"]):
                         arr[itime, iz, :] = grid2loc(
                             dsi[var].isel(time=itime, z=iz), loc
                         )
                 dims = ["time", "z", "npts"]
                 coords = dict(time=dsi.time, **loc.coords)
             elif ("time" in dsi[var].dims) and ("z" not in dsi[var].dims):
-                arr = np.nan * np.zeros((dsi.dims["time"], len(lon)))
-                for itime in range(dsi.dims["time"]):
+                arr = np.nan * np.zeros((dsi.sizes["time"], len(lon)))
+                for itime in range(dsi.sizes["time"]):
                     arr[itime, :] = grid2loc(dsi[var].isel(time=itime), loc)
                 dims = ["time", "npts"]
                 coords = dict(time=dsi.time, **loc.coords)
@@ -233,6 +234,9 @@ class MetazoneAccessor:
             dss.append(dsvar)
         dso = xr.merge(dss)
         if "depth" in dso:
+            dso = dso.set_coords("depth")
+        elif ("depth" in dsi.coords) and ("time" not in dsi["depth"].dims):
+            dso["depth"] = dsi.depth
             dso = dso.set_coords("depth")
         self._obj = dso
         return self._obj
@@ -392,7 +396,7 @@ class MetazoneAccessor:
             else:
                 da = dsi[var]
             das.append(da)
-        self._obj = xr.merge(das)
+        self._obj = xr.merge(das, combine_attrs='drop_conflicts')
         self._obj = self._obj.set_xindex(vname)
         return self._obj
 
@@ -492,7 +496,7 @@ class MetazoneAccessor:
             "time", time_bins, labels=labels, right=False
         )
 
-    def time_selection_range_clim(self, tbin: str = None) -> xr.Dataset:
+    def time_selection_range_clim(self,  start, end, tbin: str = None) -> xr.Dataset:
         """
         Subset dataset selecting elements by climatological bin.
 
