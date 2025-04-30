@@ -5,10 +5,14 @@ import logging
 import numpy as np
 import xarray as xr
 
+from dask import compute, delayed
+from dask.distributed import Client, LocalCluster
+
 import armoor.base.meta_zone
 import armoor.base.sel_var
 from armoor.algo.calculation import ensemble_mean
-from armoor.base import (  # feature_clim_hydro,; feature_currents_hfr,; feature_currents_ADCP,; feature_currents_VMADCP,; feature_drifters
+from armoor.base import (  #; feature_currents_hfr,; feature_currents_ADCP,; feature_currents_VMADCP,; feature_drifters
+    feature_clim_hydro,
     feature_prof_hydro_mooring,
     feature_prof_hydro_vessel,
     feature_section_hydro,
@@ -16,8 +20,6 @@ from armoor.base import (  # feature_clim_hydro,; feature_currents_hfr,; feature
 )
 from armoor.base.__init__ import FILTERS
 
-# import xesmf as xe
-# print(xe)
 from armoor.base.colocation import (
     horizontal_regrid,
     obs_coords,
@@ -47,7 +49,7 @@ def dict2call(config_obj: dict):
         "prof_hydro_vessel": feature_prof_hydro_vessel,
         "prof_hydro_mooring": feature_prof_hydro_mooring,
         "section_hydro": feature_section_hydro,
-        # "clim_hydro": feature_clim_hydro,
+        "clim_hydro": feature_clim_hydro,
         # "currents_hfr": feature_currents_hfr,
         # "currents_ADCP": feature_currents_ADCP,
         # "currents_VMADCP": feature_currents_VMADCP,
@@ -115,43 +117,47 @@ def get_observation_models_meta(cfg: dict):
                 f"Depth bounds: [{ds.depth.min().values}, {ds.depth.max().values}]"
             )
         ds0 = apply_metas2dataset(ds, cfg)
+        with Client() as client:
+            ds0 = ds0.compute()
         dss_obs[ids] = ds0
         if ds0 != None:
             dss_obs[ids].assign_attrs({"name": ds.attrs["name"]})
-            ds0.close()
+        ds.close()
     dss_obs = [ds for ds in dss_obs if ds != None]
     if len(dss_obs) == 0:
         raise TypeError("Metazone filters on observation leads to None.")
+
     logger.info("File(s) read for observation")
     # Open model dataset from path then decode dataset and apply meta-zone
     dss_model = []
     for imod, model in enumerate(models):
         logger.info(f"Reading model : {imod}")
-
         logger.info("Opening and decode model from file(s)")
         ds0 = open_decode(models[model].get("path"), models[model].get("fmt"))
-        logger.info(
-            f"Time bounds: [{ds0.time.min().values}, {ds0.time.max().values}]"
-        )
-        logger.info(
-            f"Lon bounds: [{ds0.lon.min().values}, {ds0.lon.max().values}]"
-        )
-        logger.info(
-            f"Lat bounds: [{ds0.lat.min().values}, {ds0.lat.max().values}]"
-        )
-        if "depth" in ds0:
+        if ds0.nbytes < 1e6:
             logger.info(
-                f"Depth bounds: [{ds0.depth.min().values}, {ds0.depth.max().values}]"
+                f"Time bounds: [{ds0.time.min().values}, {ds0.time.max().values}]"
             )
-        logger.info("Applying meta zone on model")
+            logger.info(
+                f"Lon bounds: [{ds0.lon.min().values}, {ds0.lon.max().values}]"
+            )
+            logger.info(
+                f"Lat bounds: [{ds0.lat.min().values}, {ds0.lat.max().values}]"
+            )
+            if ("depth" in ds0) and (ds0.nbytes < 1e6):
+                logger.info(
+                    f"Depth bounds: [{ds0.depth.min().values}, {ds0.depth.max().values}]"
+                )
+            logger.info("Applying meta zone on model")
         ds0 = apply_metas2dataset(ds0, cfg)
         if ds0 != None:
+            with Client() as client:
+                ds0 = ds0.compute()
             ds0 = ds0.assign_attrs({"name": models[model].get("name")})
             dss_model.append(ds0)
             ds0.close()
         else:
             raise TypeError("Metazone filters on {model} leads to None.")
-
     # colocation
     logger.info("Colocation")
     if cfg["functionality"] == "prof_hydro_vessel":
@@ -306,7 +312,6 @@ def get_observation_models_meta(cfg: dict):
                 logger.info(f"Grid2loc obs on coords: {coord}")
                 ds_obs = ds_obs.meta.horizontal_selection_coords(coord)
                 ds_model = ds_model.meta.horizontal_selection_coords(coord)
-            print(ds_obs["ptemp"].attrs)
             observation["ds_coloc"].update(
                 {
                     model: ds_obs.assign_attrs(
@@ -497,10 +502,66 @@ def get_observation_models_meta(cfg: dict):
                 )
         del dss_obs_coloc
         del dss_model_coloc
-
+    elif cfg["functionality"] == "clim_hydro":
+        if (cfg["metazone"].get("href") != None) & (
+            cfg["metazone"].get("coord") != None
+        ):
+            raise TypeError(
+                "Please, choose href or coord colocation."
+                "Both colocation is not possible."
+            )
+        if cfg["metazone"].get("trange_clim") == None:
+            raise TypeError("Please, choose a monthly trange_clim")
+        observation.update(
+            {
+                "ds_coloc": {},
+            }
+        )
+        for imodel, model in enumerate(models):
+            ds_model = dss_model[imodel].groupby(
+                "time.month"
+            ).mean(
+                "time"
+            ).rename({
+                "month": "time"
+            })
+            ds_obs = dss_obs[0]
+            if cfg["metazone"].get("href") in ("obs", "model"):
+                logger.info("Regrid :")
+                if cfg["metazone"].get("href") == "obs":
+                    logger.info("model on obs")
+                    ds_model, ds_obs = horizontal_regrid(ds_model, ds_obs)
+                elif cfg["metazone"].get("href") == "model":
+                    logger.info("obs on model")
+                    ds_obs, ds_model = horizontal_regrid(ds_obs, ds_model)
+            elif cfg["metazone"].get("coord"):
+                coord = cfg["metazone"].get("coord")
+                logger.info(f"Grid2loc obs on coords: {coord}")
+                ds_obs = ds_obs.meta.horizontal_selection_coords(coord)
+                ds_model = ds_model.meta.horizontal_selection_coords(coord)
+            observation["ds_coloc"].update(
+                {
+                    model: ds_obs.assign_attrs(
+                        {
+                            "tbound": cfg["metazone"]["tbound"],
+                            "name": observation.get("name"),
+                        }
+                    )
+                }
+            )
+            models[model].update(
+                {
+                    "ds_coloc": ds_model.assign_attrs(
+                        {
+                            "name": models[model].get("name"),
+                        }
+                    )
+                }
+            )
+            del ds_model
+            del ds_obs   
     cfg["observation"] = observation
     cfg["models"] = models
-
     return cfg
 
 
@@ -606,6 +667,17 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
             "vfreq",
             "vars",
         ]
+    elif cfg["functionality"] == "clim_hydro":
+
+        meta = [
+            "tbound",
+            "trange_clim",
+            "polygon",
+            "href",
+            "coord",
+            "vlevel",
+            "vars",
+        ]
 
     for k, v in metazone.items():
         if (k != "name") and (k not in meta):
@@ -616,8 +688,9 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
     time_meta = ["tbound", "terms", "trange_cut"]
     for k in time_meta:
         if k in metazone.keys():
-            logger.info(k)
-            ds = FILTERS[k](ds)(*metazone[k])
+            if "climatology" not in ds.time.attrs:
+                logger.info(k)
+                ds = FILTERS[k](ds)(*metazone[k])
             if ds is None:
                 return None
 
@@ -646,7 +719,6 @@ def apply_metas2dataset(ds: xr.Dataset, cfg: dict) -> xr.Dataset:
             ds = FILTERS[k](ds)(*metazone[k].items()[0])
             if ds is None:
                 return None
-
     return ds
 
     # filters = {"quality": lambda obj: obj.meta.quality_filter,

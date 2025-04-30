@@ -12,3 +12,4 @@ Armoor comparison
    comparison_prof_hydro_vessel
    comparison_prof_hydro_mooring
    comparison_section_hydro
+   comparison_clim_hydro

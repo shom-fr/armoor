@@ -1,15 +1,11 @@
-import glob
 import os
 
-import xarray as xr
 from xoa.cfgm import ConfigManager
 
-from armoor.__init__ import ROOTDIR
 from armoor.base.calls_from_dict import dict2call
 from armoor.tests.uni.__init__ import INI_FILE, SAMPLE_DIR, TMP_DIR
 
-INT_TESTS_DIR = os.path.join(ROOTDIR, "tests", "uni", "test_prof_hydro_vessel")
-
+INT_TESTS_DIR = os.path.abspath(os.path.dirname(__file__))
 
 def get_cfg(cfg):
 

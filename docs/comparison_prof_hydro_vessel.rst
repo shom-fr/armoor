@@ -91,17 +91,17 @@ Templates
 
 Hereafter, we propose a list of configuration files that can be used as templates:
 
-    .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_vessel/cmems_vs_HyCOM.cfg
+    .. literalinclude:: ../armoor/tests/uni/prof_hydro_vessel/cmems_vs_HyCOM.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_vessel/cmems_vs_HyCOM_immersions.cfg
+    .. literalinclude:: ../armoor/tests/uni/prof_hydro_vessel/cmems_vs_HyCOM_immersions.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_vessel/cmems_vs_HyCOM_layers.cfg
+    .. literalinclude:: ../armoor/tests/uni/prof_hydro_vessel/cmems_vs_HyCOM_layers.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_vessel/cmems_vs_HyCOM_intervals.cfg
+    .. literalinclude:: ../armoor/tests/uni/prof_hydro_vessel/cmems_vs_HyCOM_intervals.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_vessel/cmems_vs_HyCOM_immersions_intervals.cfg
+    .. literalinclude:: ../armoor/tests/uni/prof_hydro_vessel/cmems_vs_HyCOM_immersions_intervals.cfg
     
-    .. literalinclude:: ../armoor/tests/uni/test_prof_hydro_vessel/cmems_vs_HyCOM_layers_intervals.cfg
+    .. literalinclude:: ../armoor/tests/uni/prof_hydro_vessel/cmems_vs_HyCOM_layers_intervals.cfg
     
 Examples
 ........

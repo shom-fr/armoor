@@ -1,15 +1,11 @@
-import glob
 import os
 
-import xarray as xr
 from xoa.cfgm import ConfigManager
 
-from armoor.__init__ import ROOTDIR
-from armoor.base.calls_from_dict import dict2call, get_observation_models_meta
+from armoor.base.calls_from_dict import dict2call
 from armoor.tests.uni.__init__ import INI_FILE, SAMPLE_DIR, TMP_DIR
 
-INT_TESTS_DIR = os.path.join(ROOTDIR, "tests", "uni", "test_section_hydro")
-
+INT_TESTS_DIR = os.path.abspath(os.path.dirname(__file__))
 
 def get_cfg(cfg):
 
@@ -28,7 +24,12 @@ def get_cfg(cfg):
     return cfg
 
 
-def test():
-    cfg = get_observation_models_meta(
-        get_cfg(os.path.join(INT_TESTS_DIR, "cmems_vs_HyCOM.cfg"))
+def test_terms():
+    cfg = dict2call(
+        get_cfg(os.path.join(INT_TESTS_DIR, "cmems_vs_HyCOM_terms.cfg"))
+    )
+
+def test_intervals():
+    cfg = dict2call(
+        get_cfg(os.path.join(INT_TESTS_DIR, "cmems_vs_HyCOM_intervals.cfg"))
     )

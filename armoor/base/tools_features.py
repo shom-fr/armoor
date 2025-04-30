@@ -263,57 +263,57 @@ def sel_default_vars(config_obj):
 
     vars = default_vars + additional_vars
 
-    if feature == "clim_hydro":  # Calculate climatologies
-        config_obj["observation"]["xarray_meta"] = config_obj["observation"][
-            "xarray_meta"
+    # if feature == "clim_hydro":  # Calculate climatologies
+    #     config_obj["observation"]["ds_"] = config_obj["observation"][
+    #         "xarray_meta"
+    #     ].sel_var.selection(vars)
+    #     for i_mod, mod in enumerate(config_obj["models"]):
+    #         mod["xarray_meta"] = (
+    #             mod["xarray_meta"]
+    #             .sel_var.selection(vars)
+    #             .groupby("time.month")
+    #             .mean("time")
+    #             .rename({"month": "time"})
+    #         )
+
+    #         # Get month names
+    #         mod["xarray_meta_coloc"] = (
+    #             mod["xarray_meta_coloc"]
+    #             .sel_var.selection(vars)
+    #             .groupby("time.month")
+    #             .mean("time")
+    #             .rename({"month": "time"})
+    #         )
+    #         months = [
+    #             calendar.month_name[i]
+    #             for i in mod["xarray_meta_coloc"].time.data
+    #         ]
+    #         mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].assign_coords(
+    #             {"time": months}
+    #         )
+
+    #         config_obj["observation"]["xarray_meta_coloc"][i_mod] = (
+    #             config_obj["observation"]["xarray_meta_coloc"][i_mod]
+    #             .sel_var.selection(vars)
+    #             .assign_coords({"time": months})
+    #         )
+    # else:
+    # config_obj['observation']["ds_metazone"] = config_obj['observation'][
+    #     "ds_metazone"].sel_var.selection(vars)
+    for i_mod, mod in enumerate(config_obj["models"]):
+        # config_obj['models'][mod]["ds_metazone"] = config_obj['models'][mod]["ds_metazone"].sel_var.selection(vars)
+        logger.info(f"{mod}")
+        config_obj["models"][mod]["ds_coloc"] = config_obj["models"][mod][
+            "ds_coloc"
         ].sel_var.selection(vars)
-        for i_mod, mod in enumerate(config_obj["models"]):
-            mod["xarray_meta"] = (
-                mod["xarray_meta"]
-                .sel_var.selection(vars)
-                .groupby("time.month")
-                .mean("time")
-                .rename({"month": "time"})
-            )
-
-            # Get month names
-            mod["xarray_meta_coloc"] = (
-                mod["xarray_meta_coloc"]
-                .sel_var.selection(vars)
-                .groupby("time.month")
-                .mean("time")
-                .rename({"month": "time"})
-            )
-            months = [
-                calendar.month_name[i]
-                for i in mod["xarray_meta_coloc"].time.data
-            ]
-            mod["xarray_meta_coloc"] = mod["xarray_meta_coloc"].assign_coords(
-                {"time": months}
-            )
-
-            config_obj["observation"]["xarray_meta_coloc"][i_mod] = (
-                config_obj["observation"]["xarray_meta_coloc"][i_mod]
-                .sel_var.selection(vars)
-                .assign_coords({"time": months})
-            )
-    else:
-        # config_obj['observation']["ds_metazone"] = config_obj['observation'][
-        #     "ds_metazone"].sel_var.selection(vars)
-        for i_mod, mod in enumerate(config_obj["models"]):
-            # config_obj['models'][mod]["ds_metazone"] = config_obj['models'][mod]["ds_metazone"].sel_var.selection(vars)
-            logger.info(f"{mod}")
-            config_obj["models"][mod]["ds_coloc"] = config_obj["models"][mod][
-                "ds_coloc"
-            ].sel_var.selection(vars)
-            logger.info("obs associated")
-            config_obj["observation"]["ds_coloc"].update(
-                {
-                    mod: config_obj["observation"]["ds_coloc"][
-                        mod
-                    ].sel_var.selection(vars)
-                }
-            )
+        logger.info("obs associated")
+        config_obj["observation"]["ds_coloc"].update(
+            {
+                mod: config_obj["observation"]["ds_coloc"][
+                    mod
+                ].sel_var.selection(vars)
+            }
+        )
     vars_out = []
     for var in vars:
         if (var in config_obj["observation"]["ds_coloc"][mod]) and (
