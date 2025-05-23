@@ -1,0 +1,101 @@
+from armoor.__init__ import ArmoorError
+
+def validate_colocation(metazones, params):
+    """Validate that only one of the two parameters is defined for each metazone.
+
+    This function checks if either param1 or param2 is defined, but not both,
+    for each metazone in the metazones dictionary.
+
+    Parameters
+    ----------
+    metazones (dict): A dictionary of metazones with their parameters.
+    param1: str
+        The first parameter to check.
+    param2: str
+        The second parameter to check.
+        
+    Raises
+    ------
+        ArmoorError: If both parameters are defined or neither is defined.
+    """
+    for mz_name, mz_param in metazones.items():
+        for param1, param2 in params.values():
+            val1 = mz_param.get(param1)
+            val2 = mz_param.get(param2)
+            if val1 is not None and val2 is not None:
+                raise ArmoorError(
+                    f"Both '{param1}' and '{param2}' are defined for {mz_name}. "
+                    f"Please choose either '{param1}' or '{param2}' colocation."
+                )
+            if val1 is None and val2 is None:
+                raise ArmoorError(
+                    f"Neither '{param1}' nor '{param2}' is defined for {mz_name}. "
+                    f"Please choose either '{param1}' or '{param2}' colocation."
+                )
+
+def get_colocation_params(metazones, params_user, params_default):
+    """
+    Retrieve colocation parameters for each metazone based on given parameters.
+
+    This function takes two dictionaries as input: `metazones` and `params`. It
+    returns a dictionary where each key is a metazone and each value is a
+    dictionary containing the colocation parameters ("time", "horizontal",
+    "vertical") that were found in `metazones` using the parameter candidates
+    specified in `params`.
+
+    Parameters
+    ----------
+    metazones: dict
+        A dictionary where each key is the name of a metazone
+        and each value is a dictionary containing the
+        parameters of that metazone.
+    params_user: dict
+        A dictionary defined by users where each key is a type of colocation
+        ("time", "horizontal", "vertical") and each value is a
+        list of parameter candidates to search for in `metazones`.
+    params_default: dict
+        A dictionary where each key is a type of colocation
+        ("time", "horizontal", "vertical") and each value is a
+        list of default parameters.
+
+    Returns
+    -------
+    dict 
+        A dictionary where each key is a metazone and each value is a
+        dictionary containing the colocation parameters found for that
+        metazone.
+    """
+    coloc_params = {}
+    for mz_name, mz_params in metazones.items():             
+        coloc_params[mz_name] = {
+            coloc: (param_candidate, mz_params.get(param_candidate))
+            for coloc in ("time", "horizontal", "vertical") 
+            for param_candidate in params_user.get(coloc, [])
+            if mz_params.get(param_candidate) is not None
+            }
+        coloc_params[mz_name].update({
+            coloc: param
+            for coloc, param in params_default.items()
+            })
+        
+    return coloc_params
+    
+def get_tbound(metazones):
+    """Get tbound for each metazone.
+    
+    Parameters
+    ----------
+    metazones: dict
+        Dictionnary containing metazone parameters
+    
+    Returns
+    -------
+    dict
+        tbound for each metazones.
+    """
+    return {
+        metazone: v for metazone, params in metazones.items()
+        for k, v in params.items() if k == "tbound"
+        }
+
+    
