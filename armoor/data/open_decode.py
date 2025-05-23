@@ -20,7 +20,7 @@ import xoa.geo as xgeo
 from pyproj import Geod
 from xoa.grid import dz2depth, shift, to_rect
 
-from ..__init__ import ROOTDIR
+from armoor.__init__ import ROOTDIR, ArmoorError
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,12 @@ xoa.register_accessors(xcf=True)
 def get_paths(path_files):
 
     if not isinstance(path_files, (list, dict)):
-        raise TypeError(f"Only list or dict are allowed : {path_files}")
+        raise ArmoorError(f"Only list or dict are allowed : {path_files}")
 
     if (len(path_files) == 1) & ("*" in path_files[0]):
         paths = glob.glob(path_files[0])
         if len(paths) == 0:
-            raise TypeError(f"{path_files[0]} not found.")
+            raise ArmoorError(f"{path_files[0]} not found.")
         path_files = paths
     else:
         paths = []
@@ -42,7 +42,7 @@ def get_paths(path_files):
             if "*" in path:
                 paths += glob.glob(path)
             elif not os.path.exists(path):
-                raise TypeError(f"{path} does not exist.")
+                raise ArmoorError(f"{path} does not exist.")
             else:
                 paths.append(path)
         path_files = paths
@@ -81,7 +81,6 @@ def open_decode(
         Model or observation dataset.
     """
     # Xoa initialisation
-
     path_files = get_paths(path_files)
 
     # Open file
@@ -201,6 +200,8 @@ def open_decode_sst_satellite(path_files, fmt):
     ds["lon"] = lon
     ds["lat"] = lat
     ds = ds.set_coords(["lon", "lat"])
+    ds["ptemp"] -= 273.15
+    ds["ptemp"].attrs["units"] = "degrees C"
     return ds[["ptemp"]]
 
 
@@ -319,8 +320,7 @@ def open_decode_hycom(path_files):
         ds = ds.drop_vars(["z", "dz"])
 
     ds = ds.sel(time=~ds.get_index("time").duplicated())
-    logger.info(ds)       
-
+    
     return ds
 
 

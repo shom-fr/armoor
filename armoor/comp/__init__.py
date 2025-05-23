@@ -23,3 +23,17 @@ COLOCATION_PARAMS_DEFAULT = {
         "vertical": ("vlevel", {"depth": [0.]})
         }
     }
+
+OUTPUTS_PARAMS = {
+    "comp_sst":{
+        "diagdisp_glob": ["product"],
+        "diagdisp_sel": ["product", "time"],
+        "timeseries": None,
+        "maps": ["product", "time"],
+        }
+    }
+
+OUTPUTS_VARS = {
+    "comp_sst": ["ptemp"]
+    }
+    

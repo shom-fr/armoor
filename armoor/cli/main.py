@@ -15,7 +15,7 @@ from armoor.base.misc import string_to_tuples_float
 from armoor.comp import METAZONE_PARAMS
 from armoor.comp.io import to_netcdf_ref_prods
 from armoor.comp.coloc import main_coloc
-from armoor.comp.comp import main_comp
+from armoor.comp.output import main_output
 from armoor.data.open_decode import register_cf, open_decode
 
 logger = logging.getLogger(__name__)
@@ -265,7 +265,7 @@ def main_comp_sst():
         ncs_coloc = main_coloc(ncs_metazone, metazones, func_comp)
 
     # Comp
-    main_comp(ncs_coloc, metazones)
+    main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
 
         
         

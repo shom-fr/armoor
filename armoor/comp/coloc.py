@@ -60,7 +60,7 @@ class AbstractColocation:
         method = self.methods.get(method_name)
         if method:
             return method(self, *args, **kwargs)
-        raise AttributeError(f"Colocation '{method_name}' not found")
+        raise ArmoorError(f"Colocation '{method_name}' not found")
 
     def __init_subclass__(cls):
         """Initialize the subclass by adding the __post_init__ method to the class.
