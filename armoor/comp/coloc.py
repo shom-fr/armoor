@@ -178,9 +178,18 @@ class HorizontalColocation(AbstractColocation):
             Datasets with elements located at specific coordinates.
         """
         if ref == "reference":
-            return self.dsref, regrid(self.dsprod, self.dsref)
+            if "mask" in self.dsprod:
+                self.dsref = self.dsref.where(self.dsref.mask, drop=True)
+            self.dsprod = regrid(self.dsprod, self.dsref) 
         else:
-            return regrid(self.dsref, self.dsprod), self.dsprod
+            if "mask" in self.dsprod:
+                self.dsprod = self.dsprod.where(self.dsprod.mask, drop=True)
+            self.dsref = regrid(self.dsref, self.dsprod)
+        if "mask" in self.dsprod:
+            self.dsprod = self.dsprod.drop_vars("mask")
+        if "mask" in self.dsref:
+            self.dsref= self.dsref.drop_vars("mask")
+        return self.dsref, self.dsprod
     
 
 class VerticalColocation(AbstractColocation):

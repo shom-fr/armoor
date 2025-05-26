@@ -193,7 +193,9 @@ def open_decode_sst_satellite(path_files, fmt):
     cfspecs = xcf.get_cf_specs(f"{fmt}")
     with xcf.set_cf_specs(cfspecs):
         ds = xr.open_mfdataset(path_files).chunk(chunks={}).xcf.decode()
-    #.xoa.decode()
+    for var in ds.coords:
+        if "or_" in var:
+            ds = ds.drop_vars(var)
     ds = ds.swap_dims({"lon": "x", "lat": "y"})
     lat, lon = xr.broadcast(ds["lat"], ds["lon"])
     ds = ds.drop_vars(["lon", "lat"])
@@ -202,7 +204,7 @@ def open_decode_sst_satellite(path_files, fmt):
     ds = ds.set_coords(["lon", "lat"])
     ds["ptemp"] -= 273.15
     ds["ptemp"].attrs["units"] = "degrees C"
-    return ds[["ptemp"]]
+    return ds[["ptemp", "lon", "lat"]]
 
 
 def open_decode_model(path_files):

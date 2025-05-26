@@ -13,6 +13,7 @@ import pandas as pd
 import xarray as xr
 import xoa.geo as xgeo
 from matplotlib import path
+from scipy.ndimage import binary_dilation
 from xoa.regrid import grid2loc, regrid1d
 
 from armoor.base.__init__ import FILTERS
@@ -79,6 +80,45 @@ class ArmoorSelectionAccessor:
                 "Quality filter is not applied."
             )
             return self.ds
+        
+    def get_mask(self,coords: [(float, float)]) -> xr.Dataset:
+        """Subset dataset selecting elements located within the polygon geometry.
+
+        Parameters
+        ----------
+        coords : list of tuples
+           Set of points coordinates defining the geometry of the polygon.
+
+        Returns
+        -------
+        xarray.Dataset
+           Dataset with elements included inside the polygon.
+
+        See Also
+        --------
+        https://matplotlib.org/stable/api/path_api.html
+        """
+        logger.info("getting mask for horizontal_selection_polygon")
+        # Create the polygon where to subset
+        polygon = path.Path(coords)
+        lons, lats = self.ds.lon.data.flatten(), self.ds.lat.data.flatten()
+        dims_name = ()
+        dims_nb = ()
+        for dim in self.ds.dims:
+            if (dim in self.ds.lon.dims) or (dim in self.ds.lat.dims):
+                dims_name += (dim,)
+                dims_nb += (self.ds.sizes[dim],)
+        coords = np.vstack((lats, lons)).T
+        del lats, lons
+        flags = polygon.contains_points(coords)
+        if np.all(flags == False):
+            return None
+        mask_poly = xr.DataArray(
+            data=np.reshape(flags, dims_nb),
+            dims=dims_name,
+        )
+        return mask_poly, dims_name
+
 
     def horizontal_selection_polygon(
         self,
@@ -102,25 +142,53 @@ class ArmoorSelectionAccessor:
         https://matplotlib.org/stable/api/path_api.html
         """
         logger.info("Applying filter - horizontal_selection_polygon")
-        # Create the polygon where to subset
-        polygon = path.Path(coords)
-        lons, lats = self.ds.lon.data.flatten(), self.ds.lat.data.flatten()
-        dims_name = ()
-        dims_nb = ()
-        for dim in self.ds.dims:
-            if (dim in self.ds.lon.dims) or (dim in self.ds.lat.dims):
-                dims_name += (dim,)
-                dims_nb += (self.ds.sizes[dim],)
-        coords = np.vstack((lats, lons)).T
-        del lats, lons
-        flags = polygon.contains_points(coords)
-        if np.all(flags == False):
-            return None
-        mask_poly = xr.DataArray(
-            data=np.reshape(flags, dims_nb),
-            dims=dims_name,
-        )
+        mask_poly, dims_name = self.get_mask(coords)
 
+        if "depth" in self.ds.coords:
+            self.ds = self.ds.reset_coords("depth")
+        self.ds = self.ds.where(mask_poly, drop=True)
+        if "depth" in self.ds:
+            self.ds = self.ds.set_coords("depth")
+        for dim in dims_name:
+            if self.ds.sizes[dim] == 0:
+                return None
+        return self.ds
+    
+    def horizontal_selection_polygon_dilat(
+        self,
+        coords: [(float, float)],
+    ) -> xr.Dataset:
+        """
+        Subset dataset selecting elements located within the polygon geometry.
+
+        Parameters
+        ----------
+        coords : list of tuples
+           Set of points coordinates defining the geometry of the polygon.
+
+        Returns
+        -------
+        xarray.Dataset
+           Dataset with elements included inside the polygon.
+
+        See Also
+        --------
+        https://matplotlib.org/stable/api/path_api.html
+        """
+        logger.info("Applying filter - horizontal_selection_polygon_dilat")
+
+        mask_poly2, dims_name = self.get_mask(coords)
+
+        logger.info("storing mask into dataset after binary dilation")
+
+        mask_poly = mask_poly2.copy()
+        self.ds["mask"] = mask_poly2
+        structure = np.ones((3, 3), dtype=bool)
+        mask_poly.values = binary_dilation(
+            mask_poly2, 
+            structure=structure,
+            iterations=10
+        )
         if "depth" in self.ds.coords:
             self.ds = self.ds.reset_coords("depth")
         self.ds = self.ds.where(mask_poly, drop=True)

@@ -33,6 +33,9 @@ def interp_time(
     xarray.Dataset
 
     """
+    
+    varstime = [var for var in ds if "time" in ds[var].dims]
+    varsnotime = [var for var in ds if "time" not in ds[var].dims]
     # Time dim
     time_name = "time"
     time = ds.indexes[time_name]
@@ -120,12 +123,14 @@ def interp_time(
         del this_ds
     # Concatenate
     dso = xr.concat(
-        dss,
+        [ds[varstime] for ds in dss],
         time_name,
         compat="no_conflicts",
         coords="different",
         data_vars="all",
-    )
+        )
+    for var in varsnotime:
+        dso[var] = ds[var]
     # Attributes and encoding
     dso[time_name].attrs.update(ds[time_name].attrs)
     dso[time_name].encoding.update(ds[time_name].encoding)
@@ -156,8 +161,8 @@ def grid2loc(ds, coords: [(float, float)]):
         coords={
             "lon": ("npts", list(lon)),
             "lat": ("npts", list(lat)),
-        }
-    )
+            }
+        )
     dsi = ds.copy()
     dso = xr.Dataset(coords=dict(time=dsi.time, **loc.coords))
     if "depth" in dsi.coords:
@@ -168,18 +173,22 @@ def grid2loc(ds, coords: [(float, float)]):
         if ("time" in dsi[var].dims) and ("z" in dsi[var].dims):
             arr = np.nan * np.zeros(
                 (dsi.sizes["time"], dsi.sizes["z"], len(lon))
-            )
+                )
             for itime in range(dsi.sizes["time"]):
                 for iz in range(dsi.sizes["z"]):
                     arr[itime, iz, :] = xregrid.grid2loc(
                         dsi[var].isel(time=itime, z=iz), loc
-                    )
+                        )
             dims = ["time", "z", "npts"]
             coords = dict(time=dsi.time, **loc.coords)
         elif ("time" in dsi[var].dims) and ("z" not in dsi[var].dims):
             arr = np.nan * np.zeros((dsi.sizes["time"], len(lon)))
             for itime in range(dsi.sizes["time"]):
-                arr[itime, :] = xregrid.grid2loc(dsi[var].isel(time=itime), loc)
+                arrin = dsi[var].isel(time=itime).squeeze()
+                arr[itime, :] = xregrid.grid2loc(
+                    arrin,
+                    loc
+                    )
             dims = ["time", "npts"]
             coords = dict(time=dsi.time, **loc.coords)
         else:
@@ -226,6 +235,10 @@ def regrid(dsi, dso) -> xr.Dataset:
         & (dsi.lon <= dso.lon.max().values + 2 * dlon),
         # drop=True,
     )
+    
+    if "mask" in dso.keys():
+        dso = dso.where(dso.mask == 1 , drop=True)
+    
     regridder = xe.Regridder(dsi, dso, "bilinear", parallel=False)
     dss = []
     for var in vars2sub:

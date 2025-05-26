@@ -45,19 +45,26 @@ def create_subplots(nrows, ncols, figsize=(10, 8), x_label='X-axis', y_label='Y-
     """
     # Create a figure and a set of subplots
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, sharex=sharex, sharey=sharey)
+    
+    if ncols == 1:
+        axes = axes.reshape(-1, 1) 
 
     # Set a common title for the entire figure
     fig.suptitle(title)
-
     # Set labels for each subplot, conditionally based on sharex and sharey
     if sharex:
-        # Set x label in the middle of the bottom row
-        for ax in axes[-1, :]:
-            ax.set_xlabel(x_label)
-        # Remove x labels from other rows
-        for row in axes[:-1, :]:
-            for ax in row:
-                ax.set_xlabel('')
+        if ncols < 2:
+            for ax in axes[-1]:
+                ax.set_xlabel(x_label)
+            for row in axes[:-1]:
+                for ax in row:
+                    ax.set_xlabel('')
+        else:
+            for ax in axes[-1, :]:
+                ax.set_xlabel(x_label)
+            for row in axes[:-1, :]:
+                for ax in row:
+                    ax.set_xlabel('')
     if sharey:
         # Set y label in the middle of the first column
         for ax in axes[:, 0]:
@@ -88,7 +95,6 @@ def save_figure(fig, filename, dpi=300):
     
 def diagdisp(x_data, y_data, ax, x_label, y_label):
     
-    
     x = x_data.values.ravel()
     y = y_data.values.ravel()
 
@@ -96,6 +102,8 @@ def diagdisp(x_data, y_data, ax, x_label, y_label):
     x = x[mask]
     y = y[mask]
 
+    if (x.size == 0) or (y.size == 0):
+        return None
     global_min = min(x.min(), y.min())
     global_max = max(x.max(), y.max())
     ax.set_xlim(global_min, global_max)
@@ -119,5 +127,8 @@ def diagdisp(x_data, y_data, ax, x_label, y_label):
     #plt.tight_layout()
     return ax
     
-    
+def shadow_line(x, y, ax, label=None, color='k'):
+    """Plot a shadow line."""
+    ax.plot(x, y - 0.2, color='gray', linewidth=3, alpha=0.3)
+    ax.plot(x, y, label=label, color=color, linewidth=2)
     

@@ -1,4 +1,9 @@
+import logging
 from pathlib import Path
+
+from dask.distributed import Client
+
+logger = logging.getLogger(__name__)
 
 def to_netcdf_ref_prods(dss, parent_dir, ncpat):
     """Save in netcdf files reference and products from data.
@@ -23,6 +28,6 @@ def to_netcdf_ref_prods(dss, parent_dir, ncpat):
             nc = Path(parent_dir) / ncpat.format(**locals())
             ncs_prod.append(nc)
             nc.parent.mkdir(parents=True, exist_ok=True)
-            ds.to_netcdf(nc)
+            ds.to_netcdf(nc, compute=True)
             ds.close()
     return ncs_prod

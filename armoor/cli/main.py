@@ -92,6 +92,11 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
                     f"{k} cannot be defined to use this functionnality.\n"
                     f"See the parameters available for this functionnalité {func_param}"
                 )
+            if (k == "polygon") and ("href" in metazone_param.keys()):
+                metazones[metazone_name].update({
+                    "polygon_dilat": metazones[metazone_name].get("polygon")
+                    })
+                del metazones[metazone_name]["polygon"]
     return metazones
 
 def main_open_datasets(cfg: ConfigObj):
@@ -147,53 +152,56 @@ def main_metazones(dsins, metazones):
     for mz_name, mz_param in metazones.items():
         logger.info(f"apply metazone: {mz_name}")
         dsouts[mz_name] = []
-        for ds in dsins:
-            data_name = ds.attrs["data_name"]
-            data_ref = ds.attrs["data_ref"]
+        for dsin in dsins:
+            dsout = dsin.copy()
+            data_name = dsin.attrs["data_name"]
+            data_ref = dsin.attrs["data_ref"]
             logger.info(f"{data_name}")
             # time
             time_meta = ["tbound", "terms", "trange_cut"]
             for k in time_meta:
                 if k in mz_param:
-                    if "climatology" not in ds.time.attrs:
-                        dsout = FILTERS[k](ds)(*mz_param[k])
+                    if "climatology" not in dsin.time.attrs:
+                        dsout = FILTERS[k](dsout)(*mz_param[k])
                     if dsout is None:
                         raise ArmoorError(
-                            f"{k} filter returns None for {ds.attrs['name']} dataset."
+                            f"{k} filter returns None for {dsin.attrs['name']} dataset."
                         )
             # horizontal
             horizontal_meta = [
                 "polygon",
+                "polygon_dilat",
                 "bathy",
             ]
             for k in horizontal_meta:
                 if k in mz_param:
-                    if k == "polygon":
+                    if "polygon" in k:
                         args = mz_param[k]
                     else:
                         args = (*mz_param[k],)
-                    ds = FILTERS[k](ds)(args)
-                    if ds is None:
+                    dsout = FILTERS[k](dsout)(args)
+                    if dsout is None:
                         raise ArmoorError(
-                            f"{k} filter return None for {ds.attrs['name']} dataset."
-                        )
-            # vertical
+                            f"{k} filter return None for {dsin.attrs['name']} dataset."
+                        )            # vertical
             vertical_meta = [
                 "vlevel",
             ]
             for k in vertical_meta:
                 if k in mz_param:
-                    ds = FILTERS[k](ds)(*mz_param[k].items()[0])
-                    if ds is None:
+                    dsout = FILTERS[k](dsout)(*mz_param[k].items()[0])
+                    if dsout is None:
                         raise ArmoorError(
-                            f"{k} filter return None for {ds.attrs['name']} dataset."
+                            f"{k} filter return None for {dsin.attrs['name']} dataset."
                         )
-            ds.attrs = {
+            dsout.attrs = {
                 "data_name": data_name,
                 "data_ref": data_ref,
                 #**mz_param
             }
-            dsouts[mz_name].append(ds)
+            dsouts[mz_name].append(dsout)
+            dsout.close()
+
     return dsouts
 
 def get_parser_comp_sst():
@@ -242,27 +250,29 @@ def main_comp_sst():
             )
     cfg = ConfigManager(VALIDATION_INI).load(str(args.cfgfile))
     
-    with Client():
-        # Open-decode data
-        dss, data_ref = main_open_datasets(cfg["data"])
     
-        # Metazones
-        kw_comp_sst = {"qc": args.qc}
-        metazones = check_metazones_in(
-            args.metazones,
-            cfg["metazones"],
-            func_param=METAZONE_PARAMS[func_comp],
-            **kw_comp_sst
-            )
-        dss = main_metazones(dss, metazones)
-        ncs_metazone = to_netcdf_ref_prods(
-            dss,
-            f"{func_comp}/metazones",
-            "{mz_name}/{data_name}/{refprod}.nc"
-            )
+    #if True:
+    # Open-decode data
+    dss, data_ref = main_open_datasets(cfg["data"])
 
-        # Colocation
-        ncs_coloc = main_coloc(ncs_metazone, metazones, func_comp)
+    # Metazones
+    kw_comp_sst = {"qc": args.qc}
+    metazones = check_metazones_in(
+        args.metazones,
+        cfg["metazones"],
+        func_param=METAZONE_PARAMS[func_comp],
+        **kw_comp_sst
+        )
+    dss = main_metazones(dss, metazones)
+    logger.info("Save open-decoded/metazone in netcdf.")
+    ncs_metazone = to_netcdf_ref_prods(
+        dss,
+        f"{func_comp}/metazones",
+        "{mz_name}/{data_name}/{refprod}.nc"
+        )
+
+    # Colocation
+    ncs_coloc = main_coloc(ncs_metazone, metazones, func_comp)
 
     # Comp
     main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
