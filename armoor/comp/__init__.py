@@ -36,4 +36,7 @@ OUTPUTS_PARAMS = {
 OUTPUTS_VARS = {
     "comp_sst": ["ptemp"]
     }
-    
+
+TITLE_PLOTS = {
+    "comp_sst": "Sea surface temperature"
+    }

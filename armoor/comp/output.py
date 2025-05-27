@@ -22,9 +22,10 @@ def process_output(ocfg, func_comp):
     metazone = ''.join(ocfg[0].keys())
     output = ''.join(ocfg[1].keys())
     mparams, oparams = ocfg[0][metazone], ocfg[1][output]
+    ax_minimap = [0.7, 0.9, 0.19]
     
     logger.info(f"{metazone} -- {output}")
-    plot = PlotComp(mparams, oparams, func_comp, metazone)
+    plot = PlotComp(mparams, oparams, func_comp, metazone, ax_minimap)
     plot.__post_init__()
     plot.call(oparams.get("otype"))    
     

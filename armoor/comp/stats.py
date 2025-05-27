@@ -11,11 +11,12 @@ logger = logging.getLogger(__name__)
 class StatsComp:
     """Class for plot comparison."""
     
-    def __init__(self, mparams, dsref, dsprod):
+    def __init__(self, mparams, dsref, dsprod, extra_dims=None):
         """Initialize the AbstractPlotComp instance with an empty dictionary to store methods."""
         self.mparams = mparams
         self.dsref = dsref
         self.dsprod = dsprod
+        self.extra_dims = extra_dims
         
     def compute(self):
         """Compute statistics over dimensions."""
@@ -30,15 +31,17 @@ class StatsComp:
 
     def dims(self, dims_stat: list):
         """Get dims over which statictics will be computed."""
-        if ("x" in self.dsref.lon.dims) and ("y" in self.dsref.lon.dims):
-            dims_stat += ["x", "y"]
+        if self.extra_dims:
+            for dim in self.extra_dims:
+                if dim in self.dsref.dims:
+                    dims_stat.append(dim)        
         return dims_stat
 
     def get_stats(self, data_ref, data_prod, diff, diff2, diff2c):
-        """Get statictics."""
+        """Get statistics."""
         stats = {}
         stats["data"] = {
-            "ref": [ref0 for ref0 in data_ref][0] if isinstance(data_ref, xr.core.groupby.DatasetGroupBy) else data_ref,
+            "ref": [ref0 for ref0 in data_ref][0][1] if isinstance(data_ref, xr.core.groupby.DatasetGroupBy) else data_ref,
             }
         stats["mean"] = {
             "ref": data_ref.mean(dim=self.dims_stat),
