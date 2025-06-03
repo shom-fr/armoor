@@ -1,5 +1,14 @@
 import logging
 from pathlib import Path
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
+                                LatitudeLocator, LongitudeLocator)
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import cmocean as cmo
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import numpy as np
 import pandas as pd
 import xarray as xr
 from xoa.plot import plot_minimap
@@ -13,6 +22,8 @@ from armoor.comp.stats import StatsComp
 
 logger = logging.getLogger(__name__)
 
+plt.style.use('seaborn-v0_8-whitegrid')
+plt.rcParams.update({'font.size': 8})
 
 class PlotComp:
     """Class for plot comparison."""
@@ -142,7 +153,7 @@ class PlotComp:
                 f"{self.plot_title} \n"
                 f"{self.metazone} \n "
                 "{var} [{units}]"
-            )
+                )
             figname = (
                 f"{self.func_comp}/plot/{self.metazone}"
                 "/{var}/"
@@ -183,7 +194,7 @@ class PlotComp:
                         f"{self.plot_title} \n"
                         f"{self.metazone}: {time:%Y-%m-%dT%H:%M:%S}\n "
                         "{var} [{units}]"
-                    )
+                        )
                     self.diagdisp(
                         dsref.sel(time=time),
                         dsprod.sel(time=time),
@@ -206,7 +217,7 @@ class PlotComp:
                         f"{self.plot_title} \n"
                         f"{self.metazone}: {tref}\n "
                         "{var} [{units}]"
-                    )
+                        )
                     self.diagdisp(
                         dsref,
                         dsprod,
@@ -349,8 +360,7 @@ class PlotComp:
 
             self.save_figure(fig, figname.format(**locals()))
         return None
-    
-    
+        
     def timeseries_sel(self, dicos, var):
         """Plot time series differences."""
         npts = dicos[0]["ref"].sizes["npts"]
@@ -360,13 +370,14 @@ class PlotComp:
             "timeseries_sel_{lat_pt}_{lon_pt}.png"
             )
         for inpt in range(npts):
+            
             fig, axes = create_subplots(
                 nrows=2, figsize=(10, 3.1),
                 x_label='Date', y_label=None,
                 sharex=True
                 )
+
             for idico, dico in enumerate(dicos):
-                
                 ref = dico["ref"][var].isel(npts=inpt)
                 prod = dico["prod"][var].isel(npts=inpt)
                 diff = dico["diff"][var].isel(npts=inpt)
@@ -419,12 +430,15 @@ class PlotComp:
                     label=f"{prod_name} vs {ref_name}"
                     )
             
-            axes[0].legend(loc='upper left', fontsize=11, frameon=True, fancybox=True)
-            axes[1].legend(loc='upper left', fontsize=11, frameon=True, fancybox=True)
+            axes[0].legend(
+                loc='upper left', fontsize=11, frameon=True, fancybox=True
+                )
+            axes[1].legend(
+                loc='upper left', fontsize=11, frameon=True, fancybox=True
+                )
 
             axes[0].set_ylabel(var)
             axes[1].set_ylabel("Diff.")
-
             self.save_figure(fig, figname.format(**locals()))
         return None
     
@@ -444,10 +458,10 @@ class PlotComp:
                         dicos.append(StatsComp(
                             self.mparams, dsref, dsprod, extra_dims=["x", "y"]
                             ).compute())
-                if "mean" in dicos[0].keys():
-                    self.timeseries_stats(dicos, var)
-                else:
-                    self.timeseries_sel(dicos, var)
+            if "mean" in dicos[0].keys():
+                self.timeseries_stats(dicos, var)
+            else:
+                self.timeseries_sel(dicos, var)
             
         return None        
         
@@ -464,37 +478,161 @@ class PlotComp:
                 
                 dsprod = xr.open_dataset(ncprod)
                 dsref = xr.open_dataset(ncref)
-                
+                prod_name = dsprod.attrs["data_name"]
+                ref_name = dsref.attrs["data_name"]
                 dicos = StatsComp(
-                    self.mparams, dsref[var], dsprod[var]
+                    self.mparams,
+                    dsref[var],
+                    dsprod[var]
                     ).compute()
-                
-                # if "trange" in self.mparams:
-                #     tcoord = "time_bins"
-                #     plot_comps = ["bias", "rmse"]
-                # else:
-                #     self.maps_diff(dicos, tcoord)
-                #     plot_comps = ["diff"]
-
-                # for plot_comp in plot_comps:
-                    
-                #     comp = [dicos[plot_comp]]
-                #     if plot_comp == "bias":
-                #         param = dicos["mean"]
-                #         fig, axes = create_subplots(2, 2)
-                #     elif plot_comp == "rmse":
-                #         comp.append(dicos["rmsec"])
-                #         param = dicos["std"]
-                #     else:
-                #         param = dicos
-                #     ref = param["ref"]
-                #     prod = param["prod"]   
-                    
-                    
-                    
-                
                 dsprod.close()
                 dsref.close()
+                if "trange_seq" in self.mparams:
+                    tcoord = "time_bins"
+                else:
+                    tcoord = "time" 
+                if "mean" in dicos.keys():
+                    comps = ["bias", "rmse", "rmsec"]
+                else:
+                    comps = ["diff"]
+                for comp in comps:
+                    if comp == "diff":
+                        ds_prod = dicos["prod"]
+                        ds_ref = dicos["ref"]
+                        field = None
+                    elif comp == "bias":
+                        ds_prod = dicos["mean"]["prod"]
+                        ds_ref = dicos["mean"]["ref"]
+                        field = "mean"
+                    elif (comp == "rmse") or (comp == "rmsec"):
+                        ds_prod = dicos["std"]["prod"]
+                        ds_ref = dicos["std"]["ref"]
+                        field = "Std. Deviation"
+                    ds_comp = dicos[comp]
+                    cmean = np.abs(ds_comp).mean()
+                    cstd = cmean + 1.75 * ds_comp.std()
+                    cmin, cmax =  - cstd, cstd
+                    if comp == "diff":
+                        vmean = np.mean([ds_prod.mean(), ds_ref.mean()])
+                        vstd = np.mean([ds_prod.std(), ds_ref.std()])
+                        vmin, vmax = vmean - 1.75 * vstd, vmean + 1.75 * vstd
+                    else:
+                        vmax = np.max([ds_prod.max(), ds_ref.max()])
+                        vmin = np.min([ds_prod.min(), ds_ref.min()])
+                    dlat = ds_comp.lat.max() - ds_comp.lat.min()
+                    dlon = ds_comp.lon.max() - ds_comp.lon.min()
+                    aspect_ratio = 3 / 2 * dlat / dlon
+                    for it, time in enumerate(ds_comp[tcoord]):
+                        time = pd.to_datetime(time.values)
+                        fig, axes = create_subplots(
+                                layout_type='top_two_bottom_one',
+                                figsize=(8 / aspect_ratio, 8),
+                                x_label='Date', y_label=None,
+                                sharex=True, projection=ccrs.PlateCarree()
+                            )
+                        da_prod = ds_prod.isel({tcoord: it})
+                        da_ref = ds_ref.isel({tcoord: it})
+                        da_comp = ds_comp.isel({tcoord: it})
+                        if "npts" in ds_prod.dims:
+                            m0 = axes[0].scatter(
+                                da_prod.lon, da_prod.lat,
+                                c=da_prod,
+                                vmin=vmin,
+                                vmax=vmax,
+                                cmap="cmo.thermal"
+                                )
+                            axes[0].set_title(prod_name)
+                            m1 = axes[1].scatter(
+                                da_ref.lon, da_ref.lat,
+                                c=da_ref,
+                                vmin=vmin,
+                                vmax=vmax,
+                                cmap="cmo.thermal"
+                                )
+                            axes[1].set_title(ref_name)
+                            m2 = axes[2].scatter(
+                                da_comp.lon, da_comp.lat,
+                                c=da_comp,
+                                vmin=cmin,
+                                vmax=cmax,
+                                cmap="cmo.balance",
+                                )
+                        else:
+                            m0 = axes[0].pcolormesh(
+                                da_prod.lon, da_prod.lat, da_prod,
+                                vmin=vmin,
+                                vmax=vmax,
+                                cmap="cmo.thermal"
+                                )
+                            axes[0].set_title(prod_name)
+                            m1 = axes[1].pcolormesh(
+                                da_ref.lon, da_ref.lat, da_ref,
+                                vmin=vmin,
+                                vmax=vmax,
+                                cmap="cmo.thermal"
+                                )
+                            axes[1].set_title(ref_name)
+                            m2 = axes[2].pcolormesh(
+                                da_comp.lon, da_comp.lat, da_comp,
+                                vmin=cmin,
+                                vmax=cmax,
+                                cmap="cmo.balance",
+                                )
+                        
+                        cbar = fig.colorbar(
+                            m1, ax=axes[1], orientation='vertical', fraction=0.046, pad=0.04
+                            )
+                        if field:
+                            cbar.set_label(field)
+                        cbar = fig.colorbar(
+                            m2, ax=axes[2], orientation='vertical', fraction=0.02, pad=0.02, shrink=0.7
+                            )
+                        cbar.set_label(comp)
+                        
+                        plt.subplots_adjust(hspace=0.02, wspace=0.01)
+                        for iax, ax in enumerate(axes):
+                            gl = axes[iax].gridlines(
+                                crs=ccrs.PlateCarree(),
+                                draw_labels=True,
+                                linewidth=0.5,
+                                color='gray',
+                                alpha=0.5,
+                                linestyle='--'
+                                )
+                            # gl.xlocator = LongitudeLocator()
+                            # gl.ylocator = LatitudeLocator()
+                            # gl.xformatter = LongitudeFormatter()
+                            # gl.yformatter = LatitudeFormatter()
+                            # gl.xlabel_style = {'size': 6}
+                            # gl.ylabel_style = {'size': 6}
+                            gl.top_labels = False
+                            gl.right_labels = False
+
+                            # if iax == 1:
+                            #     gl.ylabels_left = False
+                            # gl.xformatter = LONGITUDE_FORMATTER
+                            # gl.yformatter = LATITUDE_FORMATTER
+                        units = ds_ref.attrs["units"]
+                        
+                        figname = (
+                            f"{self.func_comp}/plot/{self.metazone}" + 
+                            f"/{var}/" + 
+                            f"map_{comp}_{prod}_{time:%Y%m%d%H%M%S}.png"
+                            )
+                        
+                        pos0 = axes[0].get_position()
+                        pos2 = axes[2].get_position()
+                        pos0.x0 = pos2.x0
+                        axes[0].set_position(pos0)
+                        
+                        fig.suptitle(
+                            f"{self.plot_title} \n"
+                            f"{var} [{units}] \n"
+                            f"{self.metazone}: {time:%Y-%m-%dT%H:%M:%S}",
+                            #y=pos0.y1 + 0.09 * aspect_ratio
+                            )
+                        
+                        self.save_figure(fig, figname)
         
         return None
     

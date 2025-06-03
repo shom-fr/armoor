@@ -1,5 +1,4 @@
 """Plot functions."""
-import cartopy.crs as ccrs
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -93,11 +92,13 @@ def create_subplots(nrows=None, layout_type=None, figsize=(8, 10), x_label='X-ax
  
     if layout_type == 'top_two_bottom_one':
         # Layout: Two subplots on top, one subplot below
-        gs = gridspec.GridSpec(3, 2, figure=fig, height_ratios=[1, 1, 1])
+        gs = gridspec.GridSpec(3, 2, figure=fig,
+                               height_ratios=[1, 1, 2],
+                               width_ratios=[1, 1])
 
-        ax1 = fig.add_subplot(gs[0, 0], projection=ccrs.PlateCarree())
-        ax2 = fig.add_subplot(gs[0, 1], projection=ccrs.PlateCarree())
-        ax3 = fig.add_subplot(gs[1:, :], projection=ccrs.PlateCarree())
+        ax1 = fig.add_subplot(gs[0, 0], **subplot_kw)
+        ax2 = fig.add_subplot(gs[0, 1], **subplot_kw)
+        ax3 = fig.add_subplot(gs[1:, :], **subplot_kw)
 
         axes = [ax1, ax2, ax3]
 
@@ -130,24 +131,21 @@ def create_subplots(nrows=None, layout_type=None, figsize=(8, 10), x_label='X-ax
         gs = gridspec.GridSpec(nrows, 1, figure=fig)
         for irow in range(nrows):
             ax = fig.add_subplot(gs[irow, 0], **subplot_kw)
-
-            #     if irow < nrows - 1:
-            #         ax.set_xlabel('')
-            # else:
-            #     ax.set_xlabel(x_label)
-                
+            if irow == nrows - 1:
+                ax.set_xlabel(x_label)
             axes.append(ax)
         if sharex:
-            for ax in axes[:-1]:
-                ax.sharex(axes[-1])
+            for irow in range(nrows):
+                if irow < nrows - 1:
+                    axes[irow].set_xticklabels([])
+                    axes[irow].sharex(axes[0])
+                    
     else:
         raise ValueError("Invalid layout_type or None nrows. Please choose a valid layout type or nrows.")
- 
-    
-    #plt.subplots_adjust()
-    # Adjust layout to prevent overlap
-    # plt.tight_layout(rect=[0, 0, 1, 0.95])
+
     return fig, axes
+
+
 
 def save_figure(fig, filename, dpi=300):
     """Save a Matplotlib figure as a PNG file with high resolution.
