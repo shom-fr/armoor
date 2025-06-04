@@ -126,7 +126,7 @@ class TimeColocation(AbstractColocation):
         if ref == "reference":
             self.dsprod = interp_time(self.dsprod, self.dsref.time)
         elif ref == "product":
-            self.dsref = interp_time(self.dsref, self.dsprof.time)
+            self.dsref = interp_time(self.dsref, self.dsprod.time)
         else:
             raise ArmoorError(
                 "Use 'reference' or 'product' to specify the reference time"

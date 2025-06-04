@@ -40,3 +40,13 @@ OUTPUTS_VARS = {
 TITLE_PLOTS = {
     "comp_sst": "Sea surface temperature"
     }
+
+CMAP_VARS = {
+    "ptemp": "cmo.thermal"
+    }
+
+METRIC_LABELS = {
+    "bias": "Bias",
+    "rmse": "Rmse",
+    "rmsec": "Ce.Rmse"
+    }

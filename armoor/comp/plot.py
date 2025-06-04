@@ -17,7 +17,7 @@ from armoor.__init__ import ArmoorError
 from armoor.base.ranges import trange_seq, vrange
 from armoor.base.plot import create_subplots, save_figure, diagdisp
 from armoor.base import LINE_COLORS
-from armoor.comp import OUTPUTS_VARS, TITLE_PLOTS
+from armoor.comp import OUTPUTS_VARS, TITLE_PLOTS, CMAP_VARS, METRIC_LABELS
 from armoor.comp.stats import StatsComp
 
 logger = logging.getLogger(__name__)
@@ -123,9 +123,7 @@ class PlotComp:
             ax_minimap = plot_minimap(dsref, ax=self.ax_minimap, **kw)
             
             fig.suptitle(
-                f"{self.plot_title} \n"
-                f"{var} [{units}] \n"
-                f"{self.metazone}",
+                figtitle.format(**locals()),
                 y=1.02
                 )
             
@@ -208,14 +206,15 @@ class PlotComp:
                 gprod = trange_seq(dsprod, tstart, tend, tbin)
                 gref = trange_seq(dsref, tstart, tend, tbin)
                 for (tref, dsref), (tprod, dsprod) in zip(gref, gprod):
+                    time = pd.to_datetime(tref)
                     figname = (
                         f"{self.func_comp}/plot/{self.metazone}/" + 
                         "/{var}/" + 
-                        f"diagdisp_sel_{prod}_{tref}.png"
+                        f"diagdisp_sel_{prod}_{time:%Y%m%d%H%M%S}.png"
                         )
                     figtitle = (
                         f"{self.plot_title} \n"
-                        f"{self.metazone}: {tref}\n "
+                        f"{self.metazone}: {time:%Y-%m-%dT%H:%M:%S}\n "
                         "{var} [{units}]"
                         )
                     self.diagdisp(
@@ -503,15 +502,18 @@ class PlotComp:
                     elif comp == "bias":
                         ds_prod = dicos["mean"]["prod"]
                         ds_ref = dicos["mean"]["ref"]
-                        field = "mean"
+                        field = "Mean"
                     elif (comp == "rmse") or (comp == "rmsec"):
                         ds_prod = dicos["std"]["prod"]
                         ds_ref = dicos["std"]["ref"]
-                        field = "Std. Deviation"
+                        field = "St.D"
                     ds_comp = dicos[comp]
                     cmean = np.abs(ds_comp).mean()
                     cstd = cmean + 1.75 * ds_comp.std()
-                    cmin, cmax =  - cstd, cstd
+                    if comp in ["rmse", 'rmsec']:
+                        cmin, cmax = 0, cstd
+                    else:
+                        cmin, cmax =  - cstd, cstd
                     if comp == "diff":
                         vmean = np.mean([ds_prod.mean(), ds_ref.mean()])
                         vstd = np.mean([ds_prod.std(), ds_ref.std()])
@@ -533,13 +535,17 @@ class PlotComp:
                         da_prod = ds_prod.isel({tcoord: it})
                         da_ref = ds_ref.isel({tcoord: it})
                         da_comp = ds_comp.isel({tcoord: it})
+                        if (comp == "bias") or (comp == "diff"):
+                            cmap_comp = "cmo.diff"
+                        else:
+                            cmap_comp = "cmo.amp"
                         if "npts" in ds_prod.dims:
                             m0 = axes[0].scatter(
                                 da_prod.lon, da_prod.lat,
                                 c=da_prod,
                                 vmin=vmin,
                                 vmax=vmax,
-                                cmap="cmo.thermal"
+                                cmap=CMAP_VARS[var]
                                 )
                             axes[0].set_title(prod_name)
                             m1 = axes[1].scatter(
@@ -555,7 +561,7 @@ class PlotComp:
                                 c=da_comp,
                                 vmin=cmin,
                                 vmax=cmax,
-                                cmap="cmo.balance",
+                                cmap=cmap_comp,
                                 )
                         else:
                             m0 = axes[0].pcolormesh(
@@ -569,25 +575,25 @@ class PlotComp:
                                 da_ref.lon, da_ref.lat, da_ref,
                                 vmin=vmin,
                                 vmax=vmax,
-                                cmap="cmo.thermal"
+                                cmap=CMAP_VARS[var]
                                 )
                             axes[1].set_title(ref_name)
                             m2 = axes[2].pcolormesh(
                                 da_comp.lon, da_comp.lat, da_comp,
                                 vmin=cmin,
                                 vmax=cmax,
-                                cmap="cmo.balance",
+                                cmap=cmap_comp,
                                 )
                         
-                        cbar = fig.colorbar(
+                        cbar1 = fig.colorbar(
                             m1, ax=axes[1], orientation='vertical', fraction=0.046, pad=0.04
                             )
                         if field:
-                            cbar.set_label(field)
-                        cbar = fig.colorbar(
+                            cbar1.set_label(field)
+                        cbar2 = fig.colorbar(
                             m2, ax=axes[2], orientation='vertical', fraction=0.02, pad=0.02, shrink=0.7
                             )
-                        cbar.set_label(comp)
+                        cbar2.set_label(METRIC_LABELS[comp])
                         
                         plt.subplots_adjust(hspace=0.02, wspace=0.01)
                         for iax, ax in enumerate(axes):
@@ -599,19 +605,8 @@ class PlotComp:
                                 alpha=0.5,
                                 linestyle='--'
                                 )
-                            # gl.xlocator = LongitudeLocator()
-                            # gl.ylocator = LatitudeLocator()
-                            # gl.xformatter = LongitudeFormatter()
-                            # gl.yformatter = LatitudeFormatter()
-                            # gl.xlabel_style = {'size': 6}
-                            # gl.ylabel_style = {'size': 6}
                             gl.top_labels = False
                             gl.right_labels = False
-
-                            # if iax == 1:
-                            #     gl.ylabels_left = False
-                            # gl.xformatter = LONGITUDE_FORMATTER
-                            # gl.yformatter = LATITUDE_FORMATTER
                         units = ds_ref.attrs["units"]
                         
                         figname = (
@@ -633,6 +628,7 @@ class PlotComp:
                             )
                         
                         self.save_figure(fig, figname)
+                        
         
         return None
     
@@ -641,5 +637,6 @@ class PlotComp:
         """Save figure."""
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
-        save_figure(fig, filename)    
+        save_figure(fig, filename)
+        del fig
     
