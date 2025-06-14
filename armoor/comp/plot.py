@@ -1,4 +1,4 @@
-import logging
+import logging, os
 from pathlib import Path
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -11,13 +11,15 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import pandas as pd
 import xarray as xr
+import dask
 from xoa.plot import plot_minimap
 
 from armoor.__init__ import ArmoorError
 from armoor.base.ranges import trange_seq, vrange
 from armoor.base.plot import create_subplots, save_figure, diagdisp
 from armoor.base import LINE_COLORS
-from armoor.comp import OUTPUTS_VARS, TITLE_PLOTS, CMAP_VARS, METRIC_LABELS
+from armoor.base.filters import create_optimized_mask
+from armoor.comp import TITLE_PLOTS, CMAP_VARS, METRIC_LABELS
 from armoor.comp.stats import StatsComp
 
 logger = logging.getLogger(__name__)
@@ -98,7 +100,8 @@ class PlotComp:
     def diagdisp(self, dsref, dsprod, figtitle, figname):
         
         for var in self.mparams.get("vars"):
-            units = dsref[var].attrs['units']
+            print(dsref[var])
+            units = dsref[var].attrs.get('units')
             fig, ax = create_subplots(
                 nrows=1,
                 figsize=(8, 8),
@@ -111,7 +114,7 @@ class PlotComp:
                 )
             if ax is None:
                 continue
-            if "npts" in dsref.dims:
+            if dsref.lon.dims != ("x" ,"y"):
                 kw = dict(
                     plot_coords = "points",
                     coords_markersize=4
@@ -132,20 +135,30 @@ class PlotComp:
                 figname.format(**locals())
                 )
             
-        
-
     def diagdisp_glob(self):
         """Plot a global dispersion diagram per product."""
+        
+        concat_dim = []
+        if ("vlevel" in self.mparams) or ("vrange" in self.mparams):
+            concat_dim.append("z")
+        if ("trange_seq" in self.mparams) or ("tfreq" in self.mparams):
+            concat_dim.append("time")
+            
         for prod, ncins in self.mparams.get("ncins").items():
             logger.info(f"Product: {prod}")
+
+            dssprod = [xr.open_dataset(ncin) for ncin in ncins["prod"]]
+            dssref = [xr.open_dataset(ncin) for ncin in ncins["ref"]]
             
-            ncprod = [ncin for ncin in ncins if prod in ncin.name][0]
-            logger.info(f"ncprod: {ncprod}")
-            ncref = [ncin for ncin in ncins if prod not in ncin.name][0]
-            logger.info(f"ncref: {ncref}")
-            
-            dsprod = xr.open_dataset(ncprod)
-            dsref = xr.open_dataset(ncref)
+            if len(concat_dim) > 0:
+                dssprod = [ds.stack({'dim_stacked': concat_dim}) for ds in dssprod]
+                dssref = [ds.stack({'dim_stacked': concat_dim}) for ds in dssref]
+                
+                dsprod = xr.concat(dssprod, dim="dim_stacked")
+                dsref = xr.concat(dssref, dim="dim_stacked")
+            else:
+                dsprod = dssprod[0]
+                dsref = dssref[0]
             
             figtitle = (
                 f"{self.plot_title} \n"
@@ -157,12 +170,23 @@ class PlotComp:
                 "/{var}/"
                 f"diagdisp_glob_{prod}.png"
                 )
-            self.diagdisp(
-                dsref,
-                dsprod,
-                figtitle,
-                figname
-                )
+                
+            if "member" in dsprod.dims:
+                dsprod = dsprod.mean(dim="member")
+            if "member" in dsref.dims:
+                dsref = dsref.mean(dim="member")
+            if dsprod.sizes == dsref.sizes:
+                self.diagdisp(
+                    dsref,
+                    dsprod,
+                    figtitle,
+                    figname
+                    )
+            else:
+                logger.warning(
+                    "No global dispersion diagram: "
+                    "no compatible dimension btw ref and prod datasets."
+                    )
             
             dsprod.close()
             dsref.close()
@@ -171,61 +195,53 @@ class PlotComp:
         """Plot a dispersion diagram per product and range."""
         for prod, ncins in self.mparams.get("ncins").items():
             logger.info(f"Product: {prod}")
-            
-            ncprod = [ncin for ncin in ncins if prod in ncin.name][0]
-            logger.info(f"ncprod: {ncprod}")
-            ncref = [ncin for ncin in ncins if prod not in ncin.name][0]
-            logger.info(f"ncref: {ncref}")
-            
-            dsprod = xr.open_dataset(ncprod)
-            dsref = xr.open_dataset(ncref)
-            
-            if "tfreq" in self.mparams:
-                for time in dsref.time:
-                    time = pd.to_datetime(time.values)
-                    figname = (
-                        f"{self.func_comp}/plot/{self.metazone}" + 
-                        "/{var}/" + 
-                        f"diagdisp_sel_{prod}_{time:%Y%m%d%H%M%S}.png"
-                        )
-                    figtitle = (
-                        f"{self.plot_title} \n"
-                        f"{self.metazone}: {time:%Y-%m-%dT%H:%M:%S}\n "
-                        "{var} [{units}]"
-                        )
-                    self.diagdisp(
-                        dsref.sel(time=time),
-                        dsprod.sel(time=time),
-                        figtitle,
-                        figname
-                        )
-            elif "trange_seq" in self.mparams:
-                tbin = self.mparams['trange_seq'][0]
-                tstart = self.mparams['tbound'][0]
-                tend = self.mparams['tbound'][1]
-                gprod = trange_seq(dsprod, tstart, tend, tbin)
-                gref = trange_seq(dsref, tstart, tend, tbin)
-                for (tref, dsref), (tprod, dsprod) in zip(gref, gprod):
-                    time = pd.to_datetime(tref)
-                    figname = (
-                        f"{self.func_comp}/plot/{self.metazone}/" + 
-                        "/{var}/" + 
-                        f"diagdisp_sel_{prod}_{time:%Y%m%d%H%M%S}.png"
-                        )
-                    figtitle = (
-                        f"{self.plot_title} \n"
-                        f"{self.metazone}: {time:%Y-%m-%dT%H:%M:%S}\n "
-                        "{var} [{units}]"
-                        )
-                    self.diagdisp(
-                        dsref,
-                        dsprod,
-                        figtitle,
-                        figname
-                        )
+
+            for icomp in range(len(ncins["ref"])):
+                dsref = xr.open_dataset(ncins['ref'][icomp])
+                dsprod = xr.open_dataset(ncins['prod'][icomp])
                 
-            dsprod.close()
-            dsref.close()
+                icomp_name = os.path.basename(ncins['prod'][icomp])[:-3]                
+                
+                figname = (
+                    f"{self.func_comp}/plot/{self.metazone}" + 
+                    "/{var}/" + 
+                    f"diagdisp_sel_{icomp_name}.png"
+                    )
+                
+                if "tfreq" in self.mparams:
+                    time = f"{dsprod.attrs['time']}"
+                elif "trange_seq" in self.mparams:
+                    time = f"{dsprod.attrs['trange']}"
+                else:
+                    time = ""
+                    
+                if "vlevel" in self.mparams:
+                    vertical = f"{dsprod.attrs['vlevel']} m"
+                elif "trange_seq" in self.mparams:
+                    vertical = f"{dsprod.attrs['vrange']} m"
+                else:
+                    vertical = ""
+                    
+                figtitle = (
+                    f"{self.plot_title} \n"
+                    f"{self.metazone} {time} {vertical}\n "
+                    "{var} [{units}]"
+                    )
+                
+                if "member" in dsprod.dims:
+                    dsprod = dsprod.mean(dim="member")
+                if "member" in dsref.dims:
+                    dsref = dsref.mean(dim="member")
+                
+                self.diagdisp(
+                    dsref,
+                    dsprod,
+                    figtitle,
+                    figname
+                    )
+                
+                dsprod.close()
+                dsref.close()
         return None
     
     def timeseries_stats(self, dicos, var):
@@ -637,6 +653,7 @@ class PlotComp:
         """Save figure."""
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Saving {filename}")
         save_figure(fig, filename)
         del fig
     

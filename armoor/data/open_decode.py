@@ -3,12 +3,17 @@ Open files and decode data.
 """
 
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 import datetime
 import glob
 import logging
 import os
 import sys
 
+import glob
+import re
+from pathlib import Path
+from typing import List, Union
 import dask
 import gsw
 import numpy as np
@@ -26,28 +31,166 @@ logger = logging.getLogger(__name__)
 
 xoa.register_accessors(xcf=True)
 
-def get_paths(path_files):
+# def get_paths(path_files):
 
-    if not isinstance(path_files, (list, dict)):
-        raise ArmoorError(f"Only list or dict are allowed : {path_files}")
+#     if not isinstance(path_files, (list, dict)):
+#         raise ArmoorError(f"Only list or dict are allowed : {path_files}")
 
-    if (len(path_files) == 1) & ("*" in path_files[0]):
-        paths = glob.glob(path_files[0])
-        if len(paths) == 0:
-            raise ArmoorError(f"{path_files[0]} not found.")
-        path_files = paths
-    else:
-        paths = []
-        for path in path_files:
-            if "*" in path:
-                paths += glob.glob(path)
-            elif not os.path.exists(path):
-                raise ArmoorError(f"{path} does not exist.")
-            else:
-                paths.append(path)
-        path_files = paths
-    return path_files
+#     if (len(path_files) == 1) & ("*" in path_files[0]):
+#         paths = glob.glob(path_files[0])
+#         if len(paths) == 0:
+#             raise ArmoorError(f"{path_files[0]} not found.")
+#         path_files = paths
+#     else:
+#         paths = []
+#         for path in path_files:
+#             if "*" in path:
+#                 paths += glob.glob(path)
+#             elif not os.path.exists(path):
+#                 raise ArmoorError(f"{path} does not exist.")
+#             else:
+#                 paths.append(path)
+#         path_files = paths
+    
+#     return path_files
+        
+def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
+    """
+    Generate absolute paths from a pattern string with wildcard and list expansion.
+    
+    Supports patterns like:
+    - "/path/to/files/*.txt" (standard glob)
+    - "/path/to/files/*[option1,option2].txt" (list expansion)
+    - "/path/to/files/prefix_*[a,b,c]_suffix.txt" (complex patterns)
+    
+    Parameters
+    ----------
+    pattern : str
+        Path pattern with wildcards (*) and optional list expansions [item1,item2,...]
+    sort_results : bool, default True
+        Whether to sort the resulting paths alphabetically
+        
+    Returns
+    -------
+    List[str]
+        List of absolute paths matching the pattern
+        
+    Raises
+    ------
+    ValueError
+        If the pattern contains malformed list syntax
+    FileNotFoundError
+        If the base directory doesn't exist
+        
+    Examples
+    --------
+    >>> expand_path_pattern("/data/*[train,test].csv")
+    ['/data/data_train.csv', '/data/data_test.csv']
+    
+    >>> expand_path_pattern("/logs/*/error.log")
+    ['/logs/app1/error.log', '/logs/app2/error.log']
+    """
+    if not path_files:
+        raise ArmoorError("Pattern cannot be empty")
 
+    # Convert to Path object and resolve to absolute
+    pattern_path = Path(path_files).expanduser()
+    
+    # Check for list expansion syntax [item1,item2,...]
+    list_pattern = re.compile(r'\[([^\]]+)\]')
+    matches = list_pattern.findall(path_files)
+    
+    if not matches:
+        # Simple glob pattern without list expansion
+        return _glob_and_resolve(str(pattern_path), sort_results)
+    
+    # Handle list expansion
+    expanded_patterns = _expand_list_patterns(str(pattern_path), matches)
+    
+    # Apply glob to each expanded pattern
+    all_paths = []
+    for expanded_pattern in expanded_patterns:
+        paths = _glob_and_resolve(expanded_pattern, sort_results=False)
+        all_paths.extend(paths)
+    if len(all_paths) == 0:
+        raise ArmoorError(f"{path_files} not found.")
+    # Remove duplicates and sort if requested
+    unique_paths = list(set(all_paths))
+    return sorted(unique_paths) if sort_results else unique_paths
+
+
+def _expand_list_patterns(pattern: str, matches: List[str]) -> List[str]:
+    """
+    Expand list patterns like [item1,item2] into multiple pattern strings.
+    
+    Parameters
+    ----------
+    pattern : str
+        Original pattern with list syntax
+    matches : List[str]
+        List of matched content inside brackets
+        
+    Returns
+    -------
+    List[str]
+        List of expanded patterns
+    """
+    expanded_patterns = [pattern]
+    
+    for match in matches:
+        # Split items and clean whitespace
+        items = [item.strip() for item in match.split(',')]
+        if not items or any(not item for item in items):
+            raise ValueError(f"Invalid list syntax in pattern: [{match}]")
+        
+        # Expand current patterns with each item
+        new_patterns = []
+        for current_pattern in expanded_patterns:
+            for item in items:
+                # Replace first occurrence of [match] with item
+                new_pattern = current_pattern.replace(f'[{match}]', item, 1)
+                new_patterns.append(new_pattern)
+        
+        expanded_patterns = new_patterns
+
+    return expanded_patterns
+
+
+def _glob_and_resolve(pattern: str, sort_results: bool = True) -> List[str]:
+    """
+    Apply glob pattern matching and resolve to absolute paths.
+    
+    Parameters
+    ----------
+    pattern : str
+        Glob pattern
+    sort_results : bool
+        Whether to sort results
+        
+    Returns
+    -------
+    List[str]
+        List of absolute paths
+    """
+    try:
+        # Use glob to find matching files
+        matched_paths = glob.glob(pattern, recursive=True)
+        
+        # Convert to absolute paths
+        absolute_paths = [str(Path(path).resolve()) for path in matched_paths]
+        
+        return sorted(absolute_paths) if sort_results else absolute_paths
+    
+    except Exception as e:
+        # Check if base directory exists for better error messages
+        base_dir = Path(pattern).parent
+        while '*' in str(base_dir) or '[' in str(base_dir):
+            base_dir = base_dir.parent
+        
+        if not base_dir.exists():
+            raise FileNotFoundError(f"Base directory does not exist: {base_dir}")
+        
+        raise e
 
 def register_cf():
     
@@ -94,9 +237,9 @@ def open_decode(
     elif fmt == "cora_insitu":
         logger.info("Opening/decoding insitu cmems files")
         return open_decode_cora_insitu(path_files, platform=platform)
-    elif fmt == "model":
+    elif fmt == "cmems_model":
         logger.info("Opening/decoding model cmems files")
-        return open_decode_model(path_files)
+        return open_decode_cmems_model(path_files)
     elif "_sst_l" in fmt:
         logger.info("Opening/decoding sst satellite files")
         return open_decode_sst_satellite(path_files, fmt)
@@ -207,7 +350,7 @@ def open_decode_sst_satellite(path_files, fmt):
     return ds[["ptemp", "lon", "lat"]]
 
 
-def open_decode_model(path_files):
+def open_decode_cmems_model(path_files):
     """
     Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
     Parameters
@@ -232,7 +375,6 @@ def open_decode_model(path_files):
         ds = ds.set_coords(["lon", "lat"])
     var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
     ds["depth"] = ds["depth"].broadcast_like(ds[var])
-    ds = ds.load()
     return ds
 
 
@@ -244,7 +386,7 @@ def open_decode_hycom(path_files):
     path_files : str, list of str
         Path to the netcdf files.
     steps : float
-       Horizontal and vertical steps
+        Horizontal and vertical steps
     Returns
     -------
     xarray.Dataset
@@ -268,6 +410,7 @@ def open_decode_hycom(path_files):
                 )
                 .xoa.decode()
             )
+            #.isel(x=slice(None, None, 5), y=slice(None, None, 5))
 
         test = any(i in ['u', 'v'] for i in ds.data_vars)
         if (bathy is None) and (test is False) and ("bathy" in ds):
@@ -300,9 +443,9 @@ def open_decode_hycom(path_files):
     for var in dss_var.keys():
         ds_concat = xr.concat(dss_var[var], dim='time')
         if var == 'u':
-           dsu = ds_concat
+            dsu = ds_concat
         elif var == 'v':
-           dsv = ds_concat
+            dsv = ds_concat
         else:
             dss.append(ds_concat)
         ds_concat.close()
@@ -325,6 +468,93 @@ def open_decode_hycom(path_files):
     
     return ds
 
+# def open_decode_hycom(path_files):
+#     """
+#     Open HyCOM netcdf file(s) and store it into a ready-to-use dataset.
+
+#     Parameters
+#     ----------
+#     path_files : str or list of str
+#         Path to the netcdf files.
+
+#     Returns
+#     -------
+#     xarray.Dataset
+#         HyCOM dataset.
+#     """
+#     def process_file(path):
+#         with xcf.set_cf_specs(xcf.get_cf_specs("hycom")):
+#             # Use Dask for lazy loading
+#                 ds = xr.open_dataset(path, chunks={"time": 10, "lat": 100, "lon": 100}).xoa.decode()
+
+#         test = any(var in ['u', 'v'] for var in ds.data_vars)
+#         bathy = ds.bathy if ("bathy" in ds) else None
+
+#         if "bathy" in ds:
+#             ds = ds.drop_vars("bathy")
+
+#         varname = next(iter(ds.data_vars))
+#         if varname == "u":
+#             da_u = shift(ds["u"].squeeze(drop=True), {"x": "right"}).xoa.reloc(u=False)
+#             return varname, da_u, bathy
+#         elif varname == "v":
+#             da_v = shift(ds["v"].squeeze(drop=True), {"y": "top"}).xoa.reloc(v=False)
+#             return varname, da_v, bathy
+#         else:
+#             return varname, ds, bathy
+
+#     # def shift(da, axis_shift):
+#     #     # Implement or import the shift function as needed
+#     #     pass
+
+#     # def dz2depth(dz, centered):
+#     #     # Implement or import the dz2depth function as needed
+#     #     pass
+
+#     # Use ThreadPoolExecutor to parallelize file processing
+#     dss_var = {}
+#     bathy = None
+
+#     with ThreadPoolExecutor(max_workers=1) as executor:
+#         futures = {executor.submit(process_file, path): path for path in sorted(path_files)}
+#         for future in futures:
+#             varname, data, bathy = future.result()
+#             if varname not in dss_var:
+#                 dss_var[varname] = []
+#             dss_var[varname].append(data)
+#             del data
+
+#     # Concatenate and merge datasets
+#     dss = []
+#     dsu, dsv = None, None
+#     for var in dss_var:
+#         ds_concat = xr.concat(dss_var[var], dim='time')
+#         if var == 'u':
+#             dsu = ds_concat
+#         elif var == 'v':
+#             dsv = ds_concat
+#         else:
+#             dss.append(ds_concat)
+#         del ds_concat
+
+#     ds = xr.merge(dss)
+#     del dss
+#     if bathy is not None:
+#         ds = xr.merge([ds, bathy])
+
+#     if isinstance(dsu, xr.DataArray):
+#         ds["u"] = dsu.assign_coords(**ds.coords)
+#         del dsu
+#     if isinstance(dsv, xr.DataArray):
+#         ds["v"] = dsv.assign_coords(**ds.coords)
+#         del dsv
+#     if "dz" in ds:
+#         ds.coords["depth"] = dz2depth(ds.dz, centered=True)
+#         ds = ds.drop_vars(["z", "dz"])
+
+#     ds = ds.sel(time=~ds.get_index("time").duplicated())
+#     ds = ds.load()
+#     return ds
 
 def open_decode_woa18(path_files):
     """
@@ -431,7 +661,7 @@ def open_decode_cora_insitu(path_files, platform):
         dss.append(ds)
     if platform == "argo":
         ds = concat_argo(dss)
-        return [ds]
+        return ds
     else:
         return dss
 
@@ -455,7 +685,6 @@ def open_decode_cmems_insitu(path_files, platform):
     cfspecs = xcf.get_cf_specs(f"cmems_{platform}")
     dss = []
     for path in path_files:
-        logger.info(f"Open {path}")
         with xcf.set_cf_specs(cfspecs):
             ds = xr.open_dataset(path).load().xcf.decode()
         vars2drop = []
@@ -531,95 +760,12 @@ def open_decode_cmems_insitu(path_files, platform):
         ds.close()
     if platform == "argo":
         ds = concat_argo(dss)
-        return [ds]
+        return ds.drop_vars("TRAJECTORY")
     else:
         for ids in range(len(dss)):
             dss[ids].attrs["name"] = dss[ids].attrs["platform_code"]
         return dss
-
-    """
-        # Variables to drop/rename to prevent random behaviours
-        for var in list(dataset.keys()):
-            if "POSITION" in var or 'LOCATION' in var or '_DM' in var:
-                dataset = dataset.drop_vars(var)
-            elif var[-3:] == "_QC":
-                dataset = dataset.rename({var: f"QC_{var[:-3]}"})
-            if len(var) == 4:
-                if f"{var}_ADJUSTED" in dataset:
-                    dataset = dataset.drop_vars(f"{var}_ADJUSTED")
-                if f"{var}_ADJUSTED_ERROR" in dataset:
-                    dataset = dataset.drop_vars(f"{var}_ADJUSTED_ERROR")
-                if f"{var}_CNDC" in dataset:
-                    dataset = dataset.drop_vars(f"{var}_CNDC"
-            # Remove otherwise interp won't work
-            if var in ['DATA_MODE', 'DIRECTION', 'VERTICAL_SAMPLING_SCHEME']:
-                dataset = dataset.drop_vars(var)
-        if 'depth' in dataset.coords:
-            print(dataset)
-            #cmems = decode_profiler(cmems)
-            check_fixed_depths = []
-            for ilev in range(dataset.dims["z"]):
-                depths = np.unique(dataset.depth.isel(z=ilev).values)
-                print(depths)
-                if len(depths) == 1:
-                    check_fixed_depths.append(depths[0])
-            if len(check_fixed_depths) == dataset.dims["z"]:
-                dataset["depth"] = xr.DataArray(
-                    data=check_fixed_depths,
-                    dims={"z": dataset.dims["z"]}
-                )
-                dataset = dataset.set_coords('depth')
-                print(dataset)
-        list_ds_cmems.append(dataset)
-    if platform == "argo":
-        cmems = concat_cmems_argo(list_ds_cmems)
-    else:
-        cmems = xr.concat(list_ds_cmems, dim='instr')
-        cmems = cmems.set_coords(["lon", "lat"])
-
-    cmems = cmems.sortby('time')
-    
-    a = b
-    # Manage lon(time) and lat(time)
-    len_lon = len(cmems.lon)
-    len_lat = len(cmems.lat)
-    len_time = len(cmems.time)
-    if len_lat == len_time and len_lon == len_time:
-        cmems = convert_trajectory(cmems)
-
-    # Manage profiler depths
-    if 'DEPH' in cmems.variables:
-        cmems = decode_profiler(cmems)
-
-    # Calculate depth from pressure
-    if "PRES" in cmems:
-        cmems = cmems.rename({'PRES':'pres'})
-
-    if 'depth' in cmems.dims and 'depth' not in cmems.coords and 'pres' in cmems:
-        cmems = depth_from_press(cmems)
-
-    # Convert depth
-    cmems = convert_depths(cmems)
-    # Convert lons
-    cmems = convert_lons(cmems)
-
-    # Remove duplicate time and depth values
-    cmems = cmems.drop_duplicates('time')
-    if 'depth' in cmems.dims:
-        cmems = cmems.drop_duplicates('depth')
-
-    # Remove useless variables
-    list_to_remove = ['DC_REFERENCE', 'DEPH', 'QC_DEPH']
-    for var in list(cmems.keys()):
-        if var in list_to_remove:
-            cmems = cmems.drop_vars(var)
-
-    if steps and steps[1]:
-        horizontal_step, vertical_step = steps
-        cmems = set_hor_vert_step(cmems, horizontal_step, vertical_step)
-    """
     return ds
-
 
 def open_decode_l_adcp(path_file):
     """

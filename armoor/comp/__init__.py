@@ -8,6 +8,16 @@ METAZONE_PARAMS = {
         "cloud",
         "vars",
         "qc"
+        ],
+    "comp_argo": [
+        "tbound",
+        "trange_seq",
+        "vrange",
+        "vlevel",
+        "polygon",
+        "vars",
+        "radius",
+        "qc"
         ]
     }
 
@@ -15,30 +25,44 @@ COLOCATION_PARAMS_USER = {
     "comp_sst": {
         "time": ("trange_seq", "tfreq"),
         "horizontal": ("href", "cloud"),
+        },
+    "comp_argo": {
+        "time": ("trange_seq",),
+        "horizontal": ("radius",),
+        "vertical": ("vrange", "vlevel"),
         }
     }
 
 COLOCATION_PARAMS_DEFAULT = {
     "comp_sst": {
-        "vertical": ("vlevel", {"depth": [0.]})
+        "vertical": ("vlevel", ("depth", [0.]))
+        },
+    "comp_argo": {
+        "time": ("trange_seq", ("*","reference"))
         }
     }
 
 OUTPUTS_PARAMS = {
-    "comp_sst":{
-        "diagdisp_glob": ["product"],
-        "diagdisp_sel": ["product", "time"],
-        "timeseries": None,
-        "maps": ["product", "time"],
-        }
+    "comp_sst":[
+        "diagdisp_glob",
+        "diagdisp_sel",
+        "timeseries",
+        "maps",
+        ],
+    "comp_argo":[
+        "diagdisp_glob",
+        "diagdisp_sel"
+        ]
     }
 
-OUTPUTS_VARS = {
-    "comp_sst": ["ptemp"]
+COMP_VARS = {
+    "comp_sst": ["ptemp"],
+    "comp_argo": ["ptemp", "sal", "pdens", "temp", "sndspeed"]
     }
 
 TITLE_PLOTS = {
-    "comp_sst": "Sea surface temperature"
+    "comp_sst": "Sea surface temperature",
+    "comp_argo": "Hydrological profiles"
     }
 
 CMAP_VARS = {

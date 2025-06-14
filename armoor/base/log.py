@@ -6,7 +6,7 @@ DEFAULT_LOGGING_CONFIG = {
     "disable_existing_loggers": False,
     "formatters": {
         "brief": {
-            "format": ("%(name)-12s: %(levelname)-8s"
+            "format": ("%(asctime)s %(name)-12s: %(levelname)-8s"
                        " %(message)s"),
         },
         "precise": {

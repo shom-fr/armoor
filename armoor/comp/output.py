@@ -5,14 +5,14 @@ import pandas as pd
 import xarray as xr
 
 from armoor import ArmoorError
-from armoor.comp import OUTPUTS_PARAMS, OUTPUTS_VARS
+from armoor.comp import OUTPUTS_PARAMS, COMP_VARS
 from armoor.comp.plot import PlotComp
 
 logger = logging.getLogger(__name__)
 
 def check_output(func_name, outputs):
     for output in outputs.values():
-        if output.get('otype') not in OUTPUTS_PARAMS[func_name].keys():
+        if output.get('otype') not in OUTPUTS_PARAMS[func_name]:
             raise ArmoorError(
                 f"Not implemented output for {func_name}: {output}"
                 )
@@ -28,7 +28,6 @@ def process_output(ocfg, func_comp):
     plot = PlotComp(mparams, oparams, func_comp, metazone, ax_minimap)
     plot.__post_init__()
     plot.call(oparams.get("otype"))    
-    
 
 def main_output(ncs, metazones, output_ins, func_comp):
     
@@ -37,7 +36,7 @@ def main_output(ncs, metazones, output_ins, func_comp):
     for metazone in metazones:
         metazones[metazone].update({
             "ncins": ncs.get(metazone),
-            "vars": OUTPUTS_VARS[func_comp]
+            "vars": COMP_VARS[func_comp]
             })
     metazones = [{key: value} for key, value in metazones.items()]
     output_ins = [{key: value} for key, value in output_ins.items()]

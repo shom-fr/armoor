@@ -650,3 +650,15 @@ def get_time_bins(start, end, tbin):
         end=pd.to_datetime(end),
         freq=tbin,
     )
+
+
+def create_optimized_mask(ds, var_name, bins):
+        var = ds[var_name]
+        # Initialiser avec False
+        mask = xr.zeros_like(var, dtype=bool)
+        
+        # Ajouter chaque condition
+        for low, high in bins:
+            mask = mask | ((var >= low) & (var <= high))
+        
+        return mask

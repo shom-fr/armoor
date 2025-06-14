@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 def geo_vars(ds):
 
     geo_vars = [
@@ -43,3 +47,58 @@ def string_to_tuples_float(s):
         tuples.append(tuple(elements))
 
     return tuples
+
+def optimize_for_low_swap(dataset, target_chunk_mb=16):
+    """
+    Optimize dataset chunks to reduce swap usage.
+    
+    This function calculates optimal chunk sizes for xarray datasets to minimize 
+    memory usage and prevent excessive swap utilization during processing.
+    
+    Parameters
+    ----------
+    dataset : xarray.Dataset or xarray.DataArray
+        The dataset to optimize chunking for
+    target_chunk_mb : int, optional
+        Target chunk size in megabytes (default: 16)
+        Smaller values reduce memory usage but may increase overhead
+    
+    Returns
+    -------
+    xarray.Dataset or xarray.DataArray
+        Dataset with optimized chunk sizes
+    
+    Notes
+    -----
+    - Assumes float64 data type (8 bytes per element)
+    - Distributes chunk size evenly across all dimensions
+    - Chunk size per dimension = (total_elements_per_chunk)^(1/n_dimensions)
+    - Ensures chunk size doesn't exceed dimension size
+    
+    Examples
+    --------
+    >>> import xarray as xr
+    >>> ds = xr.open_zarr('large_dataset.zarr')
+    >>> ds_optimized = optimize_for_low_swap(ds, target_chunk_mb=8)
+    >>> print(ds_optimized.chunks)
+    
+    >>> # For very memory-constrained environments
+    >>> ds_minimal = optimize_for_low_swap(ds, target_chunk_mb=4)
+    """
+    # Calculate optimal chunk size
+    element_size = 8  # float64 bytes per element
+    elements_per_chunk = (target_chunk_mb * 1024**2) // element_size
+    
+    # Distribute across dimensions
+    n_dims = len(dataset.dims)
+    elements_per_dim = int(elements_per_chunk ** (1/n_dims))
+    
+    chunks = {}
+    for dim in dataset.dims:
+        # Ensure chunk size doesn't exceed dimension size
+        chunks[dim] = min(dataset.sizes[dim], elements_per_dim)
+    
+    logger.info(f"Anti-swap chunks: {chunks}")
+    logger.info(f"Estimated chunk size: {(elements_per_dim**n_dims * element_size) / 1024**2:.1f} MB per chunk")
+    
+    return dataset.chunk(chunks)
