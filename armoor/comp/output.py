@@ -22,7 +22,25 @@ def process_output(ocfg, func_comp):
     metazone = ''.join(ocfg[0].keys())
     output = ''.join(ocfg[1].keys())
     mparams, oparams = ocfg[0][metazone], ocfg[1][output]
-    ax_minimap = [0.7, 0.9, 0.19]
+    output = oparams.get("otype")
+    ax_minimap = [0.7, 0.91, 0.19]
+    
+    if func_comp == "comp_argo":
+        if output == "timeseries":
+            if (
+            "trange_seq" not in mparams
+            ) or (
+            "vlevel" not in mparams
+            ) or (
+            "vrange" not in mparams
+            ):
+                return None
+        elif output in ("diagdisp_sel", "diagdisp_glob"):
+            if not any(param in mparams for param in ("vrange", "vlevel")):
+                return None
+        elif output in ("maps"):
+            if not any(param in mparams for param in ("vrange", "vlevel")):
+                return None
     
     logger.info(f"{metazone} -- {output}")
     plot = PlotComp(mparams, oparams, func_comp, metazone, ax_minimap)
@@ -41,6 +59,5 @@ def main_output(ncs, metazones, output_ins, func_comp):
     metazones = [{key: value} for key, value in metazones.items()]
     output_ins = [{key: value} for key, value in output_ins.items()]
     outputs = list(itertools.product(metazones, output_ins))
-    
     for output in outputs:
         process_output(output, func_comp)        

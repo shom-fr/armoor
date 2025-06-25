@@ -30,7 +30,7 @@ from armoor.__init__ import ROOTDIR, ArmoorError
 logger = logging.getLogger(__name__)
 
 xoa.register_accessors(xcf=True)
-
+xr.set_options(keep_attrs=True)
 # def get_paths(path_files):
 
 #     if not isinstance(path_files, (list, dict)):

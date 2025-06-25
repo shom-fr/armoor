@@ -38,7 +38,7 @@ COLOCATION_PARAMS_DEFAULT = {
         "vertical": ("vlevel", ("depth", [0.]))
         },
     "comp_argo": {
-        "time": ("trange_seq", ("*","reference"))
+        "time": ("trange_seq", ("*", "reference", "nearest"))
         }
     }
 
@@ -51,7 +51,13 @@ OUTPUTS_PARAMS = {
         ],
     "comp_argo":[
         "diagdisp_glob",
-        "diagdisp_sel"
+        "diagdisp_sel",
+        "timeseries",
+        "mvprofiles",
+        "uvprofiles",
+        "mdiagts",
+        "udiagts",
+        "maps",
         ]
     }
 
@@ -66,7 +72,11 @@ TITLE_PLOTS = {
     }
 
 CMAP_VARS = {
-    "ptemp": "cmo.thermal"
+    "ptemp": "cmo.thermal",
+    "temp": "cmo.thermal",
+    "sal": "cmo.haline",
+    "pdens": "cmo.dense",
+    "sndspeed": "cmo.speed"
     }
 
 METRIC_LABELS = {

@@ -147,6 +147,7 @@ logger = logging.getLogger(__name__)
 def interp_time(
     ds,
     dates,
+    method="linear",
     preserve_encoding=False,
     keep_flag=False,
     diurnal_vars=None,
@@ -285,7 +286,7 @@ def interp_time(
             # Interpolation avec options optimisées
             this_ds = tmp_ds.interp(
                 {time_name: [date]}, 
-                method='linear',  # Explicite plus rapide
+                method=method,  # Explicite plus rapide
                 assume_sorted=True  # Optimisation
             )
             

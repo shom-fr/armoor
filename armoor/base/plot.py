@@ -17,7 +17,7 @@ def create_figure(width, height):
     fig = plt.figure(figsize=(width, height))
     return fig
 
-def create_subplots(nrows=None, layout_type=None, figsize=(8, 10), x_label='X-axis', y_label='Y-axis', title='Subplots', sharex=False, sharey=False, projection=None):
+def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x_label='X-axis', y_label='Y-axis', title='Subplots', sharex=False, sharey=False, projection=None):
     """Create and return a figure with a specified number of subplots arranged in a grid.
 
     Parameters
@@ -139,6 +139,19 @@ def create_subplots(nrows=None, layout_type=None, figsize=(8, 10), x_label='X-ax
                 if irow < nrows - 1:
                     axes[irow].set_xticklabels([])
                     axes[irow].sharex(axes[0])
+                    
+    elif ncols:
+        gs = gridspec.GridSpec(1, ncols, figure=fig)
+        for icol in range(ncols):
+            ax = fig.add_subplot(gs[0, icol], **subplot_kw)
+            if icol == ncols - 1:
+                ax.set_ylabel(y_label)
+            axes.append(ax)
+        if sharey:
+            for icol in range(ncols):
+                if icol < ncols - 1:
+                    axes[icol].set_yticklabels([])
+                    axes[icol].sharey(axes[0])
                     
     else:
         raise ValueError("Invalid layout_type or None nrows. Please choose a valid layout type or nrows.")

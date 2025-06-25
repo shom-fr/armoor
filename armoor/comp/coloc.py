@@ -138,10 +138,18 @@ class TimeColocation(AbstractColocation):
         """
         tfreq = args[0]
         ref = args[1]
+        if len(args) > 2:
+            method = args[2]
+        else:
+            method = "linear"
         if ref == "reference":
-            self.dsprod = interp_time(self.dsprod, self.dsref.time)
+            self.dsprod = interp_time(self.dsprod, self.dsref.time, method=method)
+            self.dsprod["time"].encoding = self.dsref.time.encoding
+            self.dsprod["time"].attrs = self.dsref.time.attrs
         elif ref == "product":
-            self.dsref = interp_time(self.dsref, self.dsprod.time)
+            self.dsref = interp_time(self.dsref, self.dsprod.time, method=method)
+            self.dsre["time"].encoding = self.dsprod.time.encoding
+            self.dsre["time"].attrs = self.dsprod.time.attrs
         else:
             raise ArmoorError(
                 "Use 'reference' or 'product' to specify the reference time"
@@ -222,12 +230,22 @@ class HorizontalColocation(AbstractColocation):
         rename_dims = {"npts0": "member"}
         if "time" in prod_data.dims:
             rename_dims["npts1"] = "time"
-        return (
-            xgeo.get_distances(prod_data, ref_data)
-            .squeeze()
-            .rename(rename_dims)
-            .assign_coords(member=prod_data.member)
-        )
+        # dists = []
+        # for itime in range(ref_data.sizes["time"]):
+        #     dists.append(
+        #         xgeo.get_distances(prod_data, ref_data.isel(time=[itime]))
+        #         .squeeze()
+        #         .rename(rename_dims)
+        #         .assign_coords(member=prod_data.member)
+        #     )
+        # dist = xr.concat(dists, dim="time")
+        # print(dist)
+        dist = (xgeo.get_distances(prod_data, ref_data)
+                .squeeze()
+                .rename(rename_dims)
+                .assign_coords(member=prod_data.member)
+            )
+        return dist
     
     def _handle_time_dependent_case_optimized(self, radius_meters: float) -> None:
         """
@@ -241,30 +259,36 @@ class HorizontalColocation(AbstractColocation):
         mask = dist_prod2ref < radius_meters
 
         # OPTIMISATION 3: Appliquer le masque et drop en une seule opération
-        filtered_ds = self.dsprod.where(mask, drop=True)
+        for coord in ["lon", "lat"]:
+            self.dsprod[coord] = self.dsprod[coord].expand_dims({"time": self.dsprod.time})
+        self.dsprod = self.dsprod.reset_coords(["lon", "lat"])
+        coords = [coord for coord in mask.coords]
+        mask = mask.drop_vars(coords)
+        self.dsprod = self.dsprod.where(mask, drop=True)
+        self.dsprod = self.dsprod.set_coords(["lon", "lat"])
+
+        # # OPTIMISATION 4: Vérifier s'il reste des données de manière vectorisée
+        # if filtered_ds.sizes.get("member", 0) == 0:
+        #     # Aucune donnée dans le rayon pour aucun timestep
+        #     self.dsprod = self.dsprod.isel(member=slice(0, 0))
+        #     return
         
-        # OPTIMISATION 4: Vérifier s'il reste des données de manière vectorisée
-        if filtered_ds.sizes.get("member", 0) == 0:
-            # Aucune donnée dans le rayon pour aucun timestep
-            self.dsprod = self.dsprod.isel(member=slice(0, 0))
-            return
-        
-        # OPTIMISATION 5: Nettoyage des coordonnées en une fois
-        self.dsprod = self._clean_coordinates(filtered_ds)
+        # # OPTIMISATION 5: Nettoyage des coordonnées en une fois
+        # self.dsprod = self._clean_coordinates(filtered_ds)
         
         # OPTIMISATION 6: Filtrer dsref de manière cohérente
         # Identifier les timesteps qui ont des données valides
-        valid_times = []
-        for time_idx in range(len(self.dsref.time)):
-            time_mask = mask.isel(time=time_idx)
-            if time_mask.any():
-                valid_times.append(time_idx)
+        # valid_times = []
+        # for time_idx in range(len(self.dsref.time)):
+        #     time_mask = mask.isel(time=time_idx)
+        #     if time_mask.any():
+        #         valid_times.append(time_idx)
         
-        if valid_times:
-            self.dsref = self.dsref.isel(time=valid_times)
-        else:
-            # Garder la structure mais vide
-            self.dsref = self.dsref.isel(time=slice(0, 0))
+        # if valid_times:
+        #     self.dsref = self.dsref.isel(time=valid_times)
+        # else:
+        #     # Garder la structure mais vide
+        #     self.dsref = self.dsref.isel(time=slice(0, 0))
     
     def _handle_time_dependent_case_chunked(self, radius_meters: float, chunk_size: int = 50) -> None:
         """
@@ -387,7 +411,6 @@ class HorizontalColocation(AbstractColocation):
         
         # Préparation des données (unchanged)
         self.dsprod = xcoords.geo_stack(self.dsprod, "member")
-        
         # OPTIMISATION: Choix de la méthode selon le cas
         if "time" not in self.dsref.lon.dims:
             # Cas time-independent (unchanged)
@@ -408,7 +431,6 @@ class HorizontalColocation(AbstractColocation):
         # Set depth coordinate if needed (unchanged)
         if "depth" not in self.dsprod.coords and "depth" in self.dsprod.data_vars:
             self.dsprod = self.dsprod.set_coords("depth")
-        
         return self.dsref, self.dsprod
     
 
@@ -638,8 +660,7 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     #     engine='netcdf4',
     #     compute=True  # Forcer le compute immédiat
     #     )
-    # encoding = create_fast_encoding(dsprod)
-    # logger.info(f"Save {ncout_prod}")
+    logger.info(f"Save {ncout_prod}")
     # dsprod.to_netcdf(
     #     ncout_prod,
     #     encoding=encoding,
