@@ -80,6 +80,7 @@ CMAP_VARS = {
     }
 
 METRIC_LABELS = {
+    "diff": "Difference",
     "bias": "Bias",
     "rmse": "Rmse",
     "rmsec": "Ce.Rmse"

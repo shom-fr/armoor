@@ -486,6 +486,12 @@ def get_parser_comp_sst():
 
 def main_comp_sst():
     """Compare sst reference with other products."""
+    
+    logger.info("🔍 DIAGNOSTIC INITIAL:")
+    monitor_performance()
+    
+    start_time = time.time()
+    
     # Get parser
     parser = get_parser_comp_sst()
     func_comp = "comp_sst"
@@ -503,11 +509,8 @@ def main_comp_sst():
             )
     cfg = ConfigManager(VALIDATION_INI).load(str(args.cfgfile))
     
-    
-    #if True:
-    # Open-decode data
-    dss, data_ref = main_open_datasets(cfg["data"])
-
+    if not cfg:
+        raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
     # Metazones
     kw_comp = {"qc": args.qc}
     metazones = check_metazones_in(
@@ -516,19 +519,23 @@ def main_comp_sst():
         func_param=METAZONE_PARAMS[func_comp],
         **kw_comp
         )
-    dss = main_metazones(dss, metazones)
-    logger.info("Save open-decoded/metazone in netcdf.")
-    ncs_metazone = to_netcdf_ref_prods(
-        dss,
-        f"{func_comp}/metazones",
-        "{mz_name}/{data_name}/{refprod}.nc"
-        )
+    from pprint import pprint
+    pprint(metazones)
+    logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
+    
+    register_cf()
+    
+    ncs = load_datasets_sequential(cfg["data"], metazones, func_comp)
+    
+    ncs_coloc = main_coloc(ncs, metazones, func_comp)
 
-    # Colocation
-    ncs_coloc = main_coloc(ncs_metazone, metazones, func_comp)
-
-    # Comp
     main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
+
+    elapsed = time.time() - start_time
+    logger.info(f"🎯 TRAITEMENT TERMINÉ EN {elapsed:.1f} SECONDES")    
+    
+    logger.info("🔍 DIAGNOSTIC FINAL:")
+    monitor_performance()
 
 def get_parser_comp_argo():
     """Get parser for argo comparison."""
@@ -717,9 +724,6 @@ def main_comp_argo():
     
     if not cfg:
         raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
-    
-    logger.info("🔍 DIAGNOSTIC INITIAL:")
-    monitor_performance()
     
     # Metazones setup
     kw_comp = {"radius": args.radius, "qc": args.qc}  
@@ -951,13 +955,13 @@ def save_result(dsout, mz_name, func_comp):
     encoding = create_fast_encoding(dsout)
     
     #Sauvegarde avec optimisations
-    # dsout.to_netcdf(
-    #     nc,
-    #     encoding=encoding,
-    #     format='NETCDF4',
-    #     engine='netcdf4',
-    #     compute=True  # Forcer le compute immédiat
-    #     )
+    dsout.to_netcdf(
+        nc,
+        encoding=encoding,
+        format='NETCDF4',
+        engine='netcdf4',
+        compute=True  # Forcer le compute immédiat
+        )
     
     logger.debug(f"💾 Sauvegardé: {nc}")
     return nc

@@ -275,7 +275,7 @@ class PlotComp:
                     
                 if "vlevel" in self.mparams:
                     vertical = f"{dsprod.attrs['vlevel']} m"
-                elif "trange_seq" in self.mparams:
+                elif "vrange" in self.mparams:
                     vertical = f"{dsprod.attrs['vrange']} m"
                 else:
                     vertical = ""
@@ -971,12 +971,20 @@ class PlotComp:
         
     def timeseries_sel(self, dicos, var):
         """Plot time series differences."""
-        npts = dicos[0]["ref"].sizes["npts"]
-        figname = (
-            "{self.func_comp}/plot/{self.metazone}" + 
-            "/{var}/" + 
-            "timeseries_sel_{lat_pt}_{lon_pt}.png"
-            )
+        npts = dicos[0]["ref"].sizes.get("npts")
+        if not npts:
+            npts = 1
+            figname = (
+                "{self.func_comp}/plot/{self.metazone}" + 
+                "/{var}/" + 
+                "timeseries_sel.png"
+                )
+        else:
+            figname = (
+                "{self.func_comp}/plot/{self.metazone}" + 
+                "/{var}/" + 
+                "timeseries_sel_{lat_pt}_{lon_pt}.png"
+                )
         for inpt in range(npts):
             
             fig, axes = create_subplots(
@@ -986,26 +994,44 @@ class PlotComp:
                 )
 
             for idico, dico in enumerate(dicos):
-                ref = dico["ref"][var].isel(npts=inpt)
-                prod = dico["prod"][var].isel(npts=inpt)
-                diff = dico["diff"][var].isel(npts=inpt)
+                if npts == 1:
+                    ref = dico["ref"][var]
+                    prod = dico["prod"][var]
+                    diff = dico["diff"][var]
+                else:
+                    ref = dico["ref"][var].isel(npts=inpt)
+                    prod = dico["prod"][var].isel(npts=inpt)
+                    diff = dico["diff"][var].isel(npts=inpt)
 
-                plot_coords = "points"
+                if npts > 1:
+                    plot_coords = "points"
+                else:
+                    plot_coords = "filledbox"
+                    
                 lon_pt = ref.lon.values
                 lat_pt = prod.lat.values
                 
                 if idico == 0:
                     units = dico["ref"][var].attrs["units"]
-                    fig.suptitle(
-                        f"{self.plot_title} \n"
-                        f"{var}, {units} \n"
-                        f"{self.metazone}: {lat_pt}°N, {lon_pt}°E",
-                        y=1.05
-                        )
-            
+                    if npts > 1:
+                        fig.suptitle(
+                            f"{self.plot_title} \n"
+                            f"{self.metazone}: {lat_pt}°N, {lon_pt}°E\n"
+                            f"{var}, {units}",
+                            y=1.05
+                            )
+                    else:
+                        fig.suptitle(
+                            f"{self.plot_title} \n"
+                            f"{self.metazone} \n"
+                            f"{var}, {units}",
+                            y=1.05
+                            )
+                ax_minimap = self.ax_minimap
+                ax_minimap[1] = 0.93
                 plot_minimap(
                     ref,
-                    ax=self.ax_minimap,
+                    ax=ax_minimap,
                     plot_coords=plot_coords,
                     coords_markersize=4,
                     gridlines_draw_labels=True,
@@ -1056,7 +1082,7 @@ class PlotComp:
     
     def timeseries(self):
         """Plot time series."""
-        pattern = r'([^/]+)_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}_(\d+\.?\d*|\d+-\d+)\.nc$'
+        pattern = r'([^/]+)_\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(_(\d+\.?\d*|\d+-\d+))?\.nc$'
         dicos = {}
         for prod, ncins in self.mparams.get("ncins").items():
             ncins_prod = sort_ncs_by_suffix(ncins["prod"], pattern)
@@ -1131,7 +1157,7 @@ class PlotComp:
                         
                     if "vlevel" in self.mparams:
                         vertical = f"{dsprod.attrs['vlevel']} m"
-                    elif "trange_seq" in self.mparams:
+                    elif "vrange" in self.mparams:
                         vertical = f"{dsprod.attrs['vrange']} m"
                     else:
                         vertical = ""
@@ -1164,7 +1190,7 @@ class PlotComp:
                         exclude_dims = ["time"]
                     else:
                         exclude_dims = None
-                    
+
                     dicos = StatsComp(
                         self.mparams,
                         dsref,
@@ -1221,7 +1247,10 @@ class PlotComp:
                             cmap_comp = "cmo.diff"
                         else:
                             cmap_comp = "cmo.amp"
-                        if ("npts" in ds_prod.dims) or (ds_prod.lon.dims != ("x" ,"y")):
+                        ds_prod = ds_prod.squeeze()
+                        ds_ref = ds_ref.squeeze()
+                        ds_comp = ds_comp.squeeze()
+                        if ("npts" in ds_prod.dims) or (ds_prod.lon.dims != ("y" ,"x")):
                             m0 = axes[0].scatter(
                                 ds_prod.lon, ds_prod.lat,
                                 c=ds_prod,
@@ -1246,6 +1275,7 @@ class PlotComp:
                                 cmap=cmap_comp,
                                 )
                         else:
+
                             m0 = axes[0].pcolormesh(
                                 ds_prod.lon, ds_prod.lat, ds_prod,
                                 vmin=vmin,
@@ -1293,7 +1323,7 @@ class PlotComp:
                         figname = (
                             f"{self.func_comp}/plot/{self.metazone}" + 
                             f"/{var}/" + 
-                            f"map_{icomp_name}.png"
+                            f"map_{comp}_{icomp_name}.png"
                             )
                         
                         pos0 = axes[0].get_position()

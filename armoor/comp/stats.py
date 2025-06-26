@@ -43,6 +43,11 @@ class StatsComp:
             if self.exclude_dims:
                 [dims.remove(dim) for dim in self.exclude_dims]
             return self.get_stats(dims)
+        elif self.extra_dims and (len(self.extra_dims) > 0):
+            dims = []
+            if self.extra_dims:
+                dims += self.extra_dims
+            return self.get_stats(dims)
         else:
             return self.get_diff()
 

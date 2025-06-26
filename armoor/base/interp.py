@@ -496,20 +496,20 @@ def regrid(dsi, dso) -> xr.Dataset:
     xarray.Dataset
         Regridded dataset.
     """
-    dlon = dsi.lon.diff("x").max().values
-    dlat = dsi.lat.diff("y").max().values
+    # dlon = dsi.lon.diff("x").max().values
+    # dlat = dsi.lat.diff("y").max().values
     
     vars2sub = geo_vars(dsi)
-    dsi = dsi[vars2sub].where(
-        (dsi.lat >= dso.lat.min().values - 2 * dlat)
-        & (dsi.lat <= dso.lat.max().values + 2 * dlat)
-        & (dsi.lon >= dso.lon.min().values - 2 * dlon)
-        & (dsi.lon <= dso.lon.max().values + 2 * dlon),
-        # drop=True,
-    )
+    # dsi = dsi[vars2sub].where(
+    #     (dsi.lat >= dso.lat.min().values - 2 * dlat)
+    #     & (dsi.lat <= dso.lat.max().values + 2 * dlat)
+    #     & (dsi.lon >= dso.lon.min().values - 2 * dlon)
+    #     & (dsi.lon <= dso.lon.max().values + 2 * dlon),
+    #     # drop=True,
+    # )
     
-    if "mask" in dso.keys():
-        dso = dso.where(dso.mask == 1 , drop=True)
+    # if "mask" in dsi.keys():
+    #     dsi = dsi.where(dsi.mask == 1 , drop=True)
     
     regridder = xe.Regridder(dsi, dso, "bilinear", parallel=False)
     dss = []

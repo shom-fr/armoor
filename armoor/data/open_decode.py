@@ -442,6 +442,7 @@ def open_decode_hycom(path_files):
     dss = []
     for var in dss_var.keys():
         ds_concat = xr.concat(dss_var[var], dim='time')
+        ds_concat = ds_concat.sel(time=~ds_concat.get_index("time").duplicated())
         if var == 'u':
             dsu = ds_concat
         elif var == 'v':

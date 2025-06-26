@@ -116,8 +116,8 @@ class TimeColocation(AbstractColocation):
         xarray.Dataset, xarray.Dataset
         """
         time = pd.date_range(start=self.start, end=self.end, freq=tfreq)
-        dsref = interp_time(self.dsref, time)
-        dsprod = interp_time(self.dsprod, time)
+        self.dsref = interp_time(self.dsref, time)
+        self.dsprod = interp_time(self.dsprod, time)
         return self.dsref, self.dsprod
     
     def trange_seq(self, args: [str, str]) -> xr.Dataset:
@@ -201,9 +201,10 @@ class HorizontalColocation(AbstractColocation):
             Datasets with elements located at specific coordinates.
         """
         if ref == "reference":
-            if "mask" in self.dsprod:
-                self.dsref = self.dsref.where(self.dsref.mask, drop=True)
-            self.dsprod = regrid(self.dsprod, self.dsref) 
+            if "mask" in self.dsref:
+                mask = self.dsref.mask.compute()
+                self.dsref = self.dsref.where(mask, drop=True)
+            self.dsprod = regrid(self.dsprod, self.dsref)
         else:
             if "mask" in self.dsprod:
                 self.dsprod = self.dsprod.where(self.dsprod.mask, drop=True)
@@ -653,21 +654,21 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     ncout_prod = dirout / f"{prod_name}{ncname}.nc"
     encoding = create_fast_encoding(dsref)
     logger.info(f"Save {ncout_ref}")
-    # dsref.to_netcdf(
-    #     ncout_ref,
-    #     encoding=encoding,
-    #     format='NETCDF4',
-    #     engine='netcdf4',
-    #     compute=True  # Forcer le compute immédiat
-    #     )
+    dsref.to_netcdf(
+        ncout_ref,
+        encoding=encoding,
+        format='NETCDF4',
+        engine='netcdf4',
+        compute=True  # Forcer le compute immédiat
+        )
     logger.info(f"Save {ncout_prod}")
-    # dsprod.to_netcdf(
-    #     ncout_prod,
-    #     encoding=encoding,
-    #     format='NETCDF4',
-    #     engine='netcdf4',
-    #     compute=True  # Forcer le compute immédiat
-    #     )
+    dsprod.to_netcdf(
+        ncout_prod,
+        encoding=encoding,
+        format='NETCDF4',
+        engine='netcdf4',
+        compute=True  # Forcer le compute immédiat
+        )
     return ncout_ref, ncout_prod
 
 def main_coloc(ncs, metazones, comp_func):
@@ -703,7 +704,11 @@ def main_coloc(ncs, metazones, comp_func):
         for var in COMP_VARS[comp_func]:
             dsrefin[var] = dsrefin.oceanvars.sel(var)
         for var in dsrefin.data_vars:
-            if var not in COMP_VARS[comp_func]:
+            if (
+                var not in COMP_VARS[comp_func]
+                ) and (
+                var != "mask"
+                ):
                 dsrefin = dsrefin.drop_vars(var)
         ncins = [
             nc for nc in ncs if metazone in str(nc) and "ref.nc" not in str(nc)
@@ -721,6 +726,8 @@ def main_coloc(ncs, metazones, comp_func):
 
             dsref = dsrefin.copy()
             dsprod = dsprodin.copy()
+            gattrs_ref = dsref.attrs
+            gattrs_prod = dsprod.attrs
             data_name = dsprodin.attrs['data_name']
             if not ncouts[metazone].get(data_name):
                 ncouts[metazone].update({
@@ -751,31 +758,32 @@ def main_coloc(ncs, metazones, comp_func):
                     params.get("vertical"),
                     )
                 gc.collect()
-                
+            dsref = dsref.assign_attrs(gattrs_ref)
+            dsprod = dsprod.assign_attrs(gattrs_prod)
             # Configuration optimale
             
-            # dask.config.set({
-            #     'distributed.worker.daemon': False,
-            #     'distributed.comm.timeouts.connect': '120s',
-            #     'distributed.comm.timeouts.tcp': '120s',
-            #     'distributed.worker.memory.target': 0.9,
-            #     'distributed.worker.memory.spill': 0.8,
-            #     'distributed.worker.memory.pause': 0.9,
-            #     'distributed.worker.memory.terminate': 0.95,
-            #     'distributed.worker.memory.monitor-interval': '100ms',
-            #     'distributed.scheduler.allowed-failures': 2,
-            #     'distributed.scheduler.work-stealing': True,
-            # })
+            dask.config.set({
+                'distributed.worker.daemon': False,
+                'distributed.comm.timeouts.connect': '120s',
+                'distributed.comm.timeouts.tcp': '120s',
+                'distributed.worker.memory.target': 0.9,
+                'distributed.worker.memory.spill': 0.8,
+                'distributed.worker.memory.pause': 0.9,
+                'distributed.worker.memory.terminate': 0.95,
+                'distributed.worker.memory.monitor-interval': '100ms',
+                'distributed.scheduler.allowed-failures': 2,
+                'distributed.scheduler.work-stealing': True,
+            })
             
-            # with dask.distributed.Client(
-            #     n_workers=4,  # Réduire le nombre de workers
-            #     threads_per_worker=4,
-            #     memory_limit='18GB',
-            #     silence_logs=True,
-            #     dashboard_address=':8787'
-            #     ) as client:
-            #     dsref = dsref.compute()
-            #     dsprod = dsprod.compute()
+            with dask.distributed.Client(
+                n_workers=4,  # Réduire le nombre de workers
+                threads_per_worker=4,
+                memory_limit='18GB',
+                silence_logs=True,
+                dashboard_address=':8787'
+                ) as client:
+                dsref = dsref.compute()
+                dsprod = dsprod.compute()
             
             time_coloc = params.get("time")
             if time_coloc != None:
@@ -797,8 +805,9 @@ def main_coloc(ncs, metazones, comp_func):
             if vertical_coloc != None:
                 if "vlevel" in params.get("vertical")[0]:
                     vname  = params.get("vertical")[1][0]
-                    dsref = ranges.vlevels(dsref, vname)
-                    dsprod = ranges.vlevels(dsprod, vname)
+                    if comp_func != "comp_sst":
+                        dsref = ranges.vlevels(dsref, vname)
+                        dsprod = ranges.vlevels(dsprod, vname)
                 elif "vrange" in params.get("vertical")[0]:
                     vname = params.get("vertical")[1][1]
                     vbins = params.get("vertical")[1][2]

@@ -185,7 +185,7 @@ class ArmoorSelectionAccessor:
         self.ds["mask"] = mask_poly2
         structure = np.ones((3, 3), dtype=bool)
         mask_poly.values = binary_dilation(
-            mask_poly2, 
+            mask_poly, 
             structure=structure,
             iterations=10
         )
