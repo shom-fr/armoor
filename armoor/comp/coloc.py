@@ -229,18 +229,8 @@ class HorizontalColocation(AbstractColocation):
         OPTIMISATION 1: Calcul vectorisé pour tous les timesteps simultanément
         """
         rename_dims = {"npts0": "member"}
-        if "time" in prod_data.dims:
+        if "time" in ref_data.lon.dims:
             rename_dims["npts1"] = "time"
-        # dists = []
-        # for itime in range(ref_data.sizes["time"]):
-        #     dists.append(
-        #         xgeo.get_distances(prod_data, ref_data.isel(time=[itime]))
-        #         .squeeze()
-        #         .rename(rename_dims)
-        #         .assign_coords(member=prod_data.member)
-        #     )
-        # dist = xr.concat(dists, dim="time")
-        # print(dist)
         dist = (xgeo.get_distances(prod_data, ref_data)
                 .squeeze()
                 .rename(rename_dims)
@@ -248,17 +238,12 @@ class HorizontalColocation(AbstractColocation):
             )
         return dist
     
-    def _handle_time_dependent_case_optimized(self, radius_meters: float) -> None:
+    def _handle_time_dependent(self, radius_meters: float) -> None:
         """
         OPTIMISATION MAJEURE: Traite tous les timesteps simultanément au lieu d'une boucle.
         """
-        # OPTIMISATION 1: Calcul de distances pour tous les timesteps d'un coup
         dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
-        # if "time" in self.dsprod.dims:
-        #     dist_prod2ref = dist_prod2ref.swap_dims({"npts1": "time"})
-        # OPTIMISATION 2: Filtrage vectorisé sur toutes les dimensions
         mask = dist_prod2ref < radius_meters
-
         # OPTIMISATION 3: Appliquer le masque et drop en une seule opération
         for coord in ["lon", "lat"]:
             self.dsprod[coord] = self.dsprod[coord].expand_dims({"time": self.dsprod.time})
@@ -268,125 +253,8 @@ class HorizontalColocation(AbstractColocation):
         self.dsprod = self.dsprod.where(mask, drop=True)
         self.dsprod = self.dsprod.set_coords(["lon", "lat"])
 
-        # # OPTIMISATION 4: Vérifier s'il reste des données de manière vectorisée
-        # if filtered_ds.sizes.get("member", 0) == 0:
-        #     # Aucune donnée dans le rayon pour aucun timestep
-        #     self.dsprod = self.dsprod.isel(member=slice(0, 0))
-        #     return
-        
-        # # OPTIMISATION 5: Nettoyage des coordonnées en une fois
-        # self.dsprod = self._clean_coordinates(filtered_ds)
-        
-        # OPTIMISATION 6: Filtrer dsref de manière cohérente
-        # Identifier les timesteps qui ont des données valides
-        # valid_times = []
-        # for time_idx in range(len(self.dsref.time)):
-        #     time_mask = mask.isel(time=time_idx)
-        #     if time_mask.any():
-        #         valid_times.append(time_idx)
-        
-        # if valid_times:
-        #     self.dsref = self.dsref.isel(time=valid_times)
-        # else:
-        #     # Garder la structure mais vide
-        #     self.dsref = self.dsref.isel(time=slice(0, 0))
-    
-    def _handle_time_dependent_case_chunked(self, radius_meters: float, chunk_size: int = 50) -> None:
-        """
-        OPTIMISATION ALTERNATIVE: Traitement par chunks pour économiser la mémoire.
-        Utilise cette version si vous avez des problèmes de mémoire.
-        """
-        n_times = len(self.dsref.time)
-        
-        if n_times <= chunk_size:
-            # Si petit nombre de timesteps, utiliser la version complètement vectorisée
-            return self._handle_time_dependent_case_optimized(radius_meters)
-        
-        prod_chunks = []
-        ref_chunks = []
-        
-        # OPTIMISATION: Traitement par chunks de timesteps
-        for start_idx in range(0, n_times, chunk_size):
-            end_idx = min(start_idx + chunk_size, n_times)
-            time_slice = slice(start_idx, end_idx)
-            
-            # Extraire le chunk
-            prod_chunk = self.dsprod.isel(time=time_slice)
-            ref_chunk = self.dsref.isel(time=time_slice)
-            
-            # Calculer distances pour le chunk
-            dist_chunk = self._calculate_distances_vectorized(prod_chunk, ref_chunk)
-            mask_chunk = dist_chunk < radius_meters
-            
-            # Filtrer le chunk
-            filtered_chunk = prod_chunk.where(mask_chunk, drop=True)
-            
-            # Vérifier si le chunk a des données valides
-            if filtered_chunk.sizes.get("member", 0) > 0:
-                # Nettoyer les coordonnées
-                cleaned_chunk = self._clean_coordinates(filtered_chunk)
-                prod_chunks.append(cleaned_chunk)
-                
-                # Filtrer ref_chunk pour les timesteps valides
-                valid_times_in_chunk = []
-                for local_time_idx in range(len(ref_chunk.time)):
-                    time_mask = mask_chunk.isel(time=local_time_idx)
-                    if time_mask.any():
-                        valid_times_in_chunk.append(local_time_idx)
-                
-                if valid_times_in_chunk:
-                    ref_chunks.append(ref_chunk.isel(time=valid_times_in_chunk))
-        
-        # OPTIMISATION: Concatenation finale en une seule opération
-        if prod_chunks:
-            self.dsprod = xr.concat(prod_chunks, dim="time")
-            self.dsref = xr.concat(ref_chunks, dim="time")
-        else:
-            self.dsprod = self.dsprod.isel(member=slice(0, 0))
-    
-    def _handle_time_dependent_case_lazy(self, radius_meters: float) -> None:
-        """
-        OPTIMISATION ULTIME: Utilisation de Dask pour le calcul lazy.
-        Plus complexe mais potentiellement le plus rapide pour de gros datasets.
-        """
-        # Force le chunking si pas déjà fait
-        if not self.dsprod.chunks:
-            # Chunk par timestep pour optimiser le calcul parallèle
-            self.dsprod = self.dsprod.chunk({"time": 10, "member": -1})
-            self.dsref = self.dsref.chunk({"time": 10})
-        
-        # Calcul lazy des distances
-        dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
-        
-        # Masque lazy
-        mask = dist_prod2ref < radius_meters
-        
-        # Application du masque de manière lazy
-        filtered_ds = self.dsprod.where(mask, drop=True)
-        
-        # Force le calcul seulement maintenant
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")  # Ignore les warnings Dask
-            filtered_ds = filtered_ds.compute()
-        
-        if filtered_ds.sizes.get("member", 0) == 0:
-            self.dsprod = self.dsprod.isel(member=slice(0, 0))
-            return
-        
-        self.dsprod = self._clean_coordinates(filtered_ds)
-        
-        # Traitement cohérent de dsref
-        mask_computed = mask.compute()
-        valid_times = []
-        for time_idx in range(len(self.dsref.time)):
-            time_mask = mask_computed.isel(time=time_idx)
-            if time_mask.any():
-                valid_times.append(time_idx)
-        
-        if valid_times:
-            self.dsref = self.dsref.isel(time=valid_times)
-    
-    def radius(self, radius: float, method: str = "vectorized") -> Tuple[xr.Dataset, xr.Dataset]:
+ 
+    def radius(self, radius: float) -> Tuple[xr.Dataset, xr.Dataset]:
         """
         Version optimisée de la méthode radius.
         
@@ -394,12 +262,6 @@ class HorizontalColocation(AbstractColocation):
         ----------
         radius : float
             Radius (in km) of the disk around an observation.
-        method : str, optional
-            Optimization method to use:
-            - "vectorized": Calcul vectorisé pour tous les timesteps (par défaut, le plus rapide)
-            - "chunked": Traitement par chunks (pour économiser la mémoire)
-            - "lazy": Utilisation de Dask pour calcul parallèle (pour très gros datasets)
-            
         Returns
         -------
         tuple[xarray.Dataset, xarray.Dataset]
@@ -419,15 +281,7 @@ class HorizontalColocation(AbstractColocation):
             filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters, drop=True)
             self.dsprod = self._clean_coordinates(filtered_ds)
         else:
-            # Cas time-dependent: utiliser la méthode optimisée choisie
-            if method == "vectorized":
-                self._handle_time_dependent_case_optimized(radius_meters)
-            elif method == "chunked":
-                self._handle_time_dependent_case_chunked(radius_meters)
-            elif method == "lazy":
-                self._handle_time_dependent_case_lazy(radius_meters)
-            else:
-                raise ValueError(f"Unknown method: {method}")
+            self._handle_time_dependent(radius_meters)
         
         # Set depth coordinate if needed (unchanged)
         if "depth" not in self.dsprod.coords and "depth" in self.dsprod.data_vars:
@@ -650,25 +504,25 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     else:
         pass
     
-    ncout_ref = dirout / f"{ref_name}{ncname}.nc"
-    ncout_prod = dirout / f"{prod_name}{ncname}.nc"
+    ncout_ref = dirout / f"ref{ncname}.nc"
+    ncout_prod = dirout / f"prod{ncname}.nc"
     encoding = create_fast_encoding(dsref)
     logger.info(f"Save {ncout_ref}")
-    dsref.to_netcdf(
-        ncout_ref,
-        encoding=encoding,
-        format='NETCDF4',
-        engine='netcdf4',
-        compute=True  # Forcer le compute immédiat
-        )
+    # dsref.to_netcdf(
+    #     ncout_ref,
+    #     encoding=encoding,
+    #     format='NETCDF4',
+    #     engine='netcdf4',
+    #     compute=True  # Forcer le compute immédiat
+    #     )
     logger.info(f"Save {ncout_prod}")
-    dsprod.to_netcdf(
-        ncout_prod,
-        encoding=encoding,
-        format='NETCDF4',
-        engine='netcdf4',
-        compute=True  # Forcer le compute immédiat
-        )
+    # dsprod.to_netcdf(
+    #     ncout_prod,
+    #     encoding=encoding,
+    #     format='NETCDF4',
+    #     engine='netcdf4',
+    #     compute=True  # Forcer le compute immédiat
+    #     )
     return ncout_ref, ncout_prod
 
 def main_coloc(ncs, metazones, comp_func):
@@ -693,151 +547,167 @@ def main_coloc(ncs, metazones, comp_func):
     for metazone, params in coloc_params.items():
         logger.info(f"Start colocation for {metazone}.")
         tbound = metazones[metazone].get("tbound")
-        ncouts[metazone] = {}
-        ncref = [
-            nc for nc in ncs if (metazone in str(nc)) & ("ref.nc" in str(nc))
-            ][0]
-        logger.info(f"Use reference {ncref}")
-        dsrefin = xr.open_dataset(ncref)#, engine="h5netcdf")
-        logger.info(dsrefin.sizes)
-        dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=16)
-        for var in COMP_VARS[comp_func]:
-            dsrefin[var] = dsrefin.oceanvars.sel(var)
-        for var in dsrefin.data_vars:
-            if (
-                var not in COMP_VARS[comp_func]
-                ) and (
-                var != "mask"
-                ):
-                dsrefin = dsrefin.drop_vars(var)
-        ncins = [
-            nc for nc in ncs if metazone in str(nc) and "ref.nc" not in str(nc)
+        ncrefs = [
+            nc for nc in ncs if (metazone in str(nc)) & ("ref" in str(nc))
             ]
-        for ncin in ncins:
-            logger.info(f"-- Process {ncin}")
-            dsprodin = xr.open_dataset(ncin)
-            logger.info(dsprodin.sizes)
-            dsprodin = optimize_for_low_swap(dsprodin, target_chunk_mb=16)
+        for ncref in ncrefs:
+            logger.info(f"Use reference {ncref}")
+            dsrefin = xr.open_dataset(ncref)#, engine="h5netcdf")
+            logger.info(dsrefin.sizes)
+            dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=64)
             for var in COMP_VARS[comp_func]:
-                dsprodin[var] = dsprodin.oceanvars.sel(var)
-            for var in dsprodin.data_vars:
-                if var not in COMP_VARS[comp_func]:
-                    dsprodin = dsprodin.drop_vars(var)
-
-            dsref = dsrefin.copy()
-            dsprod = dsprodin.copy()
-            gattrs_ref = dsref.attrs
-            gattrs_prod = dsprod.attrs
-            data_name = dsprodin.attrs['data_name']
-            if not ncouts[metazone].get(data_name):
-                ncouts[metazone].update({
-                    data_name: {
-                        "ref": [],
-                        "prod": []
-                        }
-                    })
-            if params.get("time"):
-                dsref, dsprod = process_time_colocation(
-                    dsref,
-                    dsprod,
-                    params.get("time"),
-                    tbound
-                    )
-                gc.collect()
-            if params.get("horizontal"):
-                dsref, dsprod = process_horizontal_colocation(
-                    dsref,
-                    dsprod,
-                    params.get("horizontal"),
-                    )
-                gc.collect()
-            if params.get("vertical"):
-                dsref, dsprod = process_vertical_colocation(
-                    dsref,
-                    dsprod,
-                    params.get("vertical"),
-                    )
-                gc.collect()
-            dsref = dsref.assign_attrs(gattrs_ref)
-            dsprod = dsprod.assign_attrs(gattrs_prod)
-            # Configuration optimale
-            
-            dask.config.set({
-                'distributed.worker.daemon': False,
-                'distributed.comm.timeouts.connect': '120s',
-                'distributed.comm.timeouts.tcp': '120s',
-                'distributed.worker.memory.target': 0.9,
-                'distributed.worker.memory.spill': 0.8,
-                'distributed.worker.memory.pause': 0.9,
-                'distributed.worker.memory.terminate': 0.95,
-                'distributed.worker.memory.monitor-interval': '100ms',
-                'distributed.scheduler.allowed-failures': 2,
-                'distributed.scheduler.work-stealing': True,
-            })
-            
-            with dask.distributed.Client(
-                n_workers=4,  # Réduire le nombre de workers
-                threads_per_worker=4,
-                memory_limit='18GB',
-                silence_logs=True,
-                dashboard_address=':8787'
-                ) as client:
-                dsref = dsref.compute()
-                dsprod = dsprod.compute()
-            
-            time_coloc = params.get("time")
-            if time_coloc != None:
-                if  "tfreq" in params.get("time")[0]:
-                    dsref = ranges.tfreq(dsref)
-                    dsprod = ranges.tfreq(dsprod)
-                elif "trange_seq" in params.get("time")[0]:
-                    if params.get("time")[1][0] != "*":
-                        dsref = ranges.trange_seq(dsref, *tbound, params.get("time")[1][0])
-                        dsprod = ranges.trange_seq(dsprod, *tbound, params.get("time")[1][0])
-                    else:
-                        dsref = [dsref]
-                        dsprod = [dsprod]
-            else:
-                dsref = [dsref]
-                dsprod = [dsprod]
-
-            vertical_coloc = params.get("vertical")
-            if vertical_coloc != None:
-                if "vlevel" in params.get("vertical")[0]:
-                    vname  = params.get("vertical")[1][0]
-                    if comp_func != "comp_sst":
-                        dsref = ranges.vlevels(dsref, vname)
-                        dsprod = ranges.vlevels(dsprod, vname)
-                elif "vrange" in params.get("vertical")[0]:
-                    vname = params.get("vertical")[1][1]
-                    vbins = params.get("vertical")[1][2]
-                    dsref = ranges.vrange(dsref, vname, vbins)
-                    dsprod = ranges.vrange(dsprod, vname, vbins)
-            dssref = dsref
-            dssprod = dsprod
-            del dsref; del dsprod
-            
-            logger.info("Save coloc data in netcdf")
-            for ids in range(len(dssref)):
-                dsref = dssref[ids]
-                dsprod = dssprod[ids]
-                dirout = Path(
-                    f"{comp_func}/coloc/{metazone}/{dsprod.attrs['data_name']}"
-                    )
-                dirout.mkdir(parents=True, exist_ok=True)
-                ncout_ref, ncout_prod = save_datasets(
-                    dsref,
-                    dsprod,
-                    dirout,
-                    dsref.attrs['data_name'],
-                    dsprod.attrs['data_name']
-                    )
-                ncouts[metazone][data_name]["ref"].append(ncout_ref)
-                ncouts[metazone][data_name]["prod"].append(ncout_prod)
-                dsref.close()
-                dsprod.close()
-
-        dsrefin.close()
-        gc.collect()
+                da = dsrefin.oceanvars.sel(var)
+                if isinstance(da, xr.DataArray):
+                    dsrefin[var] = da
+            for var in dsrefin.data_vars:
+                if (
+                    var not in COMP_VARS[comp_func]
+                    ) and (
+                    var != "mask"
+                    ):
+                    dsrefin = dsrefin.drop_vars(var)
+            ncins = [
+                nc for nc in ncs if metazone in str(nc) and "ref" not in str(nc)
+                ]
+            for ncin in ncins:
+                logger.info(f"-- Process {ncin}")
+                dsprodin = xr.open_dataset(ncin)
+                logger.info(dsprodin.sizes)
+                dsprodin = optimize_for_low_swap(dsprodin, target_chunk_mb=64)
+                for var in COMP_VARS[comp_func]:
+                    dsprodin[var] = dsprodin.oceanvars.sel(var)
+                for var in dsprodin.data_vars:
+                    if var not in COMP_VARS[comp_func]:
+                        dsprodin = dsprodin.drop_vars(var)
+                    if (
+                        "depth" in dsprodin.coords
+                        ) and (
+                        "time" in dsprodin.depth.dims
+                        ):
+                        dsprodin = dsprodin.reset_coords("depth")
+                dsref = dsrefin.copy()
+                dsprod = dsprodin.copy()
+                gattrs_ref = dsref.attrs
+                gattrs_prod = dsprod.attrs
+                prod_name = dsprodin.attrs['data_name']
+                ref_name = dsrefin.attrs['data_name']
+                if not ncouts.get(metazone):
+                    ncouts[metazone] = {}
+                if not ncouts[metazone].get(ref_name):
+                    ncouts[metazone][ref_name] = {}
+                if not ncouts[metazone][ref_name].get(prod_name):
+                    ncouts[metazone][ref_name].update({prod_name: []})
+                if params.get("time"):
+                    dsref, dsprod = process_time_colocation(
+                        dsref,
+                        dsprod,
+                        params.get("time"),
+                        tbound
+                        )
+                    gc.collect()
+                if params.get("horizontal"):
+                    dsref, dsprod = process_horizontal_colocation(
+                        dsref,
+                        dsprod,
+                        params.get("horizontal"),
+                        )
+                    gc.collect()
+                if params.get("vertical"):
+                    dsref, dsprod = process_vertical_colocation(
+                        dsref,
+                        dsprod,
+                        params.get("vertical"),
+                        )
+                    gc.collect()
+                dsref = dsref.assign_attrs(gattrs_ref)
+                dsprod = dsprod.assign_attrs(gattrs_prod)
+                # Configuration optimale
+                
+                dask.config.set({
+                    'distributed.worker.daemon': False,
+                    'distributed.comm.timeouts.connect': '120s',
+                    'distributed.comm.timeouts.tcp': '120s',
+                    'distributed.worker.memory.target': 0.9,
+                    'distributed.worker.memory.spill': 0.8,
+                    'distributed.worker.memory.pause': 0.9,
+                    'distributed.worker.memory.terminate': 0.95,
+                    'distributed.worker.memory.monitor-interval': '100ms',
+                    'distributed.scheduler.allowed-failures': 2,
+                    'distributed.scheduler.work-stealing': True,
+                })
+                
+                with dask.distributed.Client(
+                    n_workers=4,  # Réduire le nombre de workers
+                    threads_per_worker=4,
+                    memory_limit='10GB',
+                    silence_logs=True,
+                    dashboard_address='localhost:8787'
+                    ) as client:
+                    print(client.dashboard_link)
+                    dsref = dsref.compute()
+                    dsprod = dsprod.compute()
+                    
+                time_coloc = params.get("time")
+                if time_coloc != None:
+                    if  "tfreq" in params.get("time")[0]:
+                        dsref = ranges.tfreq(dsref)
+                        dsprod = ranges.tfreq(dsprod)
+                    elif "trange_seq" in params.get("time")[0]:
+                        if params.get("time")[1][0] != "*":
+                            dsref = ranges.trange_seq(dsref, *tbound, params.get("time")[1][0])
+                            dsprod = ranges.trange_seq(dsprod, *tbound, params.get("time")[1][0])
+                        else:
+                            dsref = [dsref]
+                            dsprod = [dsprod]
+                else:
+                    dsref = [dsref]
+                    dsprod = [dsprod]
+    
+                vertical_coloc = params.get("vertical")
+                if vertical_coloc != None:
+                    if (
+                        "vlevel" in params.get("vertical")[0]
+                        ) or (
+                        comp_func == "comp_mooring"    
+                        ):
+                        if comp_func == "comp_mooring":
+                            vname = "depth"
+                        else:
+                            vname  = params.get("vertical")[1][0]
+                        if comp_func != "comp_sst":
+                            dsref = ranges.vlevels(dsref, vname)
+                            dsprod = ranges.vlevels(dsprod, vname)
+                    elif "vrange" in params.get("vertical")[0]:
+                        vname = params.get("vertical")[1][1]
+                        vbins = params.get("vertical")[1][2]
+                        dsref = ranges.vrange(dsref, vname, vbins)
+                        dsprod = ranges.vrange(dsprod, vname, vbins)
+                dssref = dsref
+                dssprod = dsprod
+                del dsref; del dsprod
+                
+                logger.info("Save coloc data in netcdf")
+                for ids in range(len(dssref)):
+                    dsref = dssref[ids]
+                    dsprod = dssprod[ids]
+                    dirout = Path(
+                        f"{comp_func}/coloc/{metazone}/"
+                        f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
+                        )
+                    dirout.mkdir(parents=True, exist_ok=True)
+                    ncout_ref, ncout_prod = save_datasets(
+                        dsref,
+                        dsprod,
+                        dirout,
+                        dsref.attrs['data_name'],
+                        dsprod.attrs['data_name']
+                        )
+                    ncouts[metazone][ref_name][prod_name].append(ncout_ref)
+                    ncouts[metazone][ref_name][prod_name].append(ncout_prod)
+                    dsref.close()
+                    dsprod.close()
+    
+            dsrefin.close()
+            gc.collect()
         logger.info(f"End colocation for {metazone}.")
     return ncouts

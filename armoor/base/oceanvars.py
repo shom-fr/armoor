@@ -60,6 +60,7 @@ class OceanVars:
                 logger.warning(
                     "No salinity found, potential temperature cannot be computed."
                 )
+                return None
     
     def sel_temp(self):
         """
@@ -90,7 +91,10 @@ class OceanVars:
         xarray.DataArray
             Data array containing salinity.
         """
-        return self.ds["sal"]
+        if "sal" in self.ds:
+            return self.ds["sal"]
+        else:
+            return None
     
     def sel_pres(self):
         if "pres" in self.ds:
@@ -108,12 +112,20 @@ class OceanVars:
             Data array containing density.
         """
         if "pdens" not in self.ds:
+            sal = self.sel_sal()
+            pres = self.sel_pres()
+            if not isinstance(pres, xr.DataArray):
+                logger.warning("Potential density cannot be computed")
+                return None
+            if not isinstance(sal, xr.DataArray):
+                logger.warning("Potential density cannot be computed")
+                return None
             asal = gsw.conversions.SA_from_SP(
                 self.sel_sal(), self.sel_pres(), self.ds.lon, self.ds.lat
-            )
+                )
             ctemp = gsw.CT_from_pt(
                 asal, self.sel_ptemp()
-            )
+                )
             if not asal is None and not ctemp is None:
                 if ref_dens is None or ref_dens not in [
                     0,
@@ -147,6 +159,7 @@ class OceanVars:
                 logger.warning(
                     "Caution, potential density could not be computed, ptemp or sal are missing."
                 )
+                return None
         return self.ds["pdens"]
     
     def sel_sndspeed(self):
@@ -160,7 +173,15 @@ class OceanVars:
         """
         # Verify all the required variables are included in the dataset
         ptemp = self.sel_ptemp()
-        cons_temp = gsw.CT_from_pt(self.sel_sal(), self.sel_ptemp())
+        sal = self.sel_sal()
+        if not isinstance(ptemp, xr.DataArray):
+            logger.warning("Potential density cannot be computed")
+            return None
+        if not isinstance(sal, xr.DataArray):
+            logger.warning("Potential density cannot be computed")
+            return None
+        cons_temp = gsw.CT_from_pt(sal, ptemp)
+            
         pres = self.sel_pres()
         sal = gsw.conversions.SA_from_SP(
             self.sel_sal(), pres, self.ds.lon, self.ds.lat

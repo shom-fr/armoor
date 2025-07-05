@@ -347,7 +347,8 @@ def open_decode_sst_satellite(path_files, fmt):
     ds = ds.set_coords(["lon", "lat"])
     ds["ptemp"] -= 273.15
     ds["ptemp"].attrs["units"] = "degrees C"
-    return ds[["ptemp", "lon", "lat"]]
+    ds = ds[["ptemp", "lon", "lat"]]
+    return ds
 
 
 def open_decode_cmems_model(path_files):
@@ -466,7 +467,6 @@ def open_decode_hycom(path_files):
         ds = ds.drop_vars(["z", "dz"])
 
     ds = ds.sel(time=~ds.get_index("time").duplicated())
-    
     return ds
 
 # def open_decode_hycom(path_files):
@@ -761,10 +761,11 @@ def open_decode_cmems_insitu(path_files, platform):
         ds.close()
     if platform == "argo":
         ds = concat_argo(dss)
-        return ds.drop_vars("TRAJECTORY")
+        ds = ds.drop_vars("TRAJECTORY")
+        return ds
     else:
         for ids in range(len(dss)):
-            dss[ids].attrs["name"] = dss[ids].attrs["platform_code"]
+            dss[ids].attrs["name"] = f"{dss[ids].attrs['platform_code']}"
         return dss
     return ds
 

@@ -546,6 +546,8 @@ def vinterp(ds, vname, vlevels, method="linear"):
     """
     if (vname == "depth") and ("dens" in ds.coords):
         ds = ds.reset_coords("dens")
+        if "depth" not in ds.coords:
+            ds = ds.set_coords("depth")
     elif (vname == "dens") and ("depth" in ds.coords):
         ds = ds.reset_coords("depth")
         if "dens" not in ds.coords:

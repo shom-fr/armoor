@@ -3,6 +3,7 @@ import ast
 import re
 import gc
 import os
+import json
 import weakref
 import warnings
 from contextlib import contextmanager
@@ -31,6 +32,7 @@ from armoor.comp import METAZONE_PARAMS
 from armoor.comp.io import to_netcdf_ref_prods
 from armoor.comp.coloc import main_coloc
 from armoor.comp.output import main_output
+from armoor.comp.plot import main_plot
 from armoor.data.open_decode import register_cf, open_decode
 
 logger = logging.getLogger(__name__)
@@ -387,7 +389,7 @@ def main_open_datasets(cfg: ConfigObj):
             platform=cfg_data["platform"]
             )
         # ds = optimize_for_low_swap(ds, target_chunk_mb=8)
-        ds.attrs["data_name"] = cfg_data["name"]
+        #ds.attrs["data_name"] = cfg_data["name"]
         ds.attrs["data_ref"] = str(cfg_data["ref"])
         data_ref.update({
             cfg_data["name"]: str(cfg_data["ref"])
@@ -457,6 +459,52 @@ def main_metazones(dsin, metazones):
         dsout.close()
     return dsouts
 
+def main_comp(cfgfile, metazones, func_comp, comp_args):
+    
+    logger.info("🔍 DIAGNOSTIC INITIAL:")
+    monitor_performance()
+    
+    start_time = time.time()
+    
+    
+    cfg = ConfigManager(VALIDATION_INI).load(str(cfgfile))
+    
+    if not cfg:
+        raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
+    # Metazones
+    
+    metazones = check_metazones_in(
+        metazones,
+        cfg["metazones"],
+        func_param=METAZONE_PARAMS[func_comp],
+        **comp_args
+        )
+
+    logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
+    
+    register_cf()
+    
+    ncs = load_datasets_sequential(cfg["data"], metazones, func_comp)
+    
+    ncs_coloc = main_coloc(ncs, metazones, func_comp)
+
+    ncs_outputs = main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
+    
+    with open('ncs_outputs.json', 'w') as f:
+        json.dump(ncs_outputs, f, indent=4)
+    
+    with open('/local/home/mmorvan/devarmoor/ncs_outputs.json', 'r', encoding='utf-8') as file:
+        ncs_outputs = json.load(file)
+    
+    main_plot(ncs_outputs, metazones, func_comp)
+
+    elapsed = time.time() - start_time
+    logger.info(f"🎯 TRAITEMENT TERMINÉ EN {elapsed:.1f} SECONDES")    
+    
+    logger.info("🔍 DIAGNOSTIC FINAL:")
+    monitor_performance()
+    
+
 def get_parser_comp_sst():
     """Get parser for sst comparison."""
     # Setup argument parser
@@ -487,11 +535,6 @@ def get_parser_comp_sst():
 def main_comp_sst():
     """Compare sst reference with other products."""
     
-    logger.info("🔍 DIAGNOSTIC INITIAL:")
-    monitor_performance()
-    
-    start_time = time.time()
-    
     # Get parser
     parser = get_parser_comp_sst()
     func_comp = "comp_sst"
@@ -507,36 +550,9 @@ def main_comp_sst():
         raise ArmoorError(
             f"File not found: {args.cfgfile}."
             )
-    cfg = ConfigManager(VALIDATION_INI).load(str(args.cfgfile))
+    kw_comp = {"qc": args.qc}    
+    main_comp(args.cfgfile, args.metazones, func_comp, kw_comp)
     
-    if not cfg:
-        raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
-    # Metazones
-    kw_comp = {"qc": args.qc}
-    metazones = check_metazones_in(
-        args.metazones,
-        cfg["metazones"],
-        func_param=METAZONE_PARAMS[func_comp],
-        **kw_comp
-        )
-    from pprint import pprint
-    pprint(metazones)
-    logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    
-    register_cf()
-    
-    ncs = load_datasets_sequential(cfg["data"], metazones, func_comp)
-    
-    ncs_coloc = main_coloc(ncs, metazones, func_comp)
-
-    main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
-
-    elapsed = time.time() - start_time
-    logger.info(f"🎯 TRAITEMENT TERMINÉ EN {elapsed:.1f} SECONDES")    
-    
-    logger.info("🔍 DIAGNOSTIC FINAL:")
-    monitor_performance()
-
 def get_parser_comp_argo():
     """Get parser for argo comparison."""
     # Setup argument parser
@@ -569,143 +585,9 @@ def get_parser_comp_argo():
     
     return parser
 
-# def main_comp_argo():
-#     """Compare argo with other products."""
-#     # Get parser
-#     parser = get_parser_comp_argo()
-#     func_comp = "comp_argo"
-
-#     # Parse
-#     args = parser.parse_args()
-    
-#     # Setup logging
-#     main_setup_logging(args)
-    
-#     # Load configuration
-#     if not args.cfgfile.exists():
-#         raise ArmoorError(
-#             f"File not found: {args.cfgfile}."
-#             )
-#     cfg = ConfigManager(VALIDATION_INI).load(str(args.cfgfile))
-    
-#     # # Open-decode data
-#     # dss, data_ref = main_open_datasets(cfg["data"])
-
-#     # # Metazones
-#     # kw_comp = {"radius": args.radius, "qc": args.qc}
-#     # metazones = check_metazones_in(
-#     #     args.metazones,
-#     #     cfg["metazones"],
-#     #     func_param=METAZONE_PARAMS[func_comp],
-#     #     **kw_comp
-#     #     )
-#     # dss = main_metazones(dss, metazones)
-#     # for meta in dss:
-#     #     for ids, ds in enumerate(dss[meta]):
-#     #         dss[meta][ids] = optimize_for_low_swap(ds, target_chunk_mb=8)
-    
-#     # logger.info("Save open-decoded/metazone in netcdf.")
-
-#     # ncs_metazone = to_netcdf_ref_prods(
-#     #     dss,
-#     #     f"{func_comp}/metazones",
-#     #     "{mz_name}/{data_name}/{refprod}.nc",
-#     #     # max_workers=len(dss)
-#     #     )
-
-#     if not cfg:
-#         raise ArmoorError(
-#             "Data section empty: Check [data] in your cfgfile."
-#             )
-#     kw_comp = {"radius": args.radius, "qc": args.qc}  
-#     metazones = check_metazones_in(
-#         args.metazones,
-#         cfg["metazones"],
-#         func_param=METAZONE_PARAMS[func_comp],
-#         **kw_comp
-#         )
-#     print(metazones)
-    
-#     register_cf()
-#     data_ref = {}
-#     for _, cfg_data in cfg["data"].items():
-#         ds = open_decode(
-#             cfg_data["path"],
-#             fmt=cfg_data["fmt"],
-#             platform=cfg_data["platform"]
-#             )
-#         ds = optimize_for_low_swap(ds, target_chunk_mb=512)
-#         ds.attrs["data_name"] = cfg_data["name"]
-#         ds.attrs["data_ref"] = str(cfg_data["ref"])
-#         data_ref = str(cfg_data["ref"])
-#         for mz_name, mz_param in metazones.items():
-#             logger.info(f"apply metazone: {mz_name}")
-#             # dsouts[mz_name] = []
-#             #for dsin in dsins:
-#             dsout = ds.copy()
-#             data_name = ds.attrs["data_name"]
-#             #data_ref = dsin.attrs["data_ref"]
-#             logger.info(f"{data_name}")
-#             # time
-#             time_meta = ["tbound", "terms", "trange_cut"]
-#             for k in time_meta:
-#                 if k in mz_param:
-#                     if "climatology" not in ds.time.attrs:
-#                         dsout = FILTERS[k](dsout)(*mz_param[k])
-#                     if dsout is None:
-#                         raise ArmoorError(
-#                             f"{k} filter returns None for {ds.attrs['name']} dataset."
-#                         )
-#             # horizontal
-#             horizontal_meta = [
-#                 "bathy",
-#                 "polygon",
-#                 "polygon_dilat",
-#             ]
-#             for k in horizontal_meta:
-#                 if k in mz_param:
-#                     if "polygon" in k:
-#                         args = mz_param[k]
-#                     else:
-#                         args = (*mz_param[k],)
-#                     dsout = FILTERS[k](dsout)(args)
-#                     if dsout is None:
-#                         raise ArmoorError(
-#                             f"{k} filter return None for {ds.attrs['name']} dataset."
-#                         )
-#             dsout.attrs = {
-#                 "data_name": data_name,
-#                 "data_ref": data_ref,
-#                 #**mz_param
-#             }
-#             with Client() as client:
-#                 ds = client.compute(dsout)
-#             refprod = "ref" if dsout.attrs["data_ref"] == "True" else "prod"
-#             data_name = cfg_data["name"]
-#             parent_dir = f"{func_comp}/metazones"
-#             ncpat = "{mz_name}/{data_name}/{refprod}.nc"
-#             nc = Path(parent_dir) / ncpat.format(**locals())
-#             nc.parent.mkdir(parents=True, exist_ok=True)
-#             dsout.to_netcdf(nc)
-#             dsout.close()
-            
-#     import sys; sys.exit()
-
-
-
-# #     # Colocation
-# #     ncs_coloc = main_coloc(ncs_metazone, metazones, func_comp)
-
-# #     gc.collect()
-#############################
 def main_comp_argo():
     """Compare argo with other products - Version optimisée."""
-    
-    logger.info("🔍 DIAGNOSTIC INITIAL:")
-    monitor_performance()
-    
-    start_time = time.time()
-    
+        
     # Get parser
     parser = get_parser_comp_argo()
     func_comp = "comp_argo"
@@ -720,36 +602,64 @@ def main_comp_argo():
     if not args.cfgfile.exists():
         raise ArmoorError(f"File not found: {args.cfgfile}.")
     
-    cfg = ConfigManager(VALIDATION_INI).load(str(args.cfgfile))
+    kw_comp = {"radius": args.radius, "qc": args.qc}
     
-    if not cfg:
-        raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
-    
-    # Metazones setup
-    kw_comp = {"radius": args.radius, "qc": args.qc}  
-    metazones = check_metazones_in(
-        args.metazones,
-        cfg["metazones"],
-        func_param=METAZONE_PARAMS[func_comp],
-        **kw_comp
-    )
-    
-    logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    
-    register_cf()
-    
-    ncs = load_datasets_sequential(cfg["data"], metazones, func_comp)
-    
-    ncs_coloc = main_coloc(ncs, metazones, func_comp)
-    
-    main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
+    main_comp(args.cfgfile, args.metazones, func_comp, kw_comp)
 
-    elapsed = time.time() - start_time
-    logger.info(f"🎯 TRAITEMENT TERMINÉ EN {elapsed:.1f} SECONDES")    
+def get_parser_comp_mooring():
+    """Get parser for mooring comparison."""
+    # Setup argument parser
+    parser = ArgumentParser(
+        description="Compare mooring data with model ouputs.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+        )
+    add_logging_parser_arguments(parser)
+    parser.add_argument(
+        'metazones',
+        type=comma_separated,
+        help="List of metazone to be processed."
+        )
+    parser.add_argument(
+        'radius',
+        type=float,
+        help="Radius (in km) of the disk around an observation within which model data are taken into account"
+        )
+    parser.add_argument(
+        'cfgfile',
+        type=Path,
+        help="Path of the configuration file."
+        )
+    parser.add_argument(
+        '--qc',
+        type=dict,
+        default=None,
+        help="Dictionnary specifying quality tresholds, ex: ptemp:1,7"
+        )
     
-    logger.info("🔍 DIAGNOSTIC FINAL:")
-    monitor_performance()
+    return parser
 
+def main_comp_mooring():
+    """Compare argo with other products - Version optimisée."""
+        
+    # Get parser
+    parser = get_parser_comp_mooring()
+    func_comp = "comp_mooring"
+
+    # Parse
+    args = parser.parse_args()
+    
+    # Setup logging
+    main_setup_logging(args)
+    
+    # Load configuration
+    if not args.cfgfile.exists():
+        raise ArmoorError(f"File not found: {args.cfgfile}.")
+    
+    kw_comp = {"radius": args.radius, "qc": args.qc}
+    
+    main_comp(args.cfgfile, args.metazones, func_comp, kw_comp)
+    
+    
 def load_datasets_sequential(data_cfg, metazones, func_comp):
     """Charge les datasets de manière séquentielle (< 10s chacun)."""
     ncouts = []
@@ -763,28 +673,33 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
         # Chargement optimisé
         #with setup_dask_client():
         
-        ds = open_decode(
+        dss = open_decode(
             cfg_data["path"],
             fmt=cfg_data["fmt"],
             platform=cfg_data["platform"]
         )
-        
-        # Chunking optimal pour dimensions (121,40,500,500)
-        ds = optimize_chunks_for_dimensions(ds)
-        
-        # Métadonnées
-        ds.attrs["data_name"] = cfg_data["name"]
-        ds.attrs["data_ref"] = str(cfg_data["ref"])
+
+        if not isinstance(dss, list):
+            dss = [dss]
+
+        for ids, ds in enumerate(dss):
+            # Chunking optimal pour dimensions (121,40,500,500)
+
+            ds = optimize_chunks_for_dimensions(ds)
+            
+            # Métadonnées
+            if len(dss) == 1:
+                ds.attrs["data_name"] = cfg_data["name"]
+            else:
+                ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
+            ds.attrs["data_ref"] = str(cfg_data["ref"])
+            dss[ids] = ds
         
         elapsed = time.time() - start_time
-        logger.info(f"✅ {dataset_name} chargé en {elapsed:.1f}s")
-            
-        # Vérification contrainte < 10s
-        if elapsed > 10:
-            logger.warning(f"⚠️ {dataset_name} a pris {elapsed:.1f}s (> 10s)")
+        logger.info(f"✅ {dataset_name} load in {elapsed:.1f}s")
         
         datasets[dataset_name] = {
-            'dataset': ds,
+            'dataset': dss if len(dss) > 1 else dss[0],
             'config': cfg_data,
             'load_time': elapsed
         }
@@ -840,15 +755,19 @@ def process_all_combinations(datasets, metazones, func_comp):
     ncouts = []
     for dataset_name, dataset_info in datasets.items():
         for mz_name, mz_param in metazones.items():
-            dsout = process_single_combination(
-                dataset_info['dataset'],
-                    dataset_info['config'],
-                    mz_name,
-                    mz_param,
-                    func_comp
-                )
-            ncout = save_result(dsout, mz_name, func_comp)
-            ncouts.append(ncout)
+            dss = dataset_info['dataset']
+            if not isinstance(dss, list):
+                dss = [dss]
+            for ds in dss:
+                dsout = process_single_combination(
+                        ds,
+                        dataset_info['config'],
+                        mz_name,
+                        mz_param,
+                        func_comp
+                    )
+                ncout = save_result(dsout, mz_name, func_comp)
+                ncouts.append(ncout)
     client.close()
     return ncouts
 
@@ -868,7 +787,7 @@ def process_single_combination(ds, cfg_data, mz_name, mz_param, func_comp):
         
         # Copier le dataset pour éviter les modifications
         dsout = ds.copy(deep=True)  # Deep copy pour éviter les références
-        data_name = cfg_data["name"]
+        data_name = dsout.attrs["data_name"]#cfg_data["name"]
         data_ref = str(cfg_data["ref"])
         
         # Appliquer les filtres avec gestion d'erreurs
@@ -947,7 +866,7 @@ def save_result(dsout, mz_name, func_comp):
     refprod = "ref" if dsout.attrs["data_ref"] == "True" else "prod"
     data_name = dsout.attrs["data_name"]
     parent_dir = f"{func_comp}/metazones"
-    ncpat = "{mz_name}/{data_name}/{refprod}.nc"
+    ncpat = "{mz_name}/{data_name}/{refprod}_{data_name}.nc"
     nc = Path(parent_dir) / ncpat.format(**locals())
     nc.parent.mkdir(parents=True, exist_ok=True)
     
