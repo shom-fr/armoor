@@ -142,8 +142,12 @@ class ArmoorSelectionAccessor:
         https://matplotlib.org/stable/api/path_api.html
         """
         logger.info("Applying filter - horizontal_selection_polygon")
-        mask_poly, dims_name = self.get_mask(coords)
-
+        # mask_poly, dims_name = self.get_mask(coords)
+        mask = self.get_mask(coords)
+        if mask:
+            mask_poly, dims_name = mask
+        else:
+            return None
         if "depth" in self.ds.coords:
             self.ds = self.ds.reset_coords("depth")
         self.ds = self.ds.where(mask_poly, drop=True)

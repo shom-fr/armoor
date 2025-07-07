@@ -22,7 +22,7 @@ from pathlib import Path
 from xoa.cfgm import ConfigManager, register_validation_functions
 
 from armoor import ArmoorError
-from armoor.cli import VALIDATION_INI
+from armoor.cli import COMP_INI
 from armoor.base import FILTERS
 from armoor.base.io import ArmoorArgumentHelpFormatter, create_fast_encoding
 from armoor.base.log import add_logging_parser_arguments, main_setup_logging
@@ -467,7 +467,7 @@ def main_comp(cfgfile, metazones, func_comp, comp_args):
     start_time = time.time()
     
     
-    cfg = ConfigManager(VALIDATION_INI).load(str(cfgfile))
+    cfg = ConfigManager(COMP_INI).load(str(cfgfile))
     
     if not cfg:
         raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
