@@ -20,7 +20,8 @@ setup:
     - conda info -a
     - test -d armoor_env || conda create -p armoor_env python=3.11
     - source activate ./armoor_env
-    - conda install -c conda-forge --file environment.txt
+    - conda install -c conda-forge mamba
+    - mamba install -c conda-forge --file environment.txt
   cache:
     paths:
       - armoor_env/
