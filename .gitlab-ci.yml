@@ -30,8 +30,8 @@ tests:
     - source activate ./armoor_env
     - export PATH=$PWD/bin:$PATH
     - export PYTHONPATH=$PWD
-    - conda install pytest
-    - cd armoor/armoor/tests/uni
+    - mamba install pytest
+    - cd armoor/tests/uni
     - pytest 
   cache:
     paths:
