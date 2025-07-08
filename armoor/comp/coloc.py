@@ -461,7 +461,7 @@ def process_vertical_colocation(dsref, dsprod, param):
     tuple
         Colocated reference and product datasets.
     """
-    logger.info("---- Vertical colocation")
+    logger.info("---- Vertical colocation")    
     coloc = VerticalColocation(dsref, dsprod)
     coloc.__post_init__()
     dsref, dsprod = coloc.call(*param)
@@ -506,8 +506,11 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     
     ncout_ref = dirout / f"ref{ncname}.nc"
     ncout_prod = dirout / f"prod{ncname}.nc"
-    encoding = create_fast_encoding(dsref)
+   
     logger.info(f"Save {ncout_ref}")
+    if "mask" in dsref.data_vars:
+        dsref = dsref.drop_vars("mask")
+    encoding = create_fast_encoding(dsref)
     dsref.to_netcdf(
         ncout_ref,
         encoding=encoding,
@@ -516,6 +519,9 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
         compute=True  # Forcer le compute immédiat
         )
     logger.info(f"Save {ncout_prod}")
+    if "mask" in dsprod.data_vars:
+        dsprod = dsprod.drop_vars("mask")
+    encoding = create_fast_encoding(dsprod)
     dsprod.to_netcdf(
         ncout_prod,
         encoding=encoding,

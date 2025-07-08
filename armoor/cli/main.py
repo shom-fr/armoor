@@ -515,7 +515,55 @@ def main_comp(cfgfile, metafile, metazones, func_comp, comp_args):
     
     logger.info("🔍 DIAGNOSTIC FINAL:")
     monitor_performance()
+
+
+def get_parser_comp_models():
+    """Get parser for models comparison."""
+    # Setup argument parser
+    parser = ArgumentParser(
+        description="Compare models ouputs.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+        )
+    add_logging_parser_arguments(parser)
+    parser.add_argument(
+        'metazones',
+        type=comma_separated,
+        help="List of metazone to be processed."
+        )
+    parser.add_argument(
+        'cfgfile',
+        type=Path,
+        help="Path of the configuration file."
+        )
+    parser.add_argument(
+        '-m', '--metazonesfile',
+        type=Path,
+        help="Path of the configuration file dedicated to the description of metazones.",
+        default="metazones.cfg"
+        )
     
+    return parser
+
+def main_comp_models():
+    """Compare a model reference with other products."""
+    
+    # Get parser
+    parser = get_parser_comp_sst()
+    func_comp = "comp_models"
+
+    # Parse
+    args = parser.parse_args()
+    
+    # Setup logging
+    main_setup_logging(args)
+
+    # Load configuration
+    if not args.cfgfile.exists():
+        raise ArmoorError(
+            f"File not found: {args.cfgfile}."
+            )
+    main_comp(args.cfgfile, args.metazonesfile, args.metazones, func_comp, {})
+
 
 def get_parser_comp_sst():
     """Get parser for sst comparison."""

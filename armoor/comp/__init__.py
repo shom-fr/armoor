@@ -27,6 +27,17 @@ METAZONE_PARAMS = {
         "vars",
         "radius",
         "qc"
+        ],
+    "comp_models": [
+        "tfreq",
+        "tbound",
+        "trange_seq",
+        "polygon",
+        "href",
+        "cloud",
+        "vrange",
+        "vlevel",
+        "vars",
         ]
     }
 
@@ -43,7 +54,12 @@ COLOCATION_PARAMS_USER = {
     "comp_mooring": {
         "time": ("trange_seq", "tfreq"),
         "horizontal": ("radius",),
-        }
+        },
+    "comp_models": {
+        "time": ("trange_seq", "tfreq"),
+        "horizontal": ("href", "cloud"),
+        "vertical": ("vrange", "vlevel"),
+        },
     }
 
 COLOCATION_PARAMS_DEFAULT = {
@@ -144,18 +160,59 @@ OUTPUTS_PARAMS = {
             "output": "merge"
             }
         },
+    "comp_models":{
+        "maps": {
+            "sort": ["time", "z"],
+            "stat": ["time", "z"],
+            },
+        "diagdisp_glob": {
+            "concat": ["time"],
+            },
+        "diagdisp_sel": {
+            "sort": ["time", "z"],
+            },
+        "timeseries": {
+            "sort": ["z"],
+            "concat": ["time"],
+            "stat": ["time", "z", "y", "x"],
+            "output": "merge",
+            },
+        "mvprofiles": {
+            "sort": ["time", "z"],
+            },
+        "mdiagts": {
+            "sort": ["time", "z"],
+            },
+        "uvprofiles": {
+            "concat": ["time"],
+            "output": "merge",
+            "mparams_pro": {
+                "horizontal": ["cloud"]
+                },
+            },
+        "udiagts": {
+            "concat": ["time"],
+            "output": "merge",
+            "mparams_pro": {
+                "horizontal": ["cloud"]
+                },
+            },
+        
+        },
     }
 
 COMP_VARS = {
     "comp_sst": ["ptemp"],
     "comp_argo": ["ptemp", "sal", "pdens", "temp", "sndspeed"],
-    "comp_mooring": ["ptemp", "sal", "pdens", "temp", "sndspeed"]
+    "comp_mooring": ["ptemp", "sal", "pdens", "temp", "sndspeed"],
+    "comp_models": ["ptemp", "sal", "pdens", "sndspeed"]
     }
 
 TITLE_PLOTS = {
     "comp_sst": "Sea surface temperature",
     "comp_argo": "Hydrological profiles",
     "comp_mooring": "Hydrological mooring",
+    "comp_models": "",
     }
 
 CMAP_VARS = {
