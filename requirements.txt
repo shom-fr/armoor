@@ -15,6 +15,7 @@ gsw
 h5netcdf
 ipython
 matplotlib
+nbsphinx
 numba
 numbagg
 opendrift

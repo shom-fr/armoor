@@ -18,10 +18,8 @@ setup:
   script:
     - conda config --set always_yes yes --set changeps1 no
     - conda info -a
-    - test -d armoor_env || conda create -p armoor_env python=3.11
+    - test -d armoor_env || (conda create -p armoor_env python=3.11; source activate ./armoor_env; conda install -c conda-forge mamba; mamba install -c conda-forge --file requirements.txt; conda deactivate)
     - source activate ./armoor_env
-    - conda install -c conda-forge mamba
-    - mamba install -c conda-forge --file environment.txt
   cache:
     paths:
       - armoor_env/
