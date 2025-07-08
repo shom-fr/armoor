@@ -44,7 +44,7 @@ pages:
     - source activate ./armoor_env
     - export PATH=$PWD/bin:$PATH
     - export PYTHONPATH=$PWD
-    - cd docs
+    - cd doc
     - make html
     - cd ..
     - rm -rf public
