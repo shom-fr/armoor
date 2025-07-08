@@ -21,6 +21,7 @@ opendrift
 pip
 python=3.11
 scipy
+seaborn
 setuptools
 sphinx=7.4.7
 sphinx-argparse
@@ -36,7 +37,7 @@ sphinxcontrib-jsmath
 sphinxcontrib-programoutput
 sphinxcontrib-qthelp
 sphinxcontrib-serializinghtml
+sqlite=3.47.0
 xarray=2025.1.1
 xesmf=0.8.8
-seaborn
 
