@@ -22,7 +22,7 @@ pip
 python=3.11
 scipy
 setuptools
-sphinx
+sphinx=7.4.7
 sphinx-argparse
 sphinx-book-theme
 sphinx-gallery
