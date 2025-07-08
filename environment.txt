@@ -13,6 +13,7 @@ geojson
 gitpython
 gsw
 h5netcdf
+ipython
 matplotlib
 numba
 numbagg
