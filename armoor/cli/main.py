@@ -357,11 +357,11 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
                         f"{k} is removed to run this functionnality."
                     )
                     del metazones[metazone_name][k]
-                if (k == "polygon") and ("href" in metazone_param.keys()):
-                    metazones[metazone_name].update({
-                        "polygon_dilat": metazones[metazone_name].get("polygon")
-                        })
-                    del metazones[metazone_name]["polygon"]
+                # if (k == "polygon") and ("href" in metazone_param.keys()):
+                #     metazones[metazone_name].update({
+                #         "polygon_dilat": metazones[metazone_name].get("polygon")
+                #         })
+                #     del metazones[metazone_name]["polygon"]
     return metazones
 
 def main_open_datasets(cfg: ConfigObj):
@@ -874,12 +874,14 @@ def apply_time_filters(dsout, mz_param, data_name):
 
 def apply_horizontal_filters(dsout, mz_param, data_name):
     """Applique les filtres horizontaux."""
-    horizontal_meta = ["bathy", "polygon", "polygon_dilat"]
+    horizontal_meta = ["bathy", "polygon"]#, "polygon_dilat"]
     
     for k in horizontal_meta:
         if k in mz_param:
-            if "polygon" in k:
+            if k == "polygon":
                 args = mz_param[k]
+                if set(["x", "y"]).issubset(set(dsout.lon.dims)):
+                    k = "polygon_dilat"
             else:
                 args = (*mz_param[k],)
             
@@ -887,7 +889,6 @@ def apply_horizontal_filters(dsout, mz_param, data_name):
             if dsout is None:
                 logger.warning(f"⚠️ Filtre {k} returns None for {data_name}")
                 return None
-    
     return dsout
 
 def save_result(dsout, mz_name, func_comp):
