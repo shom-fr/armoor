@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jun 10 19:47:07 2025
-
-@author: lmmorvan
-"""
 import logging
 import gsw
 import xarray as xr
