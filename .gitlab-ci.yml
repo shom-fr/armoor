@@ -20,7 +20,7 @@ setup:
     - conda info -a
     - test -d armoor_env || conda create -p armoor_env python=3.11
     - source activate ./armoor_env
-    - conda env update --file environment.txt
+    - conda install --file environment.txt
   cache:
     paths:
       - armoor_env/
