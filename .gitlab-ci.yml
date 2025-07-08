@@ -31,7 +31,7 @@ tests:
     - export PATH=$PWD/bin:$PATH
     - export PYTHONPATH=$PWD
     - conda install pytest
-    - cd armoor/tests/uni
+    - cd armoor/armoor/tests/uni
     - pytest 
   cache:
     paths:
