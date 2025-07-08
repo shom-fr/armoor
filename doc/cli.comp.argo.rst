@@ -16,6 +16,9 @@ metazone parameters
     - ``vrange``
     - ``vlevel``
     - ``vars``
+    
+    .. note::
+       Other given parameters are ignored.
 
 outputs
 -------

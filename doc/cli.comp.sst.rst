@@ -19,6 +19,9 @@ metazone parameters
     - ``cloud``
     - ``vars``
 
+    .. note::
+       Other given parameters are ignored.
+
 outputs
 -------
 

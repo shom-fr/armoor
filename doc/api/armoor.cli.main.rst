@@ -17,6 +17,7 @@
       get_parser_comp_argo
       get_parser_comp_mooring
       get_parser_comp_sst
+      get_parser_metazones
       load_datasets_sequential
       main_comp
       main_comp_argo

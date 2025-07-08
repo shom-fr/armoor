@@ -14,6 +14,9 @@ metazone parameters
     - ``tfreq``
     - ``polygon``
     - ``vars``
+    
+    .. note::
+       Other given parameters are ignored.
 
 outputs
 -------
