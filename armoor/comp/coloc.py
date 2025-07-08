@@ -387,14 +387,14 @@ def validate_and_get_params(metazones, comp_func):
     dict
         Colocation parameters.
     """
-    validate_colocation(metazones, COLOCATION_PARAMS_USER[comp_func])
+    metazones = validate_colocation(metazones, COLOCATION_PARAMS_USER[comp_func])
     coloc_params = get_colocation_params(
         metazones,
         COLOCATION_PARAMS_USER[comp_func],
         COLOCATION_PARAMS_DEFAULT.get(comp_func)
         )
-    logger.info(f"Colocation parameters are: {coloc_params}")
     return coloc_params
+
 
 def process_time_colocation(dsref, dsprod, param, tbound):
     """Process colocation for time dimension.
@@ -508,21 +508,21 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     ncout_prod = dirout / f"prod{ncname}.nc"
     encoding = create_fast_encoding(dsref)
     logger.info(f"Save {ncout_ref}")
-    # dsref.to_netcdf(
-    #     ncout_ref,
-    #     encoding=encoding,
-    #     format='NETCDF4',
-    #     engine='netcdf4',
-    #     compute=True  # Forcer le compute immédiat
-    #     )
+    dsref.to_netcdf(
+        ncout_ref,
+        encoding=encoding,
+        format='NETCDF4',
+        engine='netcdf4',
+        compute=True  # Forcer le compute immédiat
+        )
     logger.info(f"Save {ncout_prod}")
-    # dsprod.to_netcdf(
-    #     ncout_prod,
-    #     encoding=encoding,
-    #     format='NETCDF4',
-    #     engine='netcdf4',
-    #     compute=True  # Forcer le compute immédiat
-    #     )
+    dsprod.to_netcdf(
+        ncout_prod,
+        encoding=encoding,
+        format='NETCDF4',
+        engine='netcdf4',
+        compute=True  # Forcer le compute immédiat
+        )
     return ncout_ref, ncout_prod
 
 def main_coloc(ncs, metazones, comp_func):
@@ -542,10 +542,17 @@ def main_coloc(ncs, metazones, comp_func):
         Dict of paths to the saved reference and product NetCDF files.
     """
     
-    coloc_params = validate_and_get_params(metazones, comp_func)
+    coloc_check = validate_and_get_params(metazones, comp_func)
+    coloc_params = {}
+    for metazone, params in coloc_check.items():
+        if not params:
+            logger.info(f"Skip {metazone}: colocation is not possible for this functionnality.")
+        else:
+            coloc_params[metazone] = params
     ncouts = {}
     for metazone, params in coloc_params.items():
         logger.info(f"Start colocation for {metazone}.")
+        logger.info(f"Colocation parameters are: {params}")
         tbound = metazones[metazone].get("tbound")
         ncrefs = [
             nc for nc in ncs if (metazone in str(nc)) & ("ref" in str(nc))

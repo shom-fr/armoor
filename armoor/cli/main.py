@@ -22,7 +22,7 @@ from pathlib import Path
 from xoa.cfgm import ConfigManager, register_validation_functions
 
 from armoor import ArmoorError
-from armoor.cli import COMP_INI
+from armoor.cli import COMP_INI, METAZONES_INI
 from armoor.base import FILTERS
 from armoor.base.io import ArmoorArgumentHelpFormatter, create_fast_encoding
 from armoor.base.log import add_logging_parser_arguments, main_setup_logging
@@ -348,18 +348,20 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
             if v == None:
                 del metazones_cfg[metazone][k]
         metazones[metazone] = metazones_cfg[metazone]
-    for metazone_name, metazone_param in metazones.items():
-        for k, v in metazone_param.items():
-            if (k != "name") and (k not in func_param):
-                raise ArmoorError(
-                    f"{k} cannot be defined to use this functionnality.\n"
-                    f"See the parameters available for this functionnalité {func_param}"
-                )
-            if (k == "polygon") and ("href" in metazone_param.keys()):
-                metazones[metazone_name].update({
-                    "polygon_dilat": metazones[metazone_name].get("polygon")
-                    })
-                del metazones[metazone_name]["polygon"]
+    if func_param:
+        for metazone_name, metazone_param in metazones.items():
+            for k, v in metazone_param.items():
+                if (k != "name") and (k not in func_param):
+                    logger.warning(
+                        f"{k} cannot be defined to use this functionnality.\n"
+                        f"{k} is removed to run this functionnality."
+                    )
+                    del metazones[metazone_name][k]
+                if (k == "polygon") and ("href" in metazone_param.keys()):
+                    metazones[metazone_name].update({
+                        "polygon_dilat": metazones[metazone_name].get("polygon")
+                        })
+                    del metazones[metazone_name]["polygon"]
     return metazones
 
 def main_open_datasets(cfg: ConfigObj):
@@ -398,68 +400,76 @@ def main_open_datasets(cfg: ConfigObj):
         ds.close()
     return dss, data_ref
 
-def main_metazones(dsin, metazones):
-    """Apply metazones to a list of xarray.Dataset.
-    
-    Parameters
-    ----------
-    dsins: list
-        List of xarray.Dataset
-    metazones: dict
-        Dictionary of metazones
-        
-    Return
-    ------
-    dsouts: dict
-        Dictionnary of type {mz1_name: xr.Dataset, mz2_name: xr.Dataset}
-    """
-    dsouts = {}
-    for mz_name, mz_param in metazones.items():
-        logger.info(f"apply metazone: {mz_name}")
-        # dsouts[mz_name] = []
-        #for dsin in dsins:
-        dsout = dsin.copy()
-        data_name = dsin.attrs["data_name"]
-        data_ref = dsin.attrs["data_ref"]
-        logger.info(f"{data_name}")
-        # time
-        time_meta = ["tbound", "terms", "trange_cut"]
-        for k in time_meta:
-            if k in mz_param:
-                if "climatology" not in dsin.time.attrs:
-                    dsout = FILTERS[k](dsout)(*mz_param[k])
-                if dsout is None:
-                    raise ArmoorError(
-                        f"{k} filter returns None for {dsin.attrs['name']} dataset."
-                    )
-        # horizontal
-        horizontal_meta = [
-            "bathy",
-            "polygon",
-            "polygon_dilat",
-        ]
-        for k in horizontal_meta:
-            if k in mz_param:
-                if "polygon" in k:
-                    args = mz_param[k]
-                else:
-                    args = (*mz_param[k],)
-                dsout = FILTERS[k](dsout)(args)
-                if dsout is None:
-                    raise ArmoorError(
-                        f"{k} filter return None for {dsin.attrs['name']} dataset."
-                    )
-        dsout.attrs = {
-            "data_name": data_name,
-            "data_ref": data_ref,
-            #**mz_param
-        }
-                        
-        dsouts[mz_name] = dsout
-        dsout.close()
-    return dsouts
 
-def main_comp(cfgfile, metazones, func_comp, comp_args):
+def get_parser_metazones():
+    """Get parser for sst comparison."""
+    # Setup argument parser
+    parser = ArgumentParser(
+        description="Apply filters over metazones.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+        )
+    add_logging_parser_arguments(parser)
+    parser.add_argument(
+        'metazones',
+        type=comma_separated,
+        help="List of metazone to be processed."
+        )
+    parser.add_argument(
+        'cfgfile',
+        type=Path,
+        help="Path of the configuration file."
+        )
+    parser.add_argument(
+        '-m', '--metazonesfile',
+        type=Path,
+        help="Path of the configuration file dedicated to the description of metazones.",
+        default="metazones.cfg"
+        )
+    parser.add_argument(
+        '--jsonfile',
+        type=Path,
+        help="Path of the output json file.",
+        default='ncs_metazones.json'
+        )
+    
+    return parser
+
+def main_metazones():
+    """Apply filters over metazones."""
+    # Get parser
+    parser = get_parser_metazones()
+
+    # Parse
+    args = parser.parse_args()
+    
+    # Setup logging
+    main_setup_logging(args)
+
+    # Load configuration
+    if not args.cfgfile.exists():
+        raise ArmoorError(
+            f"File not found: {args.cfgfile}."
+            )
+    
+    cfg = ConfigManager(COMP_INI).load(str(args.cfgfile))
+    metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
+    
+    metazones = check_metazones_in(
+       args. metazones,
+       metazones
+       )
+
+    logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
+    
+    register_cf()
+    
+    ncs = load_datasets_sequential(cfg["data"], metazones, None)
+
+    with open(args.jsonfile, 'w') as f:
+        json.dump(ncs, f, indent=4)
+
+
+def main_comp(cfgfile, metafile, metazones, func_comp, comp_args):
     
     logger.info("🔍 DIAGNOSTIC INITIAL:")
     monitor_performance()
@@ -468,6 +478,8 @@ def main_comp(cfgfile, metazones, func_comp, comp_args):
     
     
     cfg = ConfigManager(COMP_INI).load(str(cfgfile))
+    metas = ConfigManager(METAZONES_INI).load(str(metafile))
+
     
     if not cfg:
         raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
@@ -475,7 +487,7 @@ def main_comp(cfgfile, metazones, func_comp, comp_args):
     
     metazones = check_metazones_in(
         metazones,
-        cfg["metazones"],
+        metas,
         func_param=METAZONE_PARAMS[func_comp],
         **comp_args
         )
@@ -490,11 +502,11 @@ def main_comp(cfgfile, metazones, func_comp, comp_args):
 
     ncs_outputs = main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
     
-    with open('ncs_outputs.json', 'w') as f:
-        json.dump(ncs_outputs, f, indent=4)
+    # with open('ncs_outputs.json', 'w') as f:
+    #     json.dump(ncs_outputs, f, indent=4)
     
-    with open('/local/home/mmorvan/devarmoor/ncs_outputs.json', 'r', encoding='utf-8') as file:
-        ncs_outputs = json.load(file)
+    # with open('ncs_outputs.json', 'r', encoding='utf-8') as file:
+    #     ncs_outputs = json.load(file)
     
     main_plot(ncs_outputs, metazones, func_comp)
 
@@ -529,6 +541,12 @@ def get_parser_comp_sst():
         default=None,
         help="Dictionnary specifying quality tresholds, ex: ptemp:1,7"
         )
+    parser.add_argument(
+        '-m', '--metazonesfile',
+        type=Path,
+        help="Path of the configuration file dedicated to the description of metazones.",
+        default="metazones.cfg"
+        )
     
     return parser
 
@@ -551,7 +569,7 @@ def main_comp_sst():
             f"File not found: {args.cfgfile}."
             )
     kw_comp = {"qc": args.qc}    
-    main_comp(args.cfgfile, args.metazones, func_comp, kw_comp)
+    main_comp(args.cfgfile, args.metazonesfile, args.metazones, func_comp, kw_comp)
     
 def get_parser_comp_argo():
     """Get parser for argo comparison."""
@@ -582,6 +600,12 @@ def get_parser_comp_argo():
         default=None,
         help="Dictionnary specifying quality tresholds, ex: ptemp:1,7"
         )
+    parser.add_argument(
+        '-m', '--metazonesfile',
+        type=Path,
+        help="Path of the configuration file dedicated to the description of metazones.",
+        default="metazones.cfg"
+        )
     
     return parser
 
@@ -604,7 +628,7 @@ def main_comp_argo():
     
     kw_comp = {"radius": args.radius, "qc": args.qc}
     
-    main_comp(args.cfgfile, args.metazones, func_comp, kw_comp)
+    main_comp(args.cfgfile, args.metazonesfile, args.metazones, func_comp, kw_comp)
 
 def get_parser_comp_mooring():
     """Get parser for mooring comparison."""
@@ -635,6 +659,12 @@ def get_parser_comp_mooring():
         default=None,
         help="Dictionnary specifying quality tresholds, ex: ptemp:1,7"
         )
+    parser.add_argument(
+        '-m', '--metazonesfile',
+        type=Path,
+        help="Path of the configuration file dedicated to the description of metazones.",
+        default="metazones.cfg"
+        )
     
     return parser
 
@@ -657,7 +687,7 @@ def main_comp_mooring():
     
     kw_comp = {"radius": args.radius, "qc": args.qc}
     
-    main_comp(args.cfgfile, args.metazones, func_comp, kw_comp)
+    main_comp(args.cfgfile, args.metazonesfile, args.metazones, func_comp, kw_comp)
     
     
 def load_datasets_sequential(data_cfg, metazones, func_comp):
@@ -766,8 +796,9 @@ def process_all_combinations(datasets, metazones, func_comp):
                         mz_param,
                         func_comp
                     )
-                ncout = save_result(dsout, mz_name, func_comp)
-                ncouts.append(ncout)
+                if dsout:
+                    ncout = save_result(dsout, mz_name, func_comp)
+                    ncouts.append(ncout)
     client.close()
     return ncouts
 
@@ -836,7 +867,7 @@ def apply_time_filters(dsout, mz_param, data_name):
             if "climatology" not in dsout.time.attrs:
                 dsout = FILTERS[k](dsout)(*mz_param[k])
             if dsout is None:
-                logger.warning(f"⚠️ Filtre {k} retourne None pour {data_name}")
+                logger.warning(f"⚠️ Filtre {k} returns None for {data_name}")
                 return None
     
     return dsout
@@ -854,7 +885,7 @@ def apply_horizontal_filters(dsout, mz_param, data_name):
             
             dsout = FILTERS[k](dsout)(args)
             if dsout is None:
-                logger.warning(f"⚠️ Filtre {k} retourne None pour {data_name}")
+                logger.warning(f"⚠️ Filtre {k} returns None for {data_name}")
                 return None
     
     return dsout
@@ -865,7 +896,7 @@ def save_result(dsout, mz_name, func_comp):
     # Préparer les chemins
     refprod = "ref" if dsout.attrs["data_ref"] == "True" else "prod"
     data_name = dsout.attrs["data_name"]
-    parent_dir = f"{func_comp}/metazones"
+    parent_dir = f"{func_comp}/metazones" if func_comp else "metazones"
     ncpat = "{mz_name}/{data_name}/{refprod}_{data_name}.nc"
     nc = Path(parent_dir) / ncpat.format(**locals())
     nc.parent.mkdir(parents=True, exist_ok=True)
@@ -883,7 +914,7 @@ def save_result(dsout, mz_name, func_comp):
         )
     
     logger.debug(f"💾 Sauvegardé: {nc}")
-    return nc
+    return str(nc)
 
 # Fonction de diagnostic pour surveiller les performances
 def monitor_performance():

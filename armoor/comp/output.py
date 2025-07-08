@@ -257,15 +257,17 @@ def process_output(ocfg, func_comp):
         gc.collect()
     return ncouts
 
-def main_output(ncs, metazones, output_ins, func_comp):
+def main_output(ncs, metazones_in, output_ins, func_comp):
     
     check_output(func_comp, output_ins)
-    
-    for metazone in metazones:
-        metazones[metazone].update({
-            "ncins": ncs.get(metazone),
-            "vars": COMP_VARS[func_comp]
-            })
+    metazones = {}
+    for metazone in metazones_in.keys():
+        if metazones_in.get(metazone):
+            metazones.update({metazone: {
+                "ncins": ncs.get(metazone),
+                "vars": COMP_VARS[func_comp],
+                **metazones_in[metazone].copy()
+                }})
     metazones = [{key: value} for key, value in metazones.items()]
     output_ins = [{key: value} for key, value in output_ins.items()]
     outputs = list(itertools.product(metazones, output_ins))

@@ -1,4 +1,8 @@
+import logging
+
 from armoor.__init__ import ArmoorError
+
+logger = logging.getLogger(__name__)
 
 def validate_colocation(metazones, params):
     """Validate that only one of the two parameters is defined for each metazone.
@@ -19,8 +23,9 @@ def validate_colocation(metazones, params):
         ArmoorError: If both parameters are defined or neither is defined.
     """
     for mz_name, mz_param in metazones.items():
-        if len(mz_param.values()) == 2:
-            for param1, param2 in params.values():
+        for k, v in params.items():
+            if len(v) == 2:
+                param1, param2 = v[0], v[1]
                 val1 = mz_param.get(param1)
                 val2 = mz_param.get(param2)
                 if val1 is not None and val2 is not None:
@@ -28,11 +33,15 @@ def validate_colocation(metazones, params):
                         f"Both '{param1}' and '{param2}' are defined for {mz_name}. "
                         f"Please choose either '{param1}' or '{param2}' colocation."
                     )
+                    
                 if val1 is None and val2 is None:
-                    raise ArmoorError(
+                    logger.info(
                         f"Neither '{param1}' nor '{param2}' is defined for {mz_name}. "
                         f"Please choose either '{param1}' or '{param2}' colocation."
                     )
+                    metazones[mz_name] = None
+                    continue
+    return metazones
 
 def get_colocation_params(metazones, params_user, params_default=None):
     """
@@ -68,20 +77,23 @@ def get_colocation_params(metazones, params_user, params_default=None):
     """
     coloc_params = {}
     for mz_name, mz_params in metazones.items():
-        if params_default:
-            coloc_params[mz_name] = {}
-            for coloc, param in params_default.items():
-                coloc_params[mz_name][coloc] = param
-        coloc_params[mz_name] = {
-            coloc: (param_candidate, mz_params.get(param_candidate))
-            for coloc in ("time", "horizontal", "vertical") 
-            for param_candidate in params_user.get(coloc, [])
-            if (mz_params.get(param_candidate) is not None)
-            }
-        if params_default:
-            for coloc, param in params_default.items():
-                if coloc_params[mz_name].get(coloc) is None:
+        if mz_params:
+            if params_default:
+                coloc_params[mz_name] = {}
+                for coloc, param in params_default.items():
                     coloc_params[mz_name][coloc] = param
+            coloc_params[mz_name] = {
+                coloc: (param_candidate, mz_params.get(param_candidate))
+                for coloc in ("time", "horizontal", "vertical") 
+                for param_candidate in params_user.get(coloc, [])
+                if (mz_params.get(param_candidate) is not None)
+                }
+            if params_default:
+                for coloc, param in params_default.items():
+                    if coloc_params[mz_name].get(coloc) is None:
+                        coloc_params[mz_name][coloc] = param
+        else:
+            coloc_params[mz_name] = None
     return coloc_params
     
 def get_tbound(metazones):
