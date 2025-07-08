@@ -18,8 +18,9 @@ setup:
   script:
     - conda config --set always_yes yes --set changeps1 no
     - conda info -a
-    - test -d armoor_env || conda env create --file environment.txt -p armoor_env
+    - test -d armoor_env || conda create -p armoor_env python=3.11
     - source activate ./armoor_env
+    - conda env update --file environment.txt
   cache:
     paths:
       - armoor_env/
