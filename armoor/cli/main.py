@@ -819,11 +819,11 @@ def optimize_chunks_for_dimensions(ds):
     try:
         ds = ds.chunk(optimal_chunks)
         # Optimiser pour réduire le swap
-        ds = optimize_for_low_swap(ds, target_chunk_mb=128)  # 128MB par chunk
+        ds = optimize_for_low_swap(ds, target_chunk_mb=1000)  # 128MB par chunk
     except Exception as e:
         logger.warning(f"Erreur chunking: {e}")
         # Fallback: chunking simple
-        ds = optimize_for_low_swap(ds, target_chunk_mb=256)
+        ds = optimize_for_low_swap(ds, target_chunk_mb=2000)
     
     return ds
 
@@ -1013,9 +1013,9 @@ def setup_dask_client():
     })
     
     client = Client(
-        n_workers=4,  # Réduire le nombre de workers
+        n_workers=8,  # Réduire le nombre de workers
         threads_per_worker=4,
-        memory_limit='18GB',
+        memory_limit='30GB',
         silence_logs=True,
         dashboard_address=':8787'
     )

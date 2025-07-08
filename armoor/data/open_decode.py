@@ -403,7 +403,7 @@ def open_decode_hycom(path_files):
 
     path_files.sort()
     for path in path_files:
-
+        logger.info(path)
         with xcf.set_cf_specs(cfspecs):
             ds = (
                 xr.open_dataset(
@@ -416,6 +416,9 @@ def open_decode_hycom(path_files):
         test = any(i in ['u', 'v'] for i in ds.data_vars)
         if (bathy is None) and (test is False) and ("bathy" in ds):
             bathy = ds.bathy
+        
+        if "dens" in ds.coords:
+            ds = ds.reset_coords("dens")
 
         if "bathy" in ds:
             ds = ds.drop_vars("bathy")

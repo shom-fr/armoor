@@ -31,7 +31,7 @@ setup(
                            'armoor-comp-models',
                            'armoor-comp-mooring',
                            'armoor-comp-sst',
-                           'armoor-comp-metazones'
+                           'armoor-metazones'
                            ]},
     include_package_data=True,
     version='0.0.1',
@@ -75,7 +75,7 @@ setup(
             'armoor-comp-argo = armoor.cli.main:main_comp_argo',
             'armoor-comp-models = armoor.cli.main:main_comp_models',
             'armoor-comp-mooring = armoor.cli.main:main_comp_mooring',
-            'armoor-metazones = armoor.cli.main:main_comp_metazones',
+            'armoor-metazones = armoor.cli.main:main_metazones',
             'armoor-comp-sst = armoor.cli.main:main_comp_sst',
         ]
     },
