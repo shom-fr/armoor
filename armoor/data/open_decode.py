@@ -414,6 +414,7 @@ def open_decode_hycom(path_files):
         with xcf.set_cf_specs(cfspecs):
             # Open and decode dataset
             ds = xr.open_dataset(path)#.xoa.decode()
+            #ds = ds.compute()
             ds = optimize_for_low_swap(ds)
             ds = ds.xoa.decode()
 
@@ -441,7 +442,7 @@ def open_decode_hycom(path_files):
                     variables_data.setdefault(varname, []).append(ds[varname])
             
             ds.close()
-    
+    logger.info("concat") 
     # Concatenate and merge datasets
     datasets_to_merge = []
     
@@ -457,7 +458,7 @@ def open_decode_hycom(path_files):
     merged_ds = xr.merge(datasets_to_merge) if datasets_to_merge else xr.Dataset()
     for ds in datasets_to_merge:
         ds.close()
-    merged_ds =  optimize_for_low_swap(merged_ds, target_chunk_mb=128)
+    #merged_ds =  optimize_for_low_swap(merged_ds, target_chunk_mb=128)
     del datasets_to_merge
     # Add bathymetry if available
     if bathymetry is not None:
@@ -481,8 +482,8 @@ def open_decode_hycom(path_files):
     
     # Final deduplication
     merged_ds = merged_ds.sel(time=~merged_ds.get_index("time").duplicated())
-    
-    return merged_ds
+    logger.info("End open_decode_hycom") 
+    return merged_ds.persist()
 
 
 # def open_decode_hycom(path_files):

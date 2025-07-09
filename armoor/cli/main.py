@@ -772,7 +772,8 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
             else:
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
             ds.attrs["data_ref"] = str(cfg_data["ref"])
-            dss[ids] = ds.compute()
+            dss[ids] = ds#.compute()
+            del ds
         
         elapsed = time.time() - start_time
         logger.info(f"✅ {dataset_name} load in {elapsed:.1f}s")
@@ -782,6 +783,8 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
             'config': cfg_data,
             'load_time': elapsed
         }
+        for ds in dss:
+            ds.close()
         del dss
         ncs = process_all_combinations(datasets, metazones, func_comp)
         ncouts += ncs
@@ -849,6 +852,10 @@ def process_all_combinations(datasets, metazones, func_comp):
                     dsout = dsout.compute()
                     ncout = save_result(dsout, mz_name, func_comp)
                     ncouts.append(ncout)
+            for ds in dss:
+                ds.close()
+            del dss
+    del datasets
     # client.close()
     return ncouts
 
@@ -1221,7 +1228,7 @@ def save_result(dsout, mz_name, func_comp):
         engine='netcdf4',
         #compute=True  # Forcer le compute immédiat
         )
-    
+    dsout.close() 
     logger.debug(f"💾 Sauvegardé: {nc}")
     return str(nc)
 
@@ -1270,19 +1277,19 @@ def setup_dask_client():
         'distributed.scheduler.allowed-failures': 2,
         'distributed.scheduler.work-stealing': True,
         'array.shuffle.method': 'tasks',
-        'array.chunk-size': '128MB',
+        #'array.chunk-size': '128MB',
         'array.slicing.split_large_chunks': False,
         'optimization.cull': True
     })
     
     client = Client(
-        n_workers=4,  # Réduire le nombre de workers
+        n_workers=16,  # Réduire le nombre de workers
         threads_per_worker=2,
-        memory_limit='8GB',
+        memory_limit='16GB',
         silence_logs=True,
         dashboard_address=':8787',
         local_directory='./dask_tmp',
-        processes=True
+        #processes=True
     )
     
     return client
