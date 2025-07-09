@@ -48,7 +48,7 @@ def string_to_tuples_float(s):
 
     return tuples
 
-def optimize_for_low_swap(dataset, target_chunk_mb=16):
+def optimize_for_low_swap(dataset, target_chunk_mb=64):
     """
     Optimize dataset chunks to reduce swap usage.
     
@@ -97,6 +97,10 @@ def optimize_for_low_swap(dataset, target_chunk_mb=16):
     for dim in dataset.dims:
         # Ensure chunk size doesn't exceed dimension size
         chunks[dim] = min(dataset.sizes[dim], elements_per_dim)
+    
+    z_dim = chunks.get("z")
+    if z_dim:
+        chunks.update({"z": -1})
     
     logger.info(f"Anti-swap chunks: {chunks}")
     logger.info(f"Estimated chunk size: {(elements_per_dim**n_dims * element_size) / 1024**2:.1f} MB per chunk")

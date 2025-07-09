@@ -9,11 +9,12 @@ import glob
 import logging
 import os
 import sys
-
+import gc
+from contextlib import contextmanager
 import glob
 import re
 from pathlib import Path
-from typing import List, Union
+from typing import Union, List, Dict, Any
 import dask
 import gsw
 import numpy as np
@@ -26,6 +27,7 @@ from pyproj import Geod
 from xoa.grid import dz2depth, shift, to_rect
 
 from armoor.__init__ import ROOTDIR, ArmoorError
+from armoor.base.misc import optimize_for_low_swap
 
 logger = logging.getLogger(__name__)
 
@@ -378,99 +380,205 @@ def open_decode_cmems_model(path_files):
     ds["depth"] = ds["depth"].broadcast_like(ds[var])
     return ds
 
-
 def open_decode_hycom(path_files):
     """
     Open HyCOM netcdf file(s) and store it into a ready-to-use dataset.
+    
     Parameters
     ----------
     path_files : str, list of str
         Path to the netcdf files.
-    steps : float
-        Horizontal and vertical steps
+        
     Returns
     -------
     xarray.Dataset
         HyCOM dataset.
     """
     
-    # Open
+    # Pre-sort paths once
+    sorted_paths = sorted(path_files)
+    
+    # Get CF specs once
     cfspecs = xcf.get_cf_specs("hycom")
-
-    dss_var = {}
-    bathy = None
-    dsu, dsv = None, None
-
-    path_files.sort()
-    for path in path_files:
+    
+    # Initialize collections
+    variables_data = {}
+    bathymetry = None
+    velocity_u = []
+    velocity_v = []
+    
+    # Process each file
+    for path in sorted_paths:
         logger.info(path)
-        with xcf.set_cf_specs(cfspecs):
-            ds = (
-                xr.open_dataset(
-                    path, chunks="auto",
-                )
-                .xoa.decode()
-            )
-            #.isel(x=slice(None, None, 5), y=slice(None, None, 5))
-
-        test = any(i in ['u', 'v'] for i in ds.data_vars)
-        if (bathy is None) and (test is False) and ("bathy" in ds):
-            bathy = ds.bathy
         
-        if "dens" in ds.coords:
-            ds = ds.reset_coords("dens")
+        with xcf.set_cf_specs(cfspecs):
+            # Open and decode dataset
+            ds = xr.open_dataset(path)#.xoa.decode()
+            ds = optimize_for_low_swap(ds)
+            ds = ds.xoa.decode()
 
-        if "bathy" in ds:
-            ds = ds.drop_vars("bathy")
-
-        varname = [var for var in ds.data_vars][0]
-        if varname not in dss_var.keys():
-            dss_var[varname] = []
-        if varname == "u":
-            logger.info("shift u")
-            da_u = shift(
-                ds["u"].squeeze(drop=True), {"x": "right"}
-            ).xoa.reloc(u=False)
-            dss_var[varname].append(da_u)
-        elif varname == "v":
-            logger.info("shift v")
-            da_v = shift(
-                ds["v"].squeeze(drop=True), {"y": "top"}
-            ).xoa.reloc(v=False)
-            dss_var[varname].append(da_v)
-        else:
-            dss_var[varname].append(ds)
-
+            # Extract bathymetry only once from non-velocity files
+            if bathymetry is None and "bathy" in ds and not any(var in ['u', 'v'] for var in ds.data_vars):
+                bathymetry = ds.bathy
+            
+            # Clean up coordinates and variables
+            if "dens" in ds.coords:
+                ds = ds.reset_coords("dens")
+            if "bathy" in ds:
+                ds = ds.drop_vars("bathy")
+            
+            # Process variables
+            for varname in ds.data_vars:
+                if varname == "u":
+                    logger.info("shift u")
+                    shifted_u = shift(ds["u"].squeeze(drop=True), {"x": "right"}).xoa.reloc(u=False)
+                    velocity_u.append(shifted_u)
+                elif varname == "v":
+                    logger.info("shift v")
+                    shifted_v = shift(ds["v"].squeeze(drop=True), {"y": "top"}).xoa.reloc(v=False)
+                    velocity_v.append(shifted_v)
+                else:
+                    variables_data.setdefault(varname, []).append(ds[varname])
+            
+            ds.close()
+    
+    # Concatenate and merge datasets
+    datasets_to_merge = []
+    
+    # Process regular variables
+    for varname, data_list in variables_data.items():
+        if data_list:
+            concatenated = xr.concat(data_list, dim='time')
+            concatenated = concatenated.sel(time=~concatenated.get_index("time").duplicated())
+            datasets_to_merge.append(concatenated.to_dataset())
+    
+    # Merge all regular variables
+    #datasets = [ds.compute() for ds in datasets_to_merge]
+    merged_ds = xr.merge(datasets_to_merge) if datasets_to_merge else xr.Dataset()
+    for ds in datasets_to_merge:
         ds.close()
+    merged_ds =  optimize_for_low_swap(merged_ds, target_chunk_mb=128)
+    del datasets_to_merge
+    # Add bathymetry if available
+    if bathymetry is not None:
+        merged_ds = xr.merge([merged_ds, bathymetry])
+    
+    # Process velocity components
+    if velocity_u:
+        u_concat = xr.concat(velocity_u, dim='time')
+        u_concat = u_concat.sel(time=~u_concat.get_index("time").duplicated())
+        merged_ds["u"] = u_concat.assign_coords(**merged_ds.coords)
+    
+    if velocity_v:
+        v_concat = xr.concat(velocity_v, dim='time')
+        v_concat = v_concat.sel(time=~v_concat.get_index("time").duplicated())
+        merged_ds["v"] = v_concat.assign_coords(**merged_ds.coords)
+    
+    # Handle depth coordinates
+    if "dz" in merged_ds:
+        merged_ds.coords["depth"] = dz2depth(merged_ds.dz, centered=True)
+        merged_ds = merged_ds.drop_vars(["z", "dz"])
+    
+    # Final deduplication
+    merged_ds = merged_ds.sel(time=~merged_ds.get_index("time").duplicated())
+    
+    return merged_ds
 
-    dss = []
-    for var in dss_var.keys():
-        ds_concat = xr.concat(dss_var[var], dim='time')
-        ds_concat = ds_concat.sel(time=~ds_concat.get_index("time").duplicated())
-        if var == 'u':
-            dsu = ds_concat
-        elif var == 'v':
-            dsv = ds_concat
-        else:
-            dss.append(ds_concat)
-        ds_concat.close()
-    del dss_var
-    ds = xr.merge(dss)
-    if bathy is not None:
-        ds = xr.merge([ds, bathy])
 
-    if isinstance(dsu, xr.DataArray):
-        ds["u"] = dsu.assign_coords(**ds.coords)
-        del dsu
-    if isinstance(dsv, xr.DataArray):
-        ds["v"] = dsv.assign_coords(**ds.coords)
-        del dsv
-    if "dz" in ds:
-        ds.coords["depth"] = dz2depth(ds.dz, centered=True)
-        ds = ds.drop_vars(["z", "dz"])
+# def open_decode_hycom(path_files):
+#     """
+#     Open HyCOM netcdf file(s) and store it into a ready-to-use dataset.
+#     Parameters
+#     ----------
+#     path_files : str, list of str
+#         Path to the netcdf files.
+#     steps : float
+#         Horizontal and vertical steps
+#     Returns
+#     -------
+#     xarray.Dataset
+#         HyCOM dataset.
+#     """
+    
+#     # Open
+#     cfspecs = xcf.get_cf_specs("hycom")
 
-    ds = ds.sel(time=~ds.get_index("time").duplicated())
-    return ds
+#     dss_var = {}
+#     bathy = None
+#     dsu, dsv = None, None
+
+#     path_files.sort()
+#     for path in path_files:
+#         logger.info(path)
+#         with xcf.set_cf_specs(cfspecs):
+#             ds = (
+#                 xr.open_dataset(
+#                     path,
+#                     chunks="auto",
+#                 )
+#                 .xoa.decode()
+#             )
+#             ds = optimize_for_low_swap(ds, target_chunk_mb=64)
+#             #.isel(x=slice(None, None, 5), y=slice(None, None, 5))
+
+#         test = any(i in ['u', 'v'] for i in ds.data_vars)
+#         if (bathy is None) and (test is False) and ("bathy" in ds):
+#             bathy = ds.bathy
+        
+#         if "dens" in ds.coords:
+#             ds = ds.reset_coords("dens")
+
+#         if "bathy" in ds:
+#             ds = ds.drop_vars("bathy")
+
+#         varname = [var for var in ds.data_vars][0]
+#         if varname not in dss_var.keys():
+#             dss_var[varname] = []
+#         if varname == "u":
+#             logger.info("shift u")
+#             da_u = shift(
+#                 ds["u"].squeeze(drop=True), {"x": "right"}
+#             ).xoa.reloc(u=False)
+#             dss_var[varname].append(da_u)
+#         elif varname == "v":
+#             logger.info("shift v")
+#             da_v = shift(
+#                 ds["v"].squeeze(drop=True), {"y": "top"}
+#             ).xoa.reloc(v=False)
+#             dss_var[varname].append(da_v)
+#         else:
+#             dss_var[varname].append(ds)
+
+#         ds.close()
+
+#     dss = []
+#     for var in dss_var.keys():
+#         ds_concat = xr.concat(dss_var[var], dim='time')
+#         ds_concat = ds_concat.sel(time=~ds_concat.get_index("time").duplicated())
+#         if var == 'u':
+#             dsu = ds_concat
+#         elif var == 'v':
+#             dsv = ds_concat
+#         else:
+#             dss.append(ds_concat)
+#         ds_concat.close()
+#     del dss_var
+#     ds = xr.merge(dss)
+#     if bathy is not None:
+#         ds = xr.merge([ds, bathy])
+
+#     if isinstance(dsu, xr.DataArray):
+#         ds["u"] = dsu.assign_coords(**ds.coords)
+#         del dsu
+#     if isinstance(dsv, xr.DataArray):
+#         ds["v"] = dsv.assign_coords(**ds.coords)
+#         del dsv
+#     if "dz" in ds:
+#         ds.coords["depth"] = dz2depth(ds.dz, centered=True)
+#         ds = ds.drop_vars(["z", "dz"])
+
+#     ds = ds.sel(time=~ds.get_index("time").duplicated())
+#     return ds
 
 # def open_decode_hycom(path_files):
 #     """

@@ -10,6 +10,7 @@ import sys
 import numpy as np
 import pandas as pd
 import xarray as xr
+import dask.array as da
 import xoa.geo as xgeo
 from matplotlib import path
 from scipy.ndimage import binary_dilation
@@ -17,7 +18,6 @@ from scipy.ndimage import binary_dilation
 R_terre = 6371
 logger = logging.getLogger(__name__)
 xr.set_options(keep_attrs=True)
-
 
 @xr.register_dataarray_accessor("armoorfilters")
 @xr.register_dataset_accessor("armoorfilters")
@@ -77,7 +77,7 @@ class ArmoorSelectionAccessor:
             )
             return self.ds
         
-    def get_mask(self,coords: [(float, float)]) -> xr.Dataset:
+    def get_mask(self, coords: [(float, float)]) -> xr.Dataset:
         """Subset dataset selecting elements located within the polygon geometry.
 
         Parameters
@@ -97,24 +97,30 @@ class ArmoorSelectionAccessor:
         logger.info("getting mask for horizontal_selection_polygon")
         # Create the polygon where to subset
         polygon = path.Path(coords)
-        lons, lats = self.ds.lon.data.flatten(), self.ds.lat.data.flatten()
+        
+        # Use .values to avoid creating intermediate arrays
+        lons, lats = self.ds.lon.values.flatten(), self.ds.lat.values.flatten()
+        
         dims_name = ()
         dims_nb = ()
         for dim in self.ds.dims:
             if (dim in self.ds.lon.dims) or (dim in self.ds.lat.dims):
                 dims_name += (dim,)
                 dims_nb += (self.ds.sizes[dim],)
-        coords = np.vstack((lats, lons)).T
+        
+        # Stack coordinates more efficiently
+        coords = np.column_stack((lats, lons))
         del lats, lons
+        
         flags = polygon.contains_points(coords)
-        if np.all(flags == False):
+        if not np.any(flags):  # More efficient than np.all(flags == False)
             return None
+            
         mask_poly = xr.DataArray(
             data=np.reshape(flags, dims_nb),
             dims=dims_name,
         )
         return mask_poly, dims_name
-
 
     def horizontal_selection_polygon(
         self,
@@ -138,28 +144,35 @@ class ArmoorSelectionAccessor:
         https://matplotlib.org/stable/api/path_api.html
         """
         logger.info("Applying filter - horizontal_selection_polygon")
-        # mask_poly, dims_name = self.get_mask(coords)
         mask = self.get_mask(coords)
-        if mask:
-            mask_poly, dims_name = mask
-        else:
+        if mask is None:
             return None
-        if "depth" in self.ds.coords:
+            
+        mask_poly, dims_name = mask
+        
+        # Handle depth coordinate more efficiently
+        depth_was_coord = "depth" in self.ds.coords
+        if depth_was_coord:
             self.ds = self.ds.reset_coords("depth")
-        self.ds = self.ds.where(mask_poly, drop=True)
-        if "depth" in self.ds:
-            self.ds = self.ds.set_coords("depth")
-        for dim in dims_name:
-            if self.ds.sizes[dim] == 0:
-                return None
-        return self.ds
+            
+        # Apply mask without creating intermediate datasets
+        result = self.ds.where(mask_poly, drop=True)
+        
+        if depth_was_coord and "depth" in result:
+            result = result.set_coords("depth")
+            
+        # Check if any dimension is empty
+        if any(result.sizes[dim] == 0 for dim in dims_name):
+            return None
+            
+        return result
     
     def horizontal_selection_polygon_dilat(
         self,
         coords: [(float, float)],
     ) -> xr.Dataset:
         """
-        Subset dataset selecting elements located within the polygon geometry.
+        Subset dataset selecting elements located within the polygon geometry with dilation.
 
         Parameters
         ----------
@@ -177,27 +190,44 @@ class ArmoorSelectionAccessor:
         """
         logger.info("Applying filter - horizontal_selection_polygon_dilat")
 
-        mask_poly2, dims_name = self.get_mask(coords)
+        mask_result = self.get_mask(coords)
+        if mask_result is None:
+            return None
+            
+        mask_poly2, dims_name = mask_result
 
         logger.info("storing mask into dataset after binary dilation")
 
-        mask_poly = mask_poly2.copy()
-        self.ds["mask"] = mask_poly2
+        # Apply binary dilation directly to values (more memory efficient)
         structure = np.ones((3, 3), dtype=bool)
-        mask_poly.values = binary_dilation(
-            mask_poly, 
+        dilated_mask = binary_dilation(
+            mask_poly2.values,
             structure=structure,
             iterations=10
         )
-        if "depth" in self.ds.coords:
+        
+        # Create new mask with dilated values
+        mask_poly2 = xr.DataArray(
+            data=dilated_mask,
+            dims=mask_poly2.dims,
+        )
+        
+        # Store original mask for reference
+        self.ds["mask"] = mask_poly2
+        
+        depth_was_coord = "depth" in self.ds.coords
+        if depth_was_coord:
             self.ds = self.ds.reset_coords("depth")
-        self.ds = self.ds.where(mask_poly, drop=True)
-        if "depth" in self.ds:
-            self.ds = self.ds.set_coords("depth")
-        for dim in dims_name:
-            if self.ds.sizes[dim] == 0:
-                return None
-        return self.ds
+            
+        result = self.ds.where(mask_poly2, drop=True)
+        
+        if depth_was_coord and "depth" in result:
+            result = result.set_coords("depth")
+            
+        if any(result.sizes[dim] == 0 for dim in dims_name):
+            return None
+            
+        return result
 
     def data_selection(
         self,
@@ -239,7 +269,345 @@ class ArmoorSelectionAccessor:
             selection = self.ds[dim] <= maximum
         else:
             selection = None
-        return self.ds.where(selection)
+            
+        return self.ds.where(selection, drop=True)  # Added drop=True for consistency
+
+    # Helper methods to extract masks from existing filter methods
+    def _get_quality_mask(self, qname: str, qmin: int, qmax: int) -> xr.DataArray:
+        """Extract quality mask without applying it."""
+        qname += "_qc"
+        if qname not in self.ds:
+            return None
+            
+        if qmin and qmax:
+            return (self.ds[qname] >= int(qmin)) & (self.ds[qname] <= int(qmax))
+        elif qmin:
+            return self.ds[qname] >= int(qmin)
+        elif qmax:
+            return self.ds[qname] <= int(qmax)
+        return None
+
+    def _get_polygon_mask(self, coords: [(float, float)], dilate: bool = False) -> xr.DataArray:
+        """Extract polygon mask without applying it."""
+        mask_result = self.get_mask(coords)
+        if mask_result is None:
+            return None
+            
+        mask_poly, dims_name = mask_result
+        
+        if dilate:
+            structure = np.ones((3, 3), dtype=bool)
+            dilated_values = binary_dilation(
+                mask_poly.values,
+                structure=structure,
+                iterations=10
+            )
+            return xr.DataArray(data=dilated_values, dims=mask_poly.dims)
+        
+        return mask_poly
+
+    def _get_data_selection_mask(self, dim: str, minimum: float = None, 
+                                maximum: float = None, value: float = None) -> xr.DataArray:
+        """Extract data selection mask without applying it."""
+        if value is not None:
+            return self.ds[dim] == value
+        elif minimum is not None and maximum is not None:
+            return (self.ds[dim] >= minimum) & (self.ds[dim] <= maximum)
+        elif minimum is not None:
+            return self.ds[dim] >= minimum
+        elif maximum is not None:
+            return self.ds[dim] <= maximum
+        return None
+
+    # NEW: Combined filter method to reduce intermediate operations
+    def apply_combined_filters(self, filters_config: dict) -> xr.Dataset:
+        """
+        Apply multiple filters in a single operation to reduce memory usage.
+        
+        Parameters
+        ----------
+        filters_config : dict
+            Dictionary containing filter configurations:
+            - 'quality': {'qname': str, 'qmin': int, 'qmax': int}
+            - 'polygon': {'coords': [(float, float)], 'dilate': bool}
+            - 'data_selection': {'dim': str, 'minimum': float, 'maximum': float, 'value': float}
+            
+        Returns
+        -------
+        xarray.Dataset
+            Dataset with all filters applied
+        """
+        logger.info("Applying combined filters")
+        
+        combined_mask = None
+        
+        # Build combined boolean mask using existing methods
+        for filter_type, config in filters_config.items():
+            mask = None
+            
+            if filter_type == 'quality':
+                mask = self._get_quality_mask(
+                    config['qname'], 
+                    config.get('qmin'), 
+                    config.get('qmax')
+                )
+                        
+            elif filter_type == 'polygon':
+                mask = self._get_polygon_mask(
+                    config['coords'], 
+                    config.get('dilate', False)
+                )
+                if mask is None:
+                    return None
+                
+            elif filter_type == 'data_selection':
+                mask = self._get_data_selection_mask(
+                    config['dim'],
+                    config.get('minimum'),
+                    config.get('maximum'),
+                    config.get('value')
+                )
+            
+            # Combine masks
+            if mask is not None:
+                combined_mask = mask if combined_mask is None else combined_mask & mask
+        
+        # Apply combined mask once
+        if combined_mask is not None:
+            depth_was_coord = "depth" in self.ds.coords
+            if depth_was_coord:
+                result = self.ds.reset_coords("depth")
+            else:
+                result = self.ds
+                
+            result = result.where(combined_mask, drop=True)
+            
+            if depth_was_coord and "depth" in result:
+                result = result.set_coords("depth")
+                
+            return result
+        
+        return self.ds
+# @xr.register_dataarray_accessor("armoorfilters")
+# @xr.register_dataset_accessor("armoorfilters")
+# class ArmoorSelectionAccessor:
+#     """
+#     Select a subset of the original object filtering elements with conditions across certain dimensions.
+
+#     Attributes
+#     ----------
+#     xarray_obj : xarray.Dataset
+#         Observation dataset to subset.
+#     """
+
+#     def __init__(self, ds):
+#         self.ds = ds
+
+#     def quality_filter(self, qname: str, qmin: int, qmax: int) -> xr.Dataset:
+#         """
+#         Subset dataset filtering quality levels.
+
+#         Parameters
+#         ----------
+#         qname : str
+#             Name of the variable quality name.
+#         qmin : int
+#             Minimum value of quality.
+#         qmax : int
+#             Maximum value of quality.
+#         Returns
+#         -------
+#         xarray.Dataset
+#             Dataset filtered with quality levels input restrictions.
+#         """
+#         logger.info("Applying filter - quality_filter")
+#         qname += "_qc"
+
+#         if qname in self.ds:
+#             if qmin and qmax:
+#                 selection = (self.ds[qname] >= int(qmin)) & (
+#                     self.ds[qname] <= int(qmax)
+#                 )
+#             elif qmin:
+#                 selection = self.ds[qname] >= int(qmin)
+#             elif qmax:
+#                 selection = self.ds[qname] <= int(qmax)
+#             else:
+#                 logger.warning(
+#                     "qmin and/or qmax are missing."
+#                     "No quality filter applied."
+#                 )
+#                 return self.ds
+#             return self.ds.where(selection, drop=True)
+#         else:
+#             logger.warning(
+#                 "min_q and/or max_q are missing."
+#                 "Quality filter is not applied."
+#             )
+#             return self.ds
+        
+#     def get_mask(self,coords: [(float, float)]) -> xr.Dataset:
+#         """Subset dataset selecting elements located within the polygon geometry.
+
+#         Parameters
+#         ----------
+#         coords : list of tuples
+#            Set of points coordinates defining the geometry of the polygon.
+
+#         Returns
+#         -------
+#         xarray.Dataset
+#            Dataset with elements included inside the polygon.
+
+#         See Also
+#         --------
+#         https://matplotlib.org/stable/api/path_api.html
+#         """
+#         logger.info("getting mask for horizontal_selection_polygon")
+#         # Create the polygon where to subset
+#         polygon = path.Path(coords)
+#         lons, lats = self.ds.lon.data.flatten(), self.ds.lat.data.flatten()
+#         dims_name = ()
+#         dims_nb = ()
+#         for dim in self.ds.dims:
+#             if (dim in self.ds.lon.dims) or (dim in self.ds.lat.dims):
+#                 dims_name += (dim,)
+#                 dims_nb += (self.ds.sizes[dim],)
+#         coords = np.vstack((lats, lons)).T
+#         del lats, lons
+#         flags = polygon.contains_points(coords)
+#         if np.all(flags == False):
+#             return None
+#         mask_poly = xr.DataArray(
+#             data=np.reshape(flags, dims_nb),
+#             dims=dims_name,
+#         )
+#         return mask_poly, dims_name
+
+
+#     def horizontal_selection_polygon(
+#         self,
+#         coords: [(float, float)],
+#     ) -> xr.Dataset:
+#         """
+#         Subset dataset selecting elements located within the polygon geometry.
+
+#         Parameters
+#         ----------
+#         coords : list of tuples
+#            Set of points coordinates defining the geometry of the polygon.
+
+#         Returns
+#         -------
+#         xarray.Dataset
+#            Dataset with elements included inside the polygon.
+
+#         See Also
+#         --------
+#         https://matplotlib.org/stable/api/path_api.html
+#         """
+#         logger.info("Applying filter - horizontal_selection_polygon")
+#         # mask_poly, dims_name = self.get_mask(coords)
+#         mask = self.get_mask(coords)
+#         if mask:
+#             mask_poly, dims_name = mask
+#         else:
+#             return None
+#         if "depth" in self.ds.coords:
+#             self.ds = self.ds.reset_coords("depth")
+#         self.ds = self.ds.where(mask_poly, drop=True)
+#         if "depth" in self.ds:
+#             self.ds = self.ds.set_coords("depth")
+#         for dim in dims_name:
+#             if self.ds.sizes[dim] == 0:
+#                 return None
+#         return self.ds
+    
+#     def horizontal_selection_polygon_dilat(
+#         self,
+#         coords: [(float, float)],
+#     ) -> xr.Dataset:
+#         """
+#         Subset dataset selecting elements located within the polygon geometry.
+
+#         Parameters
+#         ----------
+#         coords : list of tuples
+#            Set of points coordinates defining the geometry of the polygon.
+
+#         Returns
+#         -------
+#         xarray.Dataset
+#            Dataset with elements included inside the polygon.
+
+#         See Also
+#         --------
+#         https://matplotlib.org/stable/api/path_api.html
+#         """
+#         logger.info("Applying filter - horizontal_selection_polygon_dilat")
+
+#         mask_poly2, dims_name = self.get_mask(coords)
+
+#         logger.info("storing mask into dataset after binary dilation")
+
+#         self.ds["mask"] = mask_poly2
+#         structure = np.ones((3, 3), dtype=bool)
+#         mask_poly2.values = binary_dilation(
+#             mask_poly2.values,
+#             structure=structure,
+#             iterations=10
+#         )
+#         depth_was_coord = "depth" in self.ds.coords
+#         if depth_was_coord:
+#             self.ds = self.ds.reset_coords("depth")
+#         self.ds = self.ds.where(mask_poly2, drop=True)
+#         if depth_was_coord and "depth" in self.ds:
+#             self.ds = self.ds.set_coords("depth")
+#         if any(self.ds.sizes[dim] == 0 for dim in dims_name):
+#             return None
+#         return self.ds
+
+#     def data_selection(
+#         self,
+#         dim: str,
+#         minimum: float = None,
+#         maximum: float = None,
+#         value: float = None,
+#     ) -> xr.Dataset:
+#         """
+#         Subset dataset filtering elements values along the specified dimension.
+
+#         Parameters
+#         ----------
+#         dim : str
+#             Dimension whom to apply the filter.
+#         minimum : float
+#             Minimum value kept.
+#         maximum : float
+#             Maximum value kept.
+#         value : float
+#             Only value kept (i.e. maximum = minimum).
+
+#         Returns
+#         -------
+#         xarray.Dataset
+#              Dataset with elements values meeting the condition(s).
+#         """
+#         logger.info("Applying filter - data_selection")
+
+#         if value is not None:
+#             selection = self.ds[dim] == value
+#         elif minimum is not None and maximum is not None:
+#             selection = (self.ds[dim] >= minimum) & (
+#                 self.ds[dim] <= maximum
+#             )
+#         elif minimum is not None:
+#             selection = self.ds[dim] >= minimum
+#         elif maximum is not None:
+#             selection = self.ds[dim] <= maximum
+#         else:
+#             selection = None
+#         return self.ds.where(selection)
 
     # def horizontal_selection_coords(
     #     self, coordinates: [(float, float)]

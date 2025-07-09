@@ -361,7 +361,7 @@ def vinterp(ds, vname, vlevels, method="linear"):
     for var in ds.data_vars:
         if "z" in ds[var].dims:
             da = xregrid.regrid1d(
-                ds[var].chunk(dict(z=-1)),
+                ds[var],#.chunk(dict(z=-1)),
                 vlevels,
                 method=method,
                 extrap="bottom"
