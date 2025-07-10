@@ -483,7 +483,7 @@ def open_decode_hycom(path_files):
     # Final deduplication
     merged_ds = merged_ds.sel(time=~merged_ds.get_index("time").duplicated())
     logger.info("End open_decode_hycom") 
-    return merged_ds.persist()
+    return merged_ds#.persist()
 
 
 # def open_decode_hycom(path_files):

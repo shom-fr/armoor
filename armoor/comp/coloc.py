@@ -11,7 +11,7 @@ import xoa.geo as xgeo
 from armoor.__init__ import ArmoorError
 from armoor.base.interp import interp_time, grid2loc, regrid, vinterp
 from armoor.base.misc import optimize_for_low_swap
-from armoor.base.io import create_fast_encoding
+from armoor.base.io import create_fast_encoding, setup_dask_client, get_zarr_encoding
 import armoor.base.ranges as ranges
 from armoor.comp import (
     COLOCATION_PARAMS_USER,
@@ -504,31 +504,55 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     else:
         pass
     
-    ncout_ref = dirout / f"ref{ncname}.nc"
-    ncout_prod = dirout / f"prod{ncname}.nc"
+    ncout_ref = dirout / f"ref{ncname}.zarr"
+    ncout_prod = dirout / f"prod{ncname}.zarr"
    
     logger.info(f"Save {ncout_ref}")
     if "mask" in dsref.data_vars:
         dsref = dsref.drop_vars("mask")
-    encoding = create_fast_encoding(dsref)
-    dsref.to_netcdf(
-        ncout_ref,
+    # encoding = create_fast_encoding(dsref)
+    dsref = dsref.chunk("auto")
+    encoding = get_zarr_encoding(dsref)
+    # dsref.to_netcdf(
+    #     ncout_ref,
+    #     encoding=encoding,
+    #     format='NETCDF4',
+    #     engine='netcdf4',
+    #     compute=True  # Forcer le compute immédiat
+    #     )
+    dsref.to_zarr(
+        store=ncout_ref,
+        mode="w",
         encoding=encoding,
-        format='NETCDF4',
-        engine='netcdf4',
-        compute=True  # Forcer le compute immédiat
+        #safe_chunks=False
+        # format='NETCDF4',
+        # engine='netcdf4',
+        #compute=True  # Forcer le compute immédiat
         )
+    dsref.close()
     logger.info(f"Save {ncout_prod}")
     if "mask" in dsprod.data_vars:
         dsprod = dsprod.drop_vars("mask")
-    encoding = create_fast_encoding(dsprod)
-    dsprod.to_netcdf(
-        ncout_prod,
+    # encoding = create_fast_encoding(dsprod)
+    dsprod = dsprod.chunk("auto")
+    encoding = get_zarr_encoding(dsprod)
+    # dsprod.to_netcdf(
+    #     ncout_prod,
+    #     encoding=encoding,
+    #     format='NETCDF4',
+    #     engine='netcdf4',
+    #     compute=True  # Forcer le compute immédiat
+    #     )
+    dsprod.to_zarr(
+        store=ncout_prod,
+        mode="w",
         encoding=encoding,
-        format='NETCDF4',
-        engine='netcdf4',
-        compute=True  # Forcer le compute immédiat
+        #safe_chunks=False
+        # format='NETCDF4',
+        # engine='netcdf4',
+        #compute=True  # Forcer le compute immédiat
         )
+    dsprod.close()
     return ncout_ref, ncout_prod
 
 def main_coloc(ncs, metazones, comp_func):
@@ -567,7 +591,7 @@ def main_coloc(ncs, metazones, comp_func):
             logger.info(f"Use reference {ncref}")
             dsrefin = xr.open_dataset(ncref)#, engine="h5netcdf")
             logger.info(dsrefin.sizes)
-            dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=64)
+            dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=512)
             for var in COMP_VARS[comp_func]:
                 da = dsrefin.oceanvars.sel(var)
                 if isinstance(da, xr.DataArray):
@@ -585,8 +609,8 @@ def main_coloc(ncs, metazones, comp_func):
             for ncin in ncins:
                 logger.info(f"-- Process {ncin}")
                 dsprodin = xr.open_dataset(ncin)
+                dsprodin = optimize_for_low_swap(dsprodin, target_chunk_mb=512)
                 logger.info(dsprodin.sizes)
-                dsprodin = optimize_for_low_swap(dsprodin, target_chunk_mb=64)
                 for var in COMP_VARS[comp_func]:
                     dsprodin[var] = dsprodin.oceanvars.sel(var)
                 for var in dsprodin.data_vars:
@@ -636,89 +660,94 @@ def main_coloc(ncs, metazones, comp_func):
                 dsprod = dsprod.assign_attrs(gattrs_prod)
                 # Configuration optimale
                 
-                dask.config.set({
-                    'distributed.worker.daemon': False,
-                    'distributed.comm.timeouts.connect': '120s',
-                    'distributed.comm.timeouts.tcp': '120s',
-                    'distributed.worker.memory.target': 0.9,
-                    'distributed.worker.memory.spill': 0.8,
-                    'distributed.worker.memory.pause': 0.9,
-                    'distributed.worker.memory.terminate': 0.95,
-                    'distributed.worker.memory.monitor-interval': '100ms',
-                    'distributed.scheduler.allowed-failures': 2,
-                    'distributed.scheduler.work-stealing': True,
-                })
+                # dask.config.set({
+                #     'distributed.worker.daemon': False,
+                #     'distributed.comm.timeouts.connect': '120s',
+                #     'distributed.comm.timeouts.tcp': '120s',
+                #     'distributed.worker.memory.target': 0.9,
+                #     'distributed.worker.memory.spill': 0.8,
+                #     'distributed.worker.memory.pause': 0.9,
+                #     'distributed.worker.memory.terminate': 0.95,
+                #     'distributed.worker.memory.monitor-interval': '100ms',
+                #     'distributed.scheduler.allowed-failures': 2,
+                #     'distributed.scheduler.work-stealing': True,
+                # })
                 
-                with dask.distributed.Client(
-                    n_workers=4,  # Réduire le nombre de workers
-                    threads_per_worker=4,
-                    memory_limit='10GB',
-                    silence_logs=True,
-                    dashboard_address='localhost:8787'
-                    ) as client:
-                    print(client.dashboard_link)
+                # with dask.distributed.Client(
+                #     n_workers=4,  # Réduire le nombre de workers
+                #     threads_per_worker=4,
+                #     memory_limit='10GB',
+                #     silence_logs=True,
+                #     dashboard_address='localhost:8787'
+                #     ) as client:
+                #     print(client.dashboard_link)
+                with setup_dask_client():
+                    logger.info("Compute coloc ref")
                     dsref = dsref.compute()
+                    logger.info("Compute coloc prod")
                     dsprod = dsprod.compute()
                     
-                time_coloc = params.get("time")
-                if time_coloc != None:
-                    if  "tfreq" in params.get("time")[0]:
-                        dsref = ranges.tfreq(dsref)
-                        dsprod = ranges.tfreq(dsprod)
-                    elif "trange_seq" in params.get("time")[0]:
-                        if params.get("time")[1][0] != "*":
-                            dsref = ranges.trange_seq(dsref, *tbound, params.get("time")[1][0])
-                            dsprod = ranges.trange_seq(dsprod, *tbound, params.get("time")[1][0])
-                        else:
-                            dsref = [dsref]
-                            dsprod = [dsprod]
-                else:
-                    dsref = [dsref]
-                    dsprod = [dsprod]
-    
-                vertical_coloc = params.get("vertical")
-                if vertical_coloc != None:
-                    if (
-                        "vlevel" in params.get("vertical")[0]
-                        ) or (
-                        comp_func == "comp_mooring"    
-                        ):
-                        if comp_func == "comp_mooring":
-                            vname = "depth"
-                        else:
-                            vname  = params.get("vertical")[1][0]
-                        if comp_func != "comp_sst":
-                            dsref = ranges.vlevels(dsref, vname)
-                            dsprod = ranges.vlevels(dsprod, vname)
-                    elif "vrange" in params.get("vertical")[0]:
-                        vname = params.get("vertical")[1][1]
-                        vbins = params.get("vertical")[1][2]
-                        dsref = ranges.vrange(dsref, vname, vbins)
-                        dsprod = ranges.vrange(dsprod, vname, vbins)
-                dssref = dsref
-                dssprod = dsprod
-                del dsref; del dsprod
-                
-                logger.info("Save coloc data in netcdf")
-                for ids in range(len(dssref)):
-                    dsref = dssref[ids]
-                    dsprod = dssprod[ids]
-                    dirout = Path(
-                        f"{comp_func}/coloc/{metazone}/"
-                        f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
-                        )
-                    dirout.mkdir(parents=True, exist_ok=True)
-                    ncout_ref, ncout_prod = save_datasets(
-                        dsref,
-                        dsprod,
-                        dirout,
-                        dsref.attrs['data_name'],
-                        dsprod.attrs['data_name']
-                        )
-                    ncouts[metazone][ref_name][prod_name].append(ncout_ref)
-                    ncouts[metazone][ref_name][prod_name].append(ncout_prod)
-                    dsref.close()
-                    dsprod.close()
+                    time_coloc = params.get("time")
+                    if time_coloc != None:
+                        if  "tfreq" in params.get("time")[0]:
+                            dsref = ranges.tfreq(dsref)
+                            dsprod = ranges.tfreq(dsprod)
+                        elif "trange_seq" in params.get("time")[0]:
+                            if params.get("time")[1][0] != "*":
+                                dsref = ranges.trange_seq(dsref, *tbound, params.get("time")[1][0])
+                                dsprod = ranges.trange_seq(dsprod, *tbound, params.get("time")[1][0])
+                            else:
+                                dsref = [dsref]
+                                dsprod = [dsprod]
+                    else:
+                        dsref = [dsref]
+                        dsprod = [dsprod]
+        
+                    vertical_coloc = params.get("vertical")
+                    if vertical_coloc != None:
+                        if (
+                            "vlevel" in params.get("vertical")[0]
+                            ) or (
+                            comp_func == "comp_mooring"    
+                            ):
+                            if comp_func == "comp_mooring":
+                                vname = "depth"
+                            else:
+                                vname  = params.get("vertical")[1][0]
+                            if comp_func != "comp_sst":
+                                dsref = ranges.vlevels(dsref, vname)
+                                dsprod = ranges.vlevels(dsprod, vname)
+                        elif "vrange" in params.get("vertical")[0]:
+                            vname = params.get("vertical")[1][1]
+                            vbins = params.get("vertical")[1][2]
+                            dsref = ranges.vrange(dsref, vname, vbins)
+                            dsprod = ranges.vrange(dsprod, vname, vbins)
+                    dssref = dsref
+                    dssprod = dsprod
+                    del dsref; del dsprod
+                    # with setup_dask_client():
+                    logger.info("Save coloc data in netcdf")
+                    for ids in range(len(dssref)):
+                        dsref = dssref[ids]
+                        dsprod = dssprod[ids]
+                        dirout = Path(
+                            f"{comp_func}/coloc/{metazone}/"
+                            f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
+                            )
+                        dirout.mkdir(parents=True, exist_ok=True)
+                        ncout_ref, ncout_prod = save_datasets(
+                            dsref,
+                            dsprod,
+                            dirout,
+                            dsref.attrs['data_name'],
+                            dsprod.attrs['data_name']
+                            )
+                        ncouts[metazone][ref_name][prod_name].append(ncout_ref)
+                        ncouts[metazone][ref_name][prod_name].append(ncout_prod)
+                        dsref.close()
+                        dsprod.close()
+                    del dssref
+                    del dssprod
     
             dsrefin.close()
             gc.collect()

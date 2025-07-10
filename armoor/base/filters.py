@@ -213,7 +213,7 @@ class ArmoorSelectionAccessor:
         )
         
         # Store original mask for reference
-        self.ds["mask"] = mask_poly2
+        self.ds["mask"] = mask_result
         
         depth_was_coord = "depth" in self.ds.coords
         if depth_was_coord:

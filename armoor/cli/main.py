@@ -1,22 +1,10 @@
 """Command-line interface for armoor."""
 import ast
-import re
 import gc
-import os
 import json
-import weakref
-import warnings
-from contextlib import contextmanager
-from typing import List, Union, Any, Tuple, Optional
+from typing import List, Union, Any, Tuple, Optional, Dict
 from argparse import ArgumentParser
-from configobj import ConfigObj
-from dask.distributed import Client, as_completed, wait
-from concurrent.futures import ThreadPoolExecutor
-import traceback
-from concurrent.futures import TimeoutError
-import asyncio
 import time
-import dask
 import logging
 from pathlib import Path
 from xoa.cfgm import ConfigManager, register_validation_functions
@@ -24,12 +12,11 @@ from xoa.cfgm import ConfigManager, register_validation_functions
 from armoor import ArmoorError
 from armoor.cli import COMP_INI, METAZONES_INI
 from armoor.base import FILTERS
-from armoor.base.io import ArmoorArgumentHelpFormatter, create_fast_encoding
+from armoor.base.io import ArmoorArgumentHelpFormatter, create_fast_encoding, setup_dask_client
 from armoor.base.log import add_logging_parser_arguments, main_setup_logging
 from armoor.base.misc import string_to_tuples_float, optimize_for_low_swap
 import armoor.base.oceanvars
 from armoor.comp import METAZONE_PARAMS
-from armoor.comp.io import to_netcdf_ref_prods
 from armoor.comp.coloc import main_coloc
 from armoor.comp.output import main_output
 from armoor.comp.plot import main_plot
@@ -364,43 +351,6 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
                 #     del metazones[metazone_name]["polygon"]
     return metazones
 
-def main_open_datasets(cfg: ConfigObj):
-    """Open and decode list of data.
-    
-    Parameters
-    ----------
-    cfg: ConfigObj
-        List of data to be opened and decoded.
-    
-    Return
-    ------
-    dss: list
-        List of datasets.
-    """
-    if not cfg:
-        raise ArmoorError(
-            "Data section empty: Check [data] in your cfgfile."
-            )
-    register_cf()
-    dss = []
-    data_ref = {}
-    for _, cfg_data in cfg.items():
-        ds = open_decode(
-            cfg_data["path"],
-            fmt=cfg_data["fmt"],
-            platform=cfg_data["platform"]
-            )
-        # ds = optimize_for_low_swap(ds, target_chunk_mb=8)
-        #ds.attrs["data_name"] = cfg_data["name"]
-        ds.attrs["data_ref"] = str(cfg_data["ref"])
-        data_ref.update({
-            cfg_data["name"]: str(cfg_data["ref"])
-            })
-        dss.append(ds)
-        ds.close()
-    return dss, data_ref
-
-
 def get_parser_metazones():
     """Get parser for sst comparison."""
     # Setup argument parser
@@ -497,9 +447,9 @@ def main_comp(cfgfile, metafile, metazones, func_comp, comp_args):
     register_cf()
     
     ncs = load_datasets_sequential(cfg["data"], metazones, func_comp)
-    
+        
     ncs_coloc = main_coloc(ncs, metazones, func_comp)
-
+        
     ncs_outputs = main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
     
     # with open('ncs_outputs.json', 'w') as f:
@@ -718,7 +668,6 @@ def get_parser_comp_mooring():
 
 def main_comp_mooring():
     """Compare argo with other products - Version optimisée."""
-        
     # Get parser
     parser = get_parser_comp_mooring()
     func_comp = "comp_mooring"
@@ -743,7 +692,6 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
     client = setup_dask_client()
     ncouts = []
     for data_key, cfg_data in data_cfg.items():
-        datasets = {}
         dataset_name = cfg_data["name"]
         logger.info(f"📥 Chargement {dataset_name}...")
         
@@ -756,16 +704,12 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
             cfg_data["path"],
             fmt=cfg_data["fmt"],
             platform=cfg_data["platform"]
-        )
+            )
 
         if not isinstance(dss, list):
             dss = [dss]
 
         for ids, ds in enumerate(dss):
-            # Chunking optimal pour dimensions (121,40,500,500)
-
-            #ds = optimize_chunks_for_dimensions(ds)
-            
             # Métadonnées
             if len(dss) == 1:
                 ds.attrs["data_name"] = cfg_data["name"]
@@ -778,142 +722,70 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
         elapsed = time.time() - start_time
         logger.info(f"✅ {dataset_name} load in {elapsed:.1f}s")
         
-        datasets[dataset_name] = {
-            'dataset': dss if len(dss) > 1 else dss[0],
-            'config': cfg_data,
-            'load_time': elapsed
-        }
+        dataset = dss if len(dss) > 1 else dss[0]
         for ds in dss:
             ds.close()
         del dss
-        ncs = process_all_combinations(datasets, metazones, func_comp)
+        ncs = process_all_combinations(dataset, metazones, func_comp)
         ncouts += ncs
+        dataset.close()
+        gc.collect()
     client.close()
-    total_datasets = len(datasets)
-    logger.info(f"📊 {total_datasets} datasets chargés avec succès")
 
     return ncouts
-
-def optimize_chunks_for_dimensions(ds):
-    """Optimise le chunking pour les dimensions (121,40,500,500)."""
     
-    # Chunks optimaux basés sur vos dimensions
-    # optimal_chunks = {}
+def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
+    """Process a single dataset×metazone combination."""
+    ds, mz_name, mz_param, func_comp = task_data
     
-    # for dim_name, dim_size in ds.sizes.items():
-    #     if dim_name == 'time':
-    #         # Time: garder entier si < 200, sinon chunker
-    #         optimal_chunks[dim_name] = min(121, dim_size)
-    #     elif dim_name == 'z':
-    #         # Z: garder entier si petit
-    #         optimal_chunks[dim_name] = min(40, dim_size)
-    #     elif dim_name in ['y', 'lat', 'latitude']:
-    #         # Y: chunker en 2-4 parties
-    #         optimal_chunks[dim_name] = min(250, dim_size)
-    #     elif dim_name in ['x', 'lon', 'longitude']:
-    #         # X: chunker en 2-4 parties
-    #         optimal_chunks[dim_name] = min(250, dim_size)
-    #     else:
-    #         # Autres dimensions: chunks adaptatifs
-    #         optimal_chunks[dim_name] = min(100, dim_size)
-    
-    # logger.debug(f"Chunks optimaux: {optimal_chunks}")
-    
-    # Appliquer le chunking
     try:
-        # ds = ds.chunk(optimal_chunks)
-        # Optimiser pour réduire le swap
-        ds = optimize_for_low_swap(ds)  # 128MB par chunk
+        # Process the combination
+        dsout = process_single_combination(
+            ds,
+            mz_name,
+            mz_param,
+            func_comp
+        )
+        dsout = optimize_for_low_swap(dsout)
+        if dsout:
+            #dsout = dsout.compute()
+            ncout = save_result(dsout, mz_name, func_comp)
+            return ncout
+        return None
+        
     except Exception as e:
-        logger.warning(f"Erreur chunking: {e}")
-        # Fallback: chunking simple
-        ds = optimize_for_low_swap(ds)
-    
-    return ds
+        print(f"Error processing {mz_name}: {e}")
+        return None
+    finally:
+        # Clean up
+        if 'ds' in locals():
+            ds.close()
+        gc.collect()
 
-def process_all_combinations(datasets, metazones, func_comp):
-    """Traite toutes les combinaisons dataset×metazone en parallèle."""
-    # client = setup_dask_client()
+def prepare_tasks(dataset, metazones: Dict, func_comp: Any) -> List[Tuple]:
+    """Prepare all tasks for parallel processing."""
+    tasks = []
+    
+    for mz_name, mz_param in metazones.items():
+        dss = dataset
+        if not isinstance(dss, list):
+            dss = [dss]
+        
+        for ds in dss:
+            task = (ds, mz_name, mz_param, func_comp)
+            tasks.append(task)
+    
+    return tasks
+
+def process_all_combinations(dataset, metazones, func_comp, max_workers=1):
+    """Process all combinations using ThreadPoolExecutor."""
+    tasks = prepare_tasks(dataset, metazones, func_comp)
     ncouts = []
-    for dataset_name, dataset_info in datasets.items():
-        for mz_name, mz_param in metazones.items():
-            dss = dataset_info['dataset']
-            if not isinstance(dss, list):
-                dss = [dss]
-            for ds in dss:
-                dsout = process_single_combination(
-                        optimize_for_low_swap(ds),
-                        dataset_info['config'],
-                        mz_name,
-                        mz_param,
-                        func_comp
-                    )
-                if dsout:
-                    dsout = dsout.compute()
-                    ncout = save_result(dsout, mz_name, func_comp)
-                    ncouts.append(ncout)
-            for ds in dss:
-                ds.close()
-            del dss
-    del datasets
-    # client.close()
+    for task in tasks:
+        ncout = process_single_task(task)
+        ncouts.append(ncout)
+    dataset.close()
     return ncouts
-
-# def process_single_combination(ds, cfg_data, mz_name, mz_param, func_comp):
-#     """Version améliorée avec gestion d'erreurs robuste."""
-    
-#     combination_id = f"{cfg_data['name']}_{mz_name}"
-#     start_time = time.time()
-#     dsout = None
-#     try:
-#         logger.info(f"🔄 Traitement {combination_id}")
-        
-#         # Vérifier que les données sont disponibles
-#         if ds is None:
-#             logger.error(f"Dataset None pour {combination_id}")
-#             return None
-        
-#         # Copier le dataset pour éviter les modifications
-#         dsout = ds.copy(deep=True)  # Deep copy pour éviter les références
-#         data_name = dsout.attrs["data_name"]#cfg_data["name"]
-#         data_ref = str(cfg_data["ref"])
-        
-#         # Appliquer les filtres avec gestion d'erreurs
-#         try:
-#             dsout = apply_time_filters(dsout, mz_param, data_name)
-#             if dsout is None:
-#                 return None
-#         except Exception as e:
-#             logger.error(f"Erreur filtre temporel {combination_id}: {e}")
-#             return None
-        
-#         try:
-#             dsout = apply_horizontal_filters(dsout, mz_param, data_name)
-#             if dsout is None:
-#                 return None
-#         except Exception as e:
-#             logger.error(f"Erreur filtre horizontal {combination_id}: {e}")
-#             return None
-        
-#         # Métadonnées finales
-#         dsout.attrs = {
-#             "data_name": data_name,
-#             "data_ref": data_ref,
-#         }
-        
-#     except Exception as e:
-#         elapsed = time.time() - start_time
-#         logger.error(f"❌ Erreur {combination_id} après {elapsed:.1f}s: {e}")
-#         return None
-#     finally:
-#         return dsout
-#         # Nettoyage mémoire robuste
-#         if dsout is not None:
-#             try:
-#                 dsout.close()
-#                 del dsout
-#             except:
-#                 pass
 
 def apply_time_filters(dsout, mz_param, data_name):
     """Applique les filtres temporels."""
@@ -996,7 +868,7 @@ def build_filters_config(mz_param, data_name):
     if 'polygon' in mz_param:
         filters_config['polygon'] = {
             'coords': mz_param['polygon'],
-            'dilate': mz_param.get('polygon_dilate', True)
+            'dilate': True if mz_param.get("href") else False
         }
     # elif 'bbox' in mz_param:
     #     # Convert bounding box to polygon coordinates
@@ -1030,7 +902,7 @@ def build_filters_config(mz_param, data_name):
     return filters_config
 
 
-def process_single_combination(ds, cfg_data, mz_name, mz_param, func_comp):
+def process_single_combination(ds, mz_name, mz_param, func_comp):
     """
     Optimized version using combined filters to reduce memory usage and dask operations.
     
@@ -1052,8 +924,8 @@ def process_single_combination(ds, cfg_data, mz_name, mz_param, func_comp):
     xarray.Dataset or None
         Processed dataset or None if processing failed
     """
-    
-    combination_id = f"{cfg_data['name']}_{mz_name}"
+    data_name = ds.attrs["data_name"]
+    combination_id = f"{data_name}_{mz_name}"
     start_time = time.time()
     dsout = None
     
@@ -1068,7 +940,7 @@ def process_single_combination(ds, cfg_data, mz_name, mz_param, func_comp):
         # Copy dataset to avoid modifications
         dsout = ds.copy(deep=True)  # Deep copy to avoid references
         data_name = dsout.attrs["data_name"]
-        data_ref = str(cfg_data["ref"])
+        data_ref = dsout.attrs["data_ref"]#str(cfg_data["ref"])
         
         # Build filters configuration
         try:
@@ -1117,95 +989,6 @@ def process_single_combination(ds, cfg_data, mz_name, mz_param, func_comp):
     
     return dsout
 
-
-# Alternative version with fallback to original methods
-def process_single_combination_with_fallback(ds, cfg_data, mz_name, mz_param, func_comp):
-    """
-    Version with fallback to original filtering methods if combined filters fail.
-    
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset
-    cfg_data : dict
-        Configuration data
-    mz_name : str
-        Name of the processing zone
-    mz_param : dict
-        Parameters for the processing zone
-    func_comp : callable
-        Comparison function
-        
-    Returns
-    -------
-    xarray.Dataset or None
-        Processed dataset or None if processing failed
-    """
-    
-    combination_id = f"{cfg_data['name']}_{mz_name}"
-    start_time = time.time()
-    dsout = None
-    
-    try:
-        logger.info(f"🔄 Processing {combination_id}")
-        
-        if ds is None:
-            logger.error(f"Dataset is None for {combination_id}")
-            return None
-        
-        dsout = ds.copy(deep=True)
-        data_name = dsout.attrs["data_name"]
-        data_ref = str(cfg_data["ref"])
-        
-        # Try combined filters first
-        try:
-            filters_config = build_filters_config(mz_param, data_name)
-            if filters_config:
-                logger.info(f"Trying combined filters for {combination_id}")
-                dsout = dsout.armoorfilters.apply_combined_filters(filters_config)
-                if dsout is None:
-                    return None
-            else:
-                logger.info(f"No filters to apply for {combination_id}")
-                
-        except Exception as e:
-            logger.warning(f"Combined filters failed for {combination_id}: {e}")
-            logger.info(f"Falling back to sequential filtering for {combination_id}")
-            
-            # Fallback to original sequential filtering
-            try:
-                dsout = apply_time_filters(dsout, mz_param, data_name)
-                if dsout is None:
-                    return None
-            except Exception as e:
-                logger.error(f"Error applying time filters for {combination_id}: {e}")
-                return None
-            
-            try:
-                dsout = apply_horizontal_filters(dsout, mz_param, data_name)
-                if dsout is None:
-                    return None
-            except Exception as e:
-                logger.error(f"Error applying horizontal filters for {combination_id}: {e}")
-                return None
-        
-        # Final metadata
-        if dsout is not None:
-            dsout.attrs = {
-                "data_name": data_name,
-                "data_ref": data_ref,
-            }
-        
-        elapsed = time.time() - start_time
-        logger.info(f"✅ Processing {combination_id} completed in {elapsed:.1f}s")
-        
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"❌ Error processing {combination_id} after {elapsed:.1f}s: {e}")
-        return None
-    
-    return dsout
-
 def save_result(dsout, mz_name, func_comp):
     """Sauvegarde optimisée (< 30s)."""
     
@@ -1213,24 +996,29 @@ def save_result(dsout, mz_name, func_comp):
     refprod = "ref" if dsout.attrs["data_ref"] == "True" else "prod"
     data_name = dsout.attrs["data_name"]
     parent_dir = f"{func_comp}/metazones" if func_comp else "metazones"
-    ncpat = "{mz_name}/{data_name}/{refprod}_{data_name}.nc"
+    ncpat = "{mz_name}/{data_name}/{refprod}_{data_name}.zarr"
     nc = Path(parent_dir) / ncpat.format(**locals())
+
     nc.parent.mkdir(parents=True, exist_ok=True)
     
     # Encoding optimisé pour la vitesse
     encoding = create_fast_encoding(dsout)
-    
+    # encoding = get_zarr_encoding(dsout)
+    logger.info(nc)
     #Sauvegarde avec optimisations
-    dsout.to_netcdf(
-        nc,
+    dsout.to_zarr(
+        store=nc,
+        mode="w",
         encoding=encoding,
-        format='NETCDF4',
-        engine='netcdf4',
+        #safe_chunks=False
+        # format='NETCDF4',
+        # engine='netcdf4',
         #compute=True  # Forcer le compute immédiat
         )
     dsout.close() 
     logger.debug(f"💾 Sauvegardé: {nc}")
     return str(nc)
+
 
 # Fonction de diagnostic pour surveiller les performances
 def monitor_performance():
@@ -1259,37 +1047,3 @@ def monitor_performance():
         logger.debug("psutil non disponible")
     except Exception as e:
         logger.debug(f"Erreur monitoring: {e}")
-
-
-# Configuration Dask recommandée
-def setup_dask_client():
-    """Configure le client Dask de manière robuste."""
-    # Configuration optimale
-    dask.config.set({
-        'distributed.worker.daemon': False,
-        'distributed.comm.timeouts.connect': '120s',
-        'distributed.comm.timeouts.tcp': '120s',
-        'distributed.worker.memory.target': 0.9,
-        'distributed.worker.memory.spill': 0.8,
-        'distributed.worker.memory.pause': 0.9,
-        'distributed.worker.memory.terminate': 0.95,
-        'distributed.worker.memory.monitor-interval': '100ms',
-        'distributed.scheduler.allowed-failures': 2,
-        'distributed.scheduler.work-stealing': True,
-        'array.shuffle.method': 'tasks',
-        #'array.chunk-size': '128MB',
-        'array.slicing.split_large_chunks': False,
-        'optimization.cull': True
-    })
-    
-    client = Client(
-        n_workers=16,  # Réduire le nombre de workers
-        threads_per_worker=2,
-        memory_limit='16GB',
-        silence_logs=True,
-        dashboard_address=':8787',
-        local_directory='./dask_tmp',
-        #processes=True
-    )
-    
-    return client

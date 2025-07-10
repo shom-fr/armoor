@@ -164,6 +164,9 @@ OUTPUTS_PARAMS = {
         "maps": {
             "sort": ["time", "z"],
             "stat": ["time", "z"],
+            "mparams_con": {
+                "time": ["tfreq"],
+                }
             },
         "diagdisp_glob": {
             "concat": ["time"],

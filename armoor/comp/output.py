@@ -10,6 +10,7 @@ from typing import List, Dict, Optional
 from collections import defaultdict
 
 from armoor import ArmoorError
+from armoor.base.io import setup_dask_client
 from armoor.comp import OUTPUTS_PARAMS, COMP_VARS
 from armoor.comp.plot import PlotComp
 from armoor.comp.stats import StatsComp
@@ -37,7 +38,7 @@ def extract_suffix_from_filename(filename):
     result = {'time': None, 'z': None}
     
     # Main pattern: ref_[time]_[z].nc
-    pattern_full = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})_([0-9.-]+)\.nc'
+    pattern_full = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})_([0-9.-]+)\.zarr'
     match_full = re.search(pattern_full, filename)
     if match_full:
         result['time'] = match_full.group(2)
@@ -45,14 +46,14 @@ def extract_suffix_from_filename(filename):
         return result
     
     # Partial pattern: ref_[time]_*.nc (time without z)
-    pattern_time_only = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.nc'
+    pattern_time_only = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.zarr'
     match_time = re.search(pattern_time_only, filename)
     
     if match_time:
         result['time'] = match_time.group(2)
     
     # Partial pattern: ref_*_[z].nc (z without valid time)
-    pattern_z_only = r'([^/]+)_([0-9.-]+)\.nc'
+    pattern_z_only = r'([^/]+)_([0-9.-]+)\.zarr'
     match_z = re.search(pattern_z_only, filename)
     
     if match_z and not result['time']:  # Only if time not already found
@@ -272,34 +273,14 @@ def main_output(ncs, metazones_in, output_ins, func_comp):
     output_ins = [{key: value} for key, value in output_ins.items()]
     outputs = list(itertools.product(metazones, output_ins))
     ncouts = {}
-    for output in outputs:
-        dask.config.set({
-            'distributed.worker.daemon': False,
-            'distributed.comm.timeouts.connect': '120s',
-            'distributed.comm.timeouts.tcp': '120s',
-            'distributed.worker.memory.target': 0.9,
-            'distributed.worker.memory.spill': 0.8,
-            'distributed.worker.memory.pause': 0.9,
-            'distributed.worker.memory.terminate': 0.95,
-            'distributed.worker.memory.monitor-interval': '100ms',
-            'distributed.scheduler.allowed-failures': 2,
-            'distributed.scheduler.work-stealing': True,
-        })
-        
-        with dask.distributed.Client(
-            n_workers=4,  # Réduire le nombre de workers
-            threads_per_worker=4,
-            memory_limit='10GB',
-            silence_logs=True,
-            dashboard_address='localhost:8787'
-            ) as client:
-            print(client.dashboard_link)
+    with setup_dask_client():
+        for output in outputs:
             ncs = process_output(output, func_comp)
-        for o, ms in ncs.items():
-            if o not in ncouts:
-                ncouts[o] = {}
-            for m, ns in ms.items():
-                if len(ns) > 0:
-                    ncouts[o][m] = ns
+            for o, ms in ncs.items():
+                if o not in ncouts:
+                    ncouts[o] = {}
+                for m, ns in ms.items():
+                    if len(ns) > 0:
+                        ncouts[o][m] = ns
     logger.info(ncouts)
     return ncouts
