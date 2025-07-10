@@ -258,6 +258,22 @@ def process_output(ocfg, func_comp):
         gc.collect()
     return ncouts
 
+@dask.delayed
+def process_and_extract(output, func_comp):
+    """Process output and extract non-empty results"""
+    ncs = process_output(output, func_comp)
+    
+    # Extract only non-empty results
+    filtered_results = {}
+    for o, ms in ncs.items():
+        for m, ns in ms.items():
+            if len(ns) > 0:
+                if o not in filtered_results:
+                    filtered_results[o] = {}
+                filtered_results[o][m] = ns
+    
+    return filtered_results
+
 def main_output(ncs, metazones_in, output_ins, func_comp):
     
     check_output(func_comp, output_ins)
@@ -273,6 +289,46 @@ def main_output(ncs, metazones_in, output_ins, func_comp):
     output_ins = [{key: value} for key, value in output_ins.items()]
     outputs = list(itertools.product(metazones, output_ins))
     ncouts = {}
+
+    delayed_tasks = [
+        process_and_extract(output, func_comp)
+        for output in outputs
+    ]
+
+    results = dask.compute(*delayed_tasks)
+    
+    # Merge all filtered results
+    ncouts = {}
+    for result in results:
+        for o, ms in result.items():
+            if o not in ncouts:
+                ncouts[o] = {}
+            ncouts[o].update(ms) 
+
+    '''
+    import dask.bag as db
+
+    # Create a dask bag from outputs
+    bag = db.from_sequence(outputs)
+
+    # Map the processing function
+    def process_single_output(output):
+        return output, process_output(output, func_comp)
+
+    # Execute in parallel and collect results
+    results = bag.map(process_single_output).compute()
+
+    # Merge results into ncouts dictionary
+    ncouts = {}
+    for output, ncs in results:
+        for o, ms in ncs.items():
+            if o not in ncouts:
+                ncouts[o] = {}
+            for m, ns in ms.items():
+                if len(ns) > 0:
+                    ncouts[o][m] = ns
+    '''
+    '''
     with setup_dask_client():
         for output in outputs:
             ncs = process_output(output, func_comp)
@@ -282,5 +338,7 @@ def main_output(ncs, metazones_in, output_ins, func_comp):
                 for m, ns in ms.items():
                     if len(ns) > 0:
                         ncouts[o][m] = ns
+    '''
     logger.info(ncouts)
     return ncouts
+

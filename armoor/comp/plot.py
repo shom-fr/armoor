@@ -21,6 +21,7 @@ from pathlib import Path
 
 from armoor.__init__ import ArmoorError
 from armoor.base.interp import vinterp
+from armoor.base.io import setup_dask_client
 from armoor.base.plot import create_subplots, save_figure, diagdisp
 from armoor.base import LINE_COLORS
 from armoor.base import FILTERS
@@ -103,6 +104,9 @@ class PlotComp:
                     self.register_method(method)
         cls.__post_init__ = __post_init__
 
+
+    def clean(self):
+        self.dt.close()
 
     def diagdisp(self, dsref, dsprod, varname, figtitle, figname):
         
@@ -1308,14 +1312,41 @@ class PlotComp:
         del fig
 
 def main_plot(ncins, metazones, func_comp):
+    """Process using dask.bag for functional mapping"""
+    import dask.bag as db
+    
+    # Flatten the nested structure into a list of tasks
+    tasks = []
     for output, metas in ncins.items():
-        # print(output)
-        # if output == "timeseries":
-            for metazone, ncs in metas.items():
-                if metazone in metazones:
-                    logger.info(f"{output} -- {metazone}")
-                    for nc in ncs:
-                        print(nc)
-                        plotcomp = PlotComp(nc, func_comp, metazone)
-                        plotcomp.call(output)
-            
+        for metazone, ncs in metas.items():
+            if metazone in metazones:
+                logger.info(f"{output} -- {metazone}")
+                for nc in ncs:
+                    tasks.append((nc, func_comp, metazone, output))
+    
+    # Create a dask bag and map the processing function
+    bag = db.from_sequence(tasks)
+    
+    def process_task(task):
+        nc, func_comp, metazone, output = task
+        print(nc)
+        plotcomp = PlotComp(nc, func_comp, metazone)
+        plotcomp.call(output)
+        plotcomp.clean()    
+    # Execute in parallel
+    bag.map(process_task).compute()
+
+'''
+def main_plot(ncins, metazones, func_comp):
+    with setup_dask_client():
+        for output, metas in ncins.items():
+            # print(output)
+            # if output == "timeseries":
+                for metazone, ncs in metas.items():
+                    if metazone in metazones:
+                        logger.info(f"{output} -- {metazone}")
+                        for nc in ncs:
+                            print(nc)
+                            plotcomp = PlotComp(nc, func_comp, metazone)
+                            plotcomp.call(output)
+''' 
