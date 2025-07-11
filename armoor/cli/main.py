@@ -1006,7 +1006,6 @@ def save_result(dsout, mz_name, func_comp):
     # encoding = get_zarr_encoding(dsout)
     logger.info(nc)
     #Sauvegarde avec optimisations
-    '''
     dsout.to_zarr(
         store=nc,
         mode="w",
@@ -1016,7 +1015,6 @@ def save_result(dsout, mz_name, func_comp):
         # engine='netcdf4',
         #compute=True  # Forcer le compute immédiat
         )
-    '''
     dsout.close() 
     logger.debug(f"💾 Sauvegardé: {nc}")
     return str(nc)
