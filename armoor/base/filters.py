@@ -120,7 +120,7 @@ class ArmoorSelectionAccessor:
             data=np.reshape(flags, dims_nb),
             dims=dims_name,
         )
-        return mask_poly, dims_name
+        return mask_poly
 
     def horizontal_selection_polygon(
         self,
@@ -193,8 +193,9 @@ class ArmoorSelectionAccessor:
         mask_result = self.get_mask(coords)
         if mask_result is None:
             return None
-            
-        mask_poly2, dims_name = mask_result
+        
+        
+        mask_poly2, dims_name = mask_result.copy()
 
         logger.info("storing mask into dataset after binary dilation")
 
@@ -212,14 +213,15 @@ class ArmoorSelectionAccessor:
             dims=mask_poly2.dims,
         )
         
-        # Store original mask for reference
-        self.ds["mask"] = mask_result
+        
         
         depth_was_coord = "depth" in self.ds.coords
         if depth_was_coord:
             self.ds = self.ds.reset_coords("depth")
             
         result = self.ds.where(mask_poly2, drop=True)
+        # Store original mask for reference
+        result["mask"] = mask_result
         
         if depth_was_coord and "depth" in result:
             result = result.set_coords("depth")
@@ -292,8 +294,7 @@ class ArmoorSelectionAccessor:
         mask_result = self.get_mask(coords)
         if mask_result is None:
             return None
-            
-        mask_poly, dims_name = mask_result
+        mask_poly = mask_result.copy()
         
         if dilate:
             structure = np.ones((3, 3), dtype=bool)
@@ -302,9 +303,9 @@ class ArmoorSelectionAccessor:
                 structure=structure,
                 iterations=10
             )
-            return xr.DataArray(data=dilated_values, dims=mask_poly.dims)
+            return mask_result, xr.DataArray(data=dilated_values, dims=mask_poly.dims)
         
-        return mask_poly
+        return None, mask_result
 
     def _get_data_selection_mask(self, dim: str, minimum: float = None, 
                                 maximum: float = None, value: float = None) -> xr.DataArray:
@@ -340,7 +341,7 @@ class ArmoorSelectionAccessor:
         logger.info("Applying combined filters")
         
         combined_mask = None
-        
+        mask2keep = None
         # Build combined boolean mask using existing methods
         for filter_type, config in filters_config.items():
             mask = None
@@ -353,7 +354,7 @@ class ArmoorSelectionAccessor:
                 )
                         
             elif filter_type == 'polygon':
-                mask = self._get_polygon_mask(
+                mask2keep, mask  = self._get_polygon_mask(
                     config['coords'], 
                     config.get('dilate', False)
                 )
@@ -379,7 +380,8 @@ class ArmoorSelectionAccessor:
                 result = self.ds.reset_coords("depth")
             else:
                 result = self.ds
-                
+            if mask2keep is not None:
+                result["mask"] = mask2keep
             result = result.where(combined_mask, drop=True)
             
             if depth_was_coord and "depth" in result:

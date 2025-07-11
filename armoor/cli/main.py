@@ -940,11 +940,10 @@ def process_single_combination(ds, mz_name, mz_param, func_comp):
         # Copy dataset to avoid modifications
         dsout = ds.copy(deep=True)  # Deep copy to avoid references
         data_name = dsout.attrs["data_name"]
-        data_ref = dsout.attrs["data_ref"]#str(cfg_data["ref"])
+        data_ref = dsout.attrs["data_ref"]
         
         # Build filters configuration
         try:
-            print(mz_param)
             filters_config = build_filters_config(mz_param, data_name)
             logger.info(f"Filters config for {combination_id}: {filters_config}")
         except Exception as e:
