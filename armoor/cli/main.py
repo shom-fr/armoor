@@ -446,18 +446,20 @@ def main_comp(cfgfile, metafile, metazones, func_comp, comp_args):
     
     register_cf()
     
-    #ncs = load_datasets_sequential(cfg["data"], metazones, func_comp)
+    ncs = load_datasets_sequential(cfg["data"], metazones, func_comp)
         
-    #ncs_coloc = main_coloc(ncs, metazones, func_comp)
+    ncs_coloc = main_coloc(ncs, metazones, func_comp)
         
-    #ncs_outputs = main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
+# =============================================================================
+#     #ncs_outputs = main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
+# =============================================================================
     
     #with open('ncs_outputs.json', 'w') as f:
     #    json.dump(ncs_outputs, f, indent=4)
     
-    with open('ncs_outputs.json', 'r', encoding='utf-8') as file:
-        ncs_outputs = json.load(file)
-    logger.info("main_plot")    
+    # with open('ncs_outputs.json', 'r', encoding='utf-8') as file:
+    #     ncs_outputs = json.load(file)
+    # logger.info("main_plot")    
     main_plot(ncs_outputs, metazones, func_comp)
 
     elapsed = time.time() - start_time
