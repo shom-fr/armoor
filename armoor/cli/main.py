@@ -450,9 +450,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, comp_args):
         
     ncs_coloc = main_coloc(ncs, metazones, func_comp)
         
-# =============================================================================
-#     #ncs_outputs = main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
-# =============================================================================
+    ncs_outputs = main_output(ncs_coloc, metazones, cfg.get("outputs"), func_comp)
     
     #with open('ncs_outputs.json', 'w') as f:
     #    json.dump(ncs_outputs, f, indent=4)
