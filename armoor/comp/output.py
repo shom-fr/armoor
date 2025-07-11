@@ -237,7 +237,7 @@ def process_output(ocfg, func_comp):
                             }))
                 ncout = dirout_sort / "all.zarr"
                 encoding = get_zarr_encoding(dt)
-                #dt.to_zarr(ncout, mode="w", encoding=encoding)
+                dt.to_zarr(ncout, mode="w", encoding=encoding)
                 ncouts[output][metazone].append(str(ncout))
             else:
                 for prod in sorted_prods.keys():
@@ -253,7 +253,7 @@ def process_output(ocfg, func_comp):
                             }))
                     ncout = dirout_sort / f"{prod}.zarr"
                     encoding = get_zarr_encoding(dt)
-                    #dt.to_zarr(ncout, mode="w", encoding=encoding)
+                    dt.to_zarr(ncout, mode="w", encoding=encoding)
                     ncouts[output][metazone].append(str(ncout))
             del dt
         del dss
