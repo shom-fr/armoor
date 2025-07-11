@@ -16,6 +16,9 @@ armoor.base.filters.ArmoorSelectionAccessor
    
       
       
+         ~ArmoorSelectionAccessor.apply_combined_filters
+      
+      
          ~ArmoorSelectionAccessor.data_selection
       
       

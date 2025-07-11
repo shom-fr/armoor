@@ -46,7 +46,7 @@ armoor requires ``python>3.11`` and depends on the following packages:
 A complete list of dependencies is given in ``requirements.txt``:
 
     .. literalinclude:: ../requirements.txt
-           :language: txt
+           :language: text
 
 From sources
 ------------

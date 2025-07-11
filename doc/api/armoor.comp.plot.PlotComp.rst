@@ -19,6 +19,9 @@ armoor.comp.plot.PlotComp
          ~PlotComp.call
       
       
+         ~PlotComp.clean
+      
+      
          ~PlotComp.diagdisp
       
       

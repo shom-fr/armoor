@@ -11,6 +11,8 @@
       :toctree:
    
       create_fast_encoding
+      get_zarr_encoding
+      setup_dask_client
    
    
 

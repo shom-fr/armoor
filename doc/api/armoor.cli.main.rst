@@ -12,6 +12,7 @@
    
       apply_horizontal_filters
       apply_time_filters
+      build_filters_config
       check_metazones_in
       comma_separated
       get_parser_comp_argo
@@ -26,16 +27,15 @@
       main_comp_mooring
       main_comp_sst
       main_metazones
-      main_open_datasets
       monitor_performance
-      optimize_chunks_for_dimensions
       parse_coords
       parse_mixed_param
       parse_multiple_params
+      prepare_tasks
       process_all_combinations
       process_single_combination
+      process_single_task
       save_result
-      setup_dask_client
       validate_mixed_param_types
    
    

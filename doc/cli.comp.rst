@@ -63,18 +63,20 @@ ouputs
 Workflow
 --------
 
-    1. Open, decode input files and apply filters --> NetCDF files stored at ``./{comp_name}/metazones/{metazone.name}/{data.name}``.
-    2. Colocate products and reference --> NetCDF files stored at ``./{comp_name}/coloc/{metazone.name}/{ref.name}/{data.name}``.
-    3. Compute outputs --> NetCDF files stored at ``./{comp_name}/output/{metazone.name}/{ref.name}/{data.name}/{otype}/``.
+    1. Open, decode input files and apply filters --> Zarr files stored at ``./{comp_name}/metazones/{metazone.name}/{data.name}``.
+    2. Colocate products and reference --> Zarr files stored at ``./{comp_name}/coloc/{metazone.name}/{ref.name}/{data.name}``.
+    3. Compute outputs --> Zarr files stored at ``./{comp_name}/output/{metazone.name}/{ref.name}/{data.name}/{otype}/``.
     4. Plots --> png files stored at ``./{comp_name}/plot/{metazone.name}/{ref.name}/{otype}/``.
 
 
 .. toctree::
    :maxdepth: 1
    
-   cli.comp.sst
    cli.comp.argo
+   cli.comp.models
    cli.comp.mooring
+   cli.comp.sst
+   
 
 
 
