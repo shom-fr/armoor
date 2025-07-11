@@ -19,14 +19,14 @@
       get_parser_comp_models
       get_parser_comp_mooring
       get_parser_comp_sst
-      get_parser_metazones
+      get_parser_filters
       load_datasets_sequential
       main_comp
       main_comp_argo
       main_comp_models
       main_comp_mooring
       main_comp_sst
-      main_metazones
+      main_filters
       monitor_performance
       parse_coords
       parse_mixed_param

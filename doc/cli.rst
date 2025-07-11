@@ -26,6 +26,7 @@ Some parameters are not compatible :
 .. toctree::
    :maxdepth: 1
    
+   cli.filters
    cli.comp
    cli.data
    cli.diag

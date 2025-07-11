@@ -65,6 +65,51 @@ def get_zarr_encoding(ds: xr.Dataset, rechunk: bool = True) -> dict:
     
     return encoding
 
+
+def zarrs2netcdfs(fins):
+    """
+    Convert multiple Zarr files to NetCDF format.
+    
+    This function takes a list of Zarr file paths and converts each one to NetCDF format
+    by replacing the file extension from 'zarr' to 'nc'. The conversion is performed
+    using xarray's open_zarr() and to_netcdf() methods.
+    
+    Parameters
+    ----------
+    fins : list of str
+        List of input Zarr file paths to be converted. Empty or None values in the
+        list will be skipped.
+    
+    Returns
+    -------
+    list of str
+        List of output NetCDF file paths that were successfully created.
+        
+    Notes
+    -----
+    - Requires xarray to be imported as 'xr'
+    - Input files must have 'zarr' extension
+    - Output files will have 'nc' extension
+    - Empty or None input paths are automatically skipped
+    
+    Examples
+    --------
+    >>> import xarray as xr
+    >>> zarr_files = ['data1.zarr', 'data2.zarr', None, 'data3.zarr']
+    >>> nc_files = zarrs2netcdfs(zarr_files)
+    >>> print(nc_files)
+    ['data1.nc', 'data2.nc', 'data3.nc']
+    """
+    extin = "zarr"
+    extout = "nc"
+    fouts = []
+    for fin in fins:
+        if fin:
+            fout = fin.replace(extin, extout)
+            xr.open_zarr(fin).to_netcdf(fout)
+            fouts.append(fout)
+    return fouts
+
 def setup_dask_client():
     """Configure le client Dask de manière robuste."""
     # Configuration optimale

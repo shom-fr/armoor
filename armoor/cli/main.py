@@ -10,9 +10,9 @@ from pathlib import Path
 from xoa.cfgm import ConfigManager, register_validation_functions
 
 from armoor import ArmoorError
-from armoor.cli import COMP_INI, METAZONES_INI
+from armoor.cli import COMP_INI, FILTERS_INI, METAZONES_INI
 from armoor.base import FILTERS
-from armoor.base.io import ArmoorArgumentHelpFormatter, create_fast_encoding, setup_dask_client
+from armoor.base.io import ArmoorArgumentHelpFormatter, create_fast_encoding, setup_dask_client, zarrs2netcdfs
 from armoor.base.log import add_logging_parser_arguments, main_setup_logging
 from armoor.base.misc import string_to_tuples_float, optimize_for_low_swap
 import armoor.base.oceanvars
@@ -351,8 +351,8 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
                 #     del metazones[metazone_name]["polygon"]
     return metazones
 
-def get_parser_metazones():
-    """Get parser for sst comparison."""
+def get_parser_filters():
+    """Get parser for filtering."""
     # Setup argument parser
     parser = ArgumentParser(
         description="Apply filters over metazones.",
@@ -379,15 +379,15 @@ def get_parser_metazones():
         '--jsonfile',
         type=Path,
         help="Path of the output json file.",
-        default='ncs_metazones.json'
+        default='ncs_filter.json'
         )
     
     return parser
 
-def main_metazones():
+def main_filters():
     """Apply filters over metazones."""
     # Get parser
-    parser = get_parser_metazones()
+    parser = get_parser_filters()
 
     # Parse
     args = parser.parse_args()
@@ -401,7 +401,7 @@ def main_metazones():
             f"File not found: {args.cfgfile}."
             )
     
-    cfg = ConfigManager(COMP_INI).load(str(args.cfgfile))
+    cfg = ConfigManager(FILTERS_INI).load(str(args.cfgfile))
     metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
     
     metazones = check_metazones_in(
@@ -413,7 +413,9 @@ def main_metazones():
     
     register_cf()
     
-    ncs = load_datasets_sequential(cfg["data"], metazones, None)
+    zarrs = load_datasets_sequential(cfg["data"], metazones, None)
+
+    ncs = zarrs2netcdfs(zarrs)
 
     with open(args.jsonfile, 'w') as f:
         json.dump(ncs, f, indent=4)
@@ -715,7 +717,7 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
                 ds.attrs["data_name"] = cfg_data["name"]
             else:
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
-            ds.attrs["data_ref"] = str(cfg_data["ref"])
+            ds.attrs["data_ref"] = str(cfg_data.get("ref"))
             dss[ids] = ds#.compute()
             del ds
         
