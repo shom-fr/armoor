@@ -85,14 +85,14 @@ def setup_dask_client():
         'array.slicing.split_large_chunks': False,
         'optimization.cull': True
     })
-    
+
     client = Client(
         n_workers=16,  # Réduire le nombre de workers
         threads_per_worker=1,
-        memory_limit='8GB',
+        memory_limit='4GB',
         silence_logs=True,
         dashboard_address=':8787',
-        local_directory='./dask_tmp',
+        local_directory='/tmp',
         processes=True
     )
     

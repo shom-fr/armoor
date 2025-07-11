@@ -206,7 +206,7 @@ def diagdisp(x_data, y_data, ax, x_label, y_label):
              fontsize=12, bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-    plt.legend(loc='upper left', fontsize=11, frameon=True, fancybox=True)
+    ax.legend(loc='upper left', fontsize=11, frameon=True, fancybox=True)
     ax.set_aspect('equal', adjustable='box')
     #plt.tight_layout()
     return ax

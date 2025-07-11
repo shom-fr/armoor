@@ -10,7 +10,7 @@ from typing import List, Dict, Optional
 from collections import defaultdict
 
 from armoor import ArmoorError
-from armoor.base.io import setup_dask_client
+from armoor.base.io import setup_dask_client, get_zarr_encoding
 from armoor.comp import OUTPUTS_PARAMS, COMP_VARS
 from armoor.comp.plot import PlotComp
 from armoor.comp.stats import StatsComp
@@ -235,8 +235,9 @@ def process_output(ocfg, func_comp):
                         dt[prod].update(xr.DataTree.from_dict({
                             data: dss0
                             }))
-                ncout = dirout_sort / "all.nc"
-                dt.to_netcdf(ncout)
+                ncout = dirout_sort / "all.zarr"
+                encoding = get_zarr_encoding(dt)
+                #dt.to_zarr(ncout, mode="w", encoding=encoding)
                 ncouts[output][metazone].append(str(ncout))
             else:
                 for prod in sorted_prods.keys():
@@ -250,8 +251,9 @@ def process_output(ocfg, func_comp):
                         dt[prod].update(xr.DataTree.from_dict({
                             data: dss0
                             }))
-                    ncout = dirout_sort / f"{prod}.nc"
-                    dt.to_netcdf(ncout)
+                    ncout = dirout_sort / f"{prod}.zarr"
+                    encoding = get_zarr_encoding(dt)
+                    #dt.to_zarr(ncout, mode="w", encoding=encoding)
                     ncouts[output][metazone].append(str(ncout))
             del dt
         del dss
@@ -305,40 +307,5 @@ def main_output(ncs, metazones_in, output_ins, func_comp):
                 ncouts[o] = {}
             ncouts[o].update(ms) 
 
-    '''
-    import dask.bag as db
-
-    # Create a dask bag from outputs
-    bag = db.from_sequence(outputs)
-
-    # Map the processing function
-    def process_single_output(output):
-        return output, process_output(output, func_comp)
-
-    # Execute in parallel and collect results
-    results = bag.map(process_single_output).compute()
-
-    # Merge results into ncouts dictionary
-    ncouts = {}
-    for output, ncs in results:
-        for o, ms in ncs.items():
-            if o not in ncouts:
-                ncouts[o] = {}
-            for m, ns in ms.items():
-                if len(ns) > 0:
-                    ncouts[o][m] = ns
-    '''
-    '''
-    with setup_dask_client():
-        for output in outputs:
-            ncs = process_output(output, func_comp)
-            for o, ms in ncs.items():
-                if o not in ncouts:
-                    ncouts[o] = {}
-                for m, ns in ms.items():
-                    if len(ns) > 0:
-                        ncouts[o][m] = ns
-    '''
-    logger.info(ncouts)
     return ncouts
 

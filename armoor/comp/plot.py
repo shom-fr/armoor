@@ -6,6 +6,7 @@ from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
                                 LatitudeLocator, LongitudeLocator)
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import cmocean as cmo
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -31,6 +32,7 @@ from armoor.comp.stats import StatsComp
 
 logger = logging.getLogger(__name__)
 
+matplotlib.use('Agg')
 plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({'font.size': 8})
 
@@ -880,7 +882,7 @@ class PlotComp:
                         units = da_ref.attrs.get("units")
                         fig.suptitle(
                             f"{self.plot_title} \n"
-                            f"{self.metazone} \n {xtitle} {xcoord}"
+                            f"{self.metazone} \n {xtitle} {xcoord}\n"
                             f"{var}, {units} \n",
                             y=1.01
                             )
@@ -1175,7 +1177,7 @@ class PlotComp:
                     
                     figtitle = (
                         f"{self.plot_title} \n"
-                        f"{self.metazone} {xtitle}\n "
+                        f"{self.metazone} \n {xtitle}\n "
                         f"{var}, {units}"
                         )
                 
@@ -1245,7 +1247,7 @@ class PlotComp:
                             dsprod.lon, dsprod.lat, dsprod,
                             vmin=vmin,
                             vmax=vmax,
-                            cmap="cmo.thermal"
+                            cmap=CMAP_VARS[var]
                             )
                         axes[0].set_title(prod_name)
                         m1 = axes[1].pcolormesh(
@@ -1302,39 +1304,35 @@ class PlotComp:
         
         return None
     
-    
     def save_figure(self, fig, filename):
         """Save figure."""
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Saving {filename}")
+        print(filename)
         save_figure(fig, filename)
         del fig
 
 def main_plot(ncins, metazones, func_comp):
     """Process using dask.bag for functional mapping"""
-    import dask.bag as db
+
+    def process_task(nc, func_comp, metazone, output):
+        plotcomp = PlotComp(nc, func_comp, metazone)
+        plotcomp.call(output)
+        plotcomp.clean()
+        del plotcomp
     
     # Flatten the nested structure into a list of tasks
     tasks = []
     for output, metas in ncins.items():
         for metazone, ncs in metas.items():
             if metazone in metazones:
-                logger.info(f"{output} -- {metazone}")
                 for nc in ncs:
-                    tasks.append((nc, func_comp, metazone, output))
-    
-    # Create a dask bag and map the processing function
-    bag = db.from_sequence(tasks)
-    
-    def process_task(task):
-        nc, func_comp, metazone, output = task
-        print(nc)
-        plotcomp = PlotComp(nc, func_comp, metazone)
-        plotcomp.call(output)
-        plotcomp.clean()    
+                    tasks.append(dask.delayed(process_task)(nc, func_comp, metazone, output))
+
     # Execute in parallel
-    bag.map(process_task).compute()
+    with setup_dask_client():
+        logger.info("Start plot")
+        dask.compute(*tasks)
 
 '''
 def main_plot(ncins, metazones, func_comp):
