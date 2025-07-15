@@ -276,8 +276,10 @@ def process_and_extract(output, func_comp):
     
     return filtered_results
 
-def main_output(ncs, metazones_in, output_ins, func_comp):
+def main_output(ncs, metazones_in, outputs, func_comp):
     
+    output_ins = outputs.copy()
+    output_ins.pop("fmt")
     check_output(func_comp, output_ins)
     metazones = {}
     for metazone in metazones_in.keys():

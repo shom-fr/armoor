@@ -1,8 +1,44 @@
 import logging
+from pathlib import Path
 
 from armoor.__init__ import ArmoorError
+from armoor.base.misc import comma_separated
 
 logger = logging.getLogger(__name__)
+
+def add_comp_parser_arguments(parser, default_level="info"):
+    parser.add_argument(
+        'metazones',
+        type=comma_separated,
+        help="List of metazone to be processed."
+        )
+    parser.add_argument(
+        'cfgfile',
+        type=Path,
+        help="Path of the configuration file."
+        )
+    parser.add_argument(
+        '-m', '--metazonesfile',
+        type=Path,
+        help="Path of the configuration file dedicated to the description of metazones.",
+        default="metazones.cfg"
+        )
+    parser.add_argument(
+        '--jsonfile',
+        type=Path,
+        help="Path of the output json file.",
+        default='ncs_comp_sst.json'
+        )
+    parser.add_argument(
+        '--filters-only',
+        action='store_true',
+        help="Use for exiting after filters processes.",
+        )
+    parser.add_argument(
+        '--coloc-only',
+        action='store_true',
+        help="Use for exiting after colocation processes.",
+        )
 
 def validate_colocation(metazones, params):
     """Validate that only one of the two parameters is defined for each metazone.

@@ -1,7 +1,38 @@
 Command-line interfaces
 #######################
 
+Open-decode
+===========
+
+Every data processed by armoor executables are first opened and decoded in a pivot format.
+
+Open files
+----------
+
+The open functions of armoor are based wether on xarray or pandas libraries depending on the original format (netcdf, .txt, .csv...).
+
+Decode data
+-----------
+
+To decode data, armoor uses `xoa.cf <https://xoa.readthedocs.io/develop/uses.cf.html>`_.
+               
+The list of configuration files used can be found at ``armoor/data/`` :
+    
+    - cf_cersat_sst_l3.cfg
+    - cf_cmems_argo.cfg
+    - cf_cmems_drifter.cfg
+    - cf_cmems_glider.cfg
+    - cf_cmems_mooring.cfg
+    - cf_cmems_sst_l3.cfg
+    - cf_cmems_sst_l4.cfg
+    - cf_cora_argo.cfg
+    - cf_hycom.cfg
+       
+Metazones
+=========
+
 Armoor provides several executable scripts which have to be associated with a configuration file based on `metazones.ini` defining the metazone and parameters associated with:
+    
     .. literalinclude:: ../armoor/cli/metazones.ini
            :language: ini
     
@@ -22,7 +53,7 @@ Some parameters are not compatible :
 
 - ``trange_seq`` and ``tfreq``
 - ``href`` and ``cloud``
-    
+
 .. toctree::
    :maxdepth: 1
    
