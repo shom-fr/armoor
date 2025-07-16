@@ -16,6 +16,7 @@ from armoor.base.log import add_logging_parser_arguments, main_setup_logging
 from armoor.base.misc import (
     optimize_for_low_swap,
     dict_to_list,
+    parse_qc_tuple,
     parse_coords,
     parse_mixed_param,
     )
@@ -169,7 +170,6 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
     cfg = ConfigManager(COMP_INI).load(str(cfgfile))
     metas = ConfigManager(METAZONES_INI).load(str(metafile))
 
-    
     if not cfg:
         raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
         
@@ -286,9 +286,9 @@ def get_parser_comp_sst():
     add_comp_parser_arguments(parser)
     parser.add_argument(
         '--qc',
-        type=dict,
+        type=parse_qc_tuple,
         default=None,
-        help="Dictionnary specifying quality tresholds, ex: ptemp:1,7"
+        help="Tuple specifying quality tresholds, ex: ptemp,1,7"
         )
     return parser
 
@@ -309,7 +309,8 @@ def main_comp_sst():
         raise ArmoorError(
             f"File not found: {args.cfgfile}."
             )
-    kw_comp = {"qc": args.qc}    
+    kw_comp = {"qc": args.qc}
+
     main_comp(
         args.cfgfile,
         args.metazonesfile,
@@ -425,12 +426,9 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
     ncouts = []
     for data_key, cfg_data in data_cfg.items():
         dataset_name = cfg_data["name"]
-        logger.info(f"📥 Chargement {dataset_name}...")
+        logger.info(f"Load {dataset_name}...")
         
         start_time = time.time()
-        
-        # Chargement optimisé
-        #with setup_dask_client():
         
         dss = open_decode(
             cfg_data["path"],
@@ -448,11 +446,11 @@ def load_datasets_sequential(data_cfg, metazones, func_comp):
             else:
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
             ds.attrs["data_ref"] = str(cfg_data.get("ref"))
-            dss[ids] = ds#.compute()
+            dss[ids] = ds
             del ds
         
         elapsed = time.time() - start_time
-        logger.info(f"✅ {dataset_name} load in {elapsed:.1f}s")
+        logger.info(f"{dataset_name} load in {elapsed:.1f}s")
         
         dataset = dss if len(dss) > 1 else dss[0]
         for ds in dss:
@@ -470,29 +468,28 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     """Process a single dataset×metazone combination."""
     ds, mz_name, mz_param, func_comp = task_data
     
-    try:
+    # try:
         # Process the combination
-        dsout = process_single_combination(
-            ds,
-            mz_name,
-            mz_param,
-            func_comp
-        )
-        dsout = optimize_for_low_swap(dsout)
-        if dsout:
-            #dsout = dsout.compute()
-            ncout = save_result(dsout, mz_name, func_comp)
-            return ncout
-        return None
+    dsout = process_single_combination(
+        ds,
+        mz_name,
+        mz_param,
+        func_comp
+    )
+    dsout = optimize_for_low_swap(dsout)
+    if dsout:
+        ncout = save_result(dsout, mz_name, func_comp)
+        return ncout
+    return None
         
-    except Exception as e:
-        print(f"Error processing {mz_name}: {e}")
-        return None
-    finally:
+    # except Exception as e:
+    #     print(f"Error processing {mz_name}: {e}")
+    #     return None
+    # finally:
         # Clean up
-        if 'ds' in locals():
-            ds.close()
-        gc.collect()
+    if 'ds' in locals():
+        ds.close()
+    gc.collect()
 
 def prepare_tasks(dataset, metazones: Dict, func_comp: Any) -> List[Tuple]:
     """Prepare all tasks for parallel processing."""
@@ -575,7 +572,7 @@ def build_filters_config(mz_param, data_name):
         filters_config['time_selection'] = {
             'dim': 'time',
             'minimum': mz_param.get('tbound')[0],
-            'maximum': mz_param.get('tbound')[0]
+            'maximum': mz_param.get('tbound')[1]
         }
     
     # # Depth filters
@@ -587,14 +584,13 @@ def build_filters_config(mz_param, data_name):
     #     }
     
     # Quality filters
-    if 'quality_min' in mz_param or 'quality_max' in mz_param:
+    if 'qc' in mz_param:
         # Assuming quality variable name based on data_name or a specific field
-        quality_var = mz_param.get('quality_var', 'temp')  # Default or from config
         filters_config['quality'] = {
-            'qname': quality_var,
-            'qmin': mz_param.get('quality_min'),
-            'qmax': mz_param.get('quality_max')
-        }
+            'qname': mz_param.get('qc')[0],
+            'qmin': mz_param.get('qc')[1],
+            'qmax': mz_param.get('qc')[2]
+            }
     
     # Horizontal/spatial filters
     if 'polygon' in mz_param:
@@ -661,62 +657,57 @@ def process_single_combination(ds, mz_name, mz_param, func_comp):
     start_time = time.time()
     dsout = None
     
-    try:
-        logger.info(f"🔄 Processing {combination_id}")
-        
-        # Check if data is available
-        if ds is None:
-            logger.error(f"Dataset is None for {combination_id}")
-            return None
-        
-        # Copy dataset to avoid modifications
-        dsout = ds.copy(deep=True)  # Deep copy to avoid references
-        data_name = dsout.attrs["data_name"]
-        data_ref = dsout.attrs["data_ref"]
-        
-        # Build filters configuration
-        try:
-            filters_config = build_filters_config(mz_param, data_name)
-            logger.info(f"Filters config for {combination_id}: {filters_config}")
-        except Exception as e:
-            logger.error(f"Error building filters config for {combination_id}: {e}")
-            return None
-        
-        # Apply combined filters if any filters are configured
-        if filters_config:
-            try:
-                logger.info(f"Applying combined filters for {combination_id}")
-                dsout = dsout.armoorfilters.apply_combined_filters(filters_config)
-                if dsout is None:
-                    logger.warning(f"No data left after filtering for {combination_id}")
-                    return None
-            except Exception as e:
-                logger.error(f"Error applying combined filters for {combination_id}: {e}")
-                return None
-        else:
-            logger.info(f"No filters to apply for {combination_id}")
-        
-        # Check if dataset is not empty after filtering
-        if dsout is not None:
-            # Check if dataset has any data left
-            if any(dsout.sizes[dim] == 0 for dim in dsout.dims):
-                logger.warning(f"Dataset empty after filtering for {combination_id}")
-                return None
-        
-        # Final metadata
-        if dsout is not None:
-            dsout.attrs = {
-                "data_name": data_name,
-                "data_ref": data_ref,
-            }
-        
-        elapsed = time.time() - start_time
-        logger.info(f"✅ Processing {combination_id} completed in {elapsed:.1f}s")
-        
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"❌ Error processing {combination_id} after {elapsed:.1f}s: {e}")
+    logger.info(f"Processing {combination_id}")
+    
+    # Check if data is available
+    if ds is None:
+        logger.error(f"Dataset is None for {combination_id}")
         return None
+    
+    # Copy dataset to avoid modifications
+    dsout = ds.copy(deep=True)  # Deep copy to avoid references
+    data_name = dsout.attrs["data_name"]
+    data_ref = dsout.attrs["data_ref"]
+    
+    # Build filters configuration
+    # try:
+    filters_config = build_filters_config(mz_param, data_name)
+    logger.info(f"Filters config for {combination_id}: {filters_config}")
+    # except Exception as e:
+    #     logger.error(f"Error building filters config for {combination_id}: {e}")
+    #     return None
+    
+    # Apply combined filters if any filters are configured
+    if filters_config:
+        # try:
+        logger.info(f"Applying combined filters for {combination_id}")
+        dsout = dsout.armoorfilters.apply_combined_filters(filters_config)
+        if dsout is None:
+            logger.warning(f"No data left after filtering for {combination_id}")
+            return None
+        # except Exception as e:
+        #     logger.error(f"Error applying combined filters for {combination_id}: {e}")
+        #     return None
+    else:
+        logger.info(f"No filters to apply for {combination_id}")
+    
+    # Check if dataset is not empty after filtering
+    if dsout is not None:
+        # Check if dataset has any data left
+        if any(dsout.sizes[dim] == 0 for dim in dsout.dims):
+            logger.warning(f"Dataset empty after filtering for {combination_id}")
+            return None
+    
+    # Final metadata
+    if dsout is not None:
+        dsout.attrs = {
+            "data_name": data_name,
+            "data_ref": data_ref,
+        }
+    
+    elapsed = time.time() - start_time
+    logger.info(f"Processing {combination_id} completed in {elapsed:.1f}s")
+        
     
     return dsout
 

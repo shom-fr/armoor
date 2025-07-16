@@ -6,6 +6,11 @@ from armoor import ArmoorError
 
 logger = logging.getLogger(__name__)
 
+
+def parse_qc_tuple(value):
+    parts = value.split(',')
+    return (parts[0].strip(), int(parts[1].strip()), int(parts[2].strip()))
+
 def parse_mixed_param(param_value: Union[str, List]) -> List:
     """
     Parse a ConfigObj parameter that contains strings and lists mixed together.

@@ -279,6 +279,7 @@ class ArmoorSelectionAccessor:
         """Extract quality mask without applying it."""
         qname += "_qc"
         if qname not in self.ds:
+            logger.warning(f"No {qname} in dataset")
             return None
             
         if qmin and qmax:
@@ -382,6 +383,7 @@ class ArmoorSelectionAccessor:
                 result = self.ds
             if mask2keep is not None:
                 result["mask"] = mask2keep
+            combined_mask = combined_mask.compute()
             result = result.where(combined_mask, drop=True)
             
             if depth_was_coord and "depth" in result:

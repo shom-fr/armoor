@@ -349,7 +349,10 @@ def open_decode_sst_satellite(path_files, fmt):
     ds = ds.set_coords(["lon", "lat"])
     ds["ptemp"] -= 273.15
     ds["ptemp"].attrs["units"] = "degrees C"
-    ds = ds[["ptemp", "lon", "lat"]]
+    if "ptemp_qc" in ds:
+        ds = ds[["ptemp", "ptemp_qc", "lon", "lat"]]
+    else:
+        ds = ds[["ptemp", "lon", "lat"]]
     return ds
 
 
