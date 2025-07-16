@@ -274,7 +274,6 @@ def main_comp_models():
         args.coloc_only,
         )
 
-
 def get_parser_comp_sst():
     """Get parser for sst comparison."""
     # Setup argument parser
@@ -332,16 +331,21 @@ def get_parser_comp_argo():
     add_logging_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
+        'radius',
+        type=float,
+        help="Radius of disk to filter model point around observation."
+        )
+    parser.add_argument(
         '--qc',
-        type=dict,
+        type=parse_qc_tuple,
         default=None,
-        help="Dictionnary specifying quality tresholds, ex: ptemp:1,7"
+        help="Tuple specifying quality tresholds, ex: ptemp,1,7"
         )
     
     return parser
 
 def main_comp_argo():
-    """Compare argo with other products - Version optimisée."""
+    """Compare argo with other products."""
         
     # Get parser
     parser = get_parser_comp_argo()
@@ -365,7 +369,6 @@ def main_comp_argo():
         args.metazones,
         func_comp,
         args.jsonfile,
-        args.jsonfile,
         args.filters_only,
         args.coloc_only,
         kw_comp
@@ -381,6 +384,11 @@ def get_parser_comp_mooring():
     add_logging_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
+        'radius',
+        type=float,
+        help="Radius of disk to filter model point around observation."
+        )
+    parser.add_argument(
         '--qc',
         type=dict,
         default=None,
@@ -390,7 +398,7 @@ def get_parser_comp_mooring():
     return parser
 
 def main_comp_mooring():
-    """Compare argo with other products - Version optimisée."""
+    """Compare argo with other products."""
     # Get parser
     parser = get_parser_comp_mooring()
     func_comp = "comp_mooring"
@@ -412,7 +420,6 @@ def main_comp_mooring():
         args.metazonesfile,
         args.metazones,
         func_comp,
-        args.jsonfile,
         args.jsonfile,
         args.filters_only,
         args.coloc_only,
