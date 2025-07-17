@@ -27,7 +27,20 @@ The list of configuration files used can be found at ``armoor/data/`` :
     - cf_cmems_sst_l4.cfg
     - cf_cora_argo.cfg
     - cf_hycom.cfg
-       
+    
+Decoding data consists in following armoor conventions:
+
+    - time dimension --> ``time``
+    - vertical dimension --> ``z``
+    - along latitude dimension --> ``y``
+    - along longitude dimension --> ``x``
+    - depth coordinate --> ``depth``
+    - pressure coordinate --> ``pres``
+    - potential density coordinate --> ``pdens``
+    - potential temperature --> ``ptemp``
+    - in-situ temperature --> ``temp``
+    - practical salinity --> ``sal``
+ 
 Metazones
 =========
 
