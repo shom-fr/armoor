@@ -27,11 +27,12 @@ from pyproj import Geod
 from xoa.grid import dz2depth, shift, to_rect
 
 from armoor.__init__ import ROOTDIR, ArmoorError
+from armoor.base.interp import regrid
 from armoor.base.misc import optimize_for_low_swap
 
 logger = logging.getLogger(__name__)
 
-xoa.register_accessors(xcf=True)
+xoa.register_accessors(xcf=True, decode_sigma=True)
 xr.set_options(keep_attrs=True)
 # def get_paths(path_files):
 
@@ -248,6 +249,9 @@ def open_decode(
     elif (fmt == "hycom") or (fmt == "hycom3d"):
         logger.info("Opening/decoding hycom files")
         return open_decode_hycom(path_files)
+    elif (fmt == "croco") or (fmt == "croco_xios"):
+        logger.info("Opening/decoding croco files")
+        return open_decode_croco(path_files, fmt)
     elif fmt == "arpege_insta":
         logger.info("Opening/decoding instantaneous arpege files")
         return open_decode_arpege_insta(path_files)
@@ -1259,7 +1263,7 @@ def open_decode_seasoar(path_file, steps):
     return seasoar
 
 
-def open_decode_croco(path_file):
+def open_decode_croco(path_file, fmt="croco"):
     """
     Open netcdf file from CROCO model.
     Parameters
@@ -1272,103 +1276,189 @@ def open_decode_croco(path_file):
     croco : xarray.Dataset
          Model dataset decoded.
     """
-    croco = xr.open_dataset(path_file).decode_sigma()
+    cfspecs = xcf.get_cf_specs(fmt)
+    ds = xr.open_mfdataset(path_file)
+    print(ds.coords)
+    for sig in ("s_rho", "s_w"):
+        if "formula_terms" not in ds[sig].attrs:
+            logger.warning(f"No formula_terms attributes in {sig}")
+            ds[sig].attrs["formula_terms"] = "s: sc_w C: Cs_w eta: zeta depth: h depth_c: hc"
+        if "standard_name" not in ds[sig].attrs:
+            logger.warning(f"No standard_name attributes in {sig}")
+            if sig == "s_rho":
+                ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
+            elif sig == "s_w":
+                ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
+    
+    with xcf.set_cf_specs(cfspecs):
+        ds = ds.decode_sigma()
+        ds = ds.xoa.decode()
+    ds = ds.drop([
+        "sig_rho",
+        "sig_w",
+        "cs_r",
+        "cs_w",
+        "sc_r",
+        "sc_w",
+        "time_centered_bounds",
+        "time_counter_bounds",
+        "hc",
+        "theta_s",
+        "theta_b",
+        "Tcline",
+        "Vtransform",
+        "corio",
+        "ex",
+        "ey",
+        "akv",
+        "akt",
+        "ubar",
+        "vbar",
+        "w",
+        "sustr",
+        "svstr"
+        ])
+    for coord in ds.coords:
+        if "nav_" in coord:
+            ds = ds.drop(coord)
+            if coord.replace("nav_", "") in ds.data_vars:
+                ds = ds.set_coords(coord.replace("nav_", ""))
+    if "time_counter" in ds.dims:
+        ds = ds.swap_dims({"time_counter": "time"})
+    ds = ds.swap_dims({"sig_rho": "z", "x_rho": "x", "y_rho": "y"})
+    ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat"})
+    print(ds)
+    print("------- \n coords \n ---------")
+    for coord in ds.coords:
+        print(coord)
+    print("------- \n dim \n ----------")
+    for dim in ds.dims:
+        print(dim)
+    print("------- \n vars \n -----------")
+    for varname in ds.data_vars:
+        print(varname)
+    for varname in ds.data_vars:
+        if varname == "u":
+            dsu = regrid(
+                ds[["u", "lon_u", "lat_u"]].drop(["lon", "lat"]).rename({"lon_u": "lon", "lat_u": "lat"}),
+                ds[["lon", "lat"]]
+                )
+            ds["u"] = dsu["u"]
+        if varname == "v":
+            dsu = regrid(
+                ds[["v", "lon_v", "lat_v"]].drop(["lon", "lat"]).rename({"lon_v": "lon", "lat_v": "lat"}),
+                ds[["lon", "lat"]]
+                )
+            ds["v"] = dsu["v"]
+            
+    if "angle" in ds:
+        angle = ds["angle"]
+        da_u = ds["u"] * np.cos(angle) - ds["v"] * np.sin(angle)
+        da_v = ds["v"] * np.cos(angle) + ds["u"] * np.sin(angle)
+        ds = ds.drop_vars(["u", "v", "angle"])
+        ds["u"] = da_u
+        ds["v"] = da_v
+    
+    if "mask" in ds:
+        ds = ds.where(ds["mask"] > 0)
 
-    # Remove variables that are never used in the features. May need to be completed.
-    list_to_keep = ["temp", "salt", "u", "v", "h", "angle", "mask_rho"]
-    for var in list(croco.keys()):
-        if var not in list_to_keep:
-            croco = croco.drop_vars(var)
+    return ds
 
-    # Convert currents if necessary
-    if "u" in croco:
-        # U processing
-        da_u = shift(croco.u, {"xi_u": "left"}).xoa.reloc(u=False)
-        da_u = da_u.sel(xi=croco.xi_rho, method="nearest")
-        croco["u"] = da_u
+    # # Remove variables that are never used in the features. May need to be completed.
+    # list_to_keep = ["temp", "salt", "u", "v", "h", "angle", "mask_rho"]
+    # for var in list(croco.keys()):
+    #     if var not in list_to_keep:
+    #         croco = croco.drop_vars(var)
 
-        # V processing
-        da_v = shift(croco.v, {"eta_v": "left"}).xoa.reloc(v=False)
-        da_v = da_v.sel(eta=croco.eta_rho, method="nearest")
-        croco["v"] = da_v
+    # # Convert currents if necessary
+    # if "u" in croco:
+    #     # U processing
+    #     da_u = shift(croco.u, {"xi_u": "left"}).xoa.reloc(u=False)
+    #     da_u = da_u.sel(xi=croco.xi_rho, method="nearest")
+    #     croco["u"] = da_u
 
-        # Rotate currents
-        if "angle" in croco:
-            angle = croco["angle"]
-            da_u = croco["u"] * np.cos(angle) - croco["v"] * np.sin(angle)
-            da_v = croco["v"] * np.cos(angle) + croco["u"] * np.sin(angle)
-            croco = croco.drop_vars(["u", "v", "angle"])
-            croco["u"] = da_u
-            croco["v"] = da_v
+    #     # V processing
+    #     da_v = shift(croco.v, {"eta_v": "left"}).xoa.reloc(v=False)
+    #     da_v = da_v.sel(eta=croco.eta_rho, method="nearest")
+    #     croco["v"] = da_v
 
-            # Remove duplicate coords
-    if "lon" in croco and "lon_rho" in croco:
-        croco = croco.drop_vars(["lon", "lat"])
+    #     # Rotate currents
+    #     if "angle" in croco:
+    #         angle = croco["angle"]
+    #         da_u = croco["u"] * np.cos(angle) - croco["v"] * np.sin(angle)
+    #         da_v = croco["v"] * np.cos(angle) + croco["u"] * np.sin(angle)
+    #         croco = croco.drop_vars(["u", "v", "angle"])
+    #         croco["u"] = da_u
+    #         croco["v"] = da_v
 
-    # Clean coordinates
-    croco = croco.rename(
-        {
-            "xi_rho": "x",
-            "eta_rho": "y",
-            "s_rho": "z",
-            "lon_rho": "lon",
-            "lat_rho": "lat",
-        }
-    )
-    if "mask_rho" in list(croco.keys()):
-        croco = croco.rename({"mask_rho": "mask"})
+    #         # Remove duplicate coords
+    # if "lon" in croco and "lon_rho" in croco:
+    #     croco = croco.drop_vars(["lon", "lat"])
 
-    for var in [
-        "lat_rho",
-        "lon_rho",
-        "xi",
-        "eta",
-        "lat_u",
-        "lat_v",
-        "lon_u",
-        "lon_v",
-        "xi_u",
-        "eta_v",
-        "depth_w",
-        "sig",
-        "s_w",
-    ]:
-        if var in croco:
-            croco = croco.drop_vars(var)
+    # # Clean coordinates
+    # croco = croco.rename(
+    #     {
+    #         "xi_rho": "x",
+    #         "eta_rho": "y",
+    #         "s_rho": "z",
+    #         "lon_rho": "lon",
+    #         "lat_rho": "lat",
+    #     }
+    # )
+    # if "mask_rho" in list(croco.keys()):
+    #     croco = croco.rename({"mask_rho": "mask"})
 
-    # Regrid if necessary
-    test_regrid = to_rect(croco)
-    if "lon" in test_regrid.dims and "lat" in test_regrid.dims:
-        croco = test_regrid
-    elif "x" in test_regrid.dims and "y" in test_regrid.dims:
-        croco = test_regrid
+    # for var in [
+    #     "lat_rho",
+    #     "lon_rho",
+    #     "xi",
+    #     "eta",
+    #     "lat_u",
+    #     "lat_v",
+    #     "lon_u",
+    #     "lon_v",
+    #     "xi_u",
+    #     "eta_v",
+    #     "depth_w",
+    #     "sig",
+    #     "s_w",
+    # ]:
+    #     if var in croco:
+    #         croco = croco.drop_vars(var)
 
-    # Convert lons
-    croco = convert_lons(croco)
+    # # Regrid if necessary
+    # test_regrid = to_rect(croco)
+    # if "lon" in test_regrid.dims and "lat" in test_regrid.dims:
+    #     croco = test_regrid
+    # elif "x" in test_regrid.dims and "y" in test_regrid.dims:
+    #     croco = test_regrid
 
-    # Convert depths
-    croco["depth"] = croco.depth.where(abs(croco.depth) < 1e30)
-    croco = convert_depths(croco)
+    # # Convert lons
+    # croco = convert_lons(croco)
 
-    # Decode
-    croco = croco.xoa.decode()
-    if "lon_u" in croco:
-        croco = croco.rename({"lon_u": "lon"})
-    if "lat_u" in croco:
-        croco = croco.rename({"lat_u": "lat"})
+    # # Convert depths
+    # croco["depth"] = croco.depth.where(abs(croco.depth) < 1e30)
+    # croco = convert_depths(croco)
 
-    # Assign croco attrs
-    croco = croco.assign_attrs({"type": "CROCO"})
+    # # Decode
+    # croco = croco.xoa.decode()
+    # if "lon_u" in croco:
+    #     croco = croco.rename({"lon_u": "lon"})
+    # if "lat_u" in croco:
+    #     croco = croco.rename({"lat_u": "lat"})
 
-    # Rename ptemp
-    if "temp" in croco:
-        croco = croco.rename({"temp": "ptemp"})
-    # Remove values outside mask
+    # # Assign croco attrs
+    # croco = croco.assign_attrs({"type": "CROCO"})
 
-    if "mask" in list(croco.keys()):
-        croco = croco.where(croco["mask"] > 0, drop=True)
+    # # Rename ptemp
+    # if "temp" in croco:
+    #     croco = croco.rename({"temp": "ptemp"})
+    # # Remove values outside mask
 
-    return croco
+    # if "mask" in list(croco.keys()):
+    #     croco = croco.where(croco["mask"] > 0, drop=True)
+
+    # return croco
 
 
 def open_decode_hycom_currents(path_files):

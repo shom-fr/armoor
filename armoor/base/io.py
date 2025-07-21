@@ -134,7 +134,7 @@ def setup_dask_client():
     client = Client(
         n_workers=16,  # Réduire le nombre de workers
         threads_per_worker=1,
-        memory_limit='4GB',
+        memory_limit='8GB',#'4GB',
         silence_logs=True,
         dashboard_address=':8787',
         local_directory='/tmp',
