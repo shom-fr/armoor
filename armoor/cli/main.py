@@ -582,7 +582,10 @@ def build_filters_config(mz_param, data_name):
             'minimum': mz_param.get('tbound')[0],
             'maximum': mz_param.get('tbound')[1]
         }
-    
+        
+    if 'tide' in mz_param:
+        filters_config['tide'] = mz_param.get("tide")
+        
     # # Depth filters
     # if 'depth_min' in mz_param or 'depth_max' in mz_param:
     #     filters_config['depth_selection'] = {

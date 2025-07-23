@@ -12,6 +12,7 @@ import pandas as pd
 import xarray as xr
 import dask.array as da
 import xoa.geo as xgeo
+import xoa.filter as xfilter
 from matplotlib import path
 from scipy.ndimage import binary_dilation
 
@@ -101,8 +102,8 @@ class ArmoorSelectionAccessor:
         if mask_result is None:
             return None
         mask_poly = mask_result.copy()
-        
-        if dilate:
+
+        if (("x" in self.ds.lon.dims) and ("y" in self.ds.lon.dims)) and dilate:
             structure = np.ones((3, 3), dtype=bool)
             dilated_values = binary_dilation(
                 mask_poly.values,
@@ -126,7 +127,51 @@ class ArmoorSelectionAccessor:
             return self.ds[dim] <= maximum
         return None
 
-    # NEW: Combined filter method to reduce intermediate operations
+    def tidal_filter(self, filter_name="demerliac"):
+        """
+        Apply a tidal filter to time-dependent variables in the dataset.
+        
+        This method processes all data variables in the dataset that have a time dimension,
+        applying the specified tidal filter to remove tidal signals from the data. The 
+        filtering is performed using the xoa.filter.tidal_filter function.
+        
+        Parameters
+        ----------
+        filter_name : str, default "demerliac"
+            Name of the tidal filter to apply. The default "demerliac" filter is commonly
+            used for removing tidal variations from oceanographic time series data.
+            
+        Notes
+        -----
+        - Only variables with a 'time' dimension are processed
+        - If filtering fails for any variable, a warning is logged and the original
+          data is preserved for that variable
+        - The filtered data replaces the original data in the dataset
+        - Uses the xoa (xarray-based ocean analysis) library for tidal filtering
+        
+        Examples
+        --------
+        >>> # Apply default Demerliac tidal filter
+        >>> obj.tidal_filter()
+        >>> 
+        >>> # Apply a different tidal filter
+        >>> obj.tidal_filter(filter_name="godin")
+        
+        Raises
+        ------
+        The method handles exceptions internally and logs warnings rather than raising
+        errors, ensuring robustness when processing multiple variables.
+        """
+        logger.info(f"Apply tidal filter: {filter_name}")
+        for vname in self.ds.data_vars:
+            dai = self.ds[vname]
+            if "time" in dai.dims:
+                try:
+                    self.ds[vname] = xfilter.tidal_filter(dai, filter_name)
+                except Exception as e:
+                    logger.warning(f"xoa: {e}")
+                    logger.info("Tide filter ignored")
+                    
     def apply_combined_filters(self, filters_config: dict) -> xr.Dataset:
         """
         Apply multiple filters in a single operation to reduce memory usage.
@@ -193,8 +238,13 @@ class ArmoorSelectionAccessor:
             
             if depth_was_coord and "depth" in result:
                 result = result.set_coords("depth")
-                
-            return result
+            
+            self.ds = result.copy()
+            result.close()
+        
+        if "tide" in filters_config:
+            filter_name = filters_config.get("tide")
+            self.tidal_filter(filter_name=filter_name)
         
         return self.ds
 # @xr.register_dataarray_accessor("armoorfilters")
