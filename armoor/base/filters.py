@@ -33,49 +33,6 @@ class ArmoorSelectionAccessor:
 
     def __init__(self, ds):
         self.ds = ds
-
-    def quality_filter(self, qname: str, qmin: int, qmax: int) -> xr.Dataset:
-        """
-        Subset dataset filtering quality levels.
-
-        Parameters
-        ----------
-        qname : str
-            Name of the variable quality name.
-        qmin : int
-            Minimum value of quality.
-        qmax : int
-            Maximum value of quality.
-        Returns
-        -------
-        xarray.Dataset
-            Dataset filtered with quality levels input restrictions.
-        """
-        logger.info("Applying filter - quality_filter")
-        qname += "_qc"
-
-        if qname in self.ds:
-            if qmin and qmax:
-                selection = (self.ds[qname] >= int(qmin)) & (
-                    self.ds[qname] <= int(qmax)
-                )
-            elif qmin:
-                selection = self.ds[qname] >= int(qmin)
-            elif qmax:
-                selection = self.ds[qname] <= int(qmax)
-            else:
-                logger.warning(
-                    "qmin and/or qmax are missing."
-                    "No quality filter applied."
-                )
-                return self.ds
-            return self.ds.where(selection, drop=True)
-        else:
-            logger.warning(
-                "min_q and/or max_q are missing."
-                "Quality filter is not applied."
-            )
-            return self.ds
         
     def get_mask(self, coords: [(float, float)]) -> xr.Dataset:
         """Subset dataset selecting elements located within the polygon geometry.
@@ -121,158 +78,6 @@ class ArmoorSelectionAccessor:
             dims=dims_name,
         )
         return mask_poly
-
-    def horizontal_selection_polygon(
-        self,
-        coords: [(float, float)],
-    ) -> xr.Dataset:
-        """
-        Subset dataset selecting elements located within the polygon geometry.
-
-        Parameters
-        ----------
-        coords : list of tuples
-           Set of points coordinates defining the geometry of the polygon.
-
-        Returns
-        -------
-        xarray.Dataset
-           Dataset with elements included inside the polygon.
-
-        See Also
-        --------
-        https://matplotlib.org/stable/api/path_api.html
-        """
-        logger.info("Applying filter - horizontal_selection_polygon")
-        mask = self.get_mask(coords)
-        if mask is None:
-            return None
-            
-        mask_poly, dims_name = mask
-        
-        # Handle depth coordinate more efficiently
-        depth_was_coord = "depth" in self.ds.coords
-        if depth_was_coord:
-            self.ds = self.ds.reset_coords("depth")
-            
-        # Apply mask without creating intermediate datasets
-        result = self.ds.where(mask_poly, drop=True)
-        
-        if depth_was_coord and "depth" in result:
-            result = result.set_coords("depth")
-            
-        # Check if any dimension is empty
-        if any(result.sizes[dim] == 0 for dim in dims_name):
-            return None
-            
-        return result
-    
-    def horizontal_selection_polygon_dilat(
-        self,
-        coords: [(float, float)],
-    ) -> xr.Dataset:
-        """
-        Subset dataset selecting elements located within the polygon geometry with dilation.
-
-        Parameters
-        ----------
-        coords : list of tuples
-           Set of points coordinates defining the geometry of the polygon.
-
-        Returns
-        -------
-        xarray.Dataset
-           Dataset with elements included inside the polygon.
-
-        See Also
-        --------
-        https://matplotlib.org/stable/api/path_api.html
-        """
-        logger.info("Applying filter - horizontal_selection_polygon_dilat")
-
-        mask_result = self.get_mask(coords)
-        if mask_result is None:
-            return None
-        
-        
-        mask_poly2, dims_name = mask_result.copy()
-
-        logger.info("storing mask into dataset after binary dilation")
-
-        # Apply binary dilation directly to values (more memory efficient)
-        structure = np.ones((3, 3), dtype=bool)
-        dilated_mask = binary_dilation(
-            mask_poly2.values,
-            structure=structure,
-            iterations=10
-        )
-        
-        # Create new mask with dilated values
-        mask_poly2 = xr.DataArray(
-            data=dilated_mask,
-            dims=mask_poly2.dims,
-        )
-        
-        
-        
-        depth_was_coord = "depth" in self.ds.coords
-        if depth_was_coord:
-            self.ds = self.ds.reset_coords("depth")
-            
-        result = self.ds.where(mask_poly2, drop=True)
-        # Store original mask for reference
-        result["mask"] = mask_result
-        
-        if depth_was_coord and "depth" in result:
-            result = result.set_coords("depth")
-            
-        if any(result.sizes[dim] == 0 for dim in dims_name):
-            return None
-            
-        return result
-
-    def data_selection(
-        self,
-        dim: str,
-        minimum: float = None,
-        maximum: float = None,
-        value: float = None,
-    ) -> xr.Dataset:
-        """
-        Subset dataset filtering elements values along the specified dimension.
-
-        Parameters
-        ----------
-        dim : str
-            Dimension whom to apply the filter.
-        minimum : float
-            Minimum value kept.
-        maximum : float
-            Maximum value kept.
-        value : float
-            Only value kept (i.e. maximum = minimum).
-
-        Returns
-        -------
-        xarray.Dataset
-             Dataset with elements values meeting the condition(s).
-        """
-        logger.info("Applying filter - data_selection")
-
-        if value is not None:
-            selection = self.ds[dim] == value
-        elif minimum is not None and maximum is not None:
-            selection = (self.ds[dim] >= minimum) & (
-                self.ds[dim] <= maximum
-            )
-        elif minimum is not None:
-            selection = self.ds[dim] >= minimum
-        elif maximum is not None:
-            selection = self.ds[dim] <= maximum
-        else:
-            selection = None
-            
-        return self.ds.where(selection, drop=True)  # Added drop=True for consistency
 
     # Helper methods to extract masks from existing filter methods
     def _get_quality_mask(self, qname: str, qmin: int, qmax: int) -> xr.DataArray:
@@ -875,34 +680,7 @@ class ArmoorSelectionAccessor:
         else:
             return self.ds.sel(time=slice(start, end))
 
-    # def time_selection_terms(
-    #     self, start=None, end=None, freq=None, dates=None
-    # ):
-    #     """
-    #     Subset dataset selecting elements at specific terms.
-
-    #     Parameters
-    #     ----------
-    #     start : str
-    #         Date (YYYY-MM-DD HH:MM:SS)
-    #     end : str
-    #         Date (YYYY-MM-DD HH:MM:SS)
-    #     freq : str
-    #         See :ref:`here <timeseries.offset_aliases>` for a list of
-    #         frequency aliases.
-    #     Returns
-    #     -------
-    #     xarray.Dataset
-    #     """
-    #     logger.info("Applying filter - time_selection_terms")
-    #     if dates:
-    #         time = [pd.to_datetime(date) for date in dates]
-    #     else:
-    #         time = pd.date_range(start=start, end=end, freq=freq)
-    #     return self.ds.interp(
-    #         time=time, method="linear", kwargs={"fill_value": "extrapolate"}
-    #     )
-
+  
 #     def time_selection_range_seq(self, start, end, tbin: str) -> xr.Dataset:
 #         """
 #         Subset dataset selecting elements by temporal bin.
@@ -992,36 +770,6 @@ class ArmoorSelectionAccessor:
 #             logger.error(f"Cutting the dataset at {freq} is not implemented.")
 #             sys.exit(1)
 #         return self.ds.where((dt >= fmin) & (dt <= fmax), drop=True)
-
-
-# def apply_trange(ds, metazone):
-
-#     # time intervals
-#     time_range = ["trange_seq", "trange_clim"]
-#     for k in time_range:
-#         if k in metazone.keys():
-#             ds = FILTERS[k](ds)(
-#                 metazone["tbound"][0], metazone["tbound"][1], metazone[k]
-#             )
-#     return ds
-
-
-# def apply_vrange(ds, metazone):
-
-#     # vertical intervals
-#     if "vrange" in metazone:
-#         attrs = ds.attrs
-#         ds = FILTERS["vrange"](ds)(*metazone["vrange"].items()[0])
-#         ds = ds.assign_attrs({**attrs})
-#     return ds
-
-
-# def get_time_bins(start, end, tbin):
-#     return pd.date_range(
-#         start=pd.to_datetime(start),
-#         end=pd.to_datetime(end),
-#         freq=tbin,
-#     )
 
 
 def create_optimized_mask(ds, var_name, bins):
