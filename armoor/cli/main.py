@@ -585,6 +585,15 @@ def build_filters_config(mz_param, data_name):
         
     if 'tide' in mz_param:
         filters_config['tide'] = mz_param.get("tide")
+    
+    if 'bathy' in mz_param:
+        # Assuming quality variable name based on data_name or a specific field
+        filters_config['bathy'] = {
+            'path': mz_param.get('bathy')[0],
+            'fmt': mz_param.get('bathy')[1],
+            'min': float(mz_param.get('bathy')[2]),
+            'max': float(mz_param.get('bathy')[3])
+            }
         
     # # Depth filters
     # if 'depth_min' in mz_param or 'depth_max' in mz_param:

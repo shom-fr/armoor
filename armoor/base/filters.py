@@ -16,6 +16,9 @@ import xoa.filter as xfilter
 from matplotlib import path
 from scipy.ndimage import binary_dilation
 
+from armoor.data.open_decode import open_decode
+from armoor.base.interp import regrid, grid2loc
+
 R_terre = 6371
 logger = logging.getLogger(__name__)
 xr.set_options(keep_attrs=True)
@@ -127,6 +130,37 @@ class ArmoorSelectionAccessor:
             return self.ds[dim] <= maximum
         return None
 
+    def bathy_filter(self, path: str, fmt: str, minimum: float, maximum: float) -> xr.DataArray:
+        """Filter dataset based on bathymetry depth range.
+   
+        Parameters:
+            path: Path to bathymetry data file
+            fmt: File format for reading bathymetry data
+            minimum: Minimum depth threshold
+            maximum: Maximum depth threshold
+            
+        Returns:
+            Filtered dataset where bathymetry is within specified range
+        """
+        logger.info("bathy filter")
+        ds_bathy = open_decode(path, fmt=fmt)
+        if "time" in self.ds.lon.dims:
+            if "time" in self.ds.lon.dims:
+                dss = []
+                for itime, time in enumerate(self.ds.time):
+                    coord = self.ds.isel(time=[itime])
+                    ds = grid2loc(ds_bathy, [(coord.lat.data[0], coord.lon.data[0])])
+                    ds = ds.swap_dims({"npts": "time"})
+                    dss.append(ds)
+                ds_bathy = xr.combine_nested(dss, "time")
+            else:
+                ds_bathy = grid2loc(ds_bathy, [(self.ds.lat.data[0], self.ds.lon.data[0])])
+        else:
+            ds_bathy = regrid(ds_bathy, self.ds[["lon", "lat"]])
+        bathy = ds_bathy["bathy"]
+        mask = (bathy >= minimum) & (bathy <= maximum)
+        return self.ds.where(mask.compute(), drop=True)
+
     def tidal_filter(self, filter_name="demerliac"):
         """
         Apply a tidal filter to time-dependent variables in the dataset.
@@ -220,6 +254,7 @@ class ArmoorSelectionAccessor:
                     config.get('value')
                 )
             
+            
             # Combine masks
             if mask is not None:
                 combined_mask = mask if combined_mask is None else combined_mask & mask
@@ -242,6 +277,14 @@ class ArmoorSelectionAccessor:
             self.ds = result.copy()
             result.close()
         
+        if "bathy" in filters_config:
+            self.bathy_filter(
+                filters_config["bathy"].get("path"),
+                filters_config["bathy"].get("fmt"),
+                filters_config["bathy"].get('min'),
+                filters_config["bathy"].get('max'),
+            )
+            
         if "tide" in filters_config:
             filter_name = filters_config.get("tide")
             self.tidal_filter(filter_name=filter_name)
@@ -574,37 +617,6 @@ class ArmoorSelectionAccessor:
             return ds_model.where(
                 dist_model2obs == dist_model2obs.min(), drop=True
             ).squeeze()
-
-    def horizontal_selection_bathy(
-        self,
-        minimum: float = None,
-        maximum: float = None,
-    ) -> xr.Dataset:
-        """
-        Subset dataset selecting elements whom bathymetry values are included in the specified
-        bathymetry range.
-
-        Parameters
-        ----------
-        minimum : float
-            Minimum bathymetry value kept.
-        maximum : float
-            Maximum bathymetry value kept.
-
-        Returns
-        -------
-        xarray.Dataset
-             Dataset with bathymetry values meeting the condition(s).
-
-        See Also
-        --------
-        cli.base.meta_zone.MetazoneAccessor.data_selection
-        """
-
-        logger.info("Applying filter - horizontal_selection_bathymetry")
-        return self.data_selection(
-            dim="bathy", minimum=minimum, maximum=maximum
-        )
 
     # def vertical_selection_range(
     #     self, vname: str, vranges: list

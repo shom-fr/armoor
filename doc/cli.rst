@@ -58,6 +58,7 @@ Hereafter we give some details about the available parameters:
 - ``trange_seq``: [1D,reference] list of two strings. The first one define the period of time intervals, the second one, the time axis over which data will be interpolated in time for comparison computing.
 - ``polygon``: list of coordinate (lat/lon) defining a polygon to filter out not needed data.
 - ``cloud``: list of coordinate (lat/lon) defining a cloud of point over which data will be interpolated.
+- ``bathy``: list of type `path, fmt, min, max`. The first element is the directory of the bathymetry file, the second one is the format of the bathymetry file, min/max are bathy tresholds to apply.
 - ``href``: string defining the grid over which data will be interpolated for comparison computing.
 - ``vlevel``: list of type `"depth",[50,100,400,500]`. The first element defines the type of vertical reference, the second one the list of vertical levels.
 - ``vrange``: list of type `"reference","depth",[(50, 100), (400, 500), (800, 1000)]`. The first element defines the vertical coordinates over which data will be interpolated in z for comparison computing, the second element defines the type of vertical levels, the third one defines the list of vertical intevals (list of tuple).

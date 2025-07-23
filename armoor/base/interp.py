@@ -241,7 +241,10 @@ def grid2loc(ds, coords: [(float, float)]):
             }
         )
     dsi = ds.copy()
-    dso = xr.Dataset(coords=dict(time=dsi.time, **loc.coords))
+    if "time" in dsi:
+        dso = xr.Dataset(coords=dict(time=dsi.time, **loc.coords))
+    else:
+        dso = xr.Dataset(coords=loc.coords)
     if "depth" in dsi.coords:
         if "time" in dsi.depth.dims:
             dsi = dsi.reset_coords("depth")
@@ -313,7 +316,6 @@ def regrid(dsi, dso) -> xr.Dataset:
     
     # if "mask" in dsi.keys():
     #     dsi = dsi.where(dsi.mask == 1 , drop=True)
-    
     regridder = xe.Regridder(dsi, dso, "bilinear", parallel=False)
     dss = []
     for var in vars2sub:
@@ -326,6 +328,7 @@ def regrid(dsi, dso) -> xr.Dataset:
     regridder.grid_out.destroy()
     # for var in dsi.data_vars:
     #     dsio[var].assign_attrs(**dsi[var].attrs)
+    print(dsio)
     return dsio
 
 def vinterp(ds, vname, vlevels, method="linear"):
