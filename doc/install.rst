@@ -58,5 +58,10 @@ Clone the repository::
 Run the installation command::
 
     $ cd armoor
-    $ python setup.py install
+    $ mamba install -n base -c conda-forge -y --file requirements.txt
+    $ pip install .
 
+Alternatively, use ``environment.yml``::
+
+    $ cd armoor
+    $ mamba env create -f environment.yml
