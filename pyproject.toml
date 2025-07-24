@@ -51,7 +51,7 @@ source-code = "https://gitlab.com/GitShom/STM/armoor"
 armoor-comp-argo = "armoor.cli.main:main_comp_argo"
 armoor-comp-models = "armoor.cli.main:main_comp_models"
 armoor-comp-mooring = "armoor.cli.main:main_comp_mooring"
-armoor-filter = "armoor.cli.main:main_filter"
+armoor-filter = "armoor.cli.main:main_filters"
 armoor-comp-sst = "armoor.cli.main:main_comp_sst"
 
 [build-system]
