@@ -200,7 +200,6 @@ def register_cf():
     cfg_files = glob.glob(
         os.path.join(ROOTDIR, "data", "cf*.cfg")
     )
-    logger.info(cfg_files)
     for cfg_file in cfg_files:
         logger.info(f"register {cfg_file}")
         xcf.register_cf_specs(cfg_file)
@@ -1279,22 +1278,22 @@ def open_decode_croco(path_file, fmt="croco"):
     """
     cfspecs = xcf.get_cf_specs(fmt)
     ds = xr.open_mfdataset(path_file)
-    print(ds.coords)
     for sig in ("s_rho", "s_w"):
-        if "formula_terms" not in ds[sig].attrs:
-            logger.warning(f"No formula_terms attributes in {sig}")
-            ds[sig].attrs["formula_terms"] = "s: sc_w C: Cs_w eta: zeta depth: h depth_c: hc"
-        if "standard_name" not in ds[sig].attrs:
-            logger.warning(f"No standard_name attributes in {sig}")
-            if sig == "s_rho":
-                ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
-            elif sig == "s_w":
-                ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
-    
+        if sig in ds:
+            if "formula_terms" not in ds[sig].attrs:
+                logger.warning(f"No formula_terms attributes in {sig}")
+                ds[sig].attrs["formula_terms"] = "s: sc_w C: Cs_w eta: zeta depth: h depth_c: hc"
+            if "standard_name" not in ds[sig].attrs:
+                logger.warning(f"No standard_name attributes in {sig}")
+                if sig == "s_rho":
+                    ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
+                elif sig == "s_w":
+                    ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
+        
     with xcf.set_cf_specs(cfspecs):
         ds = ds.decode_sigma()
         ds = ds.xoa.decode()
-    ds = ds.drop([
+    for v in [
         "sig_rho",
         "sig_w",
         "cs_r",
@@ -1317,8 +1316,15 @@ def open_decode_croco(path_file, fmt="croco"):
         "vbar",
         "w",
         "sustr",
-        "svstr"
-        ])
+        "svstr",
+        "spherical",
+        "xl",
+        "el",
+        "tke",
+        "gls",
+        ]:
+        if v in ds:
+            ds = ds.drop(v)
     for coord in ds.coords:
         if "nav_" in coord:
             ds = ds.drop(coord)
@@ -1326,32 +1332,20 @@ def open_decode_croco(path_file, fmt="croco"):
                 ds = ds.set_coords(coord.replace("nav_", ""))
     if "time_counter" in ds.dims:
         ds = ds.swap_dims({"time_counter": "time"})
-    ds = ds.swap_dims({"sig_rho": "z", "x_rho": "x", "y_rho": "y"})
-    ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat"})
-    print(ds)
-    print("------- \n coords \n ---------")
-    for coord in ds.coords:
-        print(coord)
-    print("------- \n dim \n ----------")
-    for dim in ds.dims:
-        print(dim)
-    print("------- \n vars \n -----------")
-    for varname in ds.data_vars:
-        print(varname)
+    ds = ds.swap_dims({"sig_rho": "z"})
+    ds = ds.isel(x_rho=slice(1, -1), y_rho=slice(1,-1))
     for varname in ds.data_vars:
         if varname == "u":
-            dsu = regrid(
-                ds[["u", "lon_u", "lat_u"]].drop(["lon", "lat"]).rename({"lon_u": "lon", "lat_u": "lat"}),
-                ds[["lon", "lat"]]
-                )
-            ds["u"] = dsu["u"]
+            dau = shift(ds["u"], {"x_u": "right"}).isel(x_u=slice(None, -1)).xoa.reloc(u="rho")
+            ds["u"] = dau.assign_coords(**ds.ptemp.coords)
         if varname == "v":
-            dsu = regrid(
-                ds[["v", "lon_v", "lat_v"]].drop(["lon", "lat"]).rename({"lon_v": "lon", "lat_v": "lat"}),
-                ds[["lon", "lat"]]
-                )
-            ds["v"] = dsu["v"]
-            
+            dav = shift(ds["v"], {"y_v": "top"}).isel(y_v=slice(None, -1)).xoa.reloc(v="rho")
+            ds["v"] = dav.assign_coords(**ds.ptemp.coords)
+    ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat"})
+    for dim in ("x_u", "y_v"):
+        if dim in ds.dims:
+            ds = ds.drop_dims(dim)
+    ds = ds.swap_dims({"x_rho": "x", "y_rho": "y"})
     if "angle" in ds:
         angle = ds["angle"]
         da_u = ds["u"] * np.cos(angle) - ds["v"] * np.sin(angle)
@@ -1359,7 +1353,6 @@ def open_decode_croco(path_file, fmt="croco"):
         ds = ds.drop_vars(["u", "v", "angle"])
         ds["u"] = da_u
         ds["v"] = da_v
-    
     if "mask" in ds:
         ds = ds.where(ds["mask"] > 0)
 
