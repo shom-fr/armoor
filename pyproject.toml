@@ -62,6 +62,9 @@ build-backend = "setuptools.build_meta"
 packages = ["armoor", "armoor.algo", "armoor.base", "armoor.cli", "armoor.comp", "armoor.data"]
 include-package-data = true
 
+[tool.setuptools.package-data]
+"*" = ["*.ini"]
+
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
 write_to = "armoor/_version.py"
