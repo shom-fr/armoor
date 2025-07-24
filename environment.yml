@@ -1,0 +1,30 @@
+name: armoor-env
+channels:
+  - conda-forge
+dependencies:
+  - appdirs
+  - bottleneck
+  - cartopy
+  - cfgrib
+  - cftime
+  - cmocean
+  - colorlog
+  - configobj=5.0.9
+  - dask
+  - geojson
+  - gitpython
+  - gsw
+  - h5netcdf
+  - matplotlib
+  - numba
+  - numbagg
+  - opendrift
+  - pip
+  - python=3.11
+  - scipy
+  - seaborn
+  - xarray=2025.1.1
+  - xesmf=0.8.8
+  - xoa
+  - pip:
+    - .
