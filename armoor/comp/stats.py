@@ -1,7 +1,8 @@
 import logging
+
 import numpy as np
-import xarray as xr
 import pandas as pd
+import xarray as xr
 
 from armoor.__init__ import ArmoorError
 from armoor.base.ranges import trange_seq, vrange

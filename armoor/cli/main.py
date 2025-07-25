@@ -1,33 +1,30 @@
 """Command-line interface for armoor."""
 import gc
 import json
-from typing import List, Union, Any, Tuple, Optional, Dict
-from argparse import ArgumentParser
-import time
 import logging
+import time
+from argparse import ArgumentParser
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 from xoa.cfgm import ConfigManager, register_validation_functions
 
-from armoor import ArmoorError
-from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI
-from armoor.base import FILTERS
-from armoor.base.io import ArmoorArgumentHelpFormatter, create_fast_encoding, setup_dask_client, zarrs2netcdfs
-from armoor.base.log import add_logging_parser_arguments, main_setup_logging
-from armoor.base.misc import (
-    optimize_for_low_swap,
-    dict_to_list,
-    parse_qc_tuple,
-    parse_coords,
-    parse_mixed_param,
-    comma_separated
-    )
 import armoor.base.oceanvars
+from armoor import ArmoorError
+from armoor.base import FILTERS
+from armoor.base.io import (ArmoorArgumentHelpFormatter, create_fast_encoding,
+                            setup_dask_client, zarrs2netcdfs)
+from armoor.base.log import add_logging_parser_arguments, main_setup_logging
+from armoor.base.misc import (comma_separated, dict_to_list,
+                              optimize_for_low_swap, parse_coords,
+                              parse_mixed_param, parse_qc_tuple)
+from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI
 from armoor.comp import METAZONE_PARAMS
 from armoor.comp.coloc import main_coloc
 from armoor.comp.misc import add_comp_parser_arguments
 from armoor.comp.output import main_output
 from armoor.comp.plot import main_plot
-from armoor.data.open_decode import register_cf, open_decode
+from armoor.data.open_decode import open_decode, register_cf
 
 logger = logging.getLogger(__name__)
 
@@ -767,7 +764,7 @@ def monitor_performance():
     """Surveille les performances du système."""
     try:
         import psutil
-        
+
         # Mémoire
         memory = psutil.virtual_memory()
         swap = psutil.swap_memory()

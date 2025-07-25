@@ -7,17 +7,17 @@ import math
 import re
 import sys
 
+import dask.array as da
 import numpy as np
 import pandas as pd
 import xarray as xr
-import dask.array as da
-import xoa.geo as xgeo
 import xoa.filter as xfilter
+import xoa.geo as xgeo
 from matplotlib import path
 from scipy.ndimage import binary_dilation
 
+from armoor.base.interp import grid2loc, regrid
 from armoor.data.open_decode import open_decode
-from armoor.base.interp import regrid, grid2loc
 
 R_terre = 6371
 logger = logging.getLogger(__name__)

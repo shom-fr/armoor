@@ -1,33 +1,33 @@
-import logging, os, re
+import logging
+import os
+import re
+from collections import defaultdict
 from pathlib import Path
+from typing import Dict, List, Optional
+
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from cartopy.mpl.ticker import (LongitudeFormatter, LatitudeFormatter,
-                                LatitudeLocator, LongitudeLocator)
-from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import cmocean as cmo
+import dask
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.collections import LineCollection
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import pandas as pd
 import xarray as xr
-import dask
+from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
+from cartopy.mpl.ticker import (LatitudeFormatter, LatitudeLocator,
+                                LongitudeFormatter, LongitudeLocator)
+from matplotlib.collections import LineCollection
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts
 
-from collections import defaultdict
-from typing import List, Dict, Optional
-from pathlib import Path
-
 from armoor.__init__ import ArmoorError
+from armoor.base import FILTERS, LINE_COLORS
+from armoor.base.filters import create_optimized_mask
 from armoor.base.interp import vinterp
 from armoor.base.io import setup_dask_client
-from armoor.base.plot import create_subplots, save_figure, diagdisp
-from armoor.base import LINE_COLORS
-from armoor.base import FILTERS
-from armoor.base.filters import create_optimized_mask
-from armoor.comp import TITLE_PLOTS, CMAP_VARS, METRIC_LABELS
+from armoor.base.plot import create_subplots, diagdisp, save_figure
+from armoor.comp import CMAP_VARS, METRIC_LABELS, TITLE_PLOTS
 from armoor.comp.stats import StatsComp
 
 logger = logging.getLogger(__name__)

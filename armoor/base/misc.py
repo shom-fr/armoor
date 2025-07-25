@@ -1,6 +1,6 @@
 import ast
 import logging
-from typing import List, Union, Any, Tuple, Optional, Dict
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from armoor import ArmoorError
 

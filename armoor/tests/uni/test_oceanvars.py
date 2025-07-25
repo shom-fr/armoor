@@ -1,8 +1,11 @@
-import pytest
+from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pytest
 import xarray as xr
-from unittest.mock import patch, MagicMock
+
 from armoor.base.oceanvars import OceanVars
+
 
 class TestOceanVars:
 

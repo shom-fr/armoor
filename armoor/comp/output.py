@@ -1,17 +1,19 @@
+import gc
 import itertools
-from pathlib import Path
 import logging
-import re, gc
-import numpy as np
+import re
+from collections import defaultdict
+from pathlib import Path
+from typing import Dict, List, Optional
+
 import dask
+import numpy as np
 import pandas as pd
 import xarray as xr
-from typing import List, Dict, Optional
-from collections import defaultdict
 
 from armoor import ArmoorError
-from armoor.base.io import setup_dask_client, get_zarr_encoding
-from armoor.comp import OUTPUTS_PARAMS, COMP_VARS
+from armoor.base.io import get_zarr_encoding, setup_dask_client
+from armoor.comp import COMP_VARS, OUTPUTS_PARAMS
 from armoor.comp.plot import PlotComp
 from armoor.comp.stats import StatsComp
 

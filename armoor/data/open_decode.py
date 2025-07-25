@@ -3,18 +3,18 @@ Open files and decode data.
 """
 
 import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
 import datetime
+import gc
 import glob
 import logging
 import os
-import sys
-import gc
-from contextlib import contextmanager
-import glob
 import re
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Union, List, Dict, Any
+from typing import Any, Dict, List, Union
+
 import dask
 import gsw
 import numpy as np
@@ -1278,6 +1278,7 @@ def open_decode_croco(path_file, fmt="croco"):
     """
     cfspecs = xcf.get_cf_specs(fmt)
     ds = xr.open_mfdataset(path_file)
+    ds = optimize_for_low_swap(ds)
     for sig in ("s_rho", "s_w"):
         if sig in ds:
             if "formula_terms" not in ds[sig].attrs:
@@ -1327,9 +1328,10 @@ def open_decode_croco(path_file, fmt="croco"):
             ds = ds.drop(v)
     for coord in ds.coords:
         if "nav_" in coord:
-            ds = ds.drop(coord)
-            if coord.replace("nav_", "") in ds.data_vars:
-                ds = ds.set_coords(coord.replace("nav_", ""))
+            coord_name = coord.replace("nav_", "")
+            if coord_name in ds:
+                ds = ds.drop(coord)
+            ds = ds.rename({coord: coord_name})
     if "time_counter" in ds.dims:
         ds = ds.swap_dims({"time_counter": "time"})
     ds = ds.swap_dims({"sig_rho": "z"})

@@ -1,13 +1,12 @@
 """Input/output."""
-from argparse import (
-    ArgumentDefaultsHelpFormatter,
-    RawDescriptionHelpFormatter,
-)
+from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
+
 import dask
-from dask.distributed import Client
 import numpy as np
-from numcodecs import Blosc
 import xarray as xr
+from dask.distributed import Client
+from numcodecs import Blosc
+
 
 class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
                                  ArgumentDefaultsHelpFormatter):

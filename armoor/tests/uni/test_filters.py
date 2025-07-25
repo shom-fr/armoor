@@ -1,11 +1,12 @@
 """Test suite for ArmoorSelectionAccessor module."""
 
-import pytest
+from datetime import datetime
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
-from unittest.mock import patch, MagicMock
-from datetime import datetime
 
 # Import the module to test
 from armoor.base.filters import ArmoorSelectionAccessor
@@ -532,7 +533,7 @@ class TestUtilityFunctions:
     def test_create_optimized_mask(self):
         """Test create_optimized_mask function."""
         from armoor.base.filters import create_optimized_mask
-        
+
         # Create test dataset
         ds = xr.Dataset({
             'temp': (['x', 'y'], np.random.rand(5, 5) * 30)

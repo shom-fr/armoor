@@ -1,14 +1,15 @@
-import pytest
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
-from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
-import pandas as pd
 import xesmf as xe
 
-from armoor.base.interp import interp_time, grid2loc, regrid, vinterp
+from armoor.base.interp import grid2loc, interp_time, regrid, vinterp
 from armoor.base.misc import geo_vars
+
 
 class TestInterpTime:
     """Test suite for the interp_time function."""
