@@ -1,4 +1,6 @@
 """Input/output."""
+import re
+from typing import Dict, List
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
 import dask
@@ -141,3 +143,74 @@ def setup_dask_client():
     )
     
     return client
+
+def extract_suffix_from_filename(filename):
+    """
+    Extracts 'time' and 'z' values from a filename in the format ref_[time]_[z].nc
+    
+    Args:
+        filename (str): Filename to analyze
+        
+    Returns:
+        dict: Dictionary with 'time' and 'z' keys (values None if not found)
+    """
+    result = {'time': None, 'z': None}
+    
+    # Main pattern: ref_[time]_[z].nc
+    pattern_full = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})_([0-9.-]+)\.zarr'
+    match_full = re.search(pattern_full, filename)
+    if match_full:
+        result['time'] = match_full.group(2)
+        result['z'] = match_full.group(3)
+        return result
+    
+    # Partial pattern: ref_[time]_*.nc (time without z)
+    pattern_time_only = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.zarr'
+    match_time = re.search(pattern_time_only, filename)
+    
+    if match_time:
+        result['time'] = match_time.group(2)
+    
+    # Partial pattern: ref_*_[z].nc (z without valid time)
+    pattern_z_only = r'([^/]+)_([0-9.-]+)\.zarr'
+    match_z = re.search(pattern_z_only, filename)
+    
+    if match_z and not result['time']:  # Only if time not already found
+        result['z'] = match_z.group(2)
+    return result
+
+def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List[str]]:
+    """Sort a list of NetCDF files by their suffix.
+    """
+    ncouts = {}
+    for nc in ncs:
+        if not isinstance(nc, str):
+            nc = str(nc)
+        res = extract_suffix_from_filename(nc)
+        if sort_dim == ["time", "z"]:
+            if res.get("time") and res.get("z"):
+                suff = f"{res['time']}_{res['z']}"
+            elif not res.get("time") and res.get("z"):
+                suff =  f"{res['z']}"
+            elif res.get("time") and not res.get("z"):
+                suff =  f"{res['time']}"
+            else:
+                suff = "None"
+        elif sort_dim == ["z"]:
+            if res.get("z"):
+                suff = f"{res['z']}"
+            else:
+                suff = "None"
+        elif sort_dim == ["time"]:
+            if res.get("time"):
+                suff = f"{res['time']}"
+            else:
+                suff = "None"
+        else:
+            suff = "None"
+        if not ncouts.get(suff):
+            ncouts[suff] = []
+        
+        ncouts[suff].append(nc)
+
+    return ncouts

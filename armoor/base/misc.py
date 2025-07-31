@@ -427,3 +427,4 @@ def optimize_for_low_swap(dataset, target_chunk_mb=128):
     logger.info(f"Estimated chunk size: {(elements_per_dim**n_dims * element_size) / 1024**2:.1f} MB per chunk")
     
     return dataset.chunk(chunks).unify_chunks()
+

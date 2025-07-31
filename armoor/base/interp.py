@@ -330,7 +330,6 @@ def regrid(dsi, dso) -> xr.Dataset:
     regridder.grid_out.destroy()
     # for var in dsi.data_vars:
     #     dsio[var].assign_attrs(**dsi[var].attrs)
-    print(dsio)
     return dsio
 
 def vinterp(ds, vname, vlevels, method="linear"):

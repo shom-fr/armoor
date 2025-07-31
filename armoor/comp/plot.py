@@ -1308,7 +1308,6 @@ class PlotComp:
         """Save figure."""
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
-        print(filename)
         save_figure(fig, filename)
         del fig
 
@@ -1333,18 +1332,3 @@ def main_plot(ncins, metazones, func_comp):
     with setup_dask_client():
         logger.info("Start plot")
         dask.compute(*tasks)
-
-'''
-def main_plot(ncins, metazones, func_comp):
-    with setup_dask_client():
-        for output, metas in ncins.items():
-            # print(output)
-            # if output == "timeseries":
-                for metazone, ncs in metas.items():
-                    if metazone in metazones:
-                        logger.info(f"{output} -- {metazone}")
-                        for nc in ncs:
-                            print(nc)
-                            plotcomp = PlotComp(nc, func_comp, metazone)
-                            plotcomp.call(output)
-''' 
