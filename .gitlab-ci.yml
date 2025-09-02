@@ -18,7 +18,7 @@ setup:
   script:
     - conda config --set always_yes yes --set changeps1 no
     - conda info -a
-    - test -d armoor_env || (conda create -p armoor_env python=3.11; source activate ./armoor_env; conda install -c conda-forge mamba; mamba install -c conda-forge --file requirements.txt; conda deactivate)
+    - test -d armoor_env || (conda create -p armoor_env python=3.11; source activate ./armoor_env; conda install -c conda-forge mamba; mamba install -c conda-forge --file requirements.txt; pip install .; conda deactivate)
     - source activate ./armoor_env
   cache:
     paths:
@@ -28,9 +28,7 @@ tests:
   stage: tests
   script:
     - source activate ./armoor_env
-    - export PATH=$PWD/bin:$PATH
-    - export PYTHONPATH=$PWD
-    - conda install -c conda-forge pytest
+    - mamba install -c conda-forge pytest
     - cd armoor/tests/uni
     - pytest 
   cache:
@@ -42,8 +40,6 @@ pages:
   stage: doc
   script:
     - source activate ./armoor_env
-    - export PATH=$PWD/bin:$PATH
-    - export PYTHONPATH=$PWD
     - cd doc
     - make html
     - cd ..
