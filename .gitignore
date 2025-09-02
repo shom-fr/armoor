@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+/doc/_api/
 /doc/build/
 /doc/_build/
 build/
