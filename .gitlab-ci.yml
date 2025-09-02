@@ -1,4 +1,4 @@
-image: continuumio/miniconda3:latest
+image: condaforge/miniforge3:latest
 
 stages:
   - setup
