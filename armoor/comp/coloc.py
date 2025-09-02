@@ -109,8 +109,7 @@ class TimeColocation(AbstractColocation):
         Parameters
         ----------
         freq : str
-            See :ref:`here <timeseries.offset_aliases>` for a list of
-            frequency aliases.
+            Frequency aliases.
             
         Returns
         -------
@@ -128,9 +127,7 @@ class TimeColocation(AbstractColocation):
         Parameters
         ----------
         args: list
-            List of two elements, the first one is the bin period
-            (See :ref:`here <timeseries.offset_aliases>` for a list of
-            bin aliases), 
+            List of two elements, the first one is the bin period, 
             the second one is the reference time axis (reference or product).
 
         Returns

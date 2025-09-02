@@ -58,18 +58,16 @@ xr.set_options(keep_attrs=True)
 #     return path_files
         
 def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
-    """
-    Generate absolute paths from a pattern string with wildcard and list expansion.
+    """Generate absolute paths from a pattern string with wildcard and list expansion.
     
-    Supports patterns like:
-    - "/path/to/files/*.txt" (standard glob)
-    - "/path/to/files/*[option1,option2].txt" (list expansion)
-    - "/path/to/files/prefix_*[a,b,c]_suffix.txt" (complex patterns)
+    Supports patterns like :
+    - '/path/to/files/\*.txt' (standard glob)
+    - '/path/to/files/\*[option1,option2].txt' (list expansion)
     
     Parameters
     ----------
     pattern : str
-        Path pattern with wildcards (*) and optional list expansions [item1,item2,...]
+        Path pattern with wildcards (\*) and optional list expansions [item1,item2,...]
     sort_results : bool, default True
         Whether to sort the resulting paths alphabetically
         
@@ -84,14 +82,6 @@ def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
         If the pattern contains malformed list syntax
     FileNotFoundError
         If the base directory doesn't exist
-        
-    Examples
-    --------
-    >>> expand_path_pattern("/data/*[train,test].csv")
-    ['/data/data_train.csv', '/data/data_test.csv']
-    
-    >>> expand_path_pattern("/logs/*/error.log")
-    ['/logs/app1/error.log', '/logs/app2/error.log']
     """
     if not path_files:
         raise ArmoorError("Pattern cannot be empty")
@@ -1457,127 +1447,127 @@ def open_decode_croco(path_file, fmt="croco"):
     # return croco
 
 
-def open_decode_hycom_currents(path_files):
-    """
-    Open 2D or 3D current from HYCOM model.
-    Parameters
-    ----------
-    path_files : list of str
-        List of the files to decode. The first path must refer to the h file, the following ones
-        are the variables.
+# def open_decode_hycom_currents(path_files):
+#     """
+#     Open 2D or 3D current from HYCOM model.
+#     Parameters
+#     ----------
+#     path_files : list of str
+#         List of the files to decode. The first path must refer to the h file, the following ones
+#         are the variables.
 
-    Returns
-    -------
-    hycom : xarray.Dataset
-         Model dataset decoded.
-    """
-    logger.info("Decoding HYCOM currents")
-    if len(path_files) == 2:  # Test if 2D
-        logger.info("HYCOM 2D")
-        path_u, path_v = path_files[0], path_files[1]
-        hycom = xr.Dataset()
-    elif len(path_files) == 3:  # Test if 3D
-        logger.info("HYCOM 3D")
-        path_h, path_u, path_v = path_files[0], path_files[1], path_files[2]
-        hycom = (
-            xr.open_dataset(path_h)
-            .rename({"h": "dz"})
-            .xoa.decode()
-            .squeeze(drop=True)
-        )
-        if "level" not in hycom.variables:
-            raise ValueError(
-                "Ooops ! Pour lire une sortie de courant du modèle HYCOM,"
-                " vous devez renseigner les fichiers dans l'ordre suivant : h, u, v"
-            )
-        hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
+#     Returns
+#     -------
+#     hycom : xarray.Dataset
+#          Model dataset decoded.
+#     """
+#     logger.info("Decoding HYCOM currents")
+#     if len(path_files) == 2:  # Test if 2D
+#         logger.info("HYCOM 2D")
+#         path_u, path_v = path_files[0], path_files[1]
+#         hycom = xr.Dataset()
+#     elif len(path_files) == 3:  # Test if 3D
+#         logger.info("HYCOM 3D")
+#         path_h, path_u, path_v = path_files[0], path_files[1], path_files[2]
+#         hycom = (
+#             xr.open_dataset(path_h)
+#             .rename({"h": "dz"})
+#             .xoa.decode()
+#             .squeeze(drop=True)
+#         )
+#         if "level" not in hycom.variables:
+#             raise ValueError(
+#                 "Ooops ! Pour lire une sortie de courant du modèle HYCOM,"
+#                 " vous devez renseigner les fichiers dans l'ordre suivant : h, u, v"
+#             )
+#         hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
 
-    ds_u = xr.open_dataset(path_u).xoa.decode().squeeze(drop=True)
-    ds_v = xr.open_dataset(path_v).xoa.decode().squeeze(drop=True)
-    if "u" not in ds_u.variables or "v" not in ds_v.variables:
-        raise ValueError(
-            "Ooops ! Pour lire une sortie de courant du modèle HYCOM,"
-            " vous devez renseigner les fichiers dans l'ordre suivant : h, u, v."
-        )
-    da_u = ds_u.u
-    da_v = ds_v.v
+#     ds_u = xr.open_dataset(path_u).xoa.decode().squeeze(drop=True)
+#     ds_v = xr.open_dataset(path_v).xoa.decode().squeeze(drop=True)
+#     if "u" not in ds_u.variables or "v" not in ds_v.variables:
+#         raise ValueError(
+#             "Ooops ! Pour lire une sortie de courant du modèle HYCOM,"
+#             " vous devez renseigner les fichiers dans l'ordre suivant : h, u, v."
+#         )
+#     da_u = ds_u.u
+#     da_v = ds_v.v
 
-    ut_hycom = shift(da_u, {"x": "right"}).xoa.reloc(u=False)
-    vt_hycom = shift(da_v, {"y": "top"}).xoa.reloc(v=False)
-    hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
-    hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
+#     ut_hycom = shift(da_u, {"x": "right"}).xoa.reloc(u=False)
+#     vt_hycom = shift(da_v, {"y": "top"}).xoa.reloc(v=False)
+#     hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
+#     hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
 
-    # Rename depth
-    if "level" in hycom:
-        hycom = hycom.rename({"level": "z"})
+#     # Rename depth
+#     if "level" in hycom:
+#         hycom = hycom.rename({"level": "z"})
 
-    # Regrid if necessary
-    hycom = to_rect(hycom)
+#     # Regrid if necessary
+#     hycom = to_rect(hycom)
 
-    # Convert lons
-    hycom = convert_lons(hycom)
+#     # Convert lons
+#     hycom = convert_lons(hycom)
 
-    return hycom
+#     return hycom
 
 
-def open_decode_hycom_3d(path_files):
-    """
-    Open some 3D variables from HYCOM model.
-    Parameters
-    ----------
-    path_files : list of str
-        List of the files to decode. The first path must refer to the h file, the following ones
-        are the variables.
+# def open_decode_hycom_3d(path_files):
+#     """
+#     Open some 3D variables from HYCOM model.
+#     Parameters
+#     ----------
+#     path_files : list of str
+#         List of the files to decode. The first path must refer to the h file, the following ones
+#         are the variables.
 
-    Returns
-    -------
-    hycom : xarray.Dataset
-         Model dataset decoded.
+#     Returns
+#     -------
+#     hycom : xarray.Dataset
+#          Model dataset decoded.
 
-    """
-    logger.info("Decoding HYCOM 3D")
-    # Open the file with depth values
-    path_h = path_files[0]
-    hycom = xr.open_dataset(path_h)
+#     """
+#     logger.info("Decoding HYCOM 3D")
+#     # Open the file with depth values
+#     path_h = path_files[0]
+#     hycom = xr.open_dataset(path_h)
 
-    if "h" not in hycom.variables and "sigma" not in hycom.variables:
-        raise ValueError(
-            "Ooops ! To read a 3D output from the HYCOM model,"
-            " you need to provide the files in the following order: "
-            "h/sigma, variables."
-        )
-    if "h" in hycom:
-        hycom = hycom.rename({"h": "dz"}).xoa.decode().squeeze(drop=True)
-        hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
-    elif "sigma" in hycom:
-        hycom = hycom.rename({"sigma": "dens"}).xoa.decode().squeeze(drop=True)
+#     if "h" not in hycom.variables and "sigma" not in hycom.variables:
+#         raise ValueError(
+#             "Ooops ! To read a 3D output from the HYCOM model,"
+#             " you need to provide the files in the following order: "
+#             "h/sigma, variables."
+#         )
+#     if "h" in hycom:
+#         hycom = hycom.rename({"h": "dz"}).xoa.decode().squeeze(drop=True)
+#         hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
+#     elif "sigma" in hycom:
+#         hycom = hycom.rename({"sigma": "dens"}).xoa.decode().squeeze(drop=True)
 
-    # Open the variable(s) and add them to the dataset
-    for path in path_files[1:]:
-        ds_var = xr.open_dataset(path).xoa.decode().squeeze(drop=True)
-        # Get the name of the variable
-        list_coords = ["lon", "lat", "bathymetry", "time", "lev"]
-        for var in list(ds_var.keys()):
-            if var not in list_coords:
-                var_name = var
-        hycom[var_name] = ds_var[var_name]
+#     # Open the variable(s) and add them to the dataset
+#     for path in path_files[1:]:
+#         ds_var = xr.open_dataset(path).xoa.decode().squeeze(drop=True)
+#         # Get the name of the variable
+#         list_coords = ["lon", "lat", "bathymetry", "time", "lev"]
+#         for var in list(ds_var.keys()):
+#             if var not in list_coords:
+#                 var_name = var
+#         hycom[var_name] = ds_var[var_name]
 
-    # Rename
-    hycom = hycom.rename({"level": "z"})
-    if "temp" in hycom:
-        hycom = hycom.rename({"temp": "ptemp"})
+#     # Rename
+#     hycom = hycom.rename({"level": "z"})
+#     if "temp" in hycom:
+#         hycom = hycom.rename({"temp": "ptemp"})
 
-    # Regrid if necessary
-    hycom = to_rect(hycom)
+#     # Regrid if necessary
+#     hycom = to_rect(hycom)
 
-    # Convert lons
-    hycom = convert_lons(hycom)
+#     # Convert lons
+#     hycom = convert_lons(hycom)
 
-    # Add dens coordinate
-    if "dens" in hycom:
-        hycom = hycom.assign_coords(dens=hycom.dens)
+#     # Add dens coordinate
+#     if "dens" in hycom:
+#         hycom = hycom.assign_coords(dens=hycom.dens)
 
-    return hycom
+#     return hycom
 
 
 def open_decode_cora(path_files):

@@ -1,4 +1,4 @@
-.. _clicomp:
+.. _clifilters:
 
 Command-line interfaces for applying metazone filters
 #####################################################
@@ -6,8 +6,8 @@ Command-line interfaces for applying metazone filters
 Configuration file
 ------------------
 
-    Armoor executables dedicated to apply metazone filters have to be associated with a configuration file based on `filters.ini`:
-        .. literalinclude:: ../armoor/cli/filters.ini
+    Armoor executables dedicated to apply metazone filters have to be associated with a configuration file based on `data.ini`:
+        .. literalinclude:: ../armoor/cli/data.ini
                :language: ini
     
 data

@@ -3,7 +3,7 @@
 Package API
 ===========
 .. autosummary::
-    :toctree: api
+    :toctree: _api
 
     armoor
     armoor.algo
