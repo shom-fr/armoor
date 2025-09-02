@@ -28,7 +28,7 @@ tests:
   stage: tests
   script:
     - source activate ./armoor_env
-    - mamba install -c conda-forge pytest
+    - export PYTHONPATH=$PWD
     - cd armoor/tests/uni
     - pytest 
   cache:

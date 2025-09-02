@@ -20,6 +20,7 @@ numba
 numbagg
 opendrift
 pip
+pytest
 python=3.11
 scipy
 seaborn
