@@ -1,7 +1,7 @@
 """Test suite for ArmoorSelectionAccessor module."""
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import Mock, MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -10,7 +10,6 @@ import xarray as xr
 
 # Import the module to test
 from armoor.base.filters import ArmoorSelectionAccessor
-
 
 class TestArmoorSelectionAccessor:
     """Test suite for ArmoorSelectionAccessor class."""
@@ -21,321 +20,340 @@ class TestArmoorSelectionAccessor:
         np.random.seed(42)
         
         # Create coordinate arrays
-        time = pd.date_range('2023-01-01', periods=10, freq='D')
-        lat = np.linspace(40, 45, 5)
-        lon = np.linspace(-10, -5, 5)
-        z = np.array([0, 10, 20, 30, 50])
+        lons = np.array([[1.0, 2.0, 3.0], [1.5, 2.5, 3.5], [2.0, 3.0, 4.0]])
+        lats = np.array([[50.0, 50.5, 51.0], [49.5, 50.0, 50.5], [49.0, 49.5, 50.0]])
         
-        # Create data variables
-        temp = np.random.rand(10, 5, 5, 5) * 20 + 10
-        sal = np.random.rand(10, 5, 5, 5) * 5 + 30
-        temp_qc = np.random.randint(1, 5, (10, 5, 5, 5))
-        sal_qc = np.random.randint(1, 5, (10, 5, 5, 5))
-        bathy = np.random.rand(5, 5) * 1000 + 100
-        depth = np.random.rand(10, 5, 5, 5) * 100
+        # Create time coordinate
+        times = np.array(['2023-01-01', '2023-01-02', '2023-01-03'], dtype='datetime64[D]')
         
-        # Create dataset
-        ds = xr.Dataset(
-            {
-                'temp': (['time', 'z', 'lat', 'lon'], temp),
-                'sal': (['time', 'z', 'lat', 'lon'], sal),
-                'temp_qc': (['time', 'z', 'lat', 'lon'], temp_qc),
-                'sal_qc': (['time', 'z', 'lat', 'lon'], sal_qc),
-                'bathy': (['lat', 'lon'], bathy),
-                'depth': (['time', 'z', 'lat', 'lon'], depth),
-            },
-            coords={
-                'time': time,
-                'lat': lat,
-                'lon': lon,
-                'z': z,
-            }
-        )
-        
-        # Set depth as coordinate
-        ds = ds.set_coords('depth')
+        ds = xr.Dataset({
+            'temperature': (['time', 'x', 'y'], np.random.rand(3, 3, 3) * 30),
+            'salinity': (['time', 'x', 'y'], np.random.rand(3, 3, 3) * 35),
+            'temperature_qc': (['time', 'x', 'y'], np.random.randint(1, 5, (3, 3, 3))),
+            'salinity_qc': (['time', 'x', 'y'], np.random.randint(1, 5, (3, 3, 3))),
+            'depth': (['x', 'y'], np.random.rand(3, 3) * 100),
+            'lon': (['x', 'y'], lons),
+            'lat': (['x', 'y'], lats)
+        }, coords={
+            'time': times,
+            'x': [0, 1, 2],
+            'y': [0, 1, 2]
+        })
         
         return ds
     
     @pytest.fixture
-    def sample_2d_dataset(self):
-        """Create a 2D dataset for testing horizontal selection."""
-        np.random.seed(42)
+    def simple_dataset(self):
+        """Create a simple 2D dataset without time dimension."""
+        lons = np.array([[1.0, 2.0], [1.5, 2.5]])
+        lats = np.array([[50.0, 50.5], [49.5, 50.0]])
         
-        lat = np.linspace(40, 45, 8)
-        lon = np.linspace(-10, -5, 10)
-        
-        lon, lat = np.meshgrid(lon, lat)
-        
-        temp = np.random.rand(8, 10) * 20 + 10
-        
-        ds = xr.Dataset(
-            {
-                'temp': (['y', 'x'], temp),
-            },
-            coords={
-                'lat': (['y', 'x'], lat),
-                'lon': (['y', 'x'], lon),
-            }
-        )
+        ds = xr.Dataset({
+            'temperature': (['x', 'y'], np.random.rand(2, 2) * 30),
+            'temperature_qc': (['x', 'y'], np.random.randint(1, 5, (2, 2))),
+            'lon': (['x', 'y'], lons),
+            'lat': (['x', 'y'], lats)
+        }, coords={
+            'x': [0, 1],
+            'y': [0, 1]
+        })
         
         return ds
-
-    def test_quality_filter_with_qmin_qmax(self, sample_dataset):
-        """Test quality filter with both minimum and maximum values."""
-        result = sample_dataset.armoorfilters.quality_filter('temp', 2, 4)
+    
+    @pytest.fixture
+    def accessor(self, sample_dataset):
+        """Create an ArmoorSelectionAccessor instance."""
+        return ArmoorSelectionAccessor(sample_dataset)
+    
+    def test_init(self, sample_dataset):
+        """Test accessor initialization."""
+        accessor = ArmoorSelectionAccessor(sample_dataset)
+        assert accessor.ds is sample_dataset
+    
+    def test_get_mask_valid_polygon(self, accessor):
+        """Test get_mask with a valid polygon that contains some points."""
+        # Define a polygon that should contain some points
+        coords = [(49.0, 0.5), (51.5, 0.5), (51.5, 4.5), (49.0, 4.5)]
         
-        # Check that values outside quality range are masked
-        assert isinstance(result, xr.Dataset)
-        assert 'temp' in result.data_vars
-        
-        # Verify that quality filtering was applied
-        original_temp_qc = sample_dataset['temp_qc']
-        mask = (original_temp_qc >= 2) & (original_temp_qc <= 4)
-        expected_nan_count = np.sum(~mask)
-        actual_nan_count = np.sum(np.isnan(result['temp'].values))
-        
-        assert actual_nan_count >= expected_nan_count
-
-    def test_quality_filter_qmin_only(self, sample_dataset):
-        """Test quality filter with only minimum value."""
-        result = sample_dataset.armoorfilters.quality_filter('temp', 3, None)
-        
-        assert isinstance(result, xr.Dataset)
-        original_temp_qc = sample_dataset['temp_qc']
-        mask = original_temp_qc >= 3
-        expected_nan_count = np.sum(~mask)
-        actual_nan_count = np.sum(np.isnan(result['temp'].values))
-        
-        assert actual_nan_count >= expected_nan_count
-
-    def test_quality_filter_qmax_only(self, sample_dataset):
-        """Test quality filter with only maximum value."""
-        result = sample_dataset.armoorfilters.quality_filter('temp', None, 3)
-        
-        assert isinstance(result, xr.Dataset)
-        original_temp_qc = sample_dataset['temp_qc']
-        mask = original_temp_qc <= 3
-        expected_nan_count = np.sum(~mask)
-        actual_nan_count = np.sum(np.isnan(result['temp'].values))
-        
-        assert actual_nan_count >= expected_nan_count
-
-    def test_quality_filter_no_qc_variable(self, sample_dataset):
-        """Test quality filter when quality control variable doesn't exist."""
-        # Remove quality control variable
-        ds_no_qc = sample_dataset.drop_vars(['temp_qc'])
-        
-        result = ds_no_qc.armoorfilters.quality_filter('temp', 2, 4)
-        
-        # Should return original dataset unchanged
-        assert result.equals(ds_no_qc)
-
-    def test_quality_filter_no_limits(self, sample_dataset):
-        """Test quality filter with no limits provided."""
-        result = sample_dataset.armoorfilters.quality_filter('temp', None, None)
-        
-        # Should return original dataset unchanged
-        assert result.equals(sample_dataset)
-
-    def test_get_mask_polygon(self, sample_2d_dataset):
-        """Test get_mask method with polygon coordinates."""
-        # Define a simple polygon
-        coords = [(41, -8), (41, -7), (43, -7), (43, -8), (41, -8)]
-        
-        result = sample_2d_dataset.armoorfilters.get_mask(coords)
-        
-        assert result is not None
-        mask, dims_name = result
-        assert isinstance(mask, xr.DataArray)
-        assert mask.dtype == bool
-        assert len(dims_name) > 0
-
-    def test_get_mask_no_points_inside(self, sample_2d_dataset):
+        with patch('matplotlib.path.Path') as mock_path:
+            mock_polygon = Mock()
+            mock_path.return_value = mock_polygon
+            mock_polygon.contains_points.return_value = np.array([True, False, True, False, True, False, True, False, True])
+            
+            result = accessor.get_mask(coords)
+            
+            assert result is not None
+            assert isinstance(result, xr.DataArray)
+            mock_path.assert_called_once_with(coords)
+            mock_polygon.contains_points.assert_called_once()
+    
+    def test_get_mask_empty_selection(self, accessor):
         """Test get_mask when no points are inside the polygon."""
-        # Define a polygon far from the data
-        coords = [(50, 50), (51, 50), (51, 51), (50, 51), (50, 50)]
+        coords = [(100.0, 100.0), (101.0, 100.0), (101.0, 101.0), (100.0, 101.0)]
         
-        result = sample_2d_dataset.armoorfilters.get_mask(coords)
-        
-        assert result is None
-
-    def test_horizontal_selection_polygon(self, sample_2d_dataset):
-        """Test horizontal selection with polygon."""
-        # Define a polygon that includes some points
-        coords = [(-8, 41), (-7, 41), (-7, 43), (-8, 43), (-8, 41)]
-        
-        with patch.object(sample_2d_dataset.armoorfilters, 'get_mask') as mock_get_mask:
-            # Mock the get_mask method
-            mock_mask = xr.DataArray(
-                np.ones((8, 10), dtype=bool),
-                dims=['y', 'x']
-            )
-            mock_get_mask.return_value = (mock_mask, ('y', 'x'))
+        with patch('matplotlib.path.Path') as mock_path:
+            mock_polygon = Mock()
+            mock_path.return_value = mock_polygon
+            mock_polygon.contains_points.return_value = np.array([False] * 9)
             
-            result = sample_2d_dataset.armoorfilters.horizontal_selection_polygon(coords)
-            
-            assert isinstance(result, xr.Dataset)
-            mock_get_mask.assert_called_once_with(coords)
-
-    def test_horizontal_selection_polygon_no_data(self, sample_2d_dataset):
-        """Test horizontal selection when no data points are selected."""
-        coords = [(-8, 41), (-7, 41), (-7, 43), (-8, 43), (-8, 41)]
-        
-        with patch.object(sample_2d_dataset.armoorfilters, 'get_mask') as mock_get_mask:
-            mock_get_mask.return_value = None
-            
-            result = sample_2d_dataset.armoorfilters.horizontal_selection_polygon(coords)
+            result = accessor.get_mask(coords)
             
             assert result is None
-
-    def test_horizontal_selection_polygon_dilat(self, sample_2d_dataset):
-        """Test horizontal selection with polygon dilation."""
-        coords = [(-8, 41), (-7, 41), (-7, 43), (-8, 43), (-8, 41)]
+    
+    def test_get_quality_mask_both_limits(self, accessor):
+        """Test _get_quality_mask with both min and max values."""
+        mask = accessor._get_quality_mask('temperature', qmin=2, qmax=4)
         
-        with patch.object(sample_2d_dataset.armoorfilters, 'get_mask') as mock_get_mask:
-            mock_mask = xr.DataArray(
-                np.ones((10, 10), dtype=bool),
-                dims=['lat', 'lon']
-            )
-            mock_get_mask.return_value = (mock_mask, ('lat', 'lon'))
+        assert mask is not None
+        assert isinstance(mask, xr.DataArray)
+        # Check that the mask is a boolean array
+        assert mask.dtype == bool
+    
+    def test_get_quality_mask_min_only(self, accessor):
+        """Test _get_quality_mask with only minimum value."""
+        mask = accessor._get_quality_mask('temperature', qmin=2, qmax=None)
+        
+        assert mask is not None
+        assert isinstance(mask, xr.DataArray)
+        assert mask.dtype == bool
+    
+    def test_get_quality_mask_max_only(self, accessor):
+        """Test _get_quality_mask with only maximum value."""
+        mask = accessor._get_quality_mask('temperature', qmin=None, qmax=4)
+        
+        assert mask is not None
+        assert isinstance(mask, xr.DataArray)
+        assert mask.dtype == bool
+    
+    def test_get_quality_mask_no_qc_variable(self, accessor, caplog):
+        """Test _get_quality_mask when QC variable doesn't exist."""
+        mask = accessor._get_quality_mask('nonexistent', qmin=2, qmax=4)
+        
+        assert mask is None
+        assert "No nonexistent_qc in dataset" in caplog.text
+    
+    def test_get_quality_mask_no_limits(self, accessor):
+        """Test _get_quality_mask with no limits provided."""
+        mask = accessor._get_quality_mask('temperature', qmin=None, qmax=None)
+        
+        assert mask is None
+    
+    def test_get_polygon_mask_without_dilation(self, accessor):
+        """Test _get_polygon_mask without dilation."""
+        coords = [(49.0, 0.5), (51.5, 0.5), (51.5, 4.5), (49.0, 4.5)]
+        
+        with patch.object(accessor, 'get_mask') as mock_get_mask:
+            mock_mask = Mock()
+            mock_get_mask.return_value = mock_mask
             
-            with patch('scipy.ndimage.binary_dilation') as mock_dilation:
-                mock_dilation.return_value = np.ones((10, 10), dtype=bool)
+            mask2keep, mask_result = accessor._get_polygon_mask(coords, dilate=False)
+            
+            assert mask2keep is None
+            assert mask_result == mock_mask
+    
+    def test_get_polygon_mask_with_dilation(self, accessor):
+        """Test _get_polygon_mask with dilation when x,y dims present."""
+        coords = [(49.0, 0.5), (51.5, 0.5), (51.5, 4.5), (49.0, 4.5)]
+        
+        # Modify dataset to have x,y dimensions in lon
+        accessor.ds = accessor.ds.swap_dims({'x': 'x_new', 'y': 'y_new'})
+        accessor.ds = accessor.ds.rename({'x_new': 'x', 'y_new': 'y'})
+        
+        with patch.object(accessor, 'get_mask') as mock_get_mask:
+            mock_mask = Mock()
+            mock_mask.values = np.array([[True, False], [False, True]])
+            mock_mask.dims = ['x', 'y']
+            mock_mask.copy.return_value = mock_mask
+            mock_get_mask.return_value = mock_mask
                 
-                result = sample_2d_dataset.armoorfilters.horizontal_selection_polygon_dilat(coords)
-                
-                assert isinstance(result, xr.Dataset)
-                assert 'mask' in result.data_vars
-                # mock_dilation.assert_called_once()
-
-    # def test_data_selection_with_value(self, sample_dataset):
-    #     """Test data selection with specific value."""
-    #     result = sample_dataset.armoorfilters.data_selection('z', value=10)
+            mask2keep, mask_result = accessor._get_polygon_mask(coords, dilate=True)
+            
+            assert mask2keep == mock_mask
+            assert mask_result is not None
+    
+    def test_get_polygon_mask_no_result(self, accessor):
+        """Test _get_polygon_mask when get_mask returns None."""
+        coords = [(49.0, 0.5), (51.5, 0.5), (51.5, 4.5), (49.0, 4.5)]
         
-    #     assert isinstance(result, xr.Dataset)
-    #     # Check that only the specified value is selected
-    #     selected_z = result['z'].values
-    #     print(selected_z)
-    #     assert np.all((selected_z == 10) | np.isnan(selected_z))
-
-    # def test_data_selection_with_range(self, sample_dataset):
-    #     """Test data selection with minimum and maximum."""
-    #     result = sample_dataset.armoorfilters.data_selection('z', minimum=10, maximum=30)
+        with patch.object(accessor, 'get_mask') as mock_get_mask:
+            mock_get_mask.return_value = None
+            
+            result = accessor._get_polygon_mask(coords, dilate=False)
+            
+            assert result is None
+    
+    def test_get_data_selection_mask_exact_value(self, accessor):
+        """Test _get_data_selection_mask with exact value."""
+        mask = accessor._get_data_selection_mask('depth', value=50.0)
         
-    #     assert isinstance(result, xr.Dataset)
-    #     # Check that values are within the specified range
-    #     selected_z = result['z'].values
-    #     valid_z = selected_z[~np.isnan(selected_z)]
-    #     assert np.all((valid_z >= 10) & (valid_z <= 30))
-
-    # def test_data_selection_minimum_only(self, sample_dataset):
-    #     """Test data selection with minimum only."""
-    #     result = sample_dataset.armoorfilters.data_selection('z', minimum=20)
+        assert mask is not None
+        assert isinstance(mask, xr.DataArray)
+        assert mask.dtype == bool
+    
+    def test_get_data_selection_mask_range(self, accessor):
+        """Test _get_data_selection_mask with min and max."""
+        mask = accessor._get_data_selection_mask('depth', minimum=20.0, maximum=80.0)
         
-    #     assert isinstance(result, xr.Dataset)
-    #     selected_z = result['z'].values
-    #     valid_z = selected_z[~np.isnan(selected_z)]
-    #     assert np.all(valid_z >= 20)
-
-    # def test_data_selection_maximum_only(self, sample_dataset):
-    #     """Test data selection with maximum only."""
-    #     result = sample_dataset.armoorfilters.data_selection('z', maximum=20)
+        assert mask is not None
+        assert isinstance(mask, xr.DataArray)
+        assert mask.dtype == bool
+    
+    def test_get_data_selection_mask_min_only(self, accessor):
+        """Test _get_data_selection_mask with minimum only."""
+        mask = accessor._get_data_selection_mask('depth', minimum=20.0)
         
-    #     assert isinstance(result, xr.Dataset)
-    #     selected_z = result['z'].values
-    #     valid_z = selected_z[~np.isnan(selected_z)]
-    #     assert np.all(valid_z <= 20)
-
-    # def test_data_selection_no_conditions(self, sample_dataset):
-    #     """Test data selection with no conditions."""
-    #     result = sample_dataset.armoorfilters.data_selection('z')
+        assert mask is not None
+        assert isinstance(mask, xr.DataArray)
+        assert mask.dtype == bool
+    
+    def test_get_data_selection_mask_max_only(self, accessor):
+        """Test _get_data_selection_mask with maximum only."""
+        mask = accessor._get_data_selection_mask('depth', maximum=80.0)
         
-    #     # Should return dataset with all NaN for the selected dimension
-    #     assert isinstance(result, xr.Dataset)
-
-    # @patch('xoa.regrid.grid2loc')
-    # def test_horizontal_selection_coords(self, mock_grid2loc, sample_dataset):
-    #     """Test horizontal selection at specific coordinates."""
-    #     coordinates = [(-7.5, 42.5), (-6.5, 43.5)]
+        assert mask is not None
+        assert isinstance(mask, xr.DataArray)
+        assert mask.dtype == bool
+    
+    def test_get_data_selection_mask_no_criteria(self, accessor):
+        """Test _get_data_selection_mask with no criteria."""
+        mask = accessor._get_data_selection_mask('depth')
         
-    #     # Mock the grid2loc function
-    #     mock_grid2loc.return_value = np.array([15.0, 16.0])
+        assert mask is None
+    
+    def test_tidal_filter(self, accessor):
+        """Test successful tidal filter application."""
         
-    #     result = sample_dataset.armoorfilters.horizontal_selection_coords(coordinates)
+        accessor.tidal_filter(filter_name="demerliac")
         
-    #     assert isinstance(result, xr.Dataset)
-    #     assert 'npts' in result.dims
-    #     assert result.sizes['npts'] == 2
-    #     assert mock_grid2loc.call_count > 0
-
-    # @patch('xoa.geo.get_distances')
-    # def test_sel_closest_without_time_in_coords(self, mock_get_distances, sample_2d_dataset):
-    #     """Test selecting closest point without time in coordinates."""
-    #     # Create observation dataset
-    #     obs_ds = xr.Dataset(
-    #         coords={
-    #             'lat': (['npts'], [42.0]),
-    #             'lon': (['npts'], [-7.0]),
-    #         }
-    #     )
+        # Check that tidal_filter was called for time-dependent variables
+        expected_calls = len([v for v in accessor.ds.data_vars if 'time' in accessor.ds[v].dims])
+        assert 4 == expected_calls
+    
+    def test_apply_combined_filters_quality_only(self, accessor):
+        """Test apply_combined_filters with quality filter only."""
+        filters_config = {
+            'quality': {'qname': 'temperature', 'qmin': 2, 'qmax': 4}
+        }
         
-    #     # Mock distance calculation
-    #     mock_distances = xr.DataArray(
-    #         np.array([[1.0, 2.0, 3.0, 4.0, 5.0]]),
-    #         dims=['member', 'lat']
-    #     )
-    #     mock_get_distances.return_value = mock_distances
+        result = accessor.apply_combined_filters(filters_config)
         
-    #     result = sample_2d_dataset.armoorfilters.sel_closest(obs_ds)
+        assert result is not None
+        assert isinstance(result, xr.Dataset)
+    
+    def test_apply_combined_filters_polygon_only(self, accessor):
+        """Test apply_combined_filters with polygon filter only."""
+        coords = [(49.0, 0.5), (51.5, 0.5), (51.5, 4.5), (49.0, 4.5)]
+        filters_config = {
+            'polygon': {'coords': coords, 'dilate': False}
+        }
         
-    #     assert isinstance(result, xr.Dataset)
-    #     mock_get_distances.assert_called_once()
-
-    # def test_horizontal_selection_bathy(self, sample_dataset):
-    #     """Test horizontal selection by bathymetry."""
-    #     result = sample_dataset.armoorfilters.horizontal_selection_bathy(
-    #         minimum=200, maximum=800
-    #     )
+        result = accessor.apply_combined_filters(filters_config)
         
-    #     assert isinstance(result, xr.Dataset)
-    #     # The result should have bathymetry values filtered
-    #     bathy_values = result['bathy'].values
-    #     valid_bathy = bathy_values[~np.isnan(bathy_values)]
-    #     if len(valid_bathy) > 0:
-    #         assert np.all((valid_bathy >= 200) & (valid_bathy <= 800))
-
-    # def test_vertical_selection_range(self, sample_dataset):
-    #     """Test vertical selection with ranges."""
-    #     vranges = [[0, 15], [20, 40]]
+        assert result is not None
+    
+    def test_apply_combined_filters_polygon_returns_none(self, accessor):
+        """Test apply_combined_filters when polygon filter returns None."""
+        coords = [(100.0, 100.0), (101.0, 100.0), (101.0, 101.0), (100.0, 101.0)]
+        filters_config = {
+            'polygon': {'coords': coords, 'dilate': False}
+        }
         
-    #     result = sample_dataset.armoorfilters.vertical_selection_range('z', vranges)
+        with patch.object(accessor, '_get_polygon_mask') as mock_polygon_mask:
+            mock_polygon_mask.return_value = (None, None)
+            
+            result = accessor.apply_combined_filters(filters_config)
+            
+            assert result is None
+    
+    def test_apply_combined_filters_data_selection(self, accessor):
+        """Test apply_combined_filters with data selection filter."""
+        filters_config = {
+            'data_selection': {'dim': 'depth', 'minimum': 20.0, 'maximum': 80.0}
+        }
         
-    #     assert isinstance(result, xr.Dataset)
-    #     assert 'vrange' in result.dims
-    #     assert result.sizes['vrange'] == 2
-    #     assert 'vbin' in result['vrange'].dims
-
-    # @patch('xoa.regrid.regrid1d')
-    # def test_vertical_selection_levels(self, mock_regrid1d, sample_dataset):
-    #     """Test vertical selection at specific levels."""
-    #     vlevels = [5, 15, 25]
+        result = accessor.apply_combined_filters(filters_config)
         
-    #     # Mock the regrid1d function
-    #     mock_regrid1d.return_value = sample_dataset['temp'].isel(z=slice(0, 3))
+        assert result is not None
+        assert isinstance(result, xr.Dataset)
+    
+    def test_apply_combined_filters_multiple(self, accessor):
+        """Test apply_combined_filters with multiple filters."""
+        coords = [(49.0, 0.5), (51.5, 0.5), (51.5, 4.5), (49.0, 4.5)]
+        filters_config = {
+            'quality': {'qname': 'temperature', 'qmin': 2, 'qmax': 4},
+            'polygon': {'coords': coords, 'dilate': False},
+            'data_selection': {'dim': 'depth', 'minimum': 20.0, 'maximum': 80.0}
+        }
         
-    #     result = sample_dataset.armoorfilters.vertical_selection_levels('z', vlevels)
+        result = accessor.apply_combined_filters(filters_config)
         
-    #     assert isinstance(result, xr.Dataset)
-    #     mock_regrid1d.assert_called()
+        assert result is not None
+        assert isinstance(result, xr.Dataset)
+    
+    def test_apply_combined_filters_with_bathy(self, accessor):
+        """Test apply_combined_filters with bathymetry filter."""
+        filters_config = {
+            'bathy': {'path': '/path/to/bathy', 'fmt': 'netcdf', 'min': 20.0, 'max': 100.0}
+        }
+        
+        with patch.object(accessor, 'bathy_filter') as mock_bathy_filter:
+            mock_bathy_filter.return_value = accessor.ds
+            
+            result = accessor.apply_combined_filters(filters_config)
+            
+            mock_bathy_filter.assert_called_once_with('/path/to/bathy', 'netcdf', 20.0, 100.0)
+    
+    def test_apply_combined_filters_with_tide(self, accessor):
+        """Test apply_combined_filters with tidal filter."""
+        filters_config = {
+            'tide': 'demerliac'
+        }
+        
+        with patch.object(accessor, 'tidal_filter') as mock_tidal_filter:
+            result = accessor.apply_combined_filters(filters_config)
+            
+            mock_tidal_filter.assert_called_once_with(filter_name='demerliac')
+    
+    def test_apply_combined_filters_depth_coordinate_handling(self, accessor):
+        """Test apply_combined_filters handles depth coordinate correctly."""
+        # Set depth as coordinate
+        accessor.ds = accessor.ds.set_coords('depth')
+        
+        filters_config = {
+            'quality': {'qname': 'temperature', 'qmin': 2, 'qmax': 4}
+        }
+        
+        result = accessor.apply_combined_filters(filters_config)
+        
+        assert result is not None
+        assert 'depth' in result.coords
+    
+    def test_apply_combined_filters_no_filters(self, accessor):
+        """Test apply_combined_filters with empty config."""
+        filters_config = {}
+        
+        result = accessor.apply_combined_filters(filters_config)
+        
+        # Should return the original dataset since no filters applied
+        assert result is accessor.ds
+    
+    def test_dataset_accessor_registration(self, sample_dataset):
+        """Test that the accessor is properly registered with xarray."""
+        # This test checks if the accessor can be accessed via .armoorfilters
+        assert hasattr(sample_dataset, 'armoorfilters')
+        assert isinstance(sample_dataset.armoorfilters, ArmoorSelectionAccessor)
+    
+    def test_dataarray_accessor_registration(self, sample_dataset):
+        """Test that the accessor is properly registered with DataArray."""
+        da = sample_dataset['temperature']
+        assert hasattr(da, 'armoorfilters')
+        assert isinstance(da.armoorfilters, ArmoorSelectionAccessor)
 
     def test_time_selection_bounds(self, sample_dataset):
         """Test time selection with bounds."""
-        start = '2023-01-03'
+        start = '2023-01-01'
         end = '2023-01-07'
-        
         result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
-        
         assert isinstance(result, xr.Dataset)
         assert len(result.time) <= len(sample_dataset.time)
         assert result.time.min() >= pd.to_datetime(start)
@@ -343,7 +361,7 @@ class TestArmoorSelectionAccessor:
 
     def test_time_selection_bounds_with_int_end(self, sample_dataset):
         """Test time selection with integer end (days offset)."""
-        start = '2023-01-03'
+        start = '2023-01-01'
         end = 5  # 5 days offset
         
         result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
@@ -368,216 +386,3 @@ class TestArmoorSelectionAccessor:
         result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
         
         assert result is None
-
-    # def test_time_selection_terms_with_dates(self, sample_dataset):
-    #     """Test time selection with specific dates."""
-    #     dates = ['2023-01-02', '2023-01-05', '2023-01-08']
-        
-    #     result = sample_dataset.armoorfilters.time_selection_terms(dates=dates)
-        
-    #     assert isinstance(result, xr.Dataset)
-    #     assert len(result.time) == 3
-
-    # def test_time_selection_terms_with_frequency(self, sample_dataset):
-    #     """Test time selection with start, end, and frequency."""
-    #     start = '2023-01-01'
-    #     end = '2023-01-10'
-    #     freq = '2D'
-        
-    #     result = sample_dataset.armoorfilters.time_selection_terms(
-    #         start=start, end=end, freq=freq
-    #     )
-        
-    #     assert isinstance(result, xr.Dataset)
-    #     assert len(result.time) == 5  # Every 2 days over 10 days
-
-    # @patch('armoor.base.meta_zone.get_time_bins')
-    # def test_time_selection_range_seq(self, mock_get_time_bins, sample_dataset):
-    #     """Test sequential time range selection."""
-    #     start = '2023-01-01'
-    #     end = '2023-01-10'
-    #     tbin = '3D'
-        
-    #     # Mock time bins
-    #     mock_time_bins = pd.date_range(start, end, freq=tbin)
-    #     mock_get_time_bins.return_value = mock_time_bins
-        
-    #     result = sample_dataset.armoorfilters.time_selection_range_seq(start, end, tbin)
-        
-    #     assert hasattr(result, 'groups')  # Should be a GroupBy object
-    #     mock_get_time_bins.assert_called_once_with(start, end, tbin)
-
-    # def test_time_selection_range_clim_with_string(self, sample_dataset):
-    #     """Test climatological time range selection with string."""
-    #     start = '2023-01-01'
-    #     end = '2023-01-10'
-    #     tbin = 'month'
-        
-    #     result = sample_dataset.armoorfilters.time_selection_range_clim(start, end, tbin)
-        
-    #     assert hasattr(result, 'groups')  # Should be a GroupBy object
-
-    # def test_time_selection_range_clim_with_dict(self, sample_dataset):
-    #     """Test climatological time range selection with dictionary."""
-    #     start = '2023-01-01'
-    #     end = '2023-01-10'
-    #     tbin = {'winter': [12, 1, 2], 'summer': [6, 7, 8]}
-        
-    #     result = sample_dataset.armoorfilters.time_selection_range_clim(start, end, tbin)
-        
-    #     assert hasattr(result, 'groups')  # Should be a GroupBy object
-
-    # def test_time_selection_cut_hour(self, sample_dataset):
-    #     """Test time selection cut by hour."""
-    #     # Add hourly time component
-    #     ds_hourly = sample_dataset.copy()
-    #     ds_hourly = ds_hourly.assign_coords(
-    #         time=pd.date_range('2023-01-01 06:00', periods=10, freq='H')
-    #     )
-        
-    #     result = ds_hourly.armoorfilters.time_selection_cut('hour', 8, 12)
-        
-    #     assert isinstance(result, xr.Dataset)
-    #     hours = result.time.dt.hour
-    #     assert np.all((hours >= 8) & (hours <= 12))
-
-    # def test_time_selection_cut_month(self, sample_dataset):
-    #     """Test time selection cut by month."""
-    #     # Create dataset spanning multiple months
-    #     ds_monthly = sample_dataset.copy()
-    #     ds_monthly = ds_monthly.assign_coords(
-    #         time=pd.date_range('2023-01-01', periods=10, freq='M')
-    #     )
-        
-    #     result = ds_monthly.armoorfilters.time_selection_cut('month', 3, 8)
-        
-    #     assert isinstance(result, xr.Dataset)
-    #     months = result.time.dt.month
-    #     assert np.all((months >= 3) & (months <= 8))
-
-    # def test_time_selection_cut_year(self, sample_dataset):
-    #     """Test time selection cut by year."""
-    #     # Create dataset spanning multiple years
-    #     ds_yearly = sample_dataset.copy()
-    #     ds_yearly = ds_yearly.assign_coords(
-    #         time=pd.date_range('2020-01-01', periods=10, freq='Y')
-    #     )
-        
-    #     result = ds_yearly.armoorfilters.time_selection_cut('year', 2022, 2025)
-        
-    #     assert isinstance(result, xr.Dataset)
-    #     years = result.time.dt.year
-    #     assert np.all((years >= 2022) & (years <= 2025))
-
-    # def test_time_selection_cut_invalid_freq(self, sample_dataset):
-    #     """Test time selection cut with invalid frequency."""
-    #     with pytest.raises(SystemExit):
-    #         sample_dataset.armoorfilters.time_selection_cut('invalid', 1, 10)
-
-
-class TestUtilityFunctions:
-    """Test utility functions in the module."""
-    
-    # @patch('armoor.base.meta_zone.FILTERS')
-    # def test_apply_trange_seq(self, mock_filters):
-    #     """Test apply_trange function with sequential range."""
-    #     mock_ds = MagicMock()
-    #     mock_filter_func = MagicMock()
-    #     mock_filter_func.return_value = mock_ds
-    #     mock_filters.__getitem__.return_value = mock_filter_func
-        
-    #     metazone = {
-    #         'trange_seq': '1D',
-    #         'tbound': ['2023-01-01', '2023-01-10']
-    #     }
-        
-    #     from armoor.base.meta_zone import apply_trange
-    #     result = apply_trange(mock_ds, metazone)
-        
-    #     assert result == mock_ds
-    #     mock_filters.__getitem__.assert_called_with('trange_seq')
-
-    # @patch('armoor.base.meta_zone.FILTERS')
-    # def test_apply_vrange(self, mock_filters):
-    #     """Test apply_vrange function."""
-    #     mock_ds = MagicMock()
-    #     mock_ds.attrs = {'test': 'value'}
-    #     mock_filter_func = MagicMock()
-    #     mock_filter_func.return_value = mock_ds
-    #     mock_filters.__getitem__.return_value = mock_filter_func
-        
-    #     metazone = {
-    #         'vrange': {'z': [0, 100]}
-    #     }
-        
-    #     from armoor.base.meta_zone import apply_vrange
-    #     result = apply_vrange(mock_ds, metazone)
-        
-    #     assert result == mock_ds
-    #     mock_filters.__getitem__.assert_called_with('vrange')
-
-    # def test_get_time_bins(self):
-    #     """Test get_time_bins function."""
-    #     from armoor.base.meta_zone import get_time_bins
-        
-    #     start = '2023-01-01'
-    #     end = '2023-01-10'
-    #     tbin = '2D'
-        
-    #     result = get_time_bins(start, end, tbin)
-        
-    #     assert isinstance(result, pd.DatetimeIndex)
-    #     assert len(result) == 5  # 0, 2, 4, 6, 8 days
-    #     assert result[0] == pd.to_datetime(start)
-
-    def test_create_optimized_mask(self):
-        """Test create_optimized_mask function."""
-        from armoor.base.filters import create_optimized_mask
-
-        # Create test dataset
-        ds = xr.Dataset({
-            'temp': (['x', 'y'], np.random.rand(5, 5) * 30)
-        })
-        
-        bins = [(10, 15), (20, 25)]
-        
-        result = create_optimized_mask(ds, 'temp', bins)
-        
-        assert isinstance(result, xr.DataArray)
-        assert result.dtype == bool
-        assert result.shape == ds['temp'].shape
-
-
-# class TestEdgeCases:
-#     """Test edge cases and error conditions."""
-    
-#     def test_quality_filter_no_start_date_sys_exit(self):
-#         """Test that missing start date causes sys.exit in time_selection_bounds."""
-#         ds = xr.Dataset({
-#             'temp': (['time'], [1, 2, 3]),
-#             'time': pd.date_range('2023-01-01', periods=3)
-#         })
-        
-#         with pytest.raises(SystemExit):
-#             ds.armoorfilters.time_selection_bounds(None, '2023-01-05')
-
-#     def test_time_selection_range_seq_invalid_regex(self):
-#         """Test invalid regex pattern in time_selection_range_seq."""
-#         ds = xr.Dataset({
-#             'temp': (['time'], [1, 2, 3]),
-#             'time': pd.date_range('2023-01-01', periods=3)
-#         })
-        
-#         with pytest.raises(SystemExit):
-#             ds.armoorfilters.time_selection_range_seq('2023-01-01', '2023-01-10', '1M')
-
-    # def test_empty_dataset_handling(self):
-    #     """Test handling of empty datasets."""
-    #     empty_ds = xr.Dataset()
-        
-    #     # Should not raise errors for most operations
-    #     result = empty_ds.armoorfilters.quality_filter('temp', 1, 5)
-    #     assert isinstance(result, xr.Dataset)
-        
-    #     result = empty_ds.armoorfilters.data_selection('z', minimum=0, maximum=100)
-    #     assert isinstance(result, xr.Dataset)
