@@ -349,40 +349,40 @@ class TestArmoorSelectionAccessor:
         assert hasattr(da, 'armoorfilters')
         assert isinstance(da.armoorfilters, ArmoorSelectionAccessor)
 
-    def test_time_selection_bounds(self, sample_dataset):
-        """Test time selection with bounds."""
-        start = '2023-01-01'
-        end = '2023-01-07'
-        result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
-        assert isinstance(result, xr.Dataset)
-        assert len(result.time) <= len(sample_dataset.time)
-        assert result.time.min() >= pd.to_datetime(start)
-        assert result.time.max() <= pd.to_datetime(end)
+    # def test_time_selection_bounds(self, sample_dataset):
+    #     """Test time selection with bounds."""
+    #     start = '2023-01-01'
+    #     end = '2023-01-07'
+    #     result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
+    #     assert isinstance(result, xr.Dataset)
+    #     assert len(result.time) <= len(sample_dataset.time)
+    #     assert result.time.min() >= pd.to_datetime(start)
+    #     assert result.time.max() <= pd.to_datetime(end)
 
-    def test_time_selection_bounds_with_int_end(self, sample_dataset):
-        """Test time selection with integer end (days offset)."""
-        start = '2023-01-01'
-        end = 5  # 5 days offset
+    # def test_time_selection_bounds_with_int_end(self, sample_dataset):
+    #     """Test time selection with integer end (days offset)."""
+    #     start = '2023-01-01'
+    #     end = 5  # 5 days offset
         
-        result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
+    #     result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
         
-        assert isinstance(result, xr.Dataset)
-        assert len(result.time) <= len(sample_dataset.time)
+    #     assert isinstance(result, xr.Dataset)
+    #     assert len(result.time) <= len(sample_dataset.time)
 
-    def test_time_selection_bounds_no_overlap_early(self, sample_dataset):
-        """Test time selection with no overlap (dates too early)."""
-        start = '2022-01-01'
-        end = '2022-01-05'
+    # def test_time_selection_bounds_no_overlap_early(self, sample_dataset):
+    #     """Test time selection with no overlap (dates too early)."""
+    #     start = '2022-01-01'
+    #     end = '2022-01-05'
         
-        result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
+    #     result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
         
-        assert result is None
+    #     assert result is None
 
-    def test_time_selection_bounds_no_overlap_late(self, sample_dataset):
-        """Test time selection with no overlap (dates too late)."""
-        start = '2024-01-01'
-        end = '2024-01-05'
+    # def test_time_selection_bounds_no_overlap_late(self, sample_dataset):
+    #     """Test time selection with no overlap (dates too late)."""
+    #     start = '2024-01-01'
+    #     end = '2024-01-05'
         
-        result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
+    #     result = sample_dataset.armoorfilters.time_selection_bounds(start, end)
         
-        assert result is None
+    #     assert result is None

@@ -206,6 +206,23 @@ class ArmoorSelectionAccessor:
                     logger.warning(f"xoa: {e}")
                     logger.info("Tide filter ignored")
                     
+    def _get_time_bounds_mask(self, start=None, end=None):
+        if not start:
+            logger.error("Giving a begindate is mandatory.")
+            sys.exit(1)
+        start = pd.to_datetime(start)
+        if isinstance(end, int):
+            end = pd.to_datetime(start) + pd.to_timedelta(end, "D")
+        end = pd.to_datetime(end)
+        if self.ds.time.max().values <= pd.to_datetime(start):
+            logger.warning("max(time) <= start")
+            return None
+        elif self.ds.time.min().values >= pd.to_datetime(end):
+            logger.warning("min(time) >= end")
+            return None
+        else:
+            return (self.ds.time >= start) & (self.ds.time <= end)
+                    
     def apply_combined_filters(self, filters_config: dict) -> xr.Dataset:
         """
         Apply multiple filters in a single operation to reduce memory usage.
@@ -252,6 +269,12 @@ class ArmoorSelectionAccessor:
                     config.get('minimum'),
                     config.get('maximum'),
                     config.get('value')
+                )
+                
+            elif filter_type == 'time_selection':
+                mask = self._get_time_bounds_mask(
+                    start=config.get('minimum'),
+                    end=config.get('maximum'),
                 )
             
             
@@ -707,40 +730,40 @@ class ArmoorSelectionAccessor:
     #     self.ds = self.ds.set_xindex(vname)
     #     return self.ds
 
-    def time_selection_bounds(self, start, end) -> xr.Dataset:
-        """
-        Subset dataset selecting elements in a bounded temporal interval.
+    # def time_selection_bounds(self, start, end) -> xr.Dataset:
+    #     """
+    #     Subset dataset selecting elements in a bounded temporal interval.
 
-        Parameters
-        ----------
-        start : str
-            Date (YYYY-MM-DD HH:MM:SS)
-        end : str
-            Date (YYYY-MM-DD HH:MM:SS)
+    #     Parameters
+    #     ----------
+    #     start : str
+    #         Date (YYYY-MM-DD HH:MM:SS)
+    #     end : str
+    #         Date (YYYY-MM-DD HH:MM:SS)
 
-        Returns
-        -------
-        xarray.Dataset
-        """
-        logger.info("Applying filter - time_selection_bounds")
-        if not start:
-            logger.error("Giving a begindate is mandatory.")
-            sys.exit(1)
+    #     Returns
+    #     -------
+    #     xarray.Dataset
+    #     """
+    #     logger.info("Applying filter - time_selection_bounds")
+    #     if not start:
+    #         logger.error("Giving a begindate is mandatory.")
+    #         sys.exit(1)
 
-        # start = pd.to_datetime(start)
-        if isinstance(end, int):
-            end = pd.to_datetime(start) + pd.to_timedelta(end, "D")
-            end = end.strftime("%Y-%m-%d")
-        # else:
-        #     end = pd.to_datetime(end)
-        if self.ds.time.max().values <= pd.to_datetime(start):
-            logger.warning("max(time) <= start")
-            return None
-        elif self.ds.time.min().values >= pd.to_datetime(end):
-            logger.warning("min(time) >= end")
-            return None
-        else:
-            return self.ds.sel(time=slice(start, end))
+    #     # start = pd.to_datetime(start)
+    #     if isinstance(end, int):
+    #         end = pd.to_datetime(start) + pd.to_timedelta(end, "D")
+    #         end = end.strftime("%Y-%m-%d")
+    #     # else:
+    #     #     end = pd.to_datetime(end)
+    #     if self.ds.time.max().values <= pd.to_datetime(start):
+    #         logger.warning("max(time) <= start")
+    #         return None
+    #     elif self.ds.time.min().values >= pd.to_datetime(end):
+    #         logger.warning("min(time) >= end")
+    #         return None
+    #     else:
+    #         return self.ds.sel(time=slice(start, end))
 
   
 #     def time_selection_range_seq(self, start, end, tbin: str) -> xr.Dataset:

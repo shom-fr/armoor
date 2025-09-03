@@ -32,7 +32,6 @@ def build_filters_config(mz_param, data_name):
     # Time filters (assuming they become data_selection filters)
     if 'tbound' in mz_param:
         filters_config['time_selection'] = {
-            'dim': 'time',
             'minimum': mz_param.get('tbound')[0],
             'maximum': mz_param.get('tbound')[1]
         }
