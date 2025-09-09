@@ -528,6 +528,7 @@ class PlotData:
                 ax.set_ylabel("Depth, m")
                 ax.set_xlim([vmin, vmax])
                 ax.set_ylim([zmin, zmax])
+                
                 kw = dict(
                     plot_coords = "points",
                     coords_markersize=4,

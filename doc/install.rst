@@ -65,3 +65,10 @@ Alternatively, use ``environment.yml``::
 
     $ cd armoor
     $ mamba env create -f environment.yml
+
+Then, run tests::
+
+    $ export PYTHONPATH=$PWD
+    $ cd armoor/tests/uni
+    $ pytest
+
