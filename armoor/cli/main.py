@@ -23,8 +23,9 @@ from armoor.comp.coloc import main_coloc
 from armoor.comp.misc import add_comp_parser_arguments
 from armoor.comp.output import main_output as output_comp
 from armoor.comp.plot import main_plot as plot_comp
-from armoor.data.output import main_output as output_data
 from armoor.data.load import load_datasets
+from armoor.data.output import main_output as output_data
+from armoor.data.plot import main_plot as plot_data
 
 logger = logging.getLogger(__name__)
 
@@ -234,12 +235,12 @@ def main_data():
     
     else:
         
-        zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs"))
+        zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs").copy())
+
+        ofmt = cfg["outputs"].get("fmt")
         
-        # ofmt = cfg["outputs"].get("fmt")
-        
-        # if "png" in ofmt:
-        #     plot_data(zarr_outputs, metazones)
+        if "png" in ofmt:
+            plot_data(zarr_outputs, metazones)
     
         # zarr_outputs = dict_to_list(zarr_outputs)
         

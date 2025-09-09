@@ -218,14 +218,6 @@ TITLE_PLOTS = {
     "comp_models": "",
     }
 
-CMAP_VARS = {
-    "ptemp": "cmo.thermal",
-    "temp": "cmo.thermal",
-    "sal": "cmo.haline",
-    "pdens": "cmo.dense",
-    "sndspeed": "cmo.speed"
-    }
-
 METRIC_LABELS = {
     "diff": "Difference",
     "bias": "Bias",

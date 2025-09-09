@@ -20,3 +20,29 @@ LINE_COLORS = [
     '#bcbd22',
     '#17becf'
     ]
+
+CMAP_VARS = {
+    "ptemp": "cmo.thermal",
+    "temp": "cmo.thermal",
+    "sal": "cmo.haline",
+    "pdens": "cmo.dense",
+    "sndspeed": "cmo.speed",
+    "mld": "cmo.deep",
+    "depth": "cmo.deep",
+    "ssh": "cmo.delta",
+    "u": "cmo.delta",
+    "v": "cmo.delta"
+    }
+
+MINMAX_VARS = {
+    "ptemp": "pos",
+    "temp": "pos",
+    "sal": "pos",
+    "pdens": "pos",
+    "sndspeed": "pos",
+    "mld": "pos",
+    "depth": "pos",
+    "ssh": "rel",
+    "u": "rel",
+    "v": "rel",
+    }

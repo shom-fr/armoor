@@ -481,6 +481,7 @@ def save_datasets(dsprod, dirout, prod_name):
     return ncout_prod
 
 def main_output(ncs, metazones, outputs):
+    outputs.pop("fmt")
     interp_check = validate_and_get_params(metazones)
     interp_params = {}
     ncouts = {}
@@ -657,16 +658,9 @@ def main_output(ncs, metazones, outputs):
                     if not ncouts.get(oname):
                         ncouts.update({oname: {}})
                     if not ncouts[oname].get(metazone):
-                        ncouts[oname] = {metazone: []}
+                        ncouts[oname].update({metazone: []})
                     ncouts[oname][metazone].append(ncout)
                     del dt
                     
     return ncouts 
- 
-            
-            
-            
-            
-            
-            
-            
+     

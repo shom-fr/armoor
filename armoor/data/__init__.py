@@ -20,6 +20,9 @@ OUTPUTS_PARAMS = {
         },
     "mvprofiles": {
         "sort": ["time", "z"],
+        "mparams_con": {
+            "vertical": ["vlevel"],
+            }
         },
     "mdiagts": {
         "sort": ["time", "z"],
@@ -30,6 +33,9 @@ OUTPUTS_PARAMS = {
         "mparams_pro": {
             "horizontal": ["cloud"]
             },
+        "mparams_con": {
+            "vertical": ["vlevel"],
+            }
         },
     "udiagts": {
         "concat": ["time"],

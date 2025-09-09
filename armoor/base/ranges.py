@@ -2,6 +2,7 @@ import logging
 import re
 
 import pandas as pd
+import xarray as xr
 
 from armoor import ArmoorError
 
@@ -44,7 +45,17 @@ def vrange(dssi, vname, vbins):
         for vbin in vbins:
             low, high = vbin[0], vbin[1]
             mask = ((var >= low) & (var <= high))
-            dso = dsi.where(mask)
+            daos = []
+            for v in dsi.data_vars:
+                dai = dsi[v]
+                if "z" in dai.dims:
+                    dao = dai.where(mask)
+                else:
+                    dao = dai.copy()
+                daos.append(dao)
+            dso = xr.merge(daos)
+            dso = dso.assign_coords(dsi.coords)
+            dso.attrs = dsi.attrs
             dso.attrs["vrange"] = f"{low}-{high}"
             dss.append(dso)
     return dss
@@ -56,6 +67,7 @@ def vlevels(dssi, vname):
         for ivlevel in range(var.sizes["z"]):
             vlevel = var.isel(z=ivlevel).values
             dso = dsi.isel(z=[ivlevel]).copy()
+            dso.attrs = dsi.attrs
             dso.attrs["vlevel"] = f"{vlevel:.1f}"
             dss.append(dso)
     return dss
