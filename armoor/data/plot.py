@@ -109,12 +109,11 @@ class PlotData:
     
     def _mdiagts(self, dsprod, figtitle, figname):
         fig, axes = create_subplots(
-            ncols=2,
-            figsize=(15, 8),
+            ncols=1,
+            figsize=(8, 8),
             title=figtitle.format(**locals())
             )
         ax0 = axes[0]
-        ax1 = axes[1]
         vmax = - dsprod.depth.min()
         vmin = - dsprod.depth.max()
         tmin = dsprod.ptemp.min()
@@ -182,152 +181,143 @@ class PlotData:
     
     def mdiagts(self):
         """Plot multi-profiles theta-saln."""
-        for prod, node_prod in self.dt.children.items():
-            logger.debug(f"{prod}, Path: {node_prod.path}")
-            for data, dt_data in node_prod.items():
-                logger.debug(f"{data}, Path: {dt_data.path}")
-                dsprod = dt_data["data"].to_dataset()
-            dsprod = dsprod.stack({"npt": list(dsprod.sizes.keys())})
-            dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
-            trange = dsprod.attrs.get("trange")
-            vlevel = dsprod.attrs.get("vlevel")
-            vrange = dsprod.attrs.get("vrange")
-            xtitle = ""
-            xfigname = ""
-            if trange:
-                xtitle += f"{trange} "
-                xfigname += f"_{trange}"
-            if vlevel:
-                xtitle += f" {vlevel}"
-                xfigname += f"_{vlevel}"
-            elif vrange:
-                xtitle += f" {vrange}"
-                xfigname += f"_{vrange}"
-            prodname = dsprod.attrs.get("data_name")
-            figtitle = (
-                f"{self.plot_title} \n"
-                f"{prodname} \n"
-                f"{self.metazone}\n"
-                f"{xtitle}"
-                )
-            figname = (
-                f"{self.func_comp}/plot/{self.metazone}/"
-                f"mdiagts_{prod}{xfigname}.png"
-                )
-                
-            self._mdiagts(dsprod, figtitle, figname)
+        dsprod = self.dt.children["data"].to_dataset()
+        dsprod = dsprod.stack({"npt": list(dsprod.sizes.keys())})
+        dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
+        data_name = dsprod.attrs.get("data_name")
+        trange = dsprod.attrs.get("trange")
+        tfreq = dsprod.attrs.get("time")
+        vlevel = dsprod.attrs.get("vlevel")
+        vrange = dsprod.attrs.get("vrange")
+        xtitle = ""
+        xfigname = ""
+        if trange:
+            xtitle += f"{trange} "
+            xfigname += f"_{trange}"
+        elif tfreq:
+            xtitle += f"{tfreq} "
+            xfigname += f"_{tfreq}"
+        if vlevel:
+            xtitle += f"\n {vlevel}"
+            xfigname += f"_{vlevel}"
+        elif vrange:
+            xtitle += f"\n {vrange}"
+            xfigname += f"_{vrange}"
+        figtitle = (
+            f"{data_name} \n"
+            f"{self.metazone}\n"
+            f"{xtitle}"
+            )
+        figname = (
+            f"data/plot/{self.metazone}/"
+            f"mdiagts_{data_name}{xfigname}.png"
+            )
+        self._mdiagts(dsprod, figtitle, figname)
     
     def udiagts(self):
         """Plot uniquely profiles theta-saln."""
-        dssprod = []
-        for prod, node_prod in self.dt.children.items():
-            logger.info(f"{prod}, Path: {node_prod.path}")
-            for data, dt_data in node_prod.items():
-                logger.info(f"{data}, Path: {dt_data.path}")
-                dssprod.append(dt_data["data"].to_dataset())
-        vranges = dssprod[0].attrs.get('vrange')
-        vlevels = dssprod[0].ref.attrs.get('vlevel')
-        for itime in range(dssprod[0].sizes["time"]):
-            if isinstance(vranges, list):
-                vrange = vranges[itime]
-            else:
-                vrange = vranges
-            if isinstance(vlevels, list):
-                vlevel = vlevels[itime]
-            else:
-                vlevel = vlevels
-            dssprod_itime = [
-                dsprod.isel(time=[itime]).squeeze() for dsprod in dssprod
-                ]
-            dssprod_closest = [
-                ds.armoorfilters.sel_closest(
-                    dsref_itime
-                    ) for ds in dssprod_itime
-                ]
-            del dssprod_itime
-            time = pd.to_datetime(dsref_itime.time.values[0])
-            mask = ~dsref_itime.ptemp.isnull()
-            if (~mask).all():
-                continue
-            depth = dsref_itime.depth.where(mask, drop=True)
-            zmin = -depth.max()
-            zmax = -depth.min()
-            xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
-            xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
-            if vrange:
-                xtitle += f"\n {vrange}"
-                xfigname  += "_{vrange}"
-            if vlevel:
-                xtitle += f"\n {vlevel}"
-                xfigname  += "_{vlevel}"
-
-            fig, ax = create_subplots(
-                nrows=1,
-                figsize=(5, 8),
-                )
-            fig.suptitle(
-                f"{self.plot_title} \n"
-                f"{self.metazone} \n{xtitle}",
-                y=1.01
-                )
-            ax = ax[0]
-            kw_ref = {"label": dsref.attrs["data_name"]}
-            tsref = plot_ts(
-                dsref_itime.ptemp, dsref_itime.sal,
-                dens=True, potential=True, absolute=False,
-                clabel=True, contour_linewidths=0.2,
-                colorbar=False,
-                axes=ax,
-                scatter_kwargs=dict(
-                    c="k",
-                    edgecolor='k',
-                    alpha=0.8,
-                    linewidths=0.5,
-                    s=50,
-                    label=refname
+        dsprod = self.dt.children["data"].to_dataset()
+        vranges = dsprod.attrs.get('vrange')
+        vlevels = dsprod.attrs.get('vlevel')
+        npts = dsprod.sizes["npts"]
+        data_name = dsprod.attrs.get("data_name")
+        for inpt in range(npts):
+            for itime in range(dsprod.sizes["time"]):
+                if isinstance(vranges, list):
+                    vrange = vranges[itime]
+                else:
+                    vrange = vranges
+                if isinstance(vlevels, list):
+                    vlevel = vlevels[itime]
+                else:
+                    vlevel = vlevels
+                ds = dsprod.isel(time=[itime], npts=inpt)#.squeeze()
+                lon_pt = f"{ds.lon:.2f}"
+                lat_pt = f"{ds.lat:.2f}"
+                time = pd.to_datetime(ds.time.values[0])
+                mask = ~ds.ptemp.isnull()
+                if (~mask).all():
+                    continue
+                depth = ds.depth.where(mask, drop=True)
+                zmin = -depth.max()
+                zmax = -depth.min()
+                xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
+                xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
+                if vrange:
+                    xtitle += f"\n {vrange}"
+                    xfigname  += "_{vrange}"
+                if vlevel:
+                    xtitle += f"\n {vlevel}"
+                    xfigname  += "_{vlevel}"
+                figname = (
+                    f"data/plot/{self.metazone}/"
+                    f"udiagts_{data_name}_{lat_pt}_{lon_pt}{xfigname}.png"
                     )
-                )
-            for iprod, dsprod_closest in enumerate(dssprod_closest):
+                figtitle = (
+                    f"{data_name} \n"
+                    f"{self.metazone}\n"
+                    f"{lat_pt}N; {lon_pt}E\n"
+                    f"{xtitle}"
+                    )
+                fig, ax = create_subplots(
+                    nrows=1,
+                    figsize=(5, 8),
+                    )
+                fig.suptitle(
+                    figtitle,
+                    y=1.01
+                    )
+                ax = ax[0]
+                kw_prod = {"label": data_name}
                 tsprod = plot_ts(
-                    dsprod_closest.ptemp, dsprod_closest.sal,
+                    ds.ptemp, ds.sal,
                     dens=True, potential=True, absolute=False,
                     clabel=True, contour_linewidths=0.2,
                     colorbar=False,
                     axes=ax,
                     scatter_kwargs=dict(
-                        c=LINE_COLORS[iprod],
+                        c=-ds.depth,
+                        cmap=cmo.cm.deep_r,
+                        vmin=zmin, vmax=zmax,
                         edgecolor='k',
                         alpha=0.8,
                         linewidths=0.5,
                         s=50,
-                        label=dssprod[iprod].attrs["data_name"]
+                        **kw_prod
                         )
                     )
+                divider = make_axes_locatable(tsprod["axes"])
+                cax = divider.append_axes("right", size="5%", pad=0.1)
+                cax.axis('off')
+                cbar2 = fig.colorbar(
+                    tsprod["scatter"],
+                    ax=cax,
+                    orientation='vertical',
+                    fraction=0.02,
+                    pad=0.02,
+                    shrink=0.7,
+                    label="Depth, m"
+                    )
+                # ax.legend(
+                #     #loc='upper left', 
+                #     fontsize=11, frameon=True, fancybox=True
+                #     )
                 ax = tsprod["axes"]
-            ax.legend(
-                #loc='upper left', 
-                fontsize=11, frameon=True, fancybox=True
-                )
-            ax = tsref["axes"]
-            ax.set_ylabel("temp, degrees_C")
-            ax.set_xlabel("sal, psu")
-            ax.grid(False)
-            kw = dict(
-                plot_coords = "points",
-                coords_markersize=4,
-                gridlines_draw_labels=True,
-                gridlines_xlabel_style={'size': 6},
-                gridlines_ylabel_style={'size': 6},
-                )
-            plot_minimap(dsref_itime, ax=self.ax_minimap, **kw)
-            figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{refname}/"
-                f"udiagts{xfigname}.png"
-                )
-            self.save_figure(
-                fig,
-                figname.format(**locals())
-                )    
+                ax.set_ylabel("temp, degrees_C")
+                ax.set_xlabel("sal, psu")
+                ax.grid(False)
+                kw = dict(
+                    plot_coords = "points",
+                    coords_markersize=4,
+                    gridlines_draw_labels=True,
+                    gridlines_xlabel_style={'size': 6},
+                    gridlines_ylabel_style={'size': 6},
+                    )
+                plot_minimap(ds, ax=self.ax_minimap, **kw)
+                self.save_figure(
+                    fig,
+                    figname.format(**locals())
+                    )    
         
     def _mvprofiles(self, dsprod, figtitle, figname):
         
@@ -371,26 +361,7 @@ class PlotData:
                              for i in range(n_times) for j in range(n_members)]
             prod_lc = LineCollection(prod_segments, colors=prod_color, linewidths=1.0, alpha=0.5, label=dsprod.attrs["data_name"])
             ax.add_collection(prod_lc)
-            
-            # ax.plot(
-            #     daref_mean, -dsref_mean.depth, color=ref_color, linewidth=2.0,
-            #     label=f"mean {dsref.attrs['data_name']}"
-            #     )
-            # ax.fill_betweenx(
-            #     -dsref_mean.depth, daref_mean - daref_std, daref_mean + daref_std, color=ref_color,
-            #     alpha=0.25,
-            #     label=f"{dsref.attrs['data_name']} mean +/- std"
-            #     )
-            # ax.plot(
-            #     daprod_mean, -dsprod_mean.depth, color=prod_color, linewidth=2.0,
-            #     label=f"{dsprod.attrs['data_name']}"    
-            #     )
-            # ax.fill_betweenx(
-            #     -dsprod_mean.depth, daprod_mean - daprod_std, daprod_mean + daprod_std, color=prod_color,
-            #     alpha=0.25,
-            #     label=f"{dsprod.attrs['data_name']} mean +/- std"
-            #     )
-            
+
             ax.legend(
                 fontsize=11, frameon=True, fancybox=True
                 )
@@ -452,7 +423,6 @@ class PlotData:
     def uvprofiles(self):
         """Plot uniquely vertical profiles."""
         dsprod = self.dt.children["data"].to_dataset()
-
         data_name = dsprod.attrs.get("data_name")
         npts = dsprod.sizes["npts"]
         trange = dsprod.attrs.get("trange")
