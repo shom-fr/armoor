@@ -242,18 +242,16 @@ def main_data():
         if "png" in ofmt:
             plot_data(zarr_outputs, metazones)
     
-        # zarr_outputs = dict_to_list(zarr_outputs)
+        zarr_outputs = dict_to_list(zarr_outputs)
         
-        # if "zarr" in ofmt:
-        #     with open(jsonfile, 'w') as f:
-        #         json.dump(zarr_outputs, f, indent=4)
+        if "zarr" in ofmt:
+            with open(args.jsonfile, 'w') as f:
+                json.dump(zarr_outputs, f, indent=4)
                 
-        # if "netcdf" in ofmt:
-        #     ncs_outputs = zarrs2netcdfs(zarr_outputs)
-        #     with open(jsonfile, 'w') as f:
-        #         json.dump(ncs_outputs, f, indent=4)
-
-
+        if "netcdf" in ofmt:
+            ncs_outputs = zarrs2netcdfs(zarr_outputs)
+            with open(args.jsonfile, 'w') as f:
+                json.dump(ncs_outputs, f, indent=4)
 
 def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, comp_args):
     

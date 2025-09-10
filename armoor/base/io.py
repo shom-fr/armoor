@@ -106,7 +106,7 @@ def zarrs2netcdfs(fins):
     fouts = []
     for fin in fins:
         if fin:
-            fout = fin.replace(extin, extout)
+            fout = str(fin).replace(extin, extout)
             xr.open_zarr(fin).to_netcdf(fout)
             fouts.append(fout)
     return fouts
