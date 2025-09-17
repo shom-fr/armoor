@@ -30,35 +30,35 @@ ouputs
 
         - ``maps``: maps of statistical metrics (bias, rmse, rmsec) or deviation (difference).
         
-        .. image:: images/maps.png
+        .. image:: images/comp_maps.png
             
         - ``diagdisp_glob``: dispersion diagram of selected data.
         
-        .. image:: images/diagdisp_glob.png
+        .. image:: images/comp_diagdisp_glob.png
             
         - ``diagdisp_sel``: dispersion diagram by intervals.
         
-        .. image:: images/diagdisp_sel.png
+        .. image:: images/comp_diagdisp_sel.png
             
         - ``timeseries``: time series of statistical metrics or deviation.
         
-        .. image:: images/timeseries.png
+        .. image:: images/comp_timeseries.png
         
         - ``mvprofiles``: plot of multiple vertical profiles.
         
-        .. image:: images/mvprofiles.png
+        .. image:: images/comp_mvprofiles.png
         
         - ``uvprofiles``: plot of an unique vertical observed profile.
         
-        .. image:: images/uvprofiles.png
+        .. image:: images/comp_uvprofiles.png
         
         - ``udiagts``: theta-s diagram of an unique vertical observed profile.
         
-        .. image:: images/udiagts.png
+        .. image:: images/comp_udiagts.png
         
         - ``mdiagts``: theta-s diagram of multiple vertical observed profiles.
         
-        .. image:: images/mdiagts.png
+        .. image:: images/comp_mdiagts.png
 
 Workflow
 --------

@@ -256,7 +256,7 @@ def load_datasets(data_cfg, metazones, dirout):
         dss = open_decode(
             cfg_data["path"],
             fmt=cfg_data["fmt"],
-            platform=cfg_data["platform"]
+            platform=cfg_data.get("platform")
             )
 
         if not isinstance(dss, list):

@@ -332,7 +332,12 @@ class PlotData:
         depth = dsprod.depth.where(mask, drop=True)
         zmin = -depth.max()
         zmax = -depth.min()
-        dsprod = dsprod.transpose("z", "time", "member")
+        if "member" in dsprod.dims:
+            dsprod = dsprod.transpose("z", "time", "member")
+        elif "npts" in dsprod.dims:
+            dsprod = dsprod.transpose("z", "time", "npts")
+        else:
+            dsprod = dsprod.transpose("z", "time")
         for var in dsprod.data_vars:
             if "z" not in dsprod[var].squeeze().dims:
                 continue
@@ -536,7 +541,7 @@ class PlotData:
             npts = 1
             figname = (
                 "data/plot/{self.metazone}/"
-                "timeseries_{var}{ncname}.png"
+                "timeseries_{data_name}_{var}{ncname}.png"
                 )
         vars2plot = [var for var in ds_data.data_vars if var != "depth"]
         for var in vars2plot:
@@ -781,6 +786,7 @@ def main_plot(ncins, metazones):
     """Process using dask.bag for functional mapping"""
 
     def process_task(nc, metazone, output):
+        print(nc)
         plotcomp = PlotData(nc, metazone)
         plotcomp.call(output)
         plotcomp.clean()

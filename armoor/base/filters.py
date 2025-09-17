@@ -260,6 +260,7 @@ class ArmoorSelectionAccessor:
                     config['coords'], 
                     config.get('dilate', False)
                 )
+
                 if mask is None:
                     return None
                 
@@ -293,7 +294,8 @@ class ArmoorSelectionAccessor:
                 result["mask"] = mask2keep
             combined_mask = combined_mask.compute()
             result = result.where(combined_mask, drop=True)
-            
+            if "time" in result["mask"].dims:
+                result["mask"] = result.mask.isel(time=0)
             if depth_was_coord and "depth" in result:
                 result = result.set_coords("depth")
             
@@ -311,7 +313,8 @@ class ArmoorSelectionAccessor:
         if "tide" in filters_config:
             filter_name = filters_config.get("tide")
             self.tidal_filter(filter_name=filter_name)
-        
+    
+
         return self.ds
 # @xr.register_dataarray_accessor("armoorfilters")
 # @xr.register_dataset_accessor("armoorfilters")
