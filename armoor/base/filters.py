@@ -103,7 +103,7 @@ class ArmoorSelectionAccessor:
         """Extract polygon mask without applying it."""
         mask_result = self.get_mask(coords)
         if mask_result is None:
-            return None
+            return None, None
         mask_poly = mask_result.copy()
 
         if (("x" in self.ds.lon.dims) and ("y" in self.ds.lon.dims)) and dilate:

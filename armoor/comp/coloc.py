@@ -587,7 +587,7 @@ def main_coloc(ncs, metazones, comp_func):
             ]
         for ncref in ncrefs:
             logger.info(f"Use reference {ncref}")
-            dsrefin = xr.open_dataset(ncref)#, engine="h5netcdf")
+            dsrefin = xr.open_dataset(ncref, engine="zarr")#, engine="h5netcdf")
             logger.info(dsrefin.sizes)
             dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=512)
             for var in COMP_VARS[comp_func]:
@@ -601,6 +601,12 @@ def main_coloc(ncs, metazones, comp_func):
                     var != "mask"
                     ):
                     dsrefin = dsrefin.drop_vars(var)
+            if (
+                "depth" in dsrefin.coords
+            ) and (
+                "time" in dsrefin.depth.dims
+            ):
+                dsrefin = dsrefin.reset_coords("depth")
             ncins = [
                 nc for nc in ncs if metazone in str(nc) and "ref" not in str(nc)
                 ]
@@ -654,31 +660,12 @@ def main_coloc(ncs, metazones, comp_func):
                         params.get("vertical"),
                         )
                     gc.collect()
+                if "depth" in dsref.data_vars:
+                    dsref = dsref.set_coords("depth")
+                if "depth" in dsprod.data_vars:
+                    dsprod = dsprod.set_coords("depth")
                 dsref = dsref.assign_attrs(gattrs_ref)
                 dsprod = dsprod.assign_attrs(gattrs_prod)
-                # Configuration optimale
-                
-                # dask.config.set({
-                #     'distributed.worker.daemon': False,
-                #     'distributed.comm.timeouts.connect': '120s',
-                #     'distributed.comm.timeouts.tcp': '120s',
-                #     'distributed.worker.memory.target': 0.9,
-                #     'distributed.worker.memory.spill': 0.8,
-                #     'distributed.worker.memory.pause': 0.9,
-                #     'distributed.worker.memory.terminate': 0.95,
-                #     'distributed.worker.memory.monitor-interval': '100ms',
-                #     'distributed.scheduler.allowed-failures': 2,
-                #     'distributed.scheduler.work-stealing': True,
-                # })
-                
-                # with dask.distributed.Client(
-                #     n_workers=4,  # Réduire le nombre de workers
-                #     threads_per_worker=4,
-                #     memory_limit='10GB',
-                #     silence_logs=True,
-                #     dashboard_address='localhost:8787'
-                #     ) as client:
-                #     print(client.dashboard_link)
                 with setup_dask_client():
                     logger.info("Compute coloc ref")
                     dsref = dsref.compute()

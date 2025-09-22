@@ -253,7 +253,7 @@ def main_data():
             with open(args.jsonfile, 'w') as f:
                 json.dump(ncs_outputs, f, indent=4)
 
-def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, comp_args):
+def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, comp_args={}):
     
     logger.info("Initial diagnostic:")
     monitor_performance()

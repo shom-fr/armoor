@@ -136,8 +136,8 @@ def process_single_combination(ds, mz_name, mz_param):
     
     # Copy dataset to avoid modifications
     dsout = ds.copy(deep=True)  # Deep copy to avoid references
-    data_name = dsout.attrs["data_name"]
-    data_ref = dsout.attrs["data_ref"]
+    data_name = ds.attrs["data_name"]
+    data_ref = ds.attrs["data_ref"]
     
     # Build filters configuration
     filters_config = build_filters_config(mz_param, data_name)
@@ -147,7 +147,7 @@ def process_single_combination(ds, mz_name, mz_param):
     if filters_config:
         # try:
         logger.info(f"Applying combined filters for {combination_id}")
-        dsout = dsout.armoorfilters.apply_combined_filters(filters_config)
+        dsout = ds.armoorfilters.apply_combined_filters(filters_config)
         if dsout is None:
             logger.warning(f"No data left after filtering for {combination_id}")
             return None
@@ -167,7 +167,7 @@ def process_single_combination(ds, mz_name, mz_param):
             "data_name": data_name,
             "data_ref": data_ref,
         }
-    
+
     elapsed = time.time() - start_time
     logger.info(f"Processing {combination_id} completed in {elapsed:.1f}s")
         
@@ -186,7 +186,7 @@ def save_result(dsout, mz_name, func_comp):
     
     # Encoding optimisé pour la vitesse
     encoding = create_fast_encoding(dsout)
-    # encoding = get_zarr_encoding(dsout)
+    #encoding = get_zarr_encoding(dsout)
     logger.info(nc)
     #Sauvegarde avec optimisations
     dsout.to_zarr(
@@ -194,7 +194,8 @@ def save_result(dsout, mz_name, func_comp):
         mode="w",
         encoding=encoding,
         )
-    dsout.close() 
+    dsout.close()
+    del dsout
     logger.debug(f"💾 Sauvegardé: {nc}")
     return str(nc)
 
