@@ -25,7 +25,7 @@ xr.set_options(keep_attrs=True)
 
 @xr.register_dataarray_accessor("armoorfilters")
 @xr.register_dataset_accessor("armoorfilters")
-class ArmoorSelectionAccessor:
+class ArmoorFilters:
     """
     Select a subset of the original object filtering elements with conditions across certain dimensions.
 
@@ -159,7 +159,9 @@ class ArmoorSelectionAccessor:
             ds_bathy = regrid(ds_bathy, self.ds[["lon", "lat"]])
         bathy = ds_bathy["bathy"]
         mask = (bathy >= minimum) & (bathy <= maximum)
-        return self.ds.where(mask.compute(), drop=True)
+        mask = mask.compute()
+        self.ds = self.ds.where(mask, drop=False)
+        return self.ds
 
     def tidal_filter(self, filter_name="demerliac"):
         """
@@ -260,7 +262,6 @@ class ArmoorSelectionAccessor:
                     config['coords'], 
                     config.get('dilate', False)
                 )
-
                 if mask is None:
                     return None
                 
@@ -278,7 +279,6 @@ class ArmoorSelectionAccessor:
                     end=config.get('maximum'),
                 )
             
-            
             # Combine masks
             if mask is not None:
                 combined_mask = mask if combined_mask is None else combined_mask & mask
@@ -294,8 +294,9 @@ class ArmoorSelectionAccessor:
                 result["mask"] = mask2keep
             combined_mask = combined_mask.compute()
             result = result.where(combined_mask, drop=True)
-            if "time" in result["mask"].dims:
-                result["mask"] = result.mask.isel(time=0)
+            if "mask" in result:
+                if "time" in result["mask"].dims:
+                    result["mask"] = result.mask.isel(time=0)
             if depth_was_coord and "depth" in result:
                 result = result.set_coords("depth")
             
@@ -314,8 +315,12 @@ class ArmoorSelectionAccessor:
             filter_name = filters_config.get("tide")
             self.tidal_filter(filter_name=filter_name)
     
-
+        if "bathy" in self.ds:
+            bathy = self.ds.bathy
+            if "time" in bathy.dims:
+                self.ds["bathy"] = bathy.isel(time=0)
         return self.ds
+    
 # @xr.register_dataarray_accessor("armoorfilters")
 # @xr.register_dataset_accessor("armoorfilters")
 # class ArmoorSelectionAccessor:

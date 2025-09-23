@@ -1,5 +1,5 @@
 """Input/output."""
-import re
+import re, os
 from typing import Dict, List
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
@@ -114,35 +114,35 @@ def zarrs2netcdfs(fins):
 def setup_dask_client():
     """Configure le client Dask de manière robuste."""
     # Configuration optimale
-    dask.config.set({
-        "distributed.worker.profile.enabled": False,
-        'distributed.worker.daemon': False,
-        'distributed.comm.timeouts.connect': '120s',
-        'distributed.comm.timeouts.tcp': '120s',
-        'distributed.worker.memory.target': 0.9,
-        'distributed.worker.memory.spill': 0.8,
-        'distributed.worker.memory.pause': 0.9,
-        'distributed.worker.memory.terminate': 0.95,
-        'distributed.worker.memory.monitor-interval': '100ms',
-        'distributed.scheduler.allowed-failures': 2,
-        'distributed.scheduler.work-stealing': True,
-        'array.shuffle.method': 'tasks',
-        # 'array.chunk-size': '128MB',
-        'array.slicing.split_large_chunks': False,
-        'optimization.cull': True
-    })
-
-    client = Client(
-        n_workers=16,  # Réduire le nombre de workers
-        threads_per_worker=1,
-        memory_limit='8GB',#'4GB',
-        silence_logs=True,
-        dashboard_address=':8787',
-        local_directory='/tmp',
-        processes=True
+    # dask.config.set({
+    #     "distributed.worker.profile.enabled": False,
+    #     'distributed.worker.daemon': False,
+    #     'distributed.comm.timeouts.connect': '120s',
+    #     'distributed.comm.timeouts.tcp': '120s',
+    #     'distributed.worker.memory.target': 0.9,
+    #     'distributed.worker.memory.spill': 0.8,
+    #     'distributed.worker.memory.pause': 0.9,
+    #     'distributed.worker.memory.terminate': 0.95,
+    #     'distributed.worker.memory.monitor-interval': '100ms',
+    #     'distributed.scheduler.allowed-failures': 2,
+    #     'distributed.scheduler.work-stealing': True,
+    #     'array.shuffle.method': 'tasks',
+    #     # 'array.chunk-size': '128MB',
+    #     'array.slicing.split_large_chunks': False,
+    #     'optimization.cull': True
+    # })
+    
+    kw_client = dict(
+       n_workers=os.cpu_count() - 2,  # Réduire le nombre de workers
+       threads_per_worker=2,
+       #memory_limit='8GB',#'4GB',
+       silence_logs=True,
+       dashboard_address=':8787',
+       local_directory='/tmp',
+       processes=True   
     )
     
-    return client
+    return kw_client
 
 def extract_suffix_from_filename(filename):
     """

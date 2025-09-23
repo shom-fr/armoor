@@ -13,11 +13,11 @@ import armoor.base.oceanvars
 from armoor import ArmoorError
 from armoor.base.io import (ArmoorArgumentHelpFormatter, create_fast_encoding,
                             setup_dask_client, zarrs2netcdfs)
-from armoor.base.log import add_logging_parser_arguments, main_setup_logging
 from armoor.base.misc import (comma_separated, dict_to_list,
                               optimize_for_low_swap, parse_coords,
                               parse_mixed_param, parse_qc_tuple)
 from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI
+from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.comp import METAZONE_PARAMS
 from armoor.comp.coloc import main_coloc
 from armoor.comp.misc import add_comp_parser_arguments

@@ -216,6 +216,7 @@ def open_decode(
         Model or observation dataset.
     """
     # Xoa initialisation
+    register_cf()
     path_files = get_paths(path_files)
 
     # Open file
@@ -232,6 +233,9 @@ def open_decode(
     elif fmt == "cmems_model":
         logger.info("Opening/decoding model cmems files")
         return open_decode_cmems_model(path_files)
+    elif fmt == "armoor":
+        logger.info("Opening armoor files")
+        return xr.open_mfdataset(path_files)
     elif "_sst_l" in fmt:
         logger.info("Opening/decoding sst satellite files")
         return open_decode_sst_satellite(path_files, fmt)
@@ -412,6 +416,7 @@ def open_decode_hycom(path_files):
         with xcf.set_cf_specs(cfspecs):
             # Open and decode dataset
             ds = xr.open_dataset(path)#.xoa.decode()
+            ds.close()
             #ds = ds.compute()
             ds = optimize_for_low_swap(ds)
             ds = ds.xoa.decode()
@@ -482,7 +487,7 @@ def open_decode_hycom(path_files):
     if "time" in merged_ds.dims:
         merged_ds = merged_ds.sel(time=~merged_ds.get_index("time").duplicated())
     logger.info("End open_decode_hycom") 
-    return merged_ds#.persist()
+    return merged_ds.unify_chunks()#.persist()
 
 
 # def open_decode_hycom(path_files):

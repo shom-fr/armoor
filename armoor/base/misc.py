@@ -1,11 +1,32 @@
 import ast
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
-
+from datetime import datetime
+from argparse import ArgumentTypeError
 from armoor import ArmoorError
 
 logger = logging.getLogger(__name__)
 
+def is_dict_empty(dictionary: Optional[Dict[Any, Any]]) -> bool:
+    """
+    Check if a dictionary is empty.
+    
+    Args:
+        dictionary: The dictionary to check. Can be None.
+        
+    Returns:
+        True if the dictionary is empty or None, False otherwise.
+        
+    Raises:
+        TypeError: If the input is not a dictionary or None.
+    """
+    if dictionary is None:
+        return True
+    
+    if not isinstance(dictionary, dict):
+        raise TypeError("Input must be a dictionary or None")
+    
+    return not dictionary
 
 def parse_qc_tuple(value):
     parts = value.split(',')
@@ -272,13 +293,38 @@ def parse_coords(s):
         ArmoorError: If the string is not in the correct format.
     """
     try:
-        return string_to_tuples_float(",".join(s))
+        if not isinstance(s, str):
+            s = ",".join(s)
+        return string_to_tuples_float(s)
     except:
         raise ArmoorError("Coordinates must be a list of tuples (lat,lon)")
 
 def comma_separated(sarg):
     """Parse a string of comma-separated list."""
     return [a.strip() for a in sarg.split(",")]
+
+def blanck_separated(sarg):
+    """Parse a string of blanck-separated list."""
+    return [a.strip() for a in sarg.split(" ")]
+
+def various_separated(sarg):
+    """Parse a string/list of various-separated list."""
+    print(type(sarg))
+    if "," in sarg:
+        return comma_separated(sarg)
+    else:
+        return blanck_separated(sarg)
+
+def parse_date(date_string):
+    formats = ['%Y-%m-%d', '%m/%d/%Y', '%d-%m-%Y']
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_string, fmt).date()
+        except ValueError:
+            continue
+    raise ArgumentTypeError(
+        f"Invalid date format: {date_string}. Use YYYY-MM-DD, MM/DD/YYYY, or DD-MM-YYYY"
+    )
 
 def geo_vars(ds):
 

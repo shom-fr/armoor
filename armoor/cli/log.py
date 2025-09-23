@@ -80,7 +80,6 @@ def add_log_level_parser_arguments(parser, default_level="info"):
         default=default_level,
     )
 
-
 def main_setup_logging(args):
     setup_logging(
         console_level=args.log_level,
