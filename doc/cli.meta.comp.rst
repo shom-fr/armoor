@@ -72,10 +72,10 @@ Workflow
 .. toctree::
    :maxdepth: 1
    
-   cli.comp.argo
-   cli.comp.models
-   cli.comp.mooring
-   cli.comp.sst
+   cli.meta.comp.argo
+   cli.meta.comp.models
+   cli.meta.comp.mooring
+   cli.meta.comp.sst
    
 
 
