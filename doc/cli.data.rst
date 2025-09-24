@@ -27,7 +27,7 @@ ouputs
 
         - ``maps``: maps of mean and standard deviation (``tfreq`` is not permitted).
         
-        .. image:: images/data_maps.png
+        .. image:: images/data_map.png
             
         - ``timeseries``: time series of mean and standard deviation.
         
@@ -37,14 +37,10 @@ ouputs
         
         .. image:: images/data_mvprofiles.png
         
-        - ``uvprofiles``: plot of a vertical profile over time (``vlevel`` is not permitted).
-        
-        .. image:: images/data_uvprofiles.png
-        
-        - ``udiagts``: theta-s diagram of an vertical over time (``vlevel`` is not permitted).
-        
-        .. image:: images/data_udiagts.png
-        
         - ``mdiagts``: theta-s diagram of multiple vertical profiles.
         
         .. image:: images/data_mdiagts.png
+        
+        - ``uvprofiles``: plot of a vertical profile over time (``vlevel`` is not permitted).
+        
+        - ``udiagts``: theta-s diagram of an vertical over time (``vlevel`` is not permitted).

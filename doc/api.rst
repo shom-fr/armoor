@@ -6,18 +6,20 @@ Package API
     :toctree: _api
 
     armoor
-    armoor.algo
     armoor.base
     armoor.base.filters
     armoor.base.interp
     armoor.base.io
-    armoor.base.log
     armoor.base.misc
     armoor.base.oceanvars
     armoor.base.plot
     armoor.base.ranges
     armoor.cli
+    armoor.cli.filters
+    armoor.cli.interp
+    armoor.cli.io
     armoor.cli.main
+    armoor.cli.log
     armoor.comp.coloc
     armoor.comp.io
     armoor.comp.misc
