@@ -43,12 +43,12 @@ def add_io_parser_arguments(parser):
 
 
 def save_output(ds, fout, ofmt="zarr"):
+    logger.info(f"Saving  {fout}")
     if ofmt == "zarr":
         to_zarr(ds, fout)
     elif ofmt == "netcdf":
         ds.to_netcdf(fout)
         
-
 def to_zarr(ds, fout):
     encoding = get_zarr_encoding(ds)
     for ivar, var_name in enumerate(ds.data_vars):

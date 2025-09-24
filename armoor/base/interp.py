@@ -1,6 +1,7 @@
 """Interpolation functions."""
 import logging
 import re
+from pyproj import Proj, Geod
 
 import numpy as np
 import pandas as pd
@@ -287,6 +288,42 @@ def grid2loc(ds, coords: [(float, float)]):
         dso["depth"] = dsi.depth
         dso = dso.set_coords("depth")
     return dso
+
+def grid2section(ds, coords: [(float, float), (float, float)], dx: float): 
+    """Interpolate a dataset on section.
+
+    Parameters
+    ----------
+    ds: xr.Dataset
+        Gridded dataset to interpolate at specific coordinates.
+    coordinates : list
+        Set of two coordinates (lat, lon) defining the bound coordinates of the section.
+    dx: float
+        Horizontal step.
+
+    Returns
+    -------
+    xarray.Dataset, xarray.Dataset
+        Dataset interpolated over a section.
+    """
+    lat0, lon0 = coords[0]
+    lat1, lon1 = coords[1]
+    dx = dx * 1e3
+    geod = Geod(ellps='WGS84')
+    d = geod.inv(lon0, lat0, lon1, lat1)
+    r = geod.inv_intermediate(lon0, lat0, lon1, lat1, int(d[-1] / dx))
+    section_dist = []
+    for npt in range(r.npts):
+        section_dist.append(npt * r.del_s)
+    dist = xr.Dataset(
+        coords=dict(
+            distance=(["npts"], section_dist),
+            )
+        )
+    ds = grid2loc(ds, list(zip(r.lats, r.lons)))
+    ds = xr.merge([ds, dist])
+    return ds
+    
     
 def regrid(dsi, dso) -> xr.Dataset:
     """

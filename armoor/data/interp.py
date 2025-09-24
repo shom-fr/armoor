@@ -5,7 +5,7 @@ import pandas as pd
 import xarray as xr
 
 from armoor.__init__ import ArmoorError
-from armoor.base.interp import grid2loc, interp_time, vinterp, regrid
+from armoor.base.interp import grid2loc, interp_time, vinterp, regrid, grid2section
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,21 @@ class HorizontalInterpolation(AbstractInterpolation):
         """
         return grid2loc(self.ds, coords)
     
+    def section(self, coords: [(float, float)], dx: float):
+        """Interpolate datasets over section.
+
+        Parameters
+        ----------
+        coordinates : list of 2 tuples
+            Two points coordinates (lon, lat) defining the bounds of the section.
+
+        Returns
+        -------
+        xarray.Dataset, xarray.Dataset
+            Dataset interpolated over the section.
+        """
+        return grid2section(self.ds, coords, dx)
+    
     def regrid_from_latlon(self, lon_grid: (float, float, float), lat_grid: (float, float, float)):
         """Regrid dataset on extra grid specified via lat/lon coordinates.
 
@@ -155,11 +170,11 @@ class HorizontalInterpolation(AbstractInterpolation):
         lon, lat = np.meshgrid(lon, lat)
         new_grid = xr.DataArray(
             data=np.full((np.shape(lon)), np.nan),
-            dims=["Y", "X"],
+            dims=["y", "x"],
             name="grid",
             coords=dict(
-                lon=(["Y", "X"], lon),
-                lat=(["Y", "X"], lat),
+                lon=(["y", "x"], lon),
+                lat=(["y", "x"], lat),
             ),
         )
         return self.regrid(new_grid)
@@ -192,6 +207,8 @@ class HorizontalInterpolation(AbstractInterpolation):
         -------
         xarray.Dataset
         """
+        if "depth" in self.ds.coords:
+            self.ds = self.ds.reset_coords("depth")
         self.ds = regrid(self.ds, new_grid)
         if "mask" in self.ds:
             self.ds = self.ds.drop_vars("mask")
@@ -236,6 +253,46 @@ class VerticalInterpolation(AbstractInterpolation):
         """
         vname = args[0]
         vlevels = args[1]
+        return self._vinterp_(vname, vlevels)
+        
+    def vfreq(self, args: (str, list)):
+        """Interpolate datasets to specified a vertical step.
+        
+        Parameters
+        ----------
+        args: dict
+            A dictionary with a single key-value pair where the key is the vertical coordinate name
+            and the value is a list of vertical levels to interpolate to.
+        
+        Returns
+        -------
+        xarray.Dataset, xarray.Dataset
+            A tuple containing the verticaly interpolated reference dataset and product dataset.
+        """
+        vname = args[0]
+        vfreq = args[1]
+        vlevels = np.arange(
+            self.ds[vname].min(),
+            self.ds[vname].max(),
+            vfreq
+            )
+        return self._vinterp_(vname, vlevels)
+        
+    def _vinterp_(self, vname, vlevels):
+        """Interpolate datasets by specifying vertical levels and vertical coordinate name.
+        
+        Parameters
+        ----------
+        vname: str
+            Name of the vertical coordinate.
+        vlevels: list
+            Vertical levels.
+        
+        Returns
+        -------
+        xarray.Dataset, xarray.Dataset
+            A tuple containing the verticaly interpolated reference dataset and product dataset.
+        """
         vlevels = xr.DataArray(vlevels, dims="z", name=vname)
         attrs = self.ds.attrs
         if "z" in self.ds.dims:

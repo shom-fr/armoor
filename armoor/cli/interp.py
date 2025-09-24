@@ -76,6 +76,12 @@ def get_parser_interp_horizontal():
         help="Tuple of coordinates of cloud points (lat/lon)."
         )
     parser.add_argument(
+        '--section',
+        nargs=5,
+        type=float,
+        help="Section coordinates and horizontal step (in km): lat0 lon0 lat1 lon1 step"
+        )
+    parser.add_argument(
         '--lon-grid',
         nargs=3,
         type=float,
@@ -92,6 +98,7 @@ def get_parser_interp_horizontal():
         type=str,
         help="Netcdf file containing lat/lon coordinates of target grid."
         )
+    
     return parser
 
 def main_interp_horizontal():
@@ -106,6 +113,7 @@ def main_interp_horizontal():
     main_setup_logging(args)
     
     cloud = args.cloud
+    section = args.section
     lon_grid = args.lon_grid
     lat_grid = args.lat_grid
     ncgrid = args.ncgrid
@@ -118,16 +126,18 @@ def main_interp_horizontal():
         raise InterpError(
             "--lon-grid is mandatory since --lat-grid is specified."
             )
-    check = sum(1 for x in (cloud, lon_grid, ncgrid) if x is not None)
+    check = sum(1 for x in (cloud, section, lon_grid, ncgrid) if x is not None)
     if check > 1:
         raise InterpError(
-            "--cloud, --lon-grid and --ncgrid are not compatible."
+            "--cloud, --section, --lon-grid and --ncgrid are not compatible."
             )
     elif check == 0:
         raise InterpError("No horizontal interpolation to be performed.")
         
     if cloud:
         params = ("cloud", cloud)
+    elif section:
+        params = ("section", [section[:2], section[2:4]], section[4])
     elif lon_grid:
         params = (
             "regrid_from_latlon", lon_grid, lat_grid
@@ -142,13 +152,63 @@ def main_interp_horizontal():
         ds = process_horizontal_interpolation(ds, params)
         save_output(ds, args.fout, args.ofmt)
     
+def get_parser_interp_vertical():
+    """Get parser for applying vertical interpolation."""
+    parser = ArgumentParser(
+        description="Apply vertical interpolation over a list of input files.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+        )
+    add_logging_parser_arguments(parser)
+    add_io_parser_arguments(parser)
+    parser.add_argument(
+        '--vlevel',
+        nargs="*",
+        type=float,
+        help="List of vertical levels."
+        )
+    parser.add_argument(
+        '--vfreq',
+        type=float,
+        help="Vertical step."
+        )
+    parser.add_argument(
+        '--vname',
+        default="depth",
+        type=str,
+        help="Name of vertical coordinate."
+        )
+    return parser
+
+def main_interp_vertical():
+    """Apply vertical interpolation over input files."""
+    # Get parser
+    parser = get_parser_interp_vertical()
+
+    # Parse
+    args = parser.parse_args()
     
+    # Setup logging
+    main_setup_logging(args)
     
+    vlevel = args.vlevel
+    vfreq = args.vfreq
+    vname = args.vname
     
+    check = sum(1 for x in (vlevel, vfreq) if x is not None)
+    if check > 1:
+        raise InterpError(
+            "--vlevel and --vfreq are not compatible."
+            )
+    elif check == 0:
+        raise InterpError("No vertical interpolation to be performed.")
+
+    if vlevel:
+        params = ("vlevel", (vname, vlevel))
+    elif vfreq:
+        params = ("vfreq", (vname, vfreq))
     
-    
-    
-    
-    
-    
+    with Client(**setup_dask_client()):
+        ds = open_decode(args.fins, args.ifmt)
+        ds = process_vertical_interpolation(ds, params)
+        save_output(ds, args.fout, args.ofmt)
  
