@@ -144,23 +144,23 @@ class ArmoorFilters:
         """
         logger.info("bathy filter")
         ds_bathy = open_decode(path, fmt=fmt)
-        # if "time" in self.ds.lon.dims:
-        #     if "time" in self.ds.lon.dims:
-        #         dss = []
-        #         for itime, time in enumerate(self.ds.time):
-        #             coord = self.ds.isel(time=[itime])
-        #             ds = grid2loc(ds_bathy, [(coord.lat.data[0], coord.lon.data[0])])
-        #             ds = ds.swap_dims({"npts": "time"})
-        #             dss.append(ds)
-        #         ds_bathy = xr.combine_nested(dss, "time")
-        #     else:
-        #         ds_bathy = grid2loc(ds_bathy, [(self.ds.lat.data[0], self.ds.lon.data[0])])
-        # else:
-        #     ds_bathy = regrid(ds_bathy, self.ds[["lon", "lat"]])
-        # bathy = ds_bathy["bathy"]
-        # mask = (bathy >= minimum) & (bathy <= maximum)
-        # mask = mask.compute()
-        # self.ds = self.ds.where(mask, drop=False)
+        if "time" in self.ds.lon.dims:
+            if "time" in self.ds.lon.dims:
+                dss = []
+                for itime, time in enumerate(self.ds.time):
+                    coord = self.ds.isel(time=[itime])
+                    ds = grid2loc(ds_bathy, [(coord.lat.data[0], coord.lon.data[0])])
+                    ds = ds.swap_dims({"npts": "time"})
+                    dss.append(ds)
+                ds_bathy = xr.combine_nested(dss, "time")
+            else:
+                ds_bathy = grid2loc(ds_bathy, [(self.ds.lat.data[0], self.ds.lon.data[0])])
+        else:
+            ds_bathy = regrid(ds_bathy, self.ds[["lon", "lat"]])
+        bathy = ds_bathy["bathy"]
+        mask = (bathy >= minimum) & (bathy <= maximum)
+        mask = mask.compute()
+        self.ds = self.ds.where(mask, drop=False)
         return self.ds
 
     def tidal_filter(self, filter_name="demerliac"):
