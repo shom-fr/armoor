@@ -206,7 +206,7 @@ def get_parser_filters_horizontal():
     parser.add_argument(
         '--polygon-coords',
         type=parse_coords,
-        help="String of comma-separated coordinate tuples (lat, lon) \
+        help="String of comma-separated coordinates (lat,lon) tuples \
               defining polygon vertices. Ex: '(45.0,2.0),(46.0,3.0),(44.0,4.0)'"
         )
     parser.add_argument(
