@@ -163,7 +163,7 @@ def get_parser_interp_horizontal():
     parser.add_argument(
         '--cloud',
         type=parse_coords,
-        help="Coordinates of scattered cloud points as (lat,lon) tuples."
+        help="String of comma-separated coordinates (lat,lon) tuples. Ex: '(45.0,2.0),(46.0,3.0),(44.0,4.0)'"
         )
     parser.add_argument(
         '--section',
@@ -228,7 +228,7 @@ def main_interp_horizontal():
     
         # Interpolate to scattered cloud points
         armoor-interp-horizontal input.nc output.zarr \\
-                                --cloud 45.0,2.0 46.0,3.0 44.0,4.0
+                                --cloud '(45.0,2.0),(46.0,3.0),(44.0,4.0)'
         
         # Create linear section with 5km spacing
         armoor-interp-horizontal input.nc output.zarr \\
