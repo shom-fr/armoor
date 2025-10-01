@@ -43,7 +43,8 @@ extensions = [
     'nbsphinx',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
-    'sphinx_rtd_theme'
+    'sphinx_rtd_theme',
+    'sphinx_design'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -86,6 +87,11 @@ autosummary_generate = True
 # The master toctree document.
 master_doc ='index'
 
+sphinx_gallery_conf = {
+    'examples_dirs': '../examples/configs',
+    'gallery_dirs': 'auto_examples/configs',
+    'filename_pattern': '/*.cfg',
+}
 
 # %% Options for LATEXPDF output---------------------------------------------
 

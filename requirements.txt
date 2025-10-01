@@ -33,6 +33,7 @@ sphinx_rtd_theme
 sphinxcontrib-applehelp 
 sphinxcontrib-autoprogram
 sphinxcontrib-devhelp
+sphinx-design
 sphinxcontrib-htmlhelp
 sphinxcontrib-jquery
 sphinxcontrib-jsmath
