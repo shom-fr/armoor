@@ -400,9 +400,9 @@ class OutputProcessor:
         ds = self._cleanup_dataset(ds)
         
         # Compute and process ranges
-        with setup_dask_client():
-            ds = ds.compute()
-            dss = self._apply_range_processing(ds, mparams)
+        # with setup_dask_client():
+        ds = ds.compute()
+        dss = self._apply_range_processing(ds, mparams)
         
         # Save processed datasets
         fouts = self._save_processed_datasets(dss, metazone)

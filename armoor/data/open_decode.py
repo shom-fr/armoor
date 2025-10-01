@@ -371,6 +371,7 @@ def open_decode_cmems_model(path_files):
     cfspecs = xcf.get_cf_specs("cmems_model")
     with xcf.set_cf_specs(cfspecs):
         ds = xr.open_mfdataset(path_files).xcf.decode()
+        ds.close()
     ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
     if len(ds.lon.dims) == 1:
         lat, lon = xr.broadcast(ds["lat"], ds["lon"])

@@ -666,73 +666,73 @@ def main_coloc(ncs, metazones, comp_func):
                     dsprod = dsprod.set_coords("depth")
                 dsref = dsref.assign_attrs(gattrs_ref)
                 dsprod = dsprod.assign_attrs(gattrs_prod)
-                with setup_dask_client():
-                    logger.info("Compute coloc ref")
-                    dsref = dsref.compute()
-                    logger.info("Compute coloc prod")
-                    dsprod = dsprod.compute()
-                    
-                    time_coloc = params.get("time")
-                    if time_coloc != None:
-                        if  "tfreq" in params.get("time")[0]:
-                            dsref = ranges.tfreq(dsref)
-                            dsprod = ranges.tfreq(dsprod)
-                        elif "trange_seq" in params.get("time")[0]:
-                            if params.get("time")[1][0] != "*":
-                                dsref = ranges.trange_seq(dsref, *tbound, params.get("time")[1][0])
-                                dsprod = ranges.trange_seq(dsprod, *tbound, params.get("time")[1][0])
-                            else:
-                                dsref = [dsref]
-                                dsprod = [dsprod]
-                    else:
-                        dsref = [dsref]
-                        dsprod = [dsprod]
-        
-                    vertical_coloc = params.get("vertical")
-                    if vertical_coloc != None:
-                        if (
-                            "vlevel" in params.get("vertical")[0]
-                            ) or (
-                            comp_func == "comp_mooring"    
-                            ):
-                            if comp_func == "comp_mooring":
-                                vname = "depth"
-                            else:
-                                vname  = params.get("vertical")[1][0]
-                            if comp_func != "comp_sst":
-                                dsref = ranges.vlevels(dsref, vname)
-                                dsprod = ranges.vlevels(dsprod, vname)
-                        elif "vrange" in params.get("vertical")[0]:
-                            vname = params.get("vertical")[1][1]
-                            vbins = params.get("vertical")[1][2]
-                            dsref = ranges.vrange(dsref, vname, vbins)
-                            dsprod = ranges.vrange(dsprod, vname, vbins)
-                    dssref = dsref
-                    dssprod = dsprod
-                    del dsref; del dsprod
-                    # with setup_dask_client():
-                    logger.info("Save coloc data in netcdf")
-                    for ids in range(len(dssref)):
-                        dsref = dssref[ids]
-                        dsprod = dssprod[ids]
-                        dirout = Path(
-                            f"{comp_func}/coloc/{metazone}/"
-                            f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
-                            )
-                        dirout.mkdir(parents=True, exist_ok=True)
-                        ncout_ref, ncout_prod = save_datasets(
-                            dsref,
-                            dsprod,
-                            dirout,
-                            dsref.attrs['data_name'],
-                            dsprod.attrs['data_name']
-                            )
-                        ncouts[metazone][ref_name][prod_name].append(ncout_ref)
-                        ncouts[metazone][ref_name][prod_name].append(ncout_prod)
-                        dsref.close()
-                        dsprod.close()
-                    del dssref
-                    del dssprod
+                # with setup_dask_client():
+                logger.info("Compute coloc ref")
+                dsref = dsref.compute()
+                logger.info("Compute coloc prod")
+                dsprod = dsprod.compute()
+                
+                time_coloc = params.get("time")
+                if time_coloc != None:
+                    if  "tfreq" in params.get("time")[0]:
+                        dsref = ranges.tfreq(dsref)
+                        dsprod = ranges.tfreq(dsprod)
+                    elif "trange_seq" in params.get("time")[0]:
+                        if params.get("time")[1][0] != "*":
+                            dsref = ranges.trange_seq(dsref, *tbound, params.get("time")[1][0])
+                            dsprod = ranges.trange_seq(dsprod, *tbound, params.get("time")[1][0])
+                        else:
+                            dsref = [dsref]
+                            dsprod = [dsprod]
+                else:
+                    dsref = [dsref]
+                    dsprod = [dsprod]
+    
+                vertical_coloc = params.get("vertical")
+                if vertical_coloc != None:
+                    if (
+                        "vlevel" in params.get("vertical")[0]
+                        ) or (
+                        comp_func == "comp_mooring"    
+                        ):
+                        if comp_func == "comp_mooring":
+                            vname = "depth"
+                        else:
+                            vname  = params.get("vertical")[1][0]
+                        if comp_func != "comp_sst":
+                            dsref = ranges.vlevels(dsref, vname)
+                            dsprod = ranges.vlevels(dsprod, vname)
+                    elif "vrange" in params.get("vertical")[0]:
+                        vname = params.get("vertical")[1][1]
+                        vbins = params.get("vertical")[1][2]
+                        dsref = ranges.vrange(dsref, vname, vbins)
+                        dsprod = ranges.vrange(dsprod, vname, vbins)
+                dssref = dsref
+                dssprod = dsprod
+                del dsref; del dsprod
+                # with setup_dask_client():
+                logger.info("Save coloc data in netcdf")
+                for ids in range(len(dssref)):
+                    dsref = dssref[ids]
+                    dsprod = dssprod[ids]
+                    dirout = Path(
+                        f"{comp_func}/coloc/{metazone}/"
+                        f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
+                        )
+                    dirout.mkdir(parents=True, exist_ok=True)
+                    ncout_ref, ncout_prod = save_datasets(
+                        dsref,
+                        dsprod,
+                        dirout,
+                        dsref.attrs['data_name'],
+                        dsprod.attrs['data_name']
+                        )
+                    ncouts[metazone][ref_name][prod_name].append(ncout_ref)
+                    ncouts[metazone][ref_name][prod_name].append(ncout_prod)
+                    dsref.close()
+                    dsprod.close()
+                del dssref
+                del dssprod
     
             dsrefin.close()
             gc.collect()

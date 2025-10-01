@@ -6,7 +6,7 @@ import time
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
-
+from dask.distributed import Client
 from xoa.cfgm import ConfigManager, register_validation_functions
 
 import armoor.base.oceanvars
@@ -148,9 +148,9 @@ def main_filters():
 
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
     
-    zarrs = load_datasets(cfg["data"], metazones, None)
-
-    ncs = zarrs2netcdfs(zarrs)
+    with Client(**setup_dask_client()):
+        zarrs = load_datasets(cfg["data"], metazones, None)
+        ncs = zarrs2netcdfs(zarrs)
 
     with open(args.jsonfile, 'w') as f:
         json.dump(ncs, f, indent=4)
@@ -221,37 +221,37 @@ def main_data():
        )
 
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
+    with Client(**setup_dask_client()):
+        zarrs = load_datasets(cfg["data"], metazones, "data")
     
-    zarrs = load_datasets(cfg["data"], metazones, "data")
-
-    if args.filters_only:
-
-        ncs = zarrs2netcdfs(zarrs)
+        if args.filters_only:
     
-        with open(args.jsonfile, 'w') as f:
-            json.dump(ncs, f, indent=4)
-            
-        logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
-    
-    else:
+            ncs = zarrs2netcdfs(zarrs)
         
-        zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs").copy())
-
-        ofmt = cfg["outputs"].get("fmt")
-        
-        if "png" in ofmt:
-            plot_data(zarr_outputs, metazones)
-    
-        zarr_outputs = dict_to_list(zarr_outputs)
-        
-        if "zarr" in ofmt:
             with open(args.jsonfile, 'w') as f:
-                json.dump(zarr_outputs, f, indent=4)
+                json.dump(ncs, f, indent=4)
                 
-        if "netcdf" in ofmt:
-            ncs_outputs = zarrs2netcdfs(zarr_outputs)
-            with open(args.jsonfile, 'w') as f:
-                json.dump(ncs_outputs, f, indent=4)
+            logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
+        
+        else:
+            
+            zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs").copy())
+    
+            ofmt = cfg["outputs"].get("fmt")
+            
+            if "png" in ofmt:
+                plot_data(zarr_outputs, metazones)
+        
+            zarr_outputs = dict_to_list(zarr_outputs)
+            
+            if "zarr" in ofmt:
+                with open(args.jsonfile, 'w') as f:
+                    json.dump(zarr_outputs, f, indent=4)
+                    
+            if "netcdf" in ofmt:
+                ncs_outputs = zarrs2netcdfs(zarr_outputs)
+                with open(args.jsonfile, 'w') as f:
+                    json.dump(ncs_outputs, f, indent=4)
 
 def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, comp_args={}):
     
@@ -275,45 +275,45 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
         )
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
+    with Client(**setup_dask_client()): 
+        zarr = load_datasets(cfg["data"], metazones, func_comp)
         
-    zarr = load_datasets(cfg["data"], metazones, func_comp)
-    
-    if ofilter:
-        zarr = [str(z) for z in zarr]
-        ncs_outputs = zarrs2netcdfs(zarr)
-        with open(jsonfile, 'w') as f:
-            json.dump(ncs_outputs, f, indent=4)
-        
-    else:
-    
-        zarr_coloc = main_coloc(zarr, metazones, func_comp)
-        
-        if ocoloc:
-            zarr_coloc = dict_to_list(zarr_coloc)
-            zarr_coloc = [str(z) for z in zarr_coloc]
-            ncs_outputs = zarrs2netcdfs(zarr_coloc)
+        if ofilter:
+            zarr = [str(z) for z in zarr]
+            ncs_outputs = zarrs2netcdfs(zarr)
             with open(jsonfile, 'w') as f:
                 json.dump(ncs_outputs, f, indent=4)
-        
+            
         else:
-            
-            zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp)
-            
-            ofmt = cfg["outputs"].get("fmt")
-            
-            if "png" in ofmt:
-                plot_comp(zarr_outputs, metazones, func_comp)
         
-            zarr_outputs = dict_to_list(zarr_outputs)
+            zarr_coloc = main_coloc(zarr, metazones, func_comp)
             
-            if "zarr" in ofmt:
-                with open(jsonfile, 'w') as f:
-                    json.dump(zarr_outputs, f, indent=4)
-                    
-            if "netcdf" in ofmt:
-                ncs_outputs = zarrs2netcdfs(zarr_outputs)
+            if ocoloc:
+                zarr_coloc = dict_to_list(zarr_coloc)
+                zarr_coloc = [str(z) for z in zarr_coloc]
+                ncs_outputs = zarrs2netcdfs(zarr_coloc)
                 with open(jsonfile, 'w') as f:
                     json.dump(ncs_outputs, f, indent=4)
+            
+            else:
+                
+                zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp)
+                
+                ofmt = cfg["outputs"].get("fmt")
+                
+                if "png" in ofmt:
+                    plot_comp(zarr_outputs, metazones, func_comp)
+            
+                zarr_outputs = dict_to_list(zarr_outputs)
+                
+                if "zarr" in ofmt:
+                    with open(jsonfile, 'w') as f:
+                        json.dump(zarr_outputs, f, indent=4)
+                        
+                if "netcdf" in ofmt:
+                    ncs_outputs = zarrs2netcdfs(zarr_outputs)
+                    with open(jsonfile, 'w') as f:
+                        json.dump(ncs_outputs, f, indent=4)
     
     logger.info(f"Find the list of generated files in: {jsonfile}")
     

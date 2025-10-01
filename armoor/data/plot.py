@@ -801,8 +801,8 @@ def main_plot(ncins, metazones):
                     tasks.append(dask.delayed(process_task)(nc, metazone, output))
 
     # Execute in parallel
-    with setup_dask_client():
-        logger.info("Start plot")
-        dask.compute(*tasks)
+    # with setup_dask_client():
+    logger.info("Start plot")
+    dask.compute(*tasks)
         # for task in tasks:
         #     dask.compute([task])

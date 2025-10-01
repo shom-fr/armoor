@@ -246,7 +246,7 @@ def process_all_combinations(dataset, metazones, dirout, max_workers=1):
 def load_datasets(data_cfg, metazones, dirout):
     """Charge les datasets de manière séquentielle (< 10s chacun)."""
     register_cf()
-    client = setup_dask_client()
+    # client = setup_dask_client()
     ncouts = []
     for data_key, cfg_data in data_cfg.items():
         dataset_name = cfg_data["name"]
@@ -284,6 +284,6 @@ def load_datasets(data_cfg, metazones, dirout):
         ncouts += ncs
         dataset.close()
         gc.collect()
-    client.close()
+    # client.close()
 
     return ncouts

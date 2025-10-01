@@ -5,6 +5,8 @@ related to input/output operations and saving xarray datasets in various formats
 """
 import logging
 
+from armoor.base.io import get_zarr_encoding
+
 logger = logging.getLogger(__name__)
 
 
@@ -301,7 +303,7 @@ def to_zarr(ds, fout):
     get_zarr_encoding : Function to get optimal zarr encoding parameters
     save_output : Higher-level function that calls this for zarr format
     """
-    encoding = get_zarr_encoding(ds)
+    #encoding = get_zarr_encoding(ds)
     
     for ivar, var_name in enumerate(ds.data_vars):
         logger.info(f"Writing variable '{var_name}' to {fout}")
@@ -316,7 +318,7 @@ def to_zarr(ds, fout):
         var_ds.to_zarr(
             store=fout,
             mode=mode,
-            encoding=encoding
+            #encoding=encoding
         )
         
         # Explicit cleanup to free memory
