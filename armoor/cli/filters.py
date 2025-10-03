@@ -4,13 +4,16 @@ This module provides command-line interfaces for applying various types of filte
 (time, horizontal, quality) to oceanographic and meteorological data files.
 """
 import logging
+import asyncio
 from argparse import ArgumentParser
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
+import dask.config
 
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
 from armoor.base.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
+    add_dask_parser_arguments,
     save_output
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
@@ -21,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 logging.getLogger('distributed').setLevel(logging.ERROR)
 
+dask.config.set({"distributed.worker.profile.enabled": False})
 
 class FiltersError(Exception):
     """Exception raised for errors in the filters module.
@@ -32,7 +36,7 @@ class FiltersError(Exception):
     pass
 
 
-def process_filters(fins, ifmt, fout, ofmt, filters_config):
+def process_filters(fins, ifmt, fout, ofmt, filters_config, dask_nworkers, dask_processes, dask_memorylimit):
     """Process input files by applying specified filters and saving output.
     
     This function opens input files, applies the configured filters using
@@ -69,13 +73,14 @@ def process_filters(fins, ifmt, fout, ofmt, filters_config):
     if is_dict_empty(filters_config):
         raise FiltersError("No filters to be applied.")
 
-    with Client(**setup_dask_client()):
-        ds = open_decode(
-            fins, ifmt
-            ).armoorfilters.apply_combined_filters(
-            filters_config
-            )
-        save_output(ds, fout, ofmt)
+    with LocalCluster(**setup_dask_client(dask_nworkers, dask_processes, dask_memorylimit)) as cluster:
+        with Client(cluster):
+            ds = open_decode(
+                fins, ifmt
+                ).armoorfilters.apply_combined_filters(
+                    filters_config
+                ).persist()
+            save_output(ds, fout, ofmt)
 
 
 def get_parser_filters_time():
@@ -98,6 +103,7 @@ def get_parser_filters_time():
         )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     parser.add_argument(
         '--date-range',
         nargs=2,
@@ -173,7 +179,8 @@ def main_filters_time():
             })
     
     process_filters(
-        args.fins, args.ifmt, args.fout, args.ofmt, filters_config
+        args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
+        args.dask_nworkers, args.dask_processes, args.dask_memorylimit
         )
 
 
@@ -197,6 +204,7 @@ def get_parser_filters_horizontal():
         )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     parser.add_argument(
         '--polygon-dilat',
         type=bool,
@@ -319,7 +327,8 @@ def main_filters_horizontal():
                 }
             })
     process_filters(
-        args.fins, args.ifmt, args.fout, args.ofmt, filters_config
+        args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
+        args.dask_nworkers, args.dask_processes, args.dask_memorylimit
         )
 
 def get_parser_filters_quality():
@@ -342,6 +351,7 @@ def get_parser_filters_quality():
         )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     parser.add_argument(
         'qc_name',
         type=str,
@@ -406,6 +416,7 @@ def main_filters_quality():
             }
         }  
     process_filters(
-        args.fins, args.ifmt, args.fout, args.ofmt, filters_config
+        args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
+        args.dask_nworkers, args.dask_processes, args.dask_memorylimit
         )
     

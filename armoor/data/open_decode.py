@@ -235,7 +235,10 @@ def open_decode(
         return open_decode_cmems_model(path_files)
     elif fmt == "armoor":
         logger.info("Opening armoor files")
-        return xr.open_mfdataset(path_files)
+        ds = xr.open_mfdataset(path_files)#, chunks="auto")
+        if "depth" in ds:
+            ds = ds.reset_coords("depth")
+        return ds
     elif "_sst_l" in fmt:
         logger.info("Opening/decoding sst satellite files")
         return open_decode_sst_satellite(path_files, fmt)
@@ -381,6 +384,7 @@ def open_decode_cmems_model(path_files):
         ds = ds.set_coords(["lon", "lat"])
     var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
     ds["depth"] = ds["depth"].broadcast_like(ds[var])
+    ds = ds.sortby("time")
     return ds
 
 def open_decode_hycom(path_files):
@@ -417,7 +421,7 @@ def open_decode_hycom(path_files):
         with xcf.set_cf_specs(cfspecs):
             # Open and decode dataset
             ds = xr.open_dataset(path)#.xoa.decode()
-            ds.close()
+            # ds.close()
             #ds = ds.compute()
             ds = optimize_for_low_swap(ds)
             ds = ds.xoa.decode()
@@ -445,7 +449,7 @@ def open_decode_hycom(path_files):
                 else:
                     variables_data.setdefault(varname, []).append(ds[varname])
             
-            ds.close()
+            # ds.close()
     logger.info("concat") 
     # Concatenate and merge datasets
     datasets_to_merge = []
@@ -460,10 +464,11 @@ def open_decode_hycom(path_files):
     # Merge all regular variables
     #datasets = [ds.compute() for ds in datasets_to_merge]
     merged_ds = xr.merge(datasets_to_merge) if datasets_to_merge else xr.Dataset()
-    for ds in datasets_to_merge:
-        ds.close()
+    # for ds in datasets_to_merge:
+    #     ds.close()
+    #     del ds
     #merged_ds =  optimize_for_low_swap(merged_ds, target_chunk_mb=128)
-    del datasets_to_merge
+    # del datasets_to_merge
     # Add bathymetry if available
     if bathymetry is not None:
         merged_ds = xr.merge([merged_ds, bathymetry])
@@ -488,7 +493,10 @@ def open_decode_hycom(path_files):
     if "time" in merged_ds.dims:
         merged_ds = merged_ds.sel(time=~merged_ds.get_index("time").duplicated())
     logger.info("End open_decode_hycom") 
-    return merged_ds.unify_chunks()#.persist()
+    merged_ds = merged_ds.unify_chunks()#.persist()
+    # merged_ds = merged_ds.chunk({'time': 1})
+
+    return merged_ds
 
 
 # def open_decode_hycom(path_files):

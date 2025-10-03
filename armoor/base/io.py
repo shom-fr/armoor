@@ -59,12 +59,12 @@ def get_zarr_encoding(ds: xr.Dataset, rechunk: bool = True) -> dict:
     
     for var_name, var in ds.data_vars.items():
         encoding[var_name] = {
-            'compressor': Blosc(cname='zstd', clevel=5),
-            'dtype': np.float32 if var.dtype == np.float64 else var.dtype
+            # 'compressors': Blosc(cname='zstd', clevel=5),
+            # 'dtype': np.float32 if var.dtype == np.float64 else var.dtype,
+            # 'chunks': var.chunks
         }
         # Don't specify chunks - let zarr handle it
-    
-    return encoding
+    return create_fast_encoding(ds)
 
 
 def zarrs2netcdfs(fins):
@@ -111,35 +111,35 @@ def zarrs2netcdfs(fins):
             fouts.append(fout)
     return fouts
 
-def setup_dask_client():
+def setup_dask_client(n_workers, processes, memory_limit):
     """Configure le client Dask de manière robuste."""
     # Configuration optimale
-    # dask.config.set({
-    #     "distributed.worker.profile.enabled": False,
-    #     'distributed.worker.daemon': False,
-    #     'distributed.comm.timeouts.connect': '120s',
-    #     'distributed.comm.timeouts.tcp': '120s',
-    #     'distributed.worker.memory.target': 0.9,
-    #     'distributed.worker.memory.spill': 0.8,
-    #     'distributed.worker.memory.pause': 0.9,
-    #     'distributed.worker.memory.terminate': 0.95,
-    #     'distributed.worker.memory.monitor-interval': '100ms',
-    #     'distributed.scheduler.allowed-failures': 2,
-    #     'distributed.scheduler.work-stealing': True,
-    #     'array.shuffle.method': 'tasks',
-    #     # 'array.chunk-size': '128MB',
-    #     'array.slicing.split_large_chunks': False,
-    #     'optimization.cull': True
-    # })
+    dask.config.set({
+        "distributed.worker.profile.enabled": False,
+        'distributed.worker.daemon': False,
+        'distributed.comm.timeouts.connect': '120s',
+        'distributed.comm.timeouts.tcp': '120s',
+        'distributed.worker.memory.target': 0.9,
+        'distributed.worker.memory.spill': 0.8,
+        'distributed.worker.memory.pause': 0.9,
+        'distributed.worker.memory.terminate': 0.95,
+        'distributed.worker.memory.monitor-interval': '100ms',
+        'distributed.scheduler.allowed-failures': 2,
+        'distributed.scheduler.work-stealing': True,
+        'array.shuffle.method': 'tasks',
+        # 'array.chunk-size': '128MB',
+        'array.slicing.split_large_chunks': False,
+        'optimization.cull': True
+    })
     
     kw_client = dict(
-       n_workers=os.cpu_count() - 2,  # Réduire le nombre de workers
-       threads_per_worker=2,
-       #memory_limit='8GB',#'4GB',
-       silence_logs=True,
-       dashboard_address=':8787',
-       local_directory='/tmp',
-       processes=True   
+        n_workers=n_workers,#os.cpu_count() - 2,  # Réduire le nombre de workers
+        threads_per_worker=1,
+        memory_limit=memory_limit,#'750MB',#'4GB',
+        silence_logs=True,
+        dashboard_address=':8787',
+        #local_directory='/tmp',
+        processes=processes
     )
     
     return kw_client

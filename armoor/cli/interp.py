@@ -6,12 +6,13 @@ The interpolation operations are optimized for large datasets using Dask distrib
 """
 import logging
 from argparse import ArgumentParser
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
 from armoor.base.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
+    add_dask_parser_arguments,
     save_output
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
@@ -68,6 +69,7 @@ def get_parser_interp_time():
         )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     parser.add_argument(
         'tfreq',
         type=str,
@@ -121,15 +123,16 @@ def main_interp_time():
     # Setup logging
     main_setup_logging(args)
     
-    with Client(**setup_dask_client()):
-        ds = open_decode(args.fins, args.ifmt)
-        ds = process_time_interpolation(
-            ds,
-            ("tfreq", args.tfreq),
-            [ds.time.min().values, ds.time.max().values]
-            )
-        save_output(ds, args.fout, args.ofmt)
-        
+    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+        with Client(cluster):
+            ds = open_decode(args.fins, args.ifmt)
+            ds = process_time_interpolation(
+                ds,
+                ("tfreq", args.tfreq),
+                [ds.time.min().values, ds.time.max().values]
+                )
+            save_output(ds, args.fout, args.ofmt)
+                
 
 def get_parser_interp_horizontal():
     """Create argument parser for horizontal spatial interpolation operations.
@@ -160,6 +163,7 @@ def get_parser_interp_horizontal():
         )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     parser.add_argument(
         '--cloud',
         type=parse_coords,
@@ -295,11 +299,12 @@ def main_interp_horizontal():
             "regrid_from_nc", ncgrid
             )
         
-    with Client(**setup_dask_client()):
-        ds = open_decode(args.fins, args.ifmt)
-        ds = process_horizontal_interpolation(ds, params)
-        save_output(ds, args.fout, args.ofmt)
-    
+    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+        with Client(cluster):
+            ds = open_decode(args.fins, args.ifmt)
+            ds = process_horizontal_interpolation(ds, params)
+            save_output(ds, args.fout, args.ofmt)
+        
 
 def get_parser_interp_vertical():
     """Create argument parser for vertical interpolation operations.
@@ -328,6 +333,7 @@ def get_parser_interp_vertical():
         )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     parser.add_argument(
         '--vlevel',
         nargs="*",
@@ -423,7 +429,8 @@ def main_interp_vertical():
     elif vfreq:
         params = ("vfreq", (vname, vfreq))
     
-    with Client(**setup_dask_client()):
-        ds = open_decode(args.fins, args.ifmt)
-        ds = process_vertical_interpolation(ds, params)
-        save_output(ds, args.fout, args.ofmt)
+    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+        with Client(cluster):
+            ds = open_decode(args.fins, args.ifmt)
+            ds = process_vertical_interpolation(ds, params)
+            save_output(ds, args.fout, args.ofmt)

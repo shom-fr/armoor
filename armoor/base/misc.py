@@ -410,7 +410,7 @@ def dict_to_list(d):
         item for sublist in get_last_keys_generator(d) for item in sublist
         ]  
 
-def optimize_for_low_swap(dataset, target_chunk_mb=128):
+def optimize_for_low_swap(dataset, target_chunk_mb=256):
     """
     Optimize dataset chunks to reduce swap usage.
     
@@ -460,15 +460,15 @@ def optimize_for_low_swap(dataset, target_chunk_mb=128):
         # Ensure chunk size doesn't exceed dimension size
         chunks[dim] = min(dataset.sizes[dim], elements_per_dim)
     
-    z_dim = chunks.get("z")
-    if z_dim:
-        chunks.update({"z": -1})
-    z_dim = chunks.get("lev")
-    if z_dim:
-        chunks.update({"lev": -1})
-    z_dim = chunks.get("time")
-    if z_dim:
-        chunks.update({"time": -1}) 
+    # z_dim = chunks.get("z")
+    # if z_dim:
+    #     chunks.update({"z": -1})
+    # z_dim = chunks.get("lev")
+    # if z_dim:
+    #     chunks.update({"lev": -1})
+    # z_dim = chunks.get("time")
+    # if z_dim:
+    #     chunks.update({"time": -1}) 
     logger.info(f"Anti-swap chunks: {chunks}")
     logger.info(f"Estimated chunk size: {(elements_per_dim**n_dims * element_size) / 1024**2:.1f} MB per chunk")
     

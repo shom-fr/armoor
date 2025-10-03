@@ -193,6 +193,63 @@ def add_io_parser_arguments(parser):
     add_output_parser_arguments(parser)
     add_output_fmt_parser_arguments(parser)
 
+def add_dask_nworkers_parser_arguments(parser):
+    """Add dask argument to argument parser.
+    
+    Adds an optional argument '--dask-nworkers' for specifying n_workers dask.
+    
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        The argument parser to which the output format argument will be added.
+    """
+    parser.add_argument(
+        "--dask-nworkers",
+        type=int,
+        default=4,
+        help="n dask workers",
+    )
+    
+def add_dask_processes_parser_arguments(parser):
+    """Add dask argument to argument parser.
+    
+    Adds an optional argument '--dask-nworkers' for specifying n_workers dask.
+    
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        The argument parser to which the output format argument will be added.
+    """
+    parser.add_argument(
+        "--dask-processes",
+        type=bool,
+        default=False,
+        help="use dask processes: True/False",
+    )
+    
+def add_dask_memorylimit_parser_arguments(parser):
+    """Add dask argument to argument parser.
+    
+    Adds an optional argument '--dask-nworkers' for specifying n_workers dask.
+    
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        The argument parser to which the output format argument will be added.
+    """
+    parser.add_argument(
+        "--dask-memorylimit",
+        type=str,
+        default=None,
+        help="LocalCluster dask memory_limit per worker",
+    )
+
+def add_dask_parser_arguments(parser):
+    """Add all dask related arguments to argument parser.
+    """
+    add_dask_nworkers_parser_arguments(parser)
+    add_dask_processes_parser_arguments(parser)
+    add_dask_memorylimit_parser_arguments(parser)
 
 def save_output(ds, fout, ofmt="zarr"):
     """Save xarray Dataset to file in specified format.
@@ -250,7 +307,7 @@ def save_output(ds, fout, ofmt="zarr"):
     if ofmt == "zarr":
         to_zarr(ds, fout)
     elif ofmt == "netcdf":
-        ds.to_netcdf(fout)
+        ds.to_netcdf(fout, engine="h5netcdf", compute=False).compute()
     else:
         raise ValueError(f"Unsupported output format: {ofmt}. Use 'zarr' or 'netcdf'.")
 
@@ -303,14 +360,13 @@ def to_zarr(ds, fout):
     get_zarr_encoding : Function to get optimal zarr encoding parameters
     save_output : Higher-level function that calls this for zarr format
     """
-    #encoding = get_zarr_encoding(ds)
-    
+    ds = ds.chunk(chunks="auto")
     for ivar, var_name in enumerate(ds.data_vars):
         logger.info(f"Writing variable '{var_name}' to {fout}")
         
         # Select single variable to minimize memory usage
-        var_ds = ds[[var_name]]
-        var_ds = var_ds.chunk("auto")
+        var_ds = ds[var_name]
+        # var_ds = var_ds.chunk('auto')
         
         # First variable overwrites, subsequent append
         mode = "w" if ivar == 0 else "a"
@@ -318,8 +374,9 @@ def to_zarr(ds, fout):
         var_ds.to_zarr(
             store=fout,
             mode=mode,
-            #encoding=encoding
+            # encoding=encoding[var_name]
         )
         
         # Explicit cleanup to free memory
         del var_ds
+

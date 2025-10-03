@@ -38,10 +38,7 @@ def interp_time(
     -------
     xarray.Dataset
 
-    """
-
-    logger = logging.getLogger(__name__)
-    
+    """    
     # Conversion et tri des dates (une seule fois)
     dates = pd.to_datetime(dates)
     if hasattr(dates, '__len__') and len(dates) > 1:
@@ -52,7 +49,7 @@ def interp_time(
     # Classification des variables (une seule fois)
     varstime = [var for var in ds if "time" in ds[var].dims]
     varsnotime = [var for var in ds if "time" not in ds[var].dims]
-    
+
     # Time dim et bornes
     time_name = "time"
     time = ds.indexes[time_name]
@@ -193,7 +190,7 @@ def interp_time(
     # Tri par date et extraction des datasets
     dss.sort(key=lambda x: x[0])
     sorted_datasets = [ds_item for _, ds_item in dss]
-    
+
     # Concaténation avec paramètres optimisés
     dso = xr.concat(
         [ds_item[varstime] for ds_item in sorted_datasets],
