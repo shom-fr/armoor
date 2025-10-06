@@ -8,6 +8,8 @@ import logging
 from argparse import ArgumentParser
 from dask.distributed import Client, LocalCluster
 
+from armoor import ArmoorError
+
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
 from armoor.base.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
@@ -159,6 +161,102 @@ def main_coloc_time():
             tbound = (dsref.time.min(), dsref.time.max())
             param = ("trange_seq", (None, "reference"))
             _, dsout = process_time_colocation(dsref, dsprod, param, tbound)
+            del dsref
+            del dsprod
+            save_output(dsout, args.fout, args.ofmt)
+
+def get_parser_coloc_horizontal():
+    """Create argument parser for horizontal colocation operations.
+    """
+    parser = ArgumentParser(
+        description="Apply time colocation over a list of input files.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+        )
+    add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
+    add_coloc_io_parser_arguments(parser)
+
+    return parser
+
+def main_coloc_horizontal():
+    """Apply horizontal colocation to input files via command line interface.
+ 
+    This function processes temporal colocation between reference and product datasets
+    by matching their time coordinates. It uses Dask distributed computing for efficient
+    processing of large datasets.
+    
+    The function performs the following steps:
+    1. Parses command-line arguments for input/output specifications
+    2. Sets up logging configuration
+    3. Creates a Dask distributed cluster for parallel processing
+    4. Opens and decodes reference and product datasets
+    5. Applies horizontal colocation using the specified parameters
+    6. Saves the colocated output to the specified file format
+    
+    Command-line Arguments
+    ----------------------
+    ref_fins : str
+        Pattern for reference input files (e.g., 'croco_*.zarr')
+    --ref-ifmt : str
+        Format of reference input files (choices: 'hycom', 'cmems_model', 'croco', 'armoor')
+    fins : str
+        Pattern for product input files
+    --ifmt : str
+        Format of product input files
+    fout : str
+        Output file path
+    --ofmt : str
+        Output file format
+    --dask-nworkers : int, optional
+        Number of Dask workers
+    --dask-processes : bool, optional
+        Use processes instead of threads for Dask workers
+    --dask-memorylimit : str, optional
+        Memory limit per Dask worker
+    
+    Notes
+    -----
+    - The function uses a LocalCluster for Dask distributed computing
+    - The colocation parameter is set to ('trange_seq', (None, 'reference'))
+    - Both input datasets are deleted after processing to free memory
+    - All distributed computing logs are set to ERROR level to reduce verbosity
+    
+    See Also
+    --------
+    process_horizontal_colocation : Core function that performs temporal colocation
+    open_decode : Function to open and decode datasets
+    save_output : Function to save processed datasets
+    
+    Examples
+    --------
+    Command-line usage:
+    
+    >>> armoor-coloc-horizontal croco_ref_*.zarr input_*.nc output.zarr \\
+    ...     --ref-ifmt croco --ifmt armoor --ofmt zarr \\
+    ...     --dask-nworkers 4
+    """
+    # Get parser
+    parser = get_parser_coloc_horizontal()
+
+    # Parse
+    args = parser.parse_args()
+    
+    # Setup logging
+    main_setup_logging(args)
+    
+    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+        with Client(cluster):
+            dsref = open_decode(args.ref_fins, args.ref_ifmt)
+            dsprod = open_decode(args.fins, args.ifmt)
+            if set(("x", "y")).issubset(dsref.lon.dims):
+                param = ("href", "reference")
+            elif (dsref.lon.dims == ("npts",)) or (dsref.lon.dims == ("time",)):
+                param = ("cloud", list(zip(dsref.lat.values, dsref.lon.values)))
+            else:
+                raise ArmoorError(
+                    "No horizontal colocation detected."
+                    )
+            _, dsout = process_horizontal_colocation(dsref, dsprod, param)
             del dsref
             del dsprod
             save_output(dsout, args.fout, args.ofmt)

@@ -183,7 +183,10 @@ class HorizontalColocation(AbstractColocation):
         xarray.Dataset, xarray.Dataset
             Dataset with elements located at specific coordinates.
         """
-        return grid2loc(self.dsref, coords), grid2loc(self.dsprod, coords)
+        if not set(("x", "y")).issubset(self.dsref.lon.dims):
+            return None, grid2loc(self.dsprod, coords)
+        else:
+            return grid2loc(self.dsref, coords), grid2loc(self.dsprod, coords)
         
     def href(self, ref: str):
         """Regrid dataset on 'ref' grid.
