@@ -1,4 +1,4 @@
-"""Command-line interface for armoor-interp-*.
+"""Command-line interface for armoor-coloc-*.
 
 This module provides command-line interfaces for applying various types of interpolation
 (temporal, horizontal, vertical) to oceanographic and meteorological data files.
@@ -86,6 +86,62 @@ def get_parser_coloc_time():
 
 def main_coloc_time():
     """Apply temporal colocation to input files via command line interface.
+ 
+    This function processes temporal colocation between reference and product datasets
+    by matching their time coordinates. It uses Dask distributed computing for efficient
+    processing of large datasets.
+    
+    The function performs the following steps:
+    1. Parses command-line arguments for input/output specifications
+    2. Sets up logging configuration
+    3. Creates a Dask distributed cluster for parallel processing
+    4. Opens and decodes reference and product datasets
+    5. Extracts time boundaries from the reference dataset
+    6. Applies temporal colocation using the specified parameters
+    7. Saves the colocated output to the specified file format
+    
+    Command-line Arguments
+    ----------------------
+    ref_fins : str
+        Pattern for reference input files (e.g., 'croco_*.zarr')
+    --ref-ifmt : str
+        Format of reference input files (choices: 'hycom', 'cmems_model', 'croco', 'armoor')
+    fins : str
+        Pattern for product input files
+    --ifmt : str
+        Format of product input files
+    fout : str
+        Output file path
+    --ofmt : str
+        Output file format
+    --dask-nworkers : int, optional
+        Number of Dask workers
+    --dask-processes : bool, optional
+        Use processes instead of threads for Dask workers
+    --dask-memorylimit : str, optional
+        Memory limit per Dask worker
+    
+    Notes
+    -----
+    - The function uses a LocalCluster for Dask distributed computing
+    - Time boundaries are extracted from the reference dataset's time coordinate
+    - The colocation parameter is set to ('trange_seq', (None, 'reference'))
+    - Both input datasets are deleted after processing to free memory
+    - All distributed computing logs are set to ERROR level to reduce verbosity
+    
+    See Also
+    --------
+    process_time_colocation : Core function that performs temporal colocation
+    open_decode : Function to open and decode datasets
+    save_output : Function to save processed datasets
+    
+    Examples
+    --------
+    Command-line usage:
+    
+    >>> armoor-coloc-time croco_ref_*.zarr input_*.nc output.zarr \\
+    ...     --ref-ifmt croco --ifmt armoor --ofmt zarr \\
+    ...     --dask-nworkers 4
     """
     # Get parser
     parser = get_parser_coloc_time()
