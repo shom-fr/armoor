@@ -11,4 +11,5 @@ The directory ``/bin`` contains the available elementary executables :
    cli.unit.interp.time
    cli.unit.interp.horizontal
    cli.unit.interp.vertical
+   cli.unit.coloc.time
    
