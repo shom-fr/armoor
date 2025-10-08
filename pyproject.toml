@@ -48,9 +48,9 @@ source-code = "https://gitlab.com/GitShom/STM/armoor"
 
 
 [project.scripts]
-armoor-coloc-time = "armoor.cli.coloc.main:main_coloc_time"
-armoor-coloc-horizontal = "armoor.cli.coloc.main:main_coloc_horizontal"
-armoor-coloc-vertical = "armoor.cli.coloc.main:main_coloc_vertical"
+armoor-coloc-time = "armoor.cli.coloc:main_coloc_time"
+armoor-coloc-horizontal = "armoor.cli.coloc:main_coloc_horizontal"
+armoor-coloc-vertical = "armoor.cli.coloc:main_coloc_vertical"
 armoor-comp = "armoor.cli.comp:main_comp"
 armoor-comp-argo = "armoor.cli.main:main_comp_argo"
 armoor-comp-models = "armoor.cli.main:main_comp_models"
