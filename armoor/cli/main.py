@@ -17,6 +17,7 @@ from armoor.base.misc import (comma_separated, dict_to_list,
                               optimize_for_low_swap, parse_coords,
                               parse_mixed_param, parse_qc_tuple)
 from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI
+from armoor.cli.io import add_dask_parser_arguments
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.comp import METAZONE_PARAMS
 from armoor.comp.coloc import main_coloc
@@ -96,6 +97,7 @@ def get_parser_filters():
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     parser.add_argument(
         'metazones',
         type=comma_separated,
@@ -148,7 +150,12 @@ def main_filters():
 
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
     
-    with Client(**setup_dask_client()):
+    kw_dask = {
+        "n_workers": args.dask_nworkers,
+        "processes": args.dask_processes,
+        "memory_limit": args.dask_memorylimit
+        }
+    with Client(**setup_dask_client(**kw_dask)):
         zarrs = load_datasets(cfg["data"], metazones, None)
         ncs = zarrs2netcdfs(zarrs)
 
@@ -165,6 +172,7 @@ def get_parser_data():
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     parser.add_argument(
         'metazones',
         type=comma_separated,
@@ -219,9 +227,15 @@ def main_data():
        args. metazones,
        metazones
        )
-
+    
+    kw_dask = {
+        "n_workers": args.dask_nworkers,
+        "processes": args.dask_processes,
+        "memory_limit": args.dask_memorylimit
+        }
+    
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    with Client(**setup_dask_client()):
+    with Client(**setup_dask_client(**kw_dask)):
         zarrs = load_datasets(cfg["data"], metazones, "data")
     
         if args.filters_only:
@@ -253,7 +267,7 @@ def main_data():
                 with open(args.jsonfile, 'w') as f:
                     json.dump(ncs_outputs, f, indent=4)
 
-def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, comp_args={}):
+def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, kw_dask, comp_args={}):
     
     logger.info("Initial diagnostic:")
     monitor_performance()
@@ -275,7 +289,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
         )
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    with Client(**setup_dask_client()): 
+    with Client(**setup_dask_client(**kw_dask)): 
         zarr = load_datasets(cfg["data"], metazones, func_comp)
         
         if ofilter:
@@ -332,6 +346,7 @@ def get_parser_comp_models():
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     
     return parser
@@ -354,6 +369,11 @@ def main_comp_models():
         raise ArmoorError(
             f"File not found: {args.cfgfile}."
             )
+    kw_dask = {
+        "n_workers": args.dask_nworkers,
+        "processes": args.dask_processes,
+        "memory_limit": args.dask_memorylimit
+        }
     main_comp(
         args.cfgfile,
         args.metazonesfile,
@@ -362,6 +382,7 @@ def main_comp_models():
         args.jsonfile,
         args.filters_only,
         args.coloc_only,
+        kw_dask
         )
 
 def get_parser_comp_sst():
@@ -372,6 +393,7 @@ def get_parser_comp_sst():
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
         '--qc',
@@ -399,6 +421,12 @@ def main_comp_sst():
             f"File not found: {args.cfgfile}."
             )
     kw_comp = {"qc": args.qc}
+    
+    kw_dask = {
+        "n_workers": args.dask_nworkers,
+        "processes": args.dask_processes,
+        "memory_limit": args.dask_memorylimit
+        }
 
     main_comp(
         args.cfgfile,
@@ -408,6 +436,7 @@ def main_comp_sst():
         args.jsonfile,
         args.filters_only,
         args.coloc_only,
+        kw_dask,
         kw_comp
         )
     
@@ -419,6 +448,7 @@ def get_parser_comp_argo():
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
         'radius',
@@ -453,6 +483,12 @@ def main_comp_argo():
     
     kw_comp = {"radius": args.radius, "qc": args.qc}
     
+    kw_dask = {
+        "n_workers": args.dask_nworkers,
+        "processes": args.dask_processes,
+        "memory_limit": args.dask_memorylimit
+        }
+    
     main_comp(
         args.cfgfile,
         args.metazonesfile,
@@ -461,6 +497,7 @@ def main_comp_argo():
         args.jsonfile,
         args.filters_only,
         args.coloc_only,
+        kw_dask,
         kw_comp
         )
 
@@ -472,6 +509,7 @@ def get_parser_comp_mooring():
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
         'radius',
@@ -504,7 +542,13 @@ def main_comp_mooring():
         raise ArmoorError(f"File not found: {args.cfgfile}.")
     
     kw_comp = {"radius": args.radius, "qc": args.qc}
-    
+
+    kw_dask = {
+        "n_workers": args.dask_nworkers,
+        "processes": args.dask_processes,
+        "memory_limit": args.dask_memorylimit
+        }    
+
     main_comp(
         args.cfgfile,
         args.metazonesfile,
@@ -513,6 +557,7 @@ def main_comp_mooring():
         args.jsonfile,
         args.filters_only,
         args.coloc_only,
+        kw_dask,
         kw_comp
         )
 
@@ -524,6 +569,7 @@ def get_parser_comp_drifter():
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
         '--period',
@@ -542,7 +588,7 @@ def get_parser_comp_drifter():
 def main_comp_drifter():
     """Compare drifter trajectory with other products."""
     # Get parser
-    parser = get_parser_comp_mooring()
+    parser = get_parser_comp_drifter()
     func_comp = "comp_drifter"
 
     # Parse
@@ -557,7 +603,13 @@ def main_comp_drifter():
     
     kw_comp = {
         "period": args.period,
-        "freq": args.frq
+        "freq": args.freq
+        }
+    
+    kw_dask = {
+        "n_workers": args.dask_nworkers,
+        "processes": args.dask_processes,
+        "memory_limit": args.dask_memorylimit
         }
     
     main_comp(
@@ -568,6 +620,7 @@ def main_comp_drifter():
         args.jsonfile,
         args.filters_only,
         args.coloc_only,
+        kw_dask,
         kw_comp
         )
 
