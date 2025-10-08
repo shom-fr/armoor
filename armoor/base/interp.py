@@ -241,7 +241,7 @@ def grid2loc(ds, coords: [(float, float)]):
             }
         )
     dsi = ds.copy()
-    if "time" in dsi:
+    if "time" in ds:
         dso = xr.Dataset(coords=dict(time=dsi.time, **loc.coords))
     else:
         dso = xr.Dataset(coords=loc.coords)
@@ -249,21 +249,20 @@ def grid2loc(ds, coords: [(float, float)]):
         if "time" in dsi.depth.dims:
             dsi = dsi.reset_coords("depth")
     dss = []
-    for var in dsi.data_vars:
+    vars_grid2loc = [
+        var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)
+        ]
+    for var in vars_grid2loc:
         da = ds[var]
         if ("time" in da.dims) and ("z" in da.dims):
-            da = xregrid.grid2loc(
-                        da, loc
-                        )
+            da = xregrid.grid2loc(da, loc)
             dims = ["time", "z", "npts"]
             da = da.transpose(*dims)
             arr = da.data
             del da
             coords = dict(time=dsi.time, **loc.coords)
         elif ("time" in da.dims) and ("z" not in da.dims):
-            da = xregrid.grid2loc(
-                        da, loc
-                        )
+            da = xregrid.grid2loc(da, loc)
             dims = ["time", "npts"]
             da = da.transpose(*dims)
             arr = da.data
