@@ -48,6 +48,9 @@ source-code = "https://gitlab.com/GitShom/STM/armoor"
 
 
 [project.scripts]
+armoor-coloc-time = "armoor.cli.coloc.main:main_coloc_time"
+armoor-coloc-horizontal = "armoor.cli.coloc.main:main_coloc_horizontal"
+armoor-coloc-vertical = "armoor.cli.coloc.main:main_coloc_vertical"
 armoor-comp-argo = "armoor.cli.main:main_comp_argo"
 armoor-comp-models = "armoor.cli.main:main_comp_models"
 armoor-comp-mooring = "armoor.cli.main:main_comp_mooring"
@@ -58,6 +61,8 @@ armoor-filters-horizontal = "armoor.cli.filters:main_filters_horizontal"
 armoor-interp-time = "armoor.cli.interp:main_interp_time"
 armoor-interp-horizontal = "armoor.cli.interp:main_interp_horizontal"
 armoor-interp-vertical = "armoor.cli.interp:main_interp_vertical"
+armoor-range-time = "armoor.cli.range:main_range_time"
+armoor-range-vertical = "armoor.cli.range:main_range_vertical"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
