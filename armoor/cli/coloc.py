@@ -35,11 +35,11 @@ logging.getLogger('distributed').setLevel(logging.ERROR)
 
 
 class ColocError(Exception):
-    """Exception raised for errors in the interpolation module.
+    """Exception raised for errors in the colocation module.
     
-    This exception is raised when there are issues with interpolation configuration
+    This exception is raised when there are issues with colocation configuration
     or execution, such as incompatible parameters, missing required arguments,
-    or invalid interpolation specifications.
+    or invalid colocation specifications.
     """
     pass
 

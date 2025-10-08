@@ -18,6 +18,7 @@ Package API
     armoor.cli.coloc
     armoor.cli.filters
     armoor.cli.interp
+    armoor.cli.range
     armoor.cli.io
     armoor.cli.main
     armoor.cli.log
