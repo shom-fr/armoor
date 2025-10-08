@@ -56,17 +56,22 @@ def process_time_range(ds, tfreq):
         t_start = time_ranges[idate]
         t_end = time_ranges[idate + 1]
         sub = ds.sel(time=slice(t_start, t_end))
-        sub = sub.assign_coords(
-            time_range=f"{t_start:%Y%M%dT%h%m%s}_to_{t_end:%Y%M%dT%h%m%s}",
-        )
+        sub = sub.expand_dims(dim="trange")
+        for var in sub.data_vars:
+            if not "time" in ds[var].sizes:
+                sub[var] = sub[var].squeeze(dim="trange")
+        sub["time_range"] = xr.DataArray(
+            [f"{t_start:%Y%m%dT%H%M%S}_to_{t_end:%Y%m%dT%H%M%S}"],
+            dims=("trange",)
+            )
         subsets.append(sub)
         
     combined = xr.concat(
         subsets,
         dim="trange",
-        coords="minimal",   # don't try to align all coordinates
-        compat="override",  # allow metadata differences
-        join="override"     # don't merge coordinates by labels
+        # coords="minimal",   # don't try to align all coordinates
+        # compat="override",  # allow metadata differences
+        # join="override"     # don't merge coordinates by labels
     )
     combined = combined.assign_coords(trange=np.arange(len(subsets)))
     return combined

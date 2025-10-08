@@ -16,6 +16,7 @@ Package API
     armoor.base.ranges
     armoor.cli
     armoor.cli.coloc
+    armoor.cli.comp
     armoor.cli.filters
     armoor.cli.interp
     armoor.cli.range

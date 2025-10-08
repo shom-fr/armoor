@@ -144,10 +144,14 @@ def get_parser_range_vertical():
         help="Name of the vertical coordinate."
         )
     parser.add_argument(
-        'vrange',
-        nargs=2,
+        'vmin',
         type=float,
-        help="Bound of a vertical range."
+        help="Minimum value a vertical range."
+        )
+    parser.add_argument(
+        'vmax',
+        type=float,
+        help="Maximum value a vertical range."
         )
     return parser
 
@@ -189,5 +193,5 @@ def main_range_vertical():
     with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
-            ds = process_vertical_range(ds, args.vname, args.vrange)
+            ds = process_vertical_range(ds, args.vname, [args.vmin, args.vmax])
             save_output(ds, args.fout, args.ofmt)

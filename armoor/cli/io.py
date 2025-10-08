@@ -193,6 +193,35 @@ def add_io_parser_arguments(parser):
     add_output_parser_arguments(parser)
     add_output_fmt_parser_arguments(parser)
 
+def add_refinput_parser_arguments(parser):
+    """Add reference input file pattern argument to argument parser.
+    """
+    parser.add_argument(
+        "ref_fins",
+        type=str,
+        help="Pattern of reference input file. Ex: croco_*.zarr",
+    )
+    
+def add_refinput_fmt_parser_arguments(parser):
+    """Add reference input file format argument to argument parser.
+    """
+    parser.add_argument(
+        "--ref-ifmt",
+        type=str,
+        choices=("hycom", "cmems_model", "croco", "armoor"),
+        help="Format of the input files",
+    )
+    
+def add_comp_io_parser_arguments(parser):
+    """Add all input/output related arguments to argument colocation/comparison parser.
+    """
+    add_refinput_parser_arguments(parser)
+    add_refinput_fmt_parser_arguments(parser)
+    add_input_parser_arguments(parser)
+    add_input_fmt_parser_arguments(parser)
+    add_output_parser_arguments(parser)
+    add_output_fmt_parser_arguments(parser)
+
 def add_dask_nworkers_parser_arguments(parser):
     """Add dask argument to argument parser.
     
