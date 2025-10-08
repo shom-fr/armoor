@@ -28,6 +28,11 @@ METAZONE_PARAMS = {
         "radius",
         "qc"
         ],
+    "comp_drifter": [
+        "tbound",
+        "polygon",
+        "vars",
+        ],
     "comp_models": [
         "tfreq",
         "tbound",
@@ -70,6 +75,9 @@ COLOCATION_PARAMS_DEFAULT = {
         "time": ("trange_seq", ("*", "reference", "nearest"))
         },
     "comp_mooring": {
+        "vertical": ("vrange", ("reference", "depth", "*"))
+        },
+    "comp_drifter": {
         "vertical": ("vrange", ("reference", "depth", "*"))
         }
     }

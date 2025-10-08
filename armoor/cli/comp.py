@@ -324,6 +324,10 @@ def process_stat(dsref, dsprod, dim):
         ds1 = func(dsref, dsprod, dim)
         ds1 = rename_stat_var(ds1, func.__name__)
         ds = xr.merge([ds, ds1])
+    if "trange" in ds.sizes:
+        ds = ds.swap_dims({"trange": "time"})
+    if "time_range" in ds:
+        ds = ds.rename_vars({"time_range": "time"})
     return ds
 
 def get_parser_comp():

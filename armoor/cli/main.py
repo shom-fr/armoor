@@ -516,39 +516,60 @@ def main_comp_mooring():
         kw_comp
         )
 
-# def apply_time_filters(dsout, mz_param, data_name):
-#     """Applique les filtres temporels."""
-#     time_meta = ["tbound", "terms", "trange_cut"]
-    
-#     for k in time_meta:
-#         if k in mz_param:
-#             if "climatology" not in dsout.time.attrs:
-#                 dsout = FILTERS[k](dsout)(*mz_param[k])
-#             if dsout is None:
-#                 logger.warning(f"⚠️ Filtre {k} returns None for {data_name}")
-#                 return None
-    
-#     return dsout
+def get_parser_comp_drifter():
+    """Get parser for mooring comparison."""
+    # Setup argument parser
+    parser = ArgumentParser(
+        description="Compare drifter data with model ouputs.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+        )
+    add_logging_parser_arguments(parser)
+    add_comp_parser_arguments(parser)
+    parser.add_argument(
+        '--period',
+        default="5d",
+        type=str,
+        help="Time period of the particle integration (pandas period string). Ex: 1h, 6h, 1d"
+        )
+    parser.add_argument(
+        '--freq',
+        default="1h",
+        type=str,
+        help="Time frequency of trajectory comparison (pandas frequency string). Ex: 1h, 6h, 1d"
+        )
+    return parser
 
-# def apply_horizontal_filters(dsout, mz_param, data_name):
-#     """Applique les filtres horizontaux."""
-#     horizontal_meta = ["bathy", "polygon"]#, "polygon_dilat"]
-    
-#     for k in horizontal_meta:
-#         if k in mz_param:
-#             if k == "polygon":
-#                 args = mz_param[k]
-#                 if set(["x", "y"]).issubset(set(dsout.lon.dims)):
-#                     k = "polygon_dilat"
-#             else:
-#                 args = (*mz_param[k],)
-            
-#             dsout = FILTERS[k](dsout)(args)
-#             if dsout is None:
-#                 logger.warning(f"⚠️ Filtre {k} returns None for {data_name}")
-#                 return None
-#     return dsout
+def main_comp_drifter():
+    """Compare drifter trajectory with other products."""
+    # Get parser
+    parser = get_parser_comp_mooring()
+    func_comp = "comp_drifter"
 
+    # Parse
+    args = parser.parse_args()
+    
+    # Setup logging
+    main_setup_logging(args)
+    
+    # Load configuration
+    if not args.cfgfile.exists():
+        raise ArmoorError(f"File not found: {args.cfgfile}.")
+    
+    kw_comp = {
+        "period": args.period,
+        "freq": args.frq
+        }
+    
+    main_comp(
+        args.cfgfile,
+        args.metazonesfile,
+        args.metazones,
+        func_comp,
+        args.jsonfile,
+        args.filters_only,
+        args.coloc_only,
+        kw_comp
+        )
 
 # Fonction de diagnostic pour surveiller les performances
 def monitor_performance():
