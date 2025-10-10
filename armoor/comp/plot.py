@@ -972,9 +972,10 @@ class PlotComp:
                         linewidth=lw
                         )
                 
-                axes[0].legend(loc='upper left', fontsize=11, frameon=True, fancybox=True)
-                axes[2].legend(loc='upper left', fontsize=11, frameon=True, fancybox=True)
-    
+                handles, labels = axes[0].get_legend_handles_labels()
+                fig.legend(handles, labels, ncol=1, loc='center left',
+                           edgecolor='gray', bbox_to_anchor=(0.11,1.0))
+ 
                 axes[0].set_ylabel("Mean")
                 axes[1].set_ylabel("St.D")
                 axes[2].set_ylabel("Bias")
