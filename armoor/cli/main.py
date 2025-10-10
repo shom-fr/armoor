@@ -6,7 +6,7 @@ import time
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 from xoa.cfgm import ConfigManager, register_validation_functions
 
 import armoor.base.oceanvars
@@ -155,9 +155,10 @@ def main_filters():
         "processes": args.dask_processes,
         "memory_limit": args.dask_memorylimit
         }
-    with Client(**setup_dask_client(**kw_dask)):
-        zarrs = load_datasets(cfg["data"], metazones, None)
-        ncs = zarrs2netcdfs(zarrs)
+    with LocalCluster(**setup_dask_client(**kw_dask)) as cluster:
+        with Client(cluster): 
+            zarrs = load_datasets(cfg["data"], metazones, None)
+            ncs = zarrs2netcdfs(zarrs)
 
     with open(args.jsonfile, 'w') as f:
         json.dump(ncs, f, indent=4)
@@ -228,44 +229,46 @@ def main_data():
        metazones
        )
     
-    kw_dask = {
-        "n_workers": args.dask_nworkers,
-        "processes": args.dask_processes,
-        "memory_limit": args.dask_memorylimit
-        }
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
     
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    with Client(**setup_dask_client(**kw_dask)):
-        zarrs = load_datasets(cfg["data"], metazones, "data")
-    
-        if args.filters_only:
-    
-            ncs = zarrs2netcdfs(zarrs)
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
+        with Client(cluster): 
+            zarrs = load_datasets(cfg["data"], metazones, "data")
         
-            with open(args.jsonfile, 'w') as f:
-                json.dump(ncs, f, indent=4)
-                
-            logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
+            if args.filters_only:
         
-        else:
+                ncs = zarrs2netcdfs(zarrs)
             
-            zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs").copy())
-    
-            ofmt = cfg["outputs"].get("fmt")
-            
-            if "png" in ofmt:
-                plot_data(zarr_outputs, metazones)
-        
-            zarr_outputs = dict_to_list(zarr_outputs)
-            
-            if "zarr" in ofmt:
                 with open(args.jsonfile, 'w') as f:
-                    json.dump(zarr_outputs, f, indent=4)
+                    json.dump(ncs, f, indent=4)
                     
-            if "netcdf" in ofmt:
-                ncs_outputs = zarrs2netcdfs(zarr_outputs)
-                with open(args.jsonfile, 'w') as f:
-                    json.dump(ncs_outputs, f, indent=4)
+                logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
+            
+            else:
+                
+                zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs").copy())
+        
+                ofmt = cfg["outputs"].get("fmt")
+                
+                if "png" in ofmt:
+                    plot_data(zarr_outputs, metazones)
+            
+                zarr_outputs = dict_to_list(zarr_outputs)
+                
+                if "zarr" in ofmt:
+                    with open(args.jsonfile, 'w') as f:
+                        json.dump(zarr_outputs, f, indent=4)
+                        
+                if "netcdf" in ofmt:
+                    ncs_outputs = zarrs2netcdfs(zarr_outputs)
+                    with open(args.jsonfile, 'w') as f:
+                        json.dump(ncs_outputs, f, indent=4)
 
 def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, kw_dask, comp_args={}):
     
@@ -288,47 +291,49 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
         **comp_args
         )
 
+    jsonfile = str(jsonfile).format(**locals())
+
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    with Client(**setup_dask_client(**kw_dask)): 
-        zarr = load_datasets(cfg["data"], metazones, func_comp)
-        
-        if ofilter:
-            zarr = [str(z) for z in zarr]
-            ncs_outputs = zarrs2netcdfs(zarr)
-            with open(jsonfile, 'w') as f:
-                json.dump(ncs_outputs, f, indent=4)
-            
-        else:
-        
-            zarr_coloc = main_coloc(zarr, metazones, func_comp)
-            
-            if ocoloc:
-                zarr_coloc = dict_to_list(zarr_coloc)
-                zarr_coloc = [str(z) for z in zarr_coloc]
-                ncs_outputs = zarrs2netcdfs(zarr_coloc)
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
+        with Client(cluster): 
+            zarr = load_datasets(cfg["data"], metazones, func_comp)
+            if ofilter:
+                zarr = [str(z) for z in zarr]
+                ncs_outputs = zarrs2netcdfs(zarr)
                 with open(jsonfile, 'w') as f:
                     json.dump(ncs_outputs, f, indent=4)
-            
+                
             else:
-                
-                zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp)
-                
-                ofmt = cfg["outputs"].get("fmt")
-                
-                if "png" in ofmt:
-                    plot_comp(zarr_outputs, metazones, func_comp)
             
-                zarr_outputs = dict_to_list(zarr_outputs)
+                zarr_coloc = main_coloc(zarr, metazones, func_comp)
                 
-                if "zarr" in ofmt:
-                    with open(jsonfile, 'w') as f:
-                        json.dump(zarr_outputs, f, indent=4)
-                        
-                if "netcdf" in ofmt:
-                    ncs_outputs = zarrs2netcdfs(zarr_outputs)
+                if ocoloc:
+                    zarr_coloc = dict_to_list(zarr_coloc)
+                    zarr_coloc = [str(z) for z in zarr_coloc]
+                    ncs_outputs = zarrs2netcdfs(zarr_coloc)
                     with open(jsonfile, 'w') as f:
                         json.dump(ncs_outputs, f, indent=4)
-    
+                
+                else:
+                    
+                    zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp)
+                    
+                    ofmt = cfg["outputs"].get("fmt")
+                    
+                    if "png" in ofmt:
+                        plot_comp(zarr_outputs, metazones, func_comp)
+                
+                    zarr_outputs = dict_to_list(zarr_outputs)
+                    
+                    if "zarr" in ofmt:
+                        with open(jsonfile, 'w') as f:
+                            json.dump(zarr_outputs, f, indent=4)
+                            
+                    if "netcdf" in ofmt:
+                        ncs_outputs = zarrs2netcdfs(zarr_outputs)
+                        with open(jsonfile, 'w') as f:
+                            json.dump(ncs_outputs, f, indent=4)
+        
     logger.info(f"Find the list of generated files in: {jsonfile}")
     
     elapsed = time.time() - start_time
@@ -369,11 +374,13 @@ def main_comp_models():
         raise ArmoorError(
             f"File not found: {args.cfgfile}."
             )
-    kw_dask = {
-        "n_workers": args.dask_nworkers,
-        "processes": args.dask_processes,
-        "memory_limit": args.dask_memorylimit
-        }
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+    
     main_comp(
         args.cfgfile,
         args.metazonesfile,
@@ -422,11 +429,12 @@ def main_comp_sst():
             )
     kw_comp = {"qc": args.qc}
     
-    kw_dask = {
-        "n_workers": args.dask_nworkers,
-        "processes": args.dask_processes,
-        "memory_limit": args.dask_memorylimit
-        }
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
 
     main_comp(
         args.cfgfile,
@@ -483,11 +491,12 @@ def main_comp_argo():
     
     kw_comp = {"radius": args.radius, "qc": args.qc}
     
-    kw_dask = {
-        "n_workers": args.dask_nworkers,
-        "processes": args.dask_processes,
-        "memory_limit": args.dask_memorylimit
-        }
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
     
     main_comp(
         args.cfgfile,
@@ -543,11 +552,12 @@ def main_comp_mooring():
     
     kw_comp = {"radius": args.radius, "qc": args.qc}
 
-    kw_dask = {
-        "n_workers": args.dask_nworkers,
-        "processes": args.dask_processes,
-        "memory_limit": args.dask_memorylimit
-        }    
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )  
 
     main_comp(
         args.cfgfile,
@@ -602,15 +612,16 @@ def main_comp_drifter():
         raise ArmoorError(f"File not found: {args.cfgfile}.")
     
     kw_comp = {
-        "period": args.period,
-        "freq": args.freq
+        "period_drift": args.period,
+        "freq_drift": args.freq
         }
     
-    kw_dask = {
-        "n_workers": args.dask_nworkers,
-        "processes": args.dask_processes,
-        "memory_limit": args.dask_memorylimit
-        }
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
     
     main_comp(
         args.cfgfile,

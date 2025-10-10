@@ -588,10 +588,9 @@ def main_coloc(ncs, metazones, comp_func):
         ncrefs = [
             nc for nc in ncs if (metazone in str(nc)) & ("ref" in str(nc))
             ]
-        for ncref in ncrefs:
+        for ncref in ncrefs[:2]:
             logger.info(f"Use reference {ncref}")
             dsrefin = xr.open_dataset(ncref, engine="zarr")#, engine="h5netcdf")
-            logger.info(dsrefin.sizes)
             dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=512)
             for var in COMP_VARS[comp_func]:
                 da = dsrefin.oceanvars.sel(var)
@@ -616,6 +615,9 @@ def main_coloc(ncs, metazones, comp_func):
             for ncin in ncins:
                 logger.info(f"-- Process {ncin}")
                 dsprodin = xr.open_dataset(ncin)
+                if "depth" in dsprodin:
+                    if "depth" not in dsprodin.coords:
+                        dsprodin = dsprodin.set_coords("depth")
                 dsprodin = optimize_for_low_swap(dsprodin, target_chunk_mb=512)
                 logger.info(dsprodin.sizes)
                 for var in COMP_VARS[comp_func]:
@@ -623,12 +625,12 @@ def main_coloc(ncs, metazones, comp_func):
                 for var in dsprodin.data_vars:
                     if var not in COMP_VARS[comp_func]:
                         dsprodin = dsprodin.drop_vars(var)
-                    if (
-                        "depth" in dsprodin.coords
-                        ) and (
-                        "time" in dsprodin.depth.dims
-                        ):
-                        dsprodin = dsprodin.reset_coords("depth")
+                if (
+                    "depth" in dsprodin.coords
+                    ) and (
+                    "time" in dsprodin.depth.dims
+                    ):
+                    dsprodin = dsprodin.reset_coords("depth")
                 dsref = dsrefin.copy()
                 dsprod = dsprodin.copy()
                 gattrs_ref = dsref.attrs
@@ -696,9 +698,9 @@ def main_coloc(ncs, metazones, comp_func):
                     if (
                         "vlevel" in params.get("vertical")[0]
                         ) or (
-                        comp_func == "comp_mooring"    
+                        comp_func in ("comp_mooring", "comp_drifter")    
                         ):
-                        if comp_func == "comp_mooring":
+                        if comp_func in ("comp_mooring", "comp_drifter"):
                             vname = "depth"
                         else:
                             vname  = params.get("vertical")[1][0]

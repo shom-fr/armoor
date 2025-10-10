@@ -36,7 +36,7 @@ class FiltersError(Exception):
     pass
 
 
-def process_filters(fins, ifmt, fout, ofmt, filters_config, dask_nworkers, dask_processes, dask_memorylimit):
+def process_filters(fins, ifmt, fout, ofmt, filters_config, kw_dask):
     """Process input files by applying specified filters and saving output.
     
     This function opens input files, applies the configured filters using
@@ -73,7 +73,7 @@ def process_filters(fins, ifmt, fout, ofmt, filters_config, dask_nworkers, dask_
     if is_dict_empty(filters_config):
         raise FiltersError("No filters to be applied.")
 
-    with LocalCluster(**setup_dask_client(dask_nworkers, dask_processes, dask_memorylimit)) as cluster:
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(
                 fins, ifmt
@@ -178,9 +178,16 @@ def main_filters_time():
             'tide': tides
             })
     
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+    
     process_filters(
         args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
-        args.dask_nworkers, args.dask_processes, args.dask_memorylimit
+        kw_dask
         )
 
 
@@ -326,9 +333,17 @@ def main_filters_horizontal():
                 "max": bathy_thr[1]
                 }
             })
+        
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+        
     process_filters(
         args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
-        args.dask_nworkers, args.dask_processes, args.dask_memorylimit
+        kw_dask
         )
 
 def get_parser_filters_quality():
@@ -414,9 +429,17 @@ def main_filters_quality():
             "qmin": args.qc_thr[0],
             "qmax": args.qc_thr[1]
             }
-        }  
+        }
+    
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+    
     process_filters(
         args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
-        args.dask_nworkers, args.dask_processes, args.dask_memorylimit
+        kw_dask
         )
     

@@ -111,7 +111,7 @@ def zarrs2netcdfs(fins):
             fouts.append(fout)
     return fouts
 
-def setup_dask_client(n_workers, processes, memory_limit):
+def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress):
     """Configure le client Dask de manière robuste."""
     # Configuration optimale
     dask.config.set({
@@ -137,7 +137,7 @@ def setup_dask_client(n_workers, processes, memory_limit):
         threads_per_worker=1,
         memory_limit=memory_limit,#'750MB',#'4GB',
         silence_logs=True,
-        dashboard_address=':8787',
+        dashboard_address=dashboardaddress,#:8082,
         #local_directory='/tmp',
         processes=processes
     )

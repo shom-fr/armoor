@@ -117,7 +117,14 @@ def main_range_time():
     # Setup logging
     main_setup_logging(args)
     
-    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+    
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
             ds = process_time_range(ds, args.tfreq)
@@ -190,7 +197,14 @@ def main_range_vertical():
     # Setup logging
     main_setup_logging(args)
     
-    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+    
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
             ds = process_vertical_range(ds, args.vname, [args.vmin, args.vmax])

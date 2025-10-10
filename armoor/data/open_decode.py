@@ -814,6 +814,8 @@ def open_decode_cmems_insitu(path_files, platform):
     for path in path_files:
         with xcf.set_cf_specs(cfspecs):
             ds = xr.open_dataset(path).load().xcf.decode()
+        object_vars = [var for var in ds.data_vars if ds[var].dtype == 'object']
+        ds = ds.drop_vars(object_vars)
         vars2drop = []
         for var in ds.data_vars:
             if var.isupper():
@@ -880,6 +882,19 @@ def open_decode_cmems_insitu(path_files, platform):
                 ds = ds.isel(z=iz2keep)
                 if ds.depth.sizes["z"] == 0:
                     continue
+            if platform == "drifter":
+                ds = ds.isel(z=[-1])
+                ds["depth"] = ds.depth.isel(time=0)
+                if "u" not in ds.data_vars:
+                    ds["u"] = (
+                        ds.lon.differentiate("time", datetime_unit="s")
+                        * xgeo.EARTH_RADIUS * np.pi / 180
+                        )
+                    ds["u"] *= np.cos(np.radians(ds.lat.values))
+                    ds["v"] = (
+                        ds.lat.differentiate("time", datetime_unit="s")
+                        * xgeo.EARTH_RADIUS * np.pi / 180
+                        )
         for var in ds.data_vars:
             if var in cmems_coords:
                 ds = ds.set_coords(var)

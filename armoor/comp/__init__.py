@@ -32,6 +32,8 @@ METAZONE_PARAMS = {
         "tbound",
         "polygon",
         "vars",
+        "freq_drift",
+        "period_drift"
         ],
     "comp_models": [
         "tfreq",
@@ -60,6 +62,7 @@ COLOCATION_PARAMS_USER = {
         "time": ("trange_seq", "tfreq"),
         "horizontal": ("radius",),
         },
+    "comp_drifter": {},
     "comp_models": {
         "time": ("trange_seq", "tfreq"),
         "horizontal": ("href", "cloud"),
@@ -160,6 +163,9 @@ OUTPUTS_PARAMS = {
             "output": "merge"
             },
         },
+    "comp_drifter": {
+        "preproc": "oceanparcels"
+        },
     "comp_mooring": {
         "timeseries": {
             "sort": ["z"],
@@ -216,6 +222,7 @@ COMP_VARS = {
     "comp_sst": ["ptemp"],
     "comp_argo": ["ptemp", "sal", "pdens", "temp", "sndspeed"],
     "comp_mooring": ["ptemp", "sal", "pdens", "temp", "sndspeed"],
+    "comp_drifter": ["ptemp", "sal", "u", "v"],
     "comp_models": ["ptemp", "sal", "pdens", "sndspeed"]
     }
 

@@ -110,8 +110,6 @@ def process_single_combination(ds, mz_name, mz_param):
     ----------
     ds : xarray.Dataset
         Input dataset
-    cfg_data : dict
-        Configuration data
     mz_name : str
         Name of the processing zone
     mz_param : dict
@@ -208,8 +206,8 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
         mz_name,
         mz_param,
     )
-    dsout = optimize_for_low_swap(dsout)
     if dsout:
+        dsout = optimize_for_low_swap(dsout)
         ncout = save_result(dsout, mz_name, dirout)
         return ncout
     return None
@@ -240,13 +238,16 @@ def process_all_combinations(dataset, metazones, dirout, max_workers=1):
     for task in tasks:
         ncout = process_single_task(task)
         ncouts.append(ncout)
-    dataset.close()
+    if isinstance(dataset, list):
+        for ds in dataset:
+            ds.close()
+    else:
+        dataset.close()
     return ncouts
 
 def load_datasets(data_cfg, metazones, dirout):
     """Charge les datasets de manière séquentielle (< 10s chacun)."""
     register_cf()
-    # client = setup_dask_client()
     ncouts = []
     for data_key, cfg_data in data_cfg.items():
         dataset_name = cfg_data["name"]
@@ -259,7 +260,6 @@ def load_datasets(data_cfg, metazones, dirout):
             fmt=cfg_data["fmt"],
             platform=cfg_data.get("platform")
             )
-
         if not isinstance(dss, list):
             dss = [dss]
 
@@ -282,8 +282,11 @@ def load_datasets(data_cfg, metazones, dirout):
         del dss
         ncs = process_all_combinations(dataset, metazones, dirout)
         ncouts += ncs
-        dataset.close()
+        if isinstance(dataset, list):
+            for ds in dataset:
+                ds.close()
+        else:
+            dataset.close()
         gc.collect()
-    # client.close()
 
     return ncouts

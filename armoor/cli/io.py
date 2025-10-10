@@ -200,7 +200,7 @@ def add_refinput_parser_arguments(parser):
         "ref_fins",
         type=str,
         help="Pattern of reference input file. Ex: croco_*.zarr",
-    )
+        )
     
 def add_refinput_fmt_parser_arguments(parser):
     """Add reference input file format argument to argument parser.
@@ -210,7 +210,7 @@ def add_refinput_fmt_parser_arguments(parser):
         type=str,
         choices=("hycom", "cmems_model", "croco", "armoor"),
         help="Format of the input files",
-    )
+        )
     
 def add_comp_io_parser_arguments(parser):
     """Add all input/output related arguments to argument colocation/comparison parser.
@@ -236,13 +236,13 @@ def add_dask_nworkers_parser_arguments(parser):
         "--dask-nworkers",
         type=int,
         default=4,
-        help="n dask workers",
-    )
+        help="Number of workers of a Dask LocalCluster",
+        )
     
 def add_dask_processes_parser_arguments(parser):
     """Add dask argument to argument parser.
     
-    Adds an optional argument '--dask-nworkers' for specifying n_workers dask.
+    Adds an optional argument '--dask-processes' for specifying n_workers dask.
     
     Parameters
     ----------
@@ -253,13 +253,13 @@ def add_dask_processes_parser_arguments(parser):
         "--dask-processes",
         type=bool,
         default=False,
-        help="use dask processes: True/False",
-    )
+        help="Use dask processes: True/False",
+        )
     
 def add_dask_memorylimit_parser_arguments(parser):
     """Add dask argument to argument parser.
     
-    Adds an optional argument '--dask-nworkers' for specifying n_workers dask.
+    Adds an optional argument '--dask-memorylimit' for specifying n_workers dask.
     
     Parameters
     ----------
@@ -270,8 +270,25 @@ def add_dask_memorylimit_parser_arguments(parser):
         "--dask-memorylimit",
         type=str,
         default=None,
-        help="LocalCluster dask memory_limit per worker",
-    )
+        help="Memory_limit per worker of a Dask LocalCluster",
+        )
+
+def add_dask_dashboardaddress_parser_arguments(parser):
+    """Add dask argument to argument parser.
+    
+    Adds an optional argument '--dask-dashboardaddress' for specifying n_workers dask.
+    
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        The argument parser to which the output format argument will be added.
+    """
+    parser.add_argument(
+        "--dask-dashboardaddress",
+        type=str,
+        default=":8787",
+        help="Dashboard adress of a Dask LocalCluster",
+        )
 
 def add_dask_parser_arguments(parser):
     """Add all dask related arguments to argument parser.
@@ -279,6 +296,7 @@ def add_dask_parser_arguments(parser):
     add_dask_nworkers_parser_arguments(parser)
     add_dask_processes_parser_arguments(parser)
     add_dask_memorylimit_parser_arguments(parser)
+    add_dask_dashboardaddress_parser_arguments(parser)
 
 def save_output(ds, fout, ofmt="zarr"):
     """Save xarray Dataset to file in specified format.

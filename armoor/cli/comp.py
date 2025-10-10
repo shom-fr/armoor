@@ -392,7 +392,14 @@ def main_comp():
     # Setup logging
     main_setup_logging(args)
     
-    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+    
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             dsref = open_decode(args.ref_fins, args.ref_ifmt)
             dsprod = open_decode(args.fins, args.ifmt)

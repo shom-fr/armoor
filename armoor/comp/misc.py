@@ -27,7 +27,7 @@ def add_comp_parser_arguments(parser, default_level="info"):
         '--jsonfile',
         type=Path,
         help="Path of the output json file.",
-        default='ncs_comp_sst.json'
+        default='ncs_{func_comp}.json'
         )
     parser.add_argument(
         '--filters-only',

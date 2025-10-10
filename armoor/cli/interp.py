@@ -123,7 +123,14 @@ def main_interp_time():
     # Setup logging
     main_setup_logging(args)
     
-    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+    
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
             ds = process_time_interpolation(
@@ -298,8 +305,15 @@ def main_interp_horizontal():
         params = (
             "regrid_from_nc", ncgrid
             )
-        
-    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+    
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )    
+    
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
             ds = process_horizontal_interpolation(ds, params)
@@ -429,7 +443,14 @@ def main_interp_vertical():
     elif vfreq:
         params = ("vfreq", (vname, vfreq))
     
-    with LocalCluster(**setup_dask_client(args.dask_nworkers, args.dask_processes, args.dask_memorylimit)) as cluster:
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress
+        )
+    
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
             ds = process_vertical_interpolation(ds, params)

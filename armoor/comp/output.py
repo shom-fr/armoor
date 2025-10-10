@@ -2,6 +2,7 @@ import gc
 import itertools
 import logging
 import re
+import shutil
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
@@ -20,6 +21,7 @@ from armoor.base.io import (
 from armoor.comp import COMP_VARS, OUTPUTS_PARAMS
 from armoor.comp.plot import PlotComp
 from armoor.comp.stats import StatsComp
+from armoor.diags.parcels import Parcels
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,54 @@ def check_output(func_name, outputs):
             raise ArmoorError(
                 f"Not implemented output for {func_name}: {output}"
                 )
+
+
+def preproc_comp_drifter(zins):
+    logger.info("Preproc comp_drifter")
+    for drifter, prods in zins.items():
+        logger.info(drifter)
+        for prod, zs in prods.items():
+            logger.info(f"Prod: {prod}")
+            zref = [z for z in zs if "ref_" in str(z)][0]
+            zprod = [z for z in zs if "prod_" in str(z)][0]
+            with xr.open_dataset(zref) as dsref:
+                dstmp = dsref.reset_coords(["lon", "lat"])
+                odt = "3600s"
+                dstmp = dstmp.resample(time=odt).mean()
+                ptc_coords_start = {
+                    "time": dstmp.time.values,
+                    "lon": dstmp.lon.values,
+                    "lat": dstmp.lat.values
+                    }
+                runtime = (
+                    dsref.time.max() - dsref.time.min()
+                    ) / pd.to_timedelta("1s")
+                runtime = f'{int(runtime)}s'
+            ncprod = str(zprod).replace(".zarr", ".nc")
+            with xr.open_dataset(zprod) as dsprod:
+                if "z" in dsprod.sizes:
+                    dsprod = dsprod.squeeze(dim="z")
+                dsprod.to_netcdf(ncprod)
+            Parcels(
+                ncprod,
+                ptc_coords_start,
+                runtime,
+                outputdt=odt,
+                ).execute()
+            shutil.rmtree(zprod)
+            with xr.open_dataset(ncprod) as dsprod:
+                dsprod.to_zarr(zprod)
+            zins[drifter].update({
+                prod: [zref, zprod]
+                })
+    return zins
+
+def preproc_comp(func_comp, ncs):
+    if func_comp == "comp_drifter":
+        return preproc_comp_drifter(ncs)
+        
+    
+    
 
 class OutputProcessor:
     """
@@ -549,7 +599,8 @@ class OutputPipelineManager:
         results = dask.compute(*delayed_tasks)
         
         # Merge all results
-        return self._merge_results(results)
+        results = self._merge_results(results)
+        return results
     
     def _prepare_output_configurations(self, ncs: Dict[str, Any], 
                                      metazones_in: Dict[str, Any],
@@ -571,13 +622,17 @@ class OutputPipelineManager:
         output_configs = outputs.copy()
         output_configs.pop("fmt", None)
         check_output(func_comp, output_configs)
-        
+        preproc = OUTPUTS_PARAMS[func_comp].get("preproc")
         # Prepare metazone configurations
         prepared_metazones = {}
         for metazone_name, metazone_config in metazones_in.items():
             if metazone_config:
+                if preproc:
+                    ncos = preproc_comp(func_comp, ncs.get(metazone_name))
+                else:
+                    ncos = ncs.get(metazone_name)
                 prepared_metazones[metazone_name] = {
-                    "ncins": ncs.get(metazone_name),
+                    "ncins": ncos,
                     "vars": COMP_VARS[func_comp],
                     **metazone_config.copy()
                 }

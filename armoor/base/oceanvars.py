@@ -30,7 +30,19 @@ class OceanVars:
             return self.ds.oceanvars.sel_sndspeed()
         elif varname == "pdens":
             return self.ds.oceanvars.sel_pdens()
-        
+        elif varname == "u":
+            return self.ds.oceanvars.sel_zonal_velocity()
+        elif varname == "v":
+            return self.ds.oceanvars.sel_meridional_velocity()
+    
+    def sel_zonal_velocity(self):
+        if "u" in self.ds:
+            return self.ds["u"]
+    
+    def sel_meridional_velocity(self):
+        if "v" in self.ds:
+            return self.ds["v"]
+    
     def sel_ptemp(self):
         if "ptemp" in self.ds:
             return self.ds["ptemp"]
