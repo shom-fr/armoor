@@ -286,7 +286,7 @@ class ArmoorFilters:
         # Apply combined mask once
         if combined_mask is not None:
             depth_was_coord = "depth" in self.ds.coords
-            if depth_was_coord and ("time" in self.ds.depth):
+            if depth_was_coord and ("time" in self.ds.depth.sizes):
                 result = self.ds.reset_coords("depth")
             else:
                 result = self.ds
