@@ -1300,7 +1300,7 @@ def open_decode_croco(path_file, fmt="croco"):
     """
     cfspecs = xcf.get_cf_specs(fmt)
     ds = xr.open_mfdataset(path_file)
-    ds = optimize_for_low_swap(ds)
+    #ds = optimize_for_low_swap(ds)
     for sig in ("s_rho", "s_w"):
         if sig in ds:
             if "formula_terms" not in ds[sig].attrs:
@@ -1312,6 +1312,9 @@ def open_decode_croco(path_file, fmt="croco"):
                     ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
                 elif sig == "s_w":
                     ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
+
+    if 'scrum_time' in ds:   
+        ds = ds.drop('scrum_time')  
         
     with xcf.set_cf_specs(cfspecs):
         ds = ds.decode_sigma()
@@ -1345,6 +1348,10 @@ def open_decode_croco(path_file, fmt="croco"):
         "el",
         "tke",
         "gls",
+        "time_step",
+        "depth_w",
+        "s_w",
+        "cs_rho",
         ]:
         if v in ds:
             ds = ds.drop(v)
@@ -1379,6 +1386,11 @@ def open_decode_croco(path_file, fmt="croco"):
         ds["v"] = da_v
     if "mask" in ds:
         ds = ds.where(ds["mask"] > 0)
+
+    # ds = ds.where(ds.ptemp > 0)
+    # ds = ds.where(ds.sal > 0)
+    ds = ds.isel(z=slice(None, None, -1))
+    ds = ds.assign_coords(depth=-ds.depth)
 
     return ds
 
