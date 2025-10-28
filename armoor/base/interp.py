@@ -69,7 +69,7 @@ def interp_time(
                 'timedelta': pd.to_timedelta(int(m["term"]), m["units"]),
                 'term': int(m["term"]),
                 'units': m["units"]
-            }
+                }
     
     # Classification des dates pour traitement par lot
     dates_in_range = []
@@ -155,7 +155,7 @@ def interp_time(
                 {time_name: [date]}, 
                 method=method,  # Explicite plus rapide
                 assume_sorted=True  # Optimisation
-            )
+                )
             
             # Éviter .load() si possible - garder lazy
             this_ds = this_ds.assign_coords({time_name: [date]})
@@ -401,8 +401,8 @@ def vinterp(ds, vname, vlevels, method="linear"):
                 ds[var],#.chunk(dict(z=-1)),
                 vlevels,
                 method=method,
-                extrap="bottom"
-            )
+                extrap="both",
+                )
         else:
             da = ds[var]
         das.append(da)

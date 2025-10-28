@@ -17,6 +17,9 @@ Hereafter we give some details about the available parameters:
 - ``tide``: string (demerliac, godin, mean) to apply a tidal filter.
 - ``tfreq``: frequency (1D, 1Y... )to define a series of terms equaly spaced (see pandas offset alias).
 - ``trange_seq``: [1D,reference] list of two strings. The first one define the period of time intervals, the second one, the time axis over which data will be interpolated in time for comparison computing.
+- ``tide``: tidal filters (godin, demerliac, 25h mean).
+- ``tresample``: time resampling at given frequency.
+- ``tsmooth``: time smoothing over a given period.
 - ``polygon``: list of coordinate (lat/lon) defining a polygon to filter out not needed data.
 - ``cloud``: list of coordinate (lat/lon) defining a cloud of point over which data will be interpolated.
 - ``bathy``: list of type `path, fmt, min, max`. The first element is the directory of the bathymetry file, the second one is the format of the bathymetry file, min/max are bathy tresholds to apply.

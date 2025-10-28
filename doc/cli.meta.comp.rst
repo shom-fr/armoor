@@ -73,6 +73,7 @@ Workflow
    :maxdepth: 1
    
    cli.meta.comp.argo
+   cli.meta.comp.drifter
    cli.meta.comp.models
    cli.meta.comp.mooring
    cli.meta.comp.sst

@@ -121,7 +121,8 @@ def main_range_time():
         args.dask_nworkers,
         args.dask_processes,
         args.dask_memorylimit,
-        args.dask_dashboardaddress
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
         )
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:

@@ -102,6 +102,13 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
 
         axes = [ax1, ax2, ax3]
 
+    elif layout_type == 'one':
+        gs = gridspec.GridSpec(1, 1, figure=fig,
+                               height_ratios=[1],
+                               width_ratios=[1])
+        ax1 = fig.add_subplot(gs[0, 0], **subplot_kw)
+        axes = [ax1]
+
     elif layout_type == 'two_by_two':
         # Layout: Two rows of two subplots each
         gs = gridspec.GridSpec(2, 2, figure=fig)

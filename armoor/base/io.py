@@ -1,18 +1,225 @@
 """Input/output."""
 import re, os
-from typing import Dict, List
+import logging
+from typing import Dict, List, Tuple
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
+import zarr
 import dask
 import numpy as np
 import xarray as xr
 from dask.distributed import Client
 from numcodecs import Blosc
 
+logger = logging.getLogger(__name__)
+
 
 class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
                                  ArgumentDefaultsHelpFormatter):
     pass
+
+def find_valid_chunk_size(dim_size: int, current_first_chunk: int) -> int:
+    """
+    Trouve une taille de chunk valide qui divise exactement la dimension
+    ou dont le dernier chunk est plus petit que le premier.
+    
+    Parameters:
+    -----------
+    dim_size : int
+        Taille totale de la dimension
+    current_first_chunk : int
+        Taille actuelle du premier chunk
+        
+    Returns:
+    --------
+    int : Taille de chunk optimale
+    """
+    # Option 1: Divise exactement
+    for chunk_size in range(current_first_chunk, 0, -1):
+        if dim_size % chunk_size == 0:
+            return chunk_size
+    
+    # Option 2: Le reste est plus petit
+    chunk_size = current_first_chunk
+    while chunk_size <= dim_size:
+        remainder = dim_size % chunk_size
+        if remainder == 0 or remainder < chunk_size:
+            return chunk_size
+        chunk_size -= 1
+    
+    # Fallback: chunk unique
+    return dim_size
+
+
+def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
+    """
+    Corrige automatiquement TOUS les problèmes d'encodage Zarr.
+    
+    Cette fonction:
+    1. Analyse tous les chunks actuels
+    2. Détecte les problèmes (dernier chunk > premier chunk)
+    3. Recalcule des chunks optimaux
+    4. Nettoie tous les encodages problématiques
+    
+    Parameters:
+    -----------
+    ds : xr.Dataset
+        Dataset à corriger
+    verbose : bool
+        Afficher les détails (défaut: True)
+        
+    Returns:
+    --------
+    xr.Dataset : Dataset corrigé, prêt pour to_zarr()
+    """
+    if verbose:
+        logger.debug("=" * 70)
+        logger.debug("AUTO-FIX ZARR CHUNKS")
+        logger.debug("=" * 70)
+    
+    ds_fixed = ds.copy()
+    
+    # Traiter toutes les variables (data + coords)
+    all_vars = list(ds_fixed.data_vars) + list(ds_fixed.coords)
+    
+    for var_name in all_vars:
+        var = ds_fixed[var_name]
+        
+        # Skip si pas de chunks
+        if var.chunks is None:
+            if verbose:
+                logger.debug(f"\n {var_name}: No chunks chunks (small array)")
+            continue
+        
+        if verbose:
+            logger.debug(f"\n{'─' * 70}")
+            logger.debug(f"Variable: {var_name}")
+            logger.debug(f"  Shape: {var.shape}")
+            logger.debug(f"  Dims: {var.dims}")
+            logger.debug(f"  Actual chunks: {var.chunks}")
+        
+        # Analyser chaque dimension
+        needs_rechunk = False
+        new_chunks = {}
+        
+        for dim_name, dim_size, dim_chunks in zip(var.dims, var.shape, var.chunks):
+            n_chunks = len(dim_chunks)
+            
+            if n_chunks <= 1:
+                # Un seul chunk - OK
+                new_chunks[dim_name] = dim_size
+                if verbose:
+                    logger.debug(f"  {dim_name}: 1 chunk ({dim_size}) - OK")
+                continue
+            
+            first_chunk = dim_chunks[0]
+            last_chunk = dim_chunks[-1]
+            
+            if last_chunk > first_chunk:
+                # PROBLÈME DÉTECTÉ
+                needs_rechunk = True
+                optimal_size = find_valid_chunk_size(dim_size, first_chunk)
+                new_chunks[dim_name] = optimal_size
+                
+                if verbose:
+                    logger.debug(f" {dim_name}: Detected problem!")
+                    logger.debug(f"    - Dimension size: {dim_size}")
+                    logger.debug(f"    - Actual chunks: {dim_chunks}")
+                    logger.debug(f"    - First chunk: {first_chunk}, Last: {last_chunk}")
+                    logger.debug(f"    - New chunk: {optimal_size}")
+                    
+                    # Calculer la nouvelle distribution
+                    n_full = dim_size // optimal_size
+                    remainder = dim_size % optimal_size
+                    if remainder > 0:
+                        logger.debug(f"    - Result: {n_full} chunks of {optimal_size} + 1 chunk of {remainder}")
+                    else:
+                        logger.debug(f"    - Result: {n_full} chunks of {optimal_size} (division exacte)")
+            else:
+                # Chunks OK - garder la taille du premier
+                new_chunks[dim_name] = first_chunk
+                if verbose:
+                    logger.debug(f"  {dim_name}: Chunks OK ({n_chunks} chunks: {first_chunk}...{last_chunk})")
+        
+        # Rechunker si nécessaire
+        if needs_rechunk:
+            if verbose:
+                logger.debug(f"  → Rechunking with: {new_chunks}")
+            ds_fixed[var_name] = var.chunk(new_chunks)
+        
+        # TOUJOURS nettoyer l'encoding
+        safe_encoding = {}
+        if '_FillValue' in ds_fixed[var_name].encoding:
+            safe_encoding['_FillValue'] = ds_fixed[var_name].encoding['_FillValue']
+        if 'dtype' in ds_fixed[var_name].encoding:
+            safe_encoding['dtype'] = ds_fixed[var_name].encoding['dtype']
+        
+        ds_fixed[var_name].encoding = safe_encoding
+        
+        if verbose:
+            logger.debug(f"  Encoding cleaned (kept: {list(safe_encoding.keys())})")
+    
+    if verbose:
+        logger.debug("\n" + "=" * 70)
+        logger.debug("Every problem corrected?")
+        logger.debug("=" * 70)
+        
+        # Résumé
+        logger.debug("\nFinal chunks:")
+        for var_name in ds_fixed.data_vars:
+            var = ds_fixed[var_name]
+            if var.chunks is not None:
+                logger.debug(f"  {var_name}: {var.chunks}")
+    
+    return ds_fixed
+
+def write_dataset_to_zarr(
+    ds: xr.Dataset,
+    path: str,
+    mode: str = 'w',
+    consolidated: bool = True,
+    compute: bool = True,
+    **kwargs
+):
+    """
+    Sauvegarde sécurisée vers Zarr avec correction automatique.
+    
+    Parameters:
+    -----------
+    ds : xr.Dataset
+        Dataset à sauvegarder
+    path : str
+        Chemin de sortie Zarr
+    mode : str
+        Mode d'écriture ('w', 'a', 'w-')
+    consolidated : bool
+        Consolider les métadonnées (recommandé)
+    compute : bool
+        Calculer immédiatement (True) ou retourner delayed (False)
+    **kwargs : arguments supplémentaires pour to_zarr()
+    """
+    # Correction automatique
+    ds_fixed = auto_fix_zarr_encoding(ds)
+    
+    logger.info(f"\n Write: {path}")
+    logger.debug(f"   Mode: {mode}")
+    logger.debug(f"   Consolidated metadata: {consolidated}")
+    
+    # Écriture
+    result = ds_fixed.to_zarr(
+        path,
+        mode=mode,
+        consolidated=consolidated,
+        compute=compute,
+        **kwargs
+    )
+    
+    if compute:
+        logger.info("Successfully written.")
+    else:
+        logger.info("Delayed writting.")
+    
+    return result
 
 def create_fast_encoding(ds):
     """Crée un encoding optimisé pour la vitesse de sauvegarde."""
@@ -111,7 +318,7 @@ def zarrs2netcdfs(fins):
             fouts.append(fout)
     return fouts
 
-def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress):
+def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, localdirectory):
     """Configure le client Dask de manière robuste."""
     # Configuration optimale
     dask.config.set({
@@ -126,10 +333,11 @@ def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress):
         'distributed.worker.memory.monitor-interval': '100ms',
         'distributed.scheduler.allowed-failures': 2,
         'distributed.scheduler.work-stealing': True,
-        'array.shuffle.method': 'tasks',
+        #'array.shuffle.method': 'tasks',
         # 'array.chunk-size': '128MB',
-        'array.slicing.split_large_chunks': False,
-        'optimization.cull': True
+        # 'optimization.cull': True
+        'array.slicing.split_large_chunks': True,
+        'optimization.fuse.active': True,
     })
     
     kw_client = dict(
@@ -138,7 +346,7 @@ def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress):
         memory_limit=memory_limit,#'750MB',#'4GB',
         silence_logs=True,
         dashboard_address=dashboardaddress,#:8082,
-        #local_directory='/tmp',
+        local_directory=localdirectory,
         processes=processes
     )
     

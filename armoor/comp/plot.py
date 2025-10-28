@@ -1115,8 +1115,239 @@ class PlotComp:
                 break
         timeseries()
 
-        return None        
+        return None
+    
+    def timeseries_drifter(self):
+        """Plot time series of model/drifter comparison."""
+        lw = 2
+        prods = list(self.dt.children.keys())
+        ds_ref = self.dt.children[f"{prods[0]}"]["ref"]["data"].to_dataset()
+        dss_prod = [
+            self.dt.children[f"{prod}"]["prod"]["data"].to_dataset() for prod in prods
+            ]
+        dss_comp = [
+            self.dt.children[f"{prod}"]["comp"]["diff"].to_dataset() for prod in prods
+            ]
+        attrs = ds_ref.attrs
+        ref_name = attrs.get("data_name")
         
+        figname = (
+            "{self.func_comp}/plot/{self.metazone}/{ref_name}/"
+            "timeseries_drifter.png"
+            )
+        fig, axes = create_subplots(
+            nrows=2, figsize=(10, 6),
+            x_label='Integration period, day', y_label=None,
+            sharex=True
+            )
+        fig.suptitle(
+            f"{self.plot_title} \n"
+            f"{self.metazone} \n {ref_name}\n",
+            y=1.01
+            )
+        
+        plot_minimap(
+            ds_ref.set_coords(["lon", "lat"]),
+            ax=self.ax_minimap,
+            fig=fig,
+            plot_coords="lines",
+            coords_markersize=4,
+            gridlines_draw_labels=True,
+            gridlines_xlabel_style={'size': 6},
+            gridlines_ylabel_style={'size': 6},
+            )
+        for iprod, ds_prod in enumerate(dss_prod):
+            
+            prod_name = dss_prod[iprod].attrs["data_name"]
+            
+            axes[0].plot(
+                dss_comp[iprod]["time"],
+                dss_comp[iprod].distance / 1e3,
+                color=LINE_COLORS[iprod],
+                linewidth=lw,
+                label=prod_name
+                )
+            
+            axes[1].plot(
+                dss_comp[iprod]["time"],
+                dss_comp[iprod].direction,
+                color=LINE_COLORS[iprod],
+                linewidth=lw,
+                label=prod_name
+                )
+        
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(handles, labels, ncol=1, loc='center left',
+                   edgecolor='gray', bbox_to_anchor=(0.11,1.0))
+
+
+        axes[0].set_ylabel("Distance, km")
+        axes[1].set_ylabel("Direction diff., °")
+
+        self.save_figure(fig, figname.format(**locals()))
+        del axes
+        return None
+    
+    def maps_trajectory_drifter(self):
+        """Plot maps per product."""
+        for prod, node_prod in self.dt.children.items():
+            dsprod = node_prod["prod/data"].to_dataset()
+            dsref = node_prod["ref/data"].to_dataset()
+            prod_name = dsprod.attrs.get("data_name")
+            ref_name = dsref.attrs.get("data_name")
+                                        
+            figtitle = (
+                f"{self.plot_title} \n"
+                f"{self.metazone}"
+                )
+                
+            dlat = dsref.lat.max() - dsref.lat.min()
+            dlon = dsref.lon.max() - dsref.lon.min()
+            aspect_ratio = dlat / dlon
+            fig, axes = create_subplots(
+                layout_type="one",
+                figsize=(10 * aspect_ratio, 10),
+                x_label=None, y_label=None,
+                sharex=True, projection=ccrs.PlateCarree()
+                )
+            
+            lonmin = dsref.lon.min() - 0.5 * dlon
+            lonmax = dsref.lon.max() + 0.5 * dlon
+            latmin = dsref.lat.min() - 0.5 * dlat
+            latmax = dsref.lat.max() + 0.5 * dlat
+            axes[0].set_xlim([lonmin, lonmax])
+            axes[0].set_ylim([latmin, latmax])
+            
+            axes[0].plot(
+                dsref.lon,
+                dsref.lat,
+                color="k",
+                label=ref_name,
+                lw=4
+                )
+            
+            for itraj in range(dsprod.sizes["trajectory_parcels"]):
+                if itraj == 0:
+                    kw = dict(label=prod_name)
+                else:
+                    kw = dict()
+                axes[0].plot(
+                    dsprod.lon_parcels.isel(trajectory_parcels=itraj),
+                    dsprod.lat_parcels.isel(trajectory_parcels=itraj),
+                    color="slateblue",
+                    lw=4,
+                    alpha=0.65,
+                    **kw
+                    )
+            
+            handles, labels = axes[0].get_legend_handles_labels()
+            fig.legend(handles, labels, ncol=1, loc='center left',
+                       edgecolor='gray', bbox_to_anchor=(0.11,0.94)) 
+            
+            #plt.subplots_adjust(hspace=0.02, wspace=0.01)
+            for iax, ax in enumerate(axes):
+                gl = axes[iax].gridlines(
+                    crs=ccrs.PlateCarree(),
+                    draw_labels=True,
+                    linewidth=0.5,
+                    color='gray',
+                    alpha=0.5,
+                    linestyle='--'
+                    )
+                gl.top_labels = False
+                gl.right_labels = False
+            
+            figname = (
+                f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                f"map_drifter_trajectories_{prod_name}.png"
+                )
+            
+            fig.suptitle(figtitle, fontsize="x-large", y=0.95)
+            
+            self.save_figure(fig, figname)
+                        
+        return None
+    
+    
+    def maps_current_drifter(self):
+        """Plot maps per product."""
+        for prod, node_prod in self.dt.children.items():
+            dsprod = node_prod["prod/data"].to_dataset()
+            dsref = node_prod["ref/data"].to_dataset()
+            prod_name = dsprod.attrs.get("data_name")
+            ref_name = dsref.attrs.get("data_name")
+                                        
+            figtitle = (
+                f"{self.plot_title} \n"
+                f"{self.metazone}"
+                )
+                
+            dlat = dsref.lat.max() - dsref.lat.min()
+            dlon = dsref.lon.max() - dsref.lon.min()
+            aspect_ratio = dlat / dlon
+            fig, axes = create_subplots(
+                layout_type="one",
+                figsize=(10 * aspect_ratio, 10),
+                x_label=None, y_label=None,
+                sharex=True, projection=ccrs.PlateCarree()
+                )
+            
+            lonmin = dsref.lon.min() - 0.5 * dlon
+            lonmax = dsref.lon.max() + 0.5 * dlon
+            latmin = dsref.lat.min() - 0.5 * dlat
+            latmax = dsref.lat.max() + 0.5 * dlat
+            axes[0].set_xlim([lonmin, lonmax])
+            axes[0].set_ylim([latmin, latmax])
+            
+            dsprod = dsprod.squeeze()
+            dsref = dsref.squeeze()
+            
+            axes[0].quiver(
+                dsref.lon,
+                dsref.lat,
+                dsref.u,
+                dsref.v,
+                color="k",
+                label=ref_name
+                )
+            
+            axes[0].quiver(
+                dsprod.lon_drifter,
+                dsprod.lat_drifter,
+                dsprod.u_drifter,
+                dsprod.v_drifter,
+                color="slateblue",
+                label=prod_name,
+                alpha=0.65,
+                )
+            
+            handles, labels = axes[0].get_legend_handles_labels()
+            fig.legend(handles, labels, ncol=1, loc='center left',
+                       edgecolor='gray', bbox_to_anchor=(0.11, 0.94)) 
+            
+            for iax, ax in enumerate(axes):
+                gl = axes[iax].gridlines(
+                    crs=ccrs.PlateCarree(),
+                    draw_labels=True,
+                    linewidth=0.5,
+                    color='gray',
+                    alpha=0.5,
+                    linestyle='--'
+                    )
+                gl.top_labels = False
+                gl.right_labels = False
+            
+            figname = (
+                f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                f"map_drifter_current_{prod_name}.png"
+                )
+            
+            fig.suptitle(figtitle, fontsize="x-large", y=0.95)
+            
+            self.save_figure(fig, figname)
+            del axes
+        return None
+     
     def maps(self):
         """Plot maps per product."""
         for prod, node_prod in self.dt.children.items():

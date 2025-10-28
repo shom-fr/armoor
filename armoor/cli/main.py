@@ -150,11 +150,14 @@ def main_filters():
 
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
     
-    kw_dask = {
-        "n_workers": args.dask_nworkers,
-        "processes": args.dask_processes,
-        "memory_limit": args.dask_memorylimit
-        }
+    kw_dask = (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
+        )
+    
     with LocalCluster(**setup_dask_client(**kw_dask)) as cluster:
         with Client(cluster): 
             zarrs = load_datasets(cfg["data"], metazones, None)
@@ -233,7 +236,8 @@ def main_data():
         args.dask_nworkers,
         args.dask_processes,
         args.dask_memorylimit,
-        args.dask_dashboardaddress
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
         )
     
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
@@ -295,7 +299,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster): 
+        with Client(cluster):
             zarr = load_datasets(cfg["data"], metazones, func_comp)
             if ofilter:
                 zarr = [str(z) for z in zarr]
@@ -315,8 +319,8 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
                         json.dump(ncs_outputs, f, indent=4)
                 
                 else:
-                    
-                    zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp)
+
+                    zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp, **comp_args)
                     
                     ofmt = cfg["outputs"].get("fmt")
                     
@@ -378,7 +382,8 @@ def main_comp_models():
         args.dask_nworkers,
         args.dask_processes,
         args.dask_memorylimit,
-        args.dask_dashboardaddress
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
         )
     
     main_comp(
@@ -433,7 +438,8 @@ def main_comp_sst():
         args.dask_nworkers,
         args.dask_processes,
         args.dask_memorylimit,
-        args.dask_dashboardaddress
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
         )
 
     main_comp(
@@ -495,7 +501,8 @@ def main_comp_argo():
         args.dask_nworkers,
         args.dask_processes,
         args.dask_memorylimit,
-        args.dask_dashboardaddress
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
         )
     
     main_comp(
@@ -556,7 +563,8 @@ def main_comp_mooring():
         args.dask_nworkers,
         args.dask_processes,
         args.dask_memorylimit,
-        args.dask_dashboardaddress
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
         )  
 
     main_comp(
@@ -572,7 +580,7 @@ def main_comp_mooring():
         )
 
 def get_parser_comp_drifter():
-    """Get parser for mooring comparison."""
+    """Get parser for drifter comparison."""
     # Setup argument parser
     parser = ArgumentParser(
         description="Compare drifter data with model ouputs.",
@@ -589,7 +597,7 @@ def get_parser_comp_drifter():
         )
     parser.add_argument(
         '--freq',
-        default="1h",
+        default="6h",
         type=str,
         help="Time frequency of trajectory comparison (pandas frequency string). Ex: 1h, 6h, 1d"
         )
@@ -620,7 +628,8 @@ def main_comp_drifter():
         args.dask_nworkers,
         args.dask_processes,
         args.dask_memorylimit,
-        args.dask_dashboardaddress
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
         )
     
     main_comp(

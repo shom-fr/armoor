@@ -588,7 +588,7 @@ def main_coloc(ncs, metazones, comp_func):
         ncrefs = [
             nc for nc in ncs if (metazone in str(nc)) & ("ref" in str(nc))
             ]
-        for ncref in ncrefs[:2]:
+        for ncref in ncrefs:
             logger.info(f"Use reference {ncref}")
             dsrefin = xr.open_dataset(ncref, engine="zarr")#, engine="h5netcdf")
             dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=512)

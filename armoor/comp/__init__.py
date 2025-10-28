@@ -33,7 +33,9 @@ METAZONE_PARAMS = {
         "polygon",
         "vars",
         "freq_drift",
-        "period_drift"
+        "period_drift",
+        "tresample",
+        "tsmooth"
         ],
     "comp_models": [
         "tfreq",
@@ -164,7 +166,14 @@ OUTPUTS_PARAMS = {
             },
         },
     "comp_drifter": {
-        "preproc": "oceanparcels"
+        "preproc": "oceanparcels",
+        "timeseries_drifter":{
+            "output": "merge"
+            },
+        "maps_current_drifter":{
+            },
+        "maps_trajectory_drifter":{
+            }
         },
     "comp_mooring": {
         "timeseries": {
@@ -231,6 +240,7 @@ TITLE_PLOTS = {
     "comp_argo": "Hydrological profiles",
     "comp_mooring": "Hydrological mooring",
     "comp_models": "",
+    "comp_drifter": "Drifters"
     }
 
 METRIC_LABELS = {

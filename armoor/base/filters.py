@@ -7,7 +7,9 @@ import math
 import re
 import sys
 
+from scipy.signal.windows import gaussian
 import dask.array as da
+import dask
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -22,6 +24,7 @@ from armoor.data.open_decode import open_decode
 R_terre = 6371
 logger = logging.getLogger(__name__)
 xr.set_options(keep_attrs=True)
+
 
 @xr.register_dataarray_accessor("armoorfilters")
 @xr.register_dataset_accessor("armoorfilters")
@@ -162,7 +165,8 @@ class ArmoorFilters:
         mask = mask.compute()
         self.ds = self.ds.where(mask, drop=False)
         return self.ds
-
+    
+    @dask.delayed
     def tidal_filter(self, filter_name="demerliac"):
         """
         Apply a tidal filter to time-dependent variables in the dataset.
@@ -207,7 +211,121 @@ class ArmoorFilters:
                 except Exception as e:
                     logger.warning(f"xoa: {e}")
                     logger.info("Tide filter ignored")
-                    
+    
+    @dask.delayed
+    def tresample(self, freq):
+        """
+        """
+        logger.info(f"Apply a time resampling at frequency: {freq}")
+        if "time" in self.ds.lon.dims:
+            self.ds = self.ds.reset_coords(["lon", "lat"])
+        self.ds = self.ds.resample(time=freq).mean()
+        if "time" in self.ds.lon.dims:
+            self.ds = self.ds.set_coords(["lon", "lat"])
+            
+    def generate_kernel_from_freq(self, freq: str, time_index: pd.DatetimeIndex, 
+                              kernel_type: str = "gaussian"):
+        """
+        Generate a 1D smoothing kernel based on user frequency and sampling rate.
+    
+        Parameters
+        ----------
+        freq : str
+            User-specified frequency (e.g., '7D', '12H').
+        time_index : pd.DatetimeIndex
+            Time index of the data (must be regular).
+        kernel_type : str, optional
+            'boxcar' (moving average) or 'gaussian'. Default is 'gaussian'.
+    
+        Returns
+        -------
+        kernel : np.ndarray
+            Normalized smoothing kernel.
+        kernel_size : int
+            Size of the kernel in number of samples.
+        """
+    
+        # Infer sampling interval of the data
+        inferred = pd.infer_freq(time_index)
+        if inferred is None:
+            raise ValueError("Time index must have a regular frequency. Consider resampling first.")
+    
+        offset_user = pd.tseries.frequencies.to_offset(freq)
+        offset_sample = pd.tseries.frequencies.to_offset(inferred)
+    
+        # Number of samples per user frequency
+        kernel_size = int(round(pd.to_timedelta(offset_user) / pd.to_timedelta(offset_sample)))
+        if kernel_size < 1:
+            kernel_size = 1
+        if kernel_size % 2 == 0:
+            kernel_size += 1  # make odd to center
+    
+        # Build kernel
+        if kernel_type == "boxcar":
+            kernel = np.ones(kernel_size) / kernel_size
+        elif kernel_type == "gaussian":
+            std = kernel_size / 6
+            kernel = gaussian(kernel_size, std)
+            kernel /= kernel.sum()
+        else:
+            raise ValueError(f"Unknown kernel_type: {kernel_type}")
+
+        return kernel, kernel_size
+
+    @dask.delayed
+    def tsmooth(self, freq: str) -> xr.Dataset:
+        """
+        Apply 1D convolution along 'time' dimension using a custom kernel.
+    
+        Parameters
+        ----------
+        freq : str
+            User-specified frequency (e.g., '7D', '12H').
+    
+        Returns
+        -------
+        xr.DataArray
+            Smoothed data.
+        """
+        logger.info(f"Apply a time smoothing at frequency: {freq}")
+        varscoord = []
+        for var in ["lon", "lat", "depth"]:
+            if "time" in self.ds[var].dims:
+                varscoord.append(var)
+        self.ds = self.ds.reset_coords(varscoord)
+        
+        if "drifter" in self.ds.attrs["data_name"]:
+            logger.info("Resample drifter")
+            logger.info("long?")
+            self.ds = self.ds.resample(time="1h").mean()
+        kernel, size = self.generate_kernel_from_freq(
+            freq,
+            self.ds.time,
+            kernel_type="gaussian"
+            )
+
+        kernel = xr.DataArray(
+            data=kernel,
+            dims="time"
+            )
+        dss = []
+        for var in self.ds.data_vars:
+            if (var != "time") and ("time" in self.ds[var].dims):
+                # da = xfilter.smooth(self.ds[var], kernel)
+                da = xr.map_blocks(
+                    xfilter.smooth, 
+                    self.ds[var], 
+                    kwargs={'kernel': kernel, "na_thres": 1}
+                )
+                da.attrs.update({**self.ds[var].attrs})
+                ds = da.to_dataset(name=var)
+                if var in varscoord:
+                    ds = ds.set_coords(var)
+            else:
+                ds = self.ds[[var]]
+            dss.append(ds)
+        self.ds = xr.merge(dss)
+
     def _get_time_bounds_mask(self, start=None, end=None):
         if not start:
             logger.error("Giving a begindate is mandatory.")
@@ -284,6 +402,7 @@ class ArmoorFilters:
                 combined_mask = mask if combined_mask is None else combined_mask & mask
         
         # Apply combined mask once
+        depth_was_coord = False
         if combined_mask is not None:
             depth_was_coord = "depth" in self.ds.coords
             if depth_was_coord and ("time" in self.ds.depth.sizes):
@@ -292,13 +411,11 @@ class ArmoorFilters:
                 result = self.ds
             if mask2keep is not None:
                 result["mask"] = mask2keep
-            combined_mask = combined_mask.compute()
+            # combined_mask = combined_mask.compute()
             result = result.where(combined_mask, drop=True)
             if "mask" in result:
                 if "time" in result["mask"].dims:
                     result["mask"] = result.mask.isel(time=0)
-            if depth_was_coord and "depth" in result:
-                result = result.set_coords("depth")
             
             self.ds = result.copy()
             result.close()
@@ -314,7 +431,16 @@ class ArmoorFilters:
         if "tide" in filters_config:
             filter_name = filters_config.get("tide")
             self.tidal_filter(filter_name=filter_name)
-    
+
+        if "tresample" in filters_config:
+            self.tresample(filters_config.get("tresample"))
+            
+        if "tsmooth" in filters_config:
+            self.tsmooth(filters_config.get("tsmooth"))
+
+        if depth_was_coord and "depth" in result:
+            result = result.set_coords("depth")
+
         if "bathy" in self.ds:
             bathy = self.ds.bathy
             if "time" in bathy.dims:

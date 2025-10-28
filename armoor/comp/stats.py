@@ -55,13 +55,6 @@ class StatsComp:
             return self.get_diff()
 
     def prepare_coords(self, dim):
-        # for d in ["time", "z", "y", "x"]:
-        #     if d in dim:
-        #         for coord in ["depth", "lon", "lat"]:
-        #             if (coord in self.dsprod.coord) and (d in self.dsprod.dim):
-        #                 self.dsprod = self.dsprod.reset_coords(coord)
-        #             if (coord in self.dsref.coord) and (d in self.dsref.dim):
-        #                 self.dsref = self.dsref.reset_coords(coord)
         coords_to_check = {"depth", "lon", "lat"}
         dims_to_check = {"time", "z", "y", "x"}
         

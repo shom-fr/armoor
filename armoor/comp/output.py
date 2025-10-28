@@ -11,30 +11,43 @@ import dask
 import numpy as np
 import pandas as pd
 import xarray as xr
+from xoa.geo import haversine, bearing, EARTH_RADIUS
+from xoa.grid import to_rect
 
 from armoor import ArmoorError
 from armoor.base.io import (
     get_zarr_encoding,
     setup_dask_client,
-    sort_ncs_by_suffix
+    sort_ncs_by_suffix,
+    write_dataset_to_zarr
     )
 from armoor.comp import COMP_VARS, OUTPUTS_PARAMS
 from armoor.comp.plot import PlotComp
 from armoor.comp.stats import StatsComp
+from armoor.data.interp import process_time_interpolation
 from armoor.diags.parcels import Parcels
 
 logger = logging.getLogger(__name__)
 
 
 def check_output(func_name, outputs):
-    for output in outputs.values():
+    for oname, output in outputs.items():
+        if (func_name == "comp_drifter") & (output.get('otype') == "timeseries"):
+            output["otype"] = "timeseries_drifter"
+            outputs[oname] = output
+        if (func_name == "comp_drifter") & (output.get('otype') == "maps_current"):
+            output["otype"] = "maps_current_drifter"
+            outputs[oname] = output
+        if (func_name == "comp_drifter") & (output.get('otype') == "maps_trajectory"):
+            output["otype"] = "maps_trajectory_drifter"
+            outputs[oname] = output
         if output.get('otype') not in OUTPUTS_PARAMS[func_name].keys():
             raise ArmoorError(
                 f"Not implemented output for {func_name}: {output}"
                 )
-
-
-def preproc_comp_drifter(zins):
+    return outputs
+        
+def preproc_comp_drifter(zins, odt, runtime=None):
     logger.info("Preproc comp_drifter")
     for drifter, prods in zins.items():
         logger.info(drifter)
@@ -42,56 +55,95 @@ def preproc_comp_drifter(zins):
             logger.info(f"Prod: {prod}")
             zref = [z for z in zs if "ref_" in str(z)][0]
             zprod = [z for z in zs if "prod_" in str(z)][0]
-            with xr.open_dataset(zref) as dsref:
-                dstmp = dsref.reset_coords(["lon", "lat"])
-                odt = "3600s"
-                dstmp = dstmp.resample(time=odt).mean()
-                ptc_coords_start = {
-                    "time": dstmp.time.values,
-                    "lon": dstmp.lon.values,
-                    "lat": dstmp.lat.values
-                    }
-                runtime = (
-                    dsref.time.max() - dsref.time.min()
-                    ) / pd.to_timedelta("1s")
-                runtime = f'{int(runtime)}s'
             ncprod = str(zprod).replace(".zarr", ".nc")
             with xr.open_dataset(zprod) as dsprod:
                 if "z" in dsprod.sizes:
                     dsprod = dsprod.squeeze(dim="z")
+                dsprod = dsprod.drop("depth")
+                dsprod = dsprod[["u", "v"]]
+                timeprod = [(
+                    pd.to_datetime(time) - pd.to_datetime("1950-01-01")
+                    ) / pd.to_timedelta("1s") for time in dsprod.time.values
+                    ]
+                dsprod["time"] = xr.DataArray(
+                    timeprod,
+                    dims=dsprod.time.dims,
+                    attrs={
+                        'dtype':  'float64',
+                        'units': 'seconds since 1950-01-01 00:00:00',
+                        }
+                    )
                 dsprod.to_netcdf(ncprod)
+            dsref = xr.open_dataset(zref)
+            dsref = dsref.reset_coords(["lon", "lat"]).drop("depth")
+            dsref = process_time_interpolation(
+                dsref,
+                ("tfreq", odt),
+                [dsref.time.min().values, dsref.time.max().values]
+                )
+            timeref = [
+                float((pd.to_datetime(time) - pd.to_datetime("1950-01-01")
+                ) / pd.to_timedelta("1s")) - timeprod[0]
+                for time in dsref.time.values
+                ]
+            ptc_coords_start = {
+                "time": timeref,
+                "lon": dsref.lon.values,
+                "lat": dsref.lat.values
+                }
+            if runtime:
+                rruntime = pd.to_timedelta(runtime) / pd.to_timedelta("1s")
+            else:
+                rruntime = (
+                    dsref.time.max() - dsref.time.min()
+                    ) / pd.to_timedelta("1s")
+            rruntime = float(rruntime)
+            dsref.close()
+            shutil.rmtree(zref)
+            dsref = dsref.load()
+            dsref.to_zarr(zref)
+            del dsref    
             Parcels(
                 ncprod,
                 ptc_coords_start,
-                runtime,
+                rruntime,
                 outputdt=odt,
                 ).execute()
             shutil.rmtree(zprod)
             with xr.open_dataset(ncprod) as dsprod:
-                dsprod.to_zarr(zprod)
+                # dsprod.to_zarr(zprod)
+                write_dataset_to_zarr(
+                    dsprod,
+                    zprod,
+                    mode="w",
+                    consolidated=True,
+                    compute=True
+                    )
+                
             zins[drifter].update({
                 prod: [zref, zprod]
                 })
     return zins
 
-def preproc_comp(func_comp, ncs):
+def preproc_comp(func_comp, ncs, **kwargs):
     if func_comp == "comp_drifter":
-        return preproc_comp_drifter(ncs)
+        return preproc_comp_drifter(
+            ncs,
+            kwargs.get("freq_drift"),
+            runtime=kwargs.get("period_drift")
+            )
         
-    
-    
-
 class OutputProcessor:
     """
     A class to handle output processing with statistical comparisons between 
     production and reference datasets.
     """
     
-    def __init__(self):
+    def __init__(self, func_comp=None):
         """Initialize the OutputProcessor."""
-        pass
+        self.func_comp = func_comp
     
-    def process_output(self, ocfg: List[Dict[str, Any]], func_comp: str) -> Dict[str, Dict[str, List[str]]]:
+    def process_output(self, ocfg: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[str]]]:
         """
         Process output configurations to generate statistical comparisons.
         
@@ -100,7 +152,6 @@ class OutputProcessor:
         
         Args:
             ocfg: List containing [metazone_config, output_config] dictionaries
-            func_comp: Function component identifier used for output directory structure
             
         Returns:
             Dictionary mapping output types to metazones to list of output file paths.
@@ -126,11 +177,11 @@ class OutputProcessor:
         logger.info(f"{metazone} -- {output}")
         
         # Validate output compatibility
-        if not self._validate_output_compatibility(oparams, mparams, metazone, output, func_comp):
+        if not self._validate_output_compatibility(oparams, mparams, metazone, output):
             return {output: {metazone: []}}
         
         # Get output parameters and initialize result structure
-        output_params = OUTPUTS_PARAMS[func_comp][output]
+        output_params = OUTPUTS_PARAMS[self.func_comp][output]
         ncouts = {output: {metazone: []}}
         ref_ncins = mparams.get("ncins")
         
@@ -140,17 +191,16 @@ class OutputProcessor:
             
             # Sort and organize input files
             sorted_prods = self._sort_products(prods, output_params)
-            
+ 
             # Generate statistics and comparisons
             processed_datasets = self._generate_statistics_and_comparisons(
-                sorted_prods, mparams, output_params
-            )
-            
+                sorted_prods, mparams, output_params, output
+                )
             # Save outputs
             output_files = self._save_outputs(
-                processed_datasets, sorted_prods, func_comp, metazone, 
+                processed_datasets, sorted_prods, metazone, 
                 ref_name, output, output_params
-            )
+                )
             
             ncouts[output][metazone].extend(output_files)
             
@@ -159,6 +209,78 @@ class OutputProcessor:
             gc.collect()
         
         return ncouts
+    
+    def _drifter(self, dsref, dsprod, output):
+        
+        if output == "timeseries_drifter":
+            coords = ["time", "lon", "lat"]#, "u", "v"]
+            suff = "_parcels"
+            dsref = dsref[coords].set_coords(["time", "lat", "lon"]).squeeze()
+            dsprod = dsprod[
+                [f"{vname}{suff}" for vname in coords]
+                ]
+            vrenames = {}
+            for vname in coords:
+                vrenames.update({
+                    f"{vname}{suff}": vname
+                    })
+            dsprod = dsprod.rename_vars(vrenames)
+            data_list = []
+            for iptc in range(dsprod.sizes["trajectory_parcels"]):
+                dsparti = dsprod.isel(trajectory_parcels=iptc)
+                dsparti = dsparti.where(dsparti.time.notnull(), drop=True)
+                dsparti = dsparti.swap_dims({"obs_parcels": "time"})
+                dsdrift = dsref.sel(time=slice(dsparti.time.min(), dsparti.time.max()))
+                dsparti = dsparti.sel(time=slice(dsdrift.time.min(), dsdrift.time.max()))
+                # if dsparti.sizes["time"] < 2:
+                #     continue
+                dist = haversine(dsdrift.lon, dsdrift.lat, dsparti.lon, dsparti.lat)
+                bear_drift = bearing(
+                    dsdrift.lon.isel(time=slice(1, None)),
+                    dsdrift.lat.isel(time=slice(1, None)),
+                    dsdrift.lon.isel(time=slice(None, -1)),
+                    dsdrift.lat.isel(time=slice(None, -1))
+                    )
+                bear_parti = bearing(
+                    dsparti.lon.isel(time=slice(1, None)),
+                    dsparti.lat.isel(time=slice(1, None)),
+                    dsparti.lon.isel(time=slice(None, -1)),
+                    dsparti.lat.isel(time=slice(None, -1))
+                    )
+                angle = (((bear_drift - bear_parti) + 180) % 360) - 180
+                if isinstance(angle, np.float64):
+                    angle = [angle]
+                angle = np.concatenate([[0], angle])
+                data_list.append(pd.DataFrame({
+                    'time': (dsparti.time - dsparti.time.min()).values / pd.to_timedelta("1d"),
+                    'dist': dist.values if hasattr(dist, 'values') else dist,
+                    'angle': angle.values if hasattr(angle, 'values') else angle
+                }))
+            df_all = pd.concat(data_list, ignore_index=True)
+            grouped = df_all.groupby('time').agg({
+                'dist': 'mean',
+                'angle': 'mean'
+            })
+            times = grouped.index.values
+            dist_mean = grouped['dist'].values
+            angle_mean = grouped['angle'].values
+            dtcomps = xr.DataTree(name="comps")
+            dtcomps.update(xr.DataTree.from_dict({
+                "diff": xr.Dataset(
+                    data_vars=dict(
+                        distance=(["time"], dist_mean),
+                        direction=(["time"], angle_mean)
+                        ),
+                    coords=dict(
+                        time=times
+                        )
+                    )
+                }))
+        elif output in ("maps_current_drifter", "maps_trajectory_drifter"):
+            dtcomps = None
+       
+        return dtcomps
+                
     
     def _parse_configuration(self, ocfg: List[Dict[str, Any]]) -> Tuple[str, str, Dict[str, Any], Dict[str, Any]]:
         """
@@ -180,7 +302,7 @@ class OutputProcessor:
         return metazone, output, mparams, oparams
     
     def _validate_output_compatibility(self, oparams: Dict[str, Any], mparams: Dict[str, Any], 
-                                     metazone: str, output: str, func_comp: str) -> bool:
+                                     metazone: str, output: str) -> bool:
         """
         Validate if output type is compatible with metazone parameters.
         
@@ -189,15 +311,16 @@ class OutputProcessor:
             mparams: Metazone parameters  
             metazone: Metazone name
             output: Output type name
-            func_comp: Function component identifier
             
         Returns:
             True if compatible, False otherwise
         """
         try:
-            output_config = OUTPUTS_PARAMS[func_comp][output]
+            if (self.func_comp == "comp_drifter") & (output == "timeseries"):
+                output = "timeseries_drifter"
+            output_config = OUTPUTS_PARAMS[self.func_comp][output]
         except KeyError:
-            logger.warning(f"Output type '{output}' not found in OUTPUTS_PARAMS for {func_comp}")
+            logger.warning(f"Output type '{output}' not found in OUTPUTS_PARAMS for {self.func_comp}")
             return False
         
         # Check required parameters
@@ -254,7 +377,7 @@ class OutputProcessor:
     
     def _generate_statistics_and_comparisons(self, sorted_prods: Dict[str, Dict], 
                                            mparams: Dict[str, Any],
-                                           output_params: Dict[str, Any]) -> Dict[str, Dict]:
+                                           output_params: Dict[str, Any], output) -> Dict[str, Dict]:
         """
         Generate statistics and comparisons for all products.
         
@@ -277,13 +400,12 @@ class OutputProcessor:
             
             # Process each sorting group
             sort_keys = sorted_prods[prod_name]["prod"].keys()
-            
             for sort_key in sort_keys:
+                
                 # Generate statistics for this sorting group
                 stats_data = self._compute_statistics_for_sort_group(
-                    sorted_prods[prod_name], sort_key, mparams, output_params
+                    sorted_prods[prod_name], sort_key, mparams, output_params, output
                 )
-                
                 # Concatenate datasets for each data type
                 for data_type in ["prod", "ref", "comp"]:
                     concatenated_data = self._concatenate_datasets(
@@ -295,7 +417,7 @@ class OutputProcessor:
     
     def _compute_statistics_for_sort_group(self, prod_files: Dict[str, Dict], 
                                          sort_key: str, mparams: Dict[str, Any],
-                                         output_params: Dict[str, Any]) -> Dict[str, List]:
+                                         output_params: Dict[str, Any], output) -> Dict[str, List]:
         """
         Compute statistics for a specific sorting group.
         
@@ -323,7 +445,7 @@ class OutputProcessor:
         for file_idx in range(num_files):
             ds_prod = xr.open_dataset(prod_files_list[file_idx])
             ds_ref = xr.open_dataset(ref_files_list[file_idx])
-            
+
             try:
                 # Prepare statistics configuration
                 stats = output_params.get("stat").copy() if output_params.get("stat") else None
@@ -332,6 +454,9 @@ class OutputProcessor:
                 dt_prod, dt_ref, dt_comps = StatsComp(
                     mparams, ds_prod, ds_ref, stats
                 ).compute()
+                
+                if self.func_comp == "comp_drifter":
+                    dt_comps = self._drifter(ds_ref, ds_prod, output)
                 
                 # Store results
                 computed_data["prod"].append(dt_prod)
@@ -408,7 +533,7 @@ class OutputProcessor:
         return concatenated
     
     def _save_outputs(self, processed_datasets: Dict[str, Dict], 
-                     sorted_prods: Dict[str, Dict], func_comp: str,
+                     sorted_prods: Dict[str, Dict],
                      metazone: str, ref_name: str, output: str,
                      output_params: Dict[str, Any]) -> List[str]:
         """
@@ -417,7 +542,6 @@ class OutputProcessor:
         Args:
             processed_datasets: Processed datasets organized by product and type
             sorted_prods: Sorted product information
-            func_comp: Function component identifier
             metazone: Metazone name
             ref_name: Reference dataset name
             output: Output type name
@@ -429,7 +553,7 @@ class OutputProcessor:
         output_files = []
         
         # Create base output directory
-        dirout = Path(f"{func_comp}/output/{metazone}/{ref_name}/{output}")
+        dirout = Path(f"{self.func_comp}/output/{metazone}/{ref_name}/{output}")
         
         # Get all sorting keys
         sort_keys = list(sorted_prods[list(sorted_prods.keys())[0]]["prod"].keys())
@@ -485,7 +609,8 @@ class OutputProcessor:
         output_file = sort_dir / "all.zarr"
         encoding = get_zarr_encoding(dt)
         dt.to_zarr(output_file, mode="w", encoding=encoding)
-        
+        # output_file = sort_dir / "all.netcdf"
+        # dt.to_netcdf(output_file)
         return output_file
     
     def _save_separate_outputs(self, processed_datasets: Dict[str, Dict], 
@@ -514,13 +639,16 @@ class OutputProcessor:
             # Add data for each type (prod, ref, comp)
             for data_type in ["prod", "ref", "comp"]:
                 datasets = processed_datasets[prod_name][data_type][sort_key]
-                data_tree = xr.DataTree.from_dict(datasets)
-                dt[prod_name].update(xr.DataTree.from_dict({data_type: data_tree}))
+                if datasets:
+                    data_tree = xr.DataTree.from_dict(datasets)
+                    dt[prod_name].update(xr.DataTree.from_dict({data_type: data_tree}))
             
             # Save product file
             output_file = sort_dir / f"{prod_name}.zarr"
             encoding = get_zarr_encoding(dt)
             dt.to_zarr(output_file, mode="w", encoding=encoding)
+            # output_file = sort_dir / f"{prod_name}.netcdf"
+            # dt.to_netcdf(output_file)
             output_files.append(output_file)
         
         return output_files
@@ -531,12 +659,12 @@ class OutputPipelineManager:
     Manager class for handling the complete output processing pipeline with parallelization.
     """
     
-    def __init__(self):
+    def __init__(self, func_comp=None):
         """Initialize the OutputPipelineManager."""
-        self.processor = OutputProcessor()
+        self.processor = OutputProcessor(func_comp=func_comp)
+        self.func_comp = func_comp
     
-    def process_and_extract(self, output_config: List[Dict[str, Any]], 
-                          func_comp: str) -> Dict[str, Dict[str, List[str]]]:
+    def process_and_extract(self, output_config: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[str]]]:
         """
         Process output configuration and extract non-empty results.
         
@@ -544,13 +672,12 @@ class OutputPipelineManager:
         
         Args:
             output_config: Output configuration
-            func_comp: Function component identifier
             
         Returns:
             Dictionary with only non-empty results
         """
         # Process the output
-        results = self.processor.process_output(output_config, func_comp)
+        results = self.processor.process_output(output_config)
         
         # Filter out empty results
         filtered_results = {}
@@ -564,7 +691,7 @@ class OutputPipelineManager:
         return filtered_results
     
     def process_all_outputs(self, ncs: Dict[str, Any], metazones_in: Dict[str, Any],
-                          outputs: Dict[str, Any], func_comp: str) -> Dict[str, Dict[str, List[str]]]:
+                          outputs: Dict[str, Any], **kwargs) -> Dict[str, Dict[str, List[str]]]:
         """
         Process all output configurations with parallel execution.
         
@@ -572,7 +699,6 @@ class OutputPipelineManager:
             ncs: NetCDF files organized by metazone
             metazones_in: Input metazone configurations
             outputs: Output configurations
-            func_comp: Function component identifier
             
         Returns:
             Dictionary mapping output types to metazones to file paths
@@ -586,12 +712,11 @@ class OutputPipelineManager:
         """
         # Prepare configurations
         output_configs = self._prepare_output_configurations(
-            ncs, metazones_in, outputs, func_comp
+            ncs, metazones_in, outputs, **kwargs
         )
-        
         # Create delayed tasks for parallel processing
         delayed_tasks = [
-            dask.delayed(self.process_and_extract)(config, func_comp)
+            dask.delayed(self.process_and_extract)(config)
             for config in output_configs
         ]
         
@@ -604,8 +729,9 @@ class OutputPipelineManager:
     
     def _prepare_output_configurations(self, ncs: Dict[str, Any], 
                                      metazones_in: Dict[str, Any],
-                                     outputs: Dict[str, Any], 
-                                     func_comp: str) -> List[List[Dict[str, Any]]]:
+                                     outputs: Dict[str, Any],
+                                     **kwargs
+                                     ) -> List[List[Dict[str, Any]]]:
         """
         Prepare output configurations for processing.
         
@@ -613,7 +739,6 @@ class OutputPipelineManager:
             ncs: NetCDF files organized by metazone
             metazones_in: Input metazone configurations
             outputs: Output configurations
-            func_comp: Function component identifier
             
         Returns:
             List of output configurations ready for processing
@@ -621,19 +746,18 @@ class OutputPipelineManager:
         # Remove format specification and validate outputs
         output_configs = outputs.copy()
         output_configs.pop("fmt", None)
-        check_output(func_comp, output_configs)
-        preproc = OUTPUTS_PARAMS[func_comp].get("preproc")
+        output_configs = check_output(self.func_comp, output_configs)
+        preproc = OUTPUTS_PARAMS[self.func_comp].get("preproc")
         # Prepare metazone configurations
         prepared_metazones = {}
         for metazone_name, metazone_config in metazones_in.items():
             if metazone_config:
+                ncins = ncs.get(metazone_name)
                 if preproc:
-                    ncos = preproc_comp(func_comp, ncs.get(metazone_name))
-                else:
-                    ncos = ncs.get(metazone_name)
+                    preproc_comp(self.func_comp, ncins, **kwargs)
                 prepared_metazones[metazone_name] = {
-                    "ncins": ncos,
-                    "vars": COMP_VARS[func_comp],
+                    "ncins": ncins,
+                    "vars": COMP_VARS[self.func_comp],
                     **metazone_config.copy()
                 }
         
@@ -688,8 +812,8 @@ def process_output(ocfg: List[Dict[str, Any]], func_comp: str) -> Dict[str, Dict
         ... ]
         >>> result = process_output(ocfg, 'validation')
     """
-    processor = OutputProcessor()
-    return processor.process_output(ocfg, func_comp)
+    processor = OutputProcessor(func_comp=func_comp)
+    return processor.process_output(ocfg)
 
 
 @dask.delayed
@@ -704,12 +828,12 @@ def process_and_extract(output_config: List[Dict[str, Any]], func_comp: str) -> 
     Returns:
         Dictionary with filtered results
     """
-    manager = OutputPipelineManager()
-    return manager.process_and_extract(output_config, func_comp)
+    manager = OutputPipelineManager(func_comp=func_comp)
+    return manager.process_and_extract(output_config)
 
 
 def main_output(ncs: Dict[str, Any], metazones_in: Dict[str, Any],
-               outputs: Dict[str, Any], func_comp: str) -> Dict[str, Dict[str, List[str]]]:
+               outputs: Dict[str, Any], func_comp: str, **kwargs) -> Dict[str, Dict[str, List[str]]]:
     """
     Main function for processing all output configurations with parallel execution.
     
@@ -734,8 +858,8 @@ def main_output(ncs: Dict[str, Any], metazones_in: Dict[str, Any],
         >>> print(result)
         {'statistics': {'atlantic': ['validation/output/atlantic/ref1/statistics/file1.zarr']}}
     """
-    manager = OutputPipelineManager()
-    return manager.process_all_outputs(ncs, metazones_in, outputs, func_comp)
+    manager = OutputPipelineManager(func_comp=func_comp)
+    return manager.process_all_outputs(ncs, metazones_in, outputs, **kwargs)
 
 # def process_output(ocfg, func_comp):
     

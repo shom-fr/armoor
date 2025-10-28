@@ -1,10 +1,14 @@
 import gc
 import logging
+import shutil
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from armoor.base.io import setup_dask_client, create_fast_encoding
+from dask.diagnostics import ProgressBar
+import xarray as xr
+
+from armoor.base.io import setup_dask_client, create_fast_encoding, write_dataset_to_zarr
 from armoor.base.misc import optimize_for_low_swap
 from armoor.data.open_decode import open_decode, register_cf
 
@@ -38,6 +42,12 @@ def build_filters_config(mz_param, data_name):
         
     if 'tide' in mz_param:
         filters_config['tide'] = mz_param.get("tide")
+    
+    if 'tresample' in mz_param:
+        filters_config['tresample'] = mz_param.get("tresample")
+        
+    if 'tsmooth' in mz_param:
+        filters_config['tsmooth'] = mz_param.get("tsmooth")
     
     if 'bathy' in mz_param:
         # Assuming quality variable name based on data_name or a specific field
@@ -158,6 +168,13 @@ def process_single_combination(ds, mz_name, mz_param):
         if any(dsout.sizes[dim] == 0 for dim in dsout.dims):
             logger.warning(f"Dataset empty after filtering for {combination_id}")
             return None
+        elif dsout.sizes["time"] == 1:
+            logger.warning(f"One time step in the filtered dataset for {combination_id}")
+            return None
+        elif "time" not in dsout.dims:
+            logger.warning(f"no index found for coordinate 'time' for {combination_id}")
+            return None
+            
     
     # Final metadata
     if dsout is not None:
@@ -183,15 +200,26 @@ def save_result(dsout, mz_name, func_comp):
     nc.parent.mkdir(parents=True, exist_ok=True)
     
     # Encoding optimisé pour la vitesse
-    encoding = create_fast_encoding(dsout)
+    # encoding = create_fast_encoding(dsout)
     #encoding = get_zarr_encoding(dsout)
     logger.info(nc)
     #Sauvegarde avec optimisations
-    dsout.to_zarr(
-        store=nc,
+    # write_job = ds_clean.chunk("auto").to_zarr(
+    #     store=nc,
+    #     mode="w",
+    #     compute=False,
+    #     consolidated=True,
+    #     # encoding=encoding
+    #     )
+    write_job = write_dataset_to_zarr(
+        dsout,
+        nc,
         mode="w",
-        encoding=encoding,
+        consolidated=True,
+        compute=False
         )
+    with ProgressBar():
+        write_job.compute()
     dsout.close()
     del dsout
     logger.debug(f"💾 Sauvegardé: {nc}")
@@ -207,8 +235,10 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
         mz_param,
     )
     if dsout:
-        dsout = optimize_for_low_swap(dsout)
+        # dsout = optimize_for_low_swap(dsout)
+        dsout = dsout.chunk('auto')
         ncout = save_result(dsout, mz_name, dirout)
+        del dsout
         return ncout
     return None
 
@@ -216,33 +246,33 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
         ds.close()
     gc.collect()
 
-def prepare_tasks(dataset, metazones: Dict, dirout: Any) -> List[Tuple]:
+def prepare_tasks(zfiles, metazones: Dict, dirout: Any) -> List[Tuple]:
     """Prepare all tasks for parallel processing."""
     tasks = []
-    
-    for mz_name, mz_param in metazones.items():
-        dss = dataset
-        if not isinstance(dss, list):
-            dss = [dss]
-        
-        for ds in dss:
+    if not isinstance(zfiles, list):
+        zfiles = [zfiles]
+    for zfile in zfiles:
+        ds = xr.open_dataset(zfile, chunks="auto")#{"time": 1, "y": 200, "x": 200})
+        # ds = ds.unify_chunks()
+        for mz_name, mz_param in metazones.items():
             task = (ds, mz_name, mz_param, dirout)
             tasks.append(task)
+        ds.close()
     
     return tasks
 
-def process_all_combinations(dataset, metazones, dirout, max_workers=1):
+def process_all_combinations(zfiles, metazones, dirout, max_workers=1):
     """Process all combinations using ThreadPoolExecutor."""
-    tasks = prepare_tasks(dataset, metazones, dirout)
+    tasks = prepare_tasks(zfiles, metazones, dirout)
     ncouts = []
     for task in tasks:
         ncout = process_single_task(task)
         ncouts.append(ncout)
-    if isinstance(dataset, list):
-        for ds in dataset:
-            ds.close()
-    else:
-        dataset.close()
+    # if isinstance(dataset, list):
+    #     for ds in dataset:
+    #         ds.close()
+    # else:
+    #     dataset.close()
     return ncouts
 
 def load_datasets(data_cfg, metazones, dirout):
@@ -262,7 +292,8 @@ def load_datasets(data_cfg, metazones, dirout):
             )
         if not isinstance(dss, list):
             dss = [dss]
-
+            
+        logger.info("Add attributes")
         for ids, ds in enumerate(dss):
             # Métadonnées
             if len(dss) == 1:
@@ -272,21 +303,44 @@ def load_datasets(data_cfg, metazones, dirout):
             ds.attrs["data_ref"] = str(cfg_data.get("ref"))
             dss[ids] = ds
             del ds
+        logger.info("Save in temporary zarr file")
+        ztmp = "tmp_{ids}.zarr"
+        zfiles = []
+        for ids, ds in enumerate(dss):
+            zfile = ztmp.format(**locals())
+            write_job = ds.to_zarr(
+                store=zfile,
+                mode="w",
+                compute=False,
+                consolidated=True,
+                )
+            with ProgressBar():
+                write_job.compute()
+            zfiles.append(zfile)
+            ds.close()
+            del ds
         
         elapsed = time.time() - start_time
         logger.info(f"{dataset_name} load in {elapsed:.1f}s")
         
-        dataset = dss if len(dss) > 1 else dss[0]
-        for ds in dss:
-            ds.close()
-        del dss
-        ncs = process_all_combinations(dataset, metazones, dirout)
+        zfiles = zfiles if len(zfiles) > 1 else zfiles[0]
+        # for ds in dss:
+        #     ds.close()
+        # del dss
+        ncs = process_all_combinations(zfiles, metazones, dirout)
         ncouts += ncs
-        if isinstance(dataset, list):
-            for ds in dataset:
-                ds.close()
+        
+        if isinstance(zfiles, list):
+            for zfile in zfiles:
+                shutil.rmtree(zfile)
         else:
-            dataset.close()
+            shutil.rmtree(zfile)
+        
+        # if isinstance(dataset, list):
+        #     for ds in dataset:
+        #         ds.close()
+        # else:
+        #     dataset.close()
         gc.collect()
 
     return ncouts

@@ -12,6 +12,9 @@ metazone parameters
     - ``tbound``
     - ``trange_seq``
     - ``tfreq``
+    - ``tide``
+    - ``tresample``
+    - ``tsmooth``
     - ``polygon``
     - ``vars``
     

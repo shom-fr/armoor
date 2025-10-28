@@ -18,7 +18,7 @@ matplotlib
 nbsphinx
 numba
 numbagg
-opendrift
+parcels
 pip
 pytest
 python=3.11

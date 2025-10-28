@@ -289,6 +289,23 @@ def add_dask_dashboardaddress_parser_arguments(parser):
         default=":8787",
         help="Dashboard adress of a Dask LocalCluster",
         )
+    
+def add_dask_localdirectory_parser_arguments(parser):
+    """Add dask argument to argument parser.
+    
+    Adds an optional argument '--dask-localdirectory' for specifying tempory dask directory.
+    
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        The argument parser to which the output format argument will be added.
+    """
+    parser.add_argument(
+        "--dask-localdirectory",
+        type=str,
+        default="/tmp",
+        help="Path of the temporary dask directory.",
+        )
 
 def add_dask_parser_arguments(parser):
     """Add all dask related arguments to argument parser.
@@ -297,6 +314,7 @@ def add_dask_parser_arguments(parser):
     add_dask_processes_parser_arguments(parser)
     add_dask_memorylimit_parser_arguments(parser)
     add_dask_dashboardaddress_parser_arguments(parser)
+    add_dask_localdirectory_parser_arguments(parser)
 
 def save_output(ds, fout, ofmt="zarr"):
     """Save xarray Dataset to file in specified format.
