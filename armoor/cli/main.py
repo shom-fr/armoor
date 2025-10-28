@@ -590,14 +590,12 @@ def get_parser_comp_drifter():
     add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
-        '--period',
-        default="5d",
+        'period',
         type=str,
         help="Time period of the particle integration (pandas period string). Ex: 1h, 6h, 1d"
         )
     parser.add_argument(
-        '--freq',
-        default="6h",
+        'freq',
         type=str,
         help="Time frequency of trajectory comparison (pandas frequency string). Ex: 1h, 6h, 1d"
         )

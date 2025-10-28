@@ -1034,7 +1034,7 @@ def open_decode_cmems_insitu(path_files, platform):
     else:
         for ids in range(len(dss)):
             dss[ids].attrs["name"] = f"{dss[ids].attrs['platform_code']}"
-        return dss[:2]
+        return dss
     return ds
 
 def open_decode_l_adcp(path_file):

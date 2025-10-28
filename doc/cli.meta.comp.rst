@@ -27,38 +27,97 @@ ouputs
         Multiple outputs can be configured. The available outputs depend on the executed comparison.
         For instance, a vertical profile of salinity is not possible with ``armoor-comp-sst``.
         See the possible outputs in the dedicated section of the documentation.
+        
+        .. grid:: 3
 
-        - ``maps``: maps of statistical metrics (bias, rmse, rmsec) or deviation (difference).
-        
-        .. image:: images/comp_maps.png
-            
-        - ``diagdisp_glob``: dispersion diagram of selected data.
-        
-        .. image:: images/comp_diagdisp_glob.png
-            
-        - ``diagdisp_sel``: dispersion diagram by intervals.
-        
-        .. image:: images/comp_diagdisp_sel.png
-            
-        - ``timeseries``: time series of statistical metrics or deviation.
-        
-        .. image:: images/comp_timeseries.png
-        
-        - ``mvprofiles``: plot of multiple vertical profiles.
-        
-        .. image:: images/comp_mvprofiles.png
-        
-        - ``uvprofiles``: plot of an unique vertical observed profile.
-        
-        .. image:: images/comp_uvprofiles.png
-        
-        - ``udiagts``: theta-s diagram of an unique vertical observed profile.
-        
-        .. image:: images/comp_udiagts.png
-        
-        - ``mdiagts``: theta-s diagram of multiple vertical observed profiles.
-        
-        .. image:: images/comp_mdiagts.png
+            .. grid-item-card:: Maps of statistics (``maps``)
+
+                Maps of statistical metrics (bias, rmse, rmsec) or deviation (difference).
+
+                .. image:: images/comp_maps.png
+                
+                :download:`Download <images/comp_maps.png>`
+
+            .. grid-item-card:: Dispersion diagrams (``diagdisp_glob``)
+
+                Dispersion diagrams of data.
+                
+                .. image:: images/comp_diagdisp_glob.png
+                
+                :download:`Download <images/comp_diagdisp_glob.png>`
+                
+            .. grid-item-card:: Dispersion diagrams by intervals (``diagdisp_sel``)
+
+                Dispersion diagrams of selected data by intervals.
+                
+                .. image:: images/comp_diagdisp_sel.png
+                
+                :download:`Download <images/comp_diagdisp_sel.png>`
+                
+            .. grid-item-card:: Time series (``timeseries``)
+
+                Time series of statistical metrics or deviation.
+                
+                .. image:: images/comp_timeseries.png
+                
+                :download:`Download <images/comp_timeseries.png>`
+                
+            .. grid-item-card:: Multiple vertical profiles (``mvprofiles``)
+
+                Plot of multiple vertical profiles.
+                
+                .. image:: images/comp_mvprofiles.png
+                
+                :download:`Download <images/comp_mvprofiles.png>`
+                
+            .. grid-item-card:: Unique vertical profiles (``uvprofiles``)
+
+                Plot of unique vertical profiles.
+                
+                .. image:: images/comp_uvprofiles.png
+                
+                :download:`Download <images/comp_uvprofiles.png>`
+                
+            .. grid-item-card:: theta-s diagram of an unique vertical profiles (``udiagts``)
+
+                Plot of a theta-s diagram by observed profile.
+                
+                .. image:: images/comp_udiagts.png
+                
+                :download:`Download <images/comp_udiagts.png>`
+                
+            .. grid-item-card:: theta-s diagram of multiple vertical profiles (``mdiagts``)
+
+                Plot of a theta-s diagram of every observed profiles.
+                
+                .. image:: images/comp_mdiagts.png
+                
+                :download:`Download <images/comp_mdiagts.png>`
+
+            .. grid-item-card:: time series for drifters (``timeseries``)
+
+                Time series distance and direction between drifter and virtual trajectories computed by parcels with the model currents.
+                
+                .. image:: images/comp_timeseries_drifter.png
+                
+                :download:`Download <images/comp_timeseries_drifter.png>`
+                
+            .. grid-item-card:: trajectories maps for drifters (``maps_trajectory``)
+
+                Maps of a drifter trajectory and virtual ones computed by parcels with the model currents.
+                
+                .. image:: images/comp_map_trajectories.png
+                
+                :download:`Download <images/comp_map_trajectories.png>`
+                
+            .. grid-item-card:: current maps for drifters (``maps_current``)
+
+                Maps of currents of drifter and the model ones interpolated along the drifter trajectory.
+                
+                .. image:: images/comp_map_current.png
+                
+                :download:`Download <images/comp_map_current.png>`
+   
 
 Workflow
 --------

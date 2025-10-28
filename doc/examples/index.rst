@@ -3,7 +3,7 @@
 Gallery of examples
 ===================
 
-.. grid:: 2
+.. grid:: 3
 
     .. grid-item-card:: Metazones structure
 
@@ -48,6 +48,18 @@ Gallery of examples
          :linenos:
 
         :download:`Download comp_argo.cfg <configs/comp_argo.cfg>`
+        
+        
+    .. grid-item-card:: Drifter comparison
+
+        Configuration for running an drifter comparison over a series of input data.
+
+        .. literalinclude:: configs/comp_drifter.cfg
+         :language: ini
+         :caption: comp_drifter.cfg
+         :linenos:
+
+        :download:`Download comp_argo.cfg <configs/comp_drifter.cfg>`
         
     .. grid-item-card:: Mooring comparison
 

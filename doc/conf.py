@@ -47,6 +47,10 @@ extensions = [
     'sphinx_design'
 ]
 
+# autodoc_type_aliases = {
+#     'Delayed': 'dask.delayed.Delayed',
+# }
+autodoc_typehints_format = 'short'
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
