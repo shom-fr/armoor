@@ -5,7 +5,9 @@ related to input/output operations and saving xarray datasets in various formats
 """
 import logging
 
-from armoor.base.io import get_zarr_encoding
+from dask.diagnostics import ProgressBar
+
+from armoor.base.io import write_dataset_to_zarr
 
 logger = logging.getLogger(__name__)
 
@@ -370,9 +372,19 @@ def save_output(ds, fout, ofmt="zarr"):
     """
     logger.info(f"Saving {fout}")
     if ofmt == "zarr":
-        to_zarr(ds, fout)
+        # delayed = to_zarr(ds, fout)
+        # delayed.compute()
+        write_job = write_dataset_to_zarr(
+            ds,
+            fout,
+            mode="w",
+            consolidated=True,
+            compute=True
+            )
+        # with ProgressBar():
+        #     write_job.compute()
     elif ofmt == "netcdf":
-        ds.to_netcdf(fout, engine="h5netcdf", compute=False).compute()
+        ds.to_netcdf(fout, engine="h5netcdf")#, compute=False).compute()
     else:
         raise ValueError(f"Unsupported output format: {ofmt}. Use 'zarr' or 'netcdf'.")
 
@@ -440,8 +452,19 @@ def to_zarr(ds, fout):
             store=fout,
             mode=mode,
             # encoding=encoding[var_name]
+            compute=False
         )
-        
         # Explicit cleanup to free memory
         del var_ds
 
+def get_dask_args(args):
+    
+    return (
+        args.dask_nworkers,
+        args.dask_processes,
+        args.dask_memorylimit,
+        args.dask_dashboardaddress,
+        args.dask_localdirectory
+        )
+    
+    

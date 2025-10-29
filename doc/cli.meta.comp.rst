@@ -112,7 +112,7 @@ ouputs
                 
             .. grid-item-card:: current maps for drifters (``maps_current``)
 
-                Maps of currents of drifter and the model ones interpolated along the drifter trajectory.
+                Maps of currents of a drifter and the model ones interpolated along the drifter trajectory.
                 
                 .. image:: images/comp_map_current.png
                 

@@ -17,7 +17,7 @@ from armoor.base.misc import (comma_separated, dict_to_list,
                               optimize_for_low_swap, parse_coords,
                               parse_mixed_param, parse_qc_tuple)
 from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI
-from armoor.cli.io import add_dask_parser_arguments
+from armoor.cli.io import add_dask_parser_arguments, get_dask_args
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.comp import METAZONE_PARAMS
 from armoor.comp.coloc import main_coloc
@@ -150,13 +150,7 @@ def main_filters():
 
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
     
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress,
-        args.dask_localdirectory
-        )
+    kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(**kw_dask)) as cluster:
         with Client(cluster): 
@@ -232,13 +226,7 @@ def main_data():
        metazones
        )
     
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress,
-        args.dask_localdirectory
-        )
+    kw_dask = get_dask_args(args)
     
     logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
@@ -378,13 +366,7 @@ def main_comp_models():
         raise ArmoorError(
             f"File not found: {args.cfgfile}."
             )
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress,
-        args.dask_localdirectory
-        )
+    kw_dask = get_dask_args(args)
     
     main_comp(
         args.cfgfile,
@@ -434,13 +416,7 @@ def main_comp_sst():
             )
     kw_comp = {"qc": args.qc}
     
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress,
-        args.dask_localdirectory
-        )
+    kw_dask = get_dask_args(args)
 
     main_comp(
         args.cfgfile,
@@ -497,13 +473,7 @@ def main_comp_argo():
     
     kw_comp = {"radius": args.radius, "qc": args.qc}
     
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress,
-        args.dask_localdirectory
-        )
+    kw_dask = get_dask_args(args)
     
     main_comp(
         args.cfgfile,
@@ -559,13 +529,7 @@ def main_comp_mooring():
     
     kw_comp = {"radius": args.radius, "qc": args.qc}
 
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress,
-        args.dask_localdirectory
-        )  
+    kw_dask = get_dask_args(args)
 
     main_comp(
         args.cfgfile,
@@ -622,13 +586,7 @@ def main_comp_drifter():
         "freq_drift": args.freq
         }
     
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress,
-        args.dask_localdirectory
-        )
+    kw_dask = get_dask_args(args)
     
     main_comp(
         args.cfgfile,

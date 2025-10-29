@@ -3,17 +3,19 @@
 This module provides command-line interfaces for applying various types of filters
 (time, horizontal, quality) to oceanographic and meteorological data files.
 """
-import logging
+import logging, shutil
 import asyncio
 from argparse import ArgumentParser
 from dask.distributed import Client, LocalCluster
 import dask.config
+import xarray as xr
 
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
 from armoor.base.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
+    get_dask_args,
     save_output
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
@@ -24,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 logging.getLogger('distributed').setLevel(logging.ERROR)
 
-dask.config.set({"distributed.worker.profile.enabled": False})
+# dask.config.set({"distributed.worker.profile.enabled": False})
 
 class FiltersError(Exception):
     """Exception raised for errors in the filters module.
@@ -75,11 +77,8 @@ def process_filters(fins, ifmt, fout, ofmt, filters_config, kw_dask):
 
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            ds = open_decode(
-                fins, ifmt
-                ).armoorfilters.apply_combined_filters(
-                    filters_config
-                ).persist()
+            ds = open_decode(fins, ifmt)
+            ds = ds.armoorfilters.apply_combined_filters(filters_config)
             save_output(ds, fout, ofmt)
 
 
@@ -115,6 +114,16 @@ def get_parser_filters_time():
         type=str,
         choices=("mean", "godin", "demerliac"),
         help="Name of tidal filter: mean, godin or demerliac."
+        )
+    parser.add_argument(
+        '--resample',
+        type=str,
+        help="Resample at a given frequency (see pandas offset alias)"
+        )
+    parser.add_argument(
+        '--smooth',
+        type=str,
+        help="Smooth over a given period (see pandas offset alias)"
         )
 
     return parser
@@ -177,13 +186,22 @@ def main_filters_time():
         filters_config.update({
             'tide': tides
             })
+        
+    # Resampling
+    resample = args.resample
+    if resample:
+        filters_config.update({
+            'tresample': resample
+            })
+        
+    # Smoothing
+    smooth = args.smooth
+    if smooth:
+        filters_config.update({
+            'tsmooth': smooth
+            })
     
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress
-        )
+    kw_dask = get_dask_args(args)
     
     process_filters(
         args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
@@ -334,12 +352,7 @@ def main_filters_horizontal():
                 }
             })
         
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress
-        )
+    kw_dask = get_dask_args(args)
         
     process_filters(
         args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
@@ -431,12 +444,7 @@ def main_filters_quality():
             }
         }
     
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress
-        )
+    kw_dask = get_dask_args(args)
     
     process_filters(
         args.fins, args.ifmt, args.fout, args.ofmt, filters_config,

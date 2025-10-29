@@ -16,6 +16,7 @@ from armoor.base.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_comp_io_parser_arguments,
     add_dask_parser_arguments,
+    get_dask_args,
     save_output
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
@@ -392,13 +393,7 @@ def main_comp():
     # Setup logging
     main_setup_logging(args)
     
-    kw_dask = (
-        args.dask_nworkers,
-        args.dask_processes,
-        args.dask_memorylimit,
-        args.dask_dashboardaddress,
-        args.dask_localdirectory
-        )
+    kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):

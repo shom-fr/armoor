@@ -202,7 +202,7 @@ def save_result(dsout, mz_name, func_comp):
     # Encoding optimisé pour la vitesse
     # encoding = create_fast_encoding(dsout)
     #encoding = get_zarr_encoding(dsout)
-    logger.info(nc)
+    # logger.info(nc)
     #Sauvegarde avec optimisations
     # write_job = ds_clean.chunk("auto").to_zarr(
     #     store=nc,
@@ -218,11 +218,11 @@ def save_result(dsout, mz_name, func_comp):
         consolidated=True,
         compute=False
         )
-    with ProgressBar():
-        write_job.compute()
+    # with ProgressBar():
+    #     write_job.compute()
     dsout.close()
     del dsout
-    logger.debug(f"💾 Sauvegardé: {nc}")
+    logger.info(f"Saved: {nc}")
     return str(nc)
 
 def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
