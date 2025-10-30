@@ -4,9 +4,10 @@ This module provides command-line interfaces for applying various types of inter
 (temporal, horizontal, vertical) to oceanographic and meteorological data files.
 The interpolation operations are optimized for large datasets using Dask distributed computing.
 """
-import logging
+import logging, shutil
 from argparse import ArgumentParser
 from dask.distributed import Client, LocalCluster
+import xarray as xr
 
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
 from armoor.base.misc import parse_date, is_dict_empty, parse_coords
@@ -129,12 +130,20 @@ def main_interp_time():
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
+            if args.ifmt != 'armoor':
+                save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
+                del ds
+                ds = xr.open_dataset("tmp.zarr")
+            if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
+                ds = ds.reset_coords("depth")
             ds = process_time_interpolation(
                 ds,
                 ("tfreq", args.tfreq),
                 [ds.time.min().values, ds.time.max().values]
                 )
-            save_output(ds, args.fout, args.ofmt)
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="processes")
+            if args.ifmt != 'armoor':
+                shutil.rmtree("tmp.zarr")
                 
 
 def get_parser_interp_horizontal():
@@ -307,8 +316,16 @@ def main_interp_horizontal():
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
+            if args.ifmt != 'armoor':
+                save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
+                del ds
+                ds = xr.open_dataset("tmp.zarr")
+            if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
+                ds = ds.reset_coords("depth")
             ds = process_horizontal_interpolation(ds, params)
-            save_output(ds, args.fout, args.ofmt)
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="processes")
+            if args.ifmt != 'armoor':
+                shutil.rmtree("tmp.zarr")
         
 
 def get_parser_interp_vertical():
@@ -439,5 +456,14 @@ def main_interp_vertical():
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt)
-            ds = process_vertical_interpolation(ds, params)
-            save_output(ds, args.fout, args.ofmt)
+            if args.ifmt != 'armoor':
+                save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
+                del ds
+                ds = xr.open_dataset("tmp.zarr")
+            if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
+                ds = ds.reset_coords("depth")
+            ds = process_vertical_interpolation(ds.chunk(dict(z=-1)), params)
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="processes")
+            if args.ifmt != 'armoor':
+                shutil.rmtree("tmp.zarr")
+            

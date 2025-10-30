@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 import xarray as xr
+from xoa.geo import m2deg
 
 from armoor.__init__ import ArmoorError
 from armoor.base.interp import grid2loc, interp_time, vinterp, regrid, grid2section
@@ -165,6 +166,15 @@ class HorizontalInterpolation(AbstractInterpolation):
         xarray.DataArray
             New grid
         """
+        lat_mean = 0.5 * (lat_grid[0] + lat_grid[1])
+        lat_grid[2] = m2deg(
+            lat_grid[-1] * 1e3,
+            lat=lat_mean
+            )
+        lon_grid[2] = m2deg(
+            lon_grid[-1] * 1e3,
+            lat=lat_mean
+            )
         lat = np.arange(*lat_grid)
         lon = np.arange(*lon_grid)
         lon, lat = np.meshgrid(lon, lat)

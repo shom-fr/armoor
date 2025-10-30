@@ -371,166 +371,66 @@ def open_decode_cmems_model(path_files):
     xarray.Dataset
         CMEMS dataset.
     """
+    def preprocess_cmems_model(ds):
+        with xcf.set_cf_specs(cfspecs):
+            ds = ds.xoa.decode()
+        ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
+        if len(ds.lon.dims) == 1:
+            lat, lon = xr.broadcast(ds["lat"], ds["lon"])
+            ds = ds.drop_vars(["lon", "lat"])
+            ds["lon"] = lon
+            ds["lat"] = lat
+            ds = ds.set_coords(["lon", "lat"])
+        var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
+        ds["depth"] = ds["depth"].broadcast_like(ds[var])
+        ds = ds.reset_coords("depth")
+        return ds
     # Open
     cfspecs = xcf.get_cf_specs("cmems_model")
-    with xcf.set_cf_specs(cfspecs):
-        ds = xr.open_mfdataset(path_files).xcf.decode()
-        ds.close()
-    ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
-    if len(ds.lon.dims) == 1:
-        lat, lon = xr.broadcast(ds["lat"], ds["lon"])
-        ds = ds.drop_vars(["lon", "lat"])
-        ds["lon"] = lon
-        ds["lat"] = lat
-        ds = ds.set_coords(["lon", "lat"])
-    var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
-    ds["depth"] = ds["depth"].broadcast_like(ds[var])
-    ds = ds.reset_coords("depth")
-    ds = ds.sortby("time")
+    sorted_paths = sorted(map(str, path_files))
+    # ds = xr.open_mfdataset(
+    #     sorted_paths,
+    #     combine="by_coords",
+    #     engine="netcdf4",
+    #     chunks={"time": 1, "lat": 100, "lon": 100},
+    #     parallel=True,
+    #     cache=False,
+    #     # lock=False,
+    #     )
+    ds = xr.open_mfdataset(#sorted_paths)
+        sorted_paths,
+        combine="by_coords",
+        engine="netcdf4",
+        chunks={"time": 1, "lat": 100, "lon": 100},
+        parallel=True,        # Avoid threading issues with netCDF4
+        cache=False,       # Cache can be disabled for huge datasets
+        # lock=False,
+        decode_times=True,     # Decode times properly
+        decode_coords=True,    # Decode coordinates
+        # Optimize I/O
+        decode_cf=True,
+        mask_and_scale=True,
+        # CRITICAL: Limit data variables to prevent reading everything at once
+        data_vars='minimal',   # Only load data variables, not coordinates as data
+        coords='minimal',      # Minimize coordinate loading
+        preprocess=preprocess_cmems_model,
+        autoclose=True
+        )
+    # with xcf.set_cf_specs(cfspecs):
+    #     ds = ds.xoa.decode()
+    # ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
+    # if len(ds.lon.dims) == 1:
+    #     lat, lon = xr.broadcast(ds["lat"], ds["lon"])
+    #     ds = ds.drop_vars(["lon", "lat"])
+    #     ds["lon"] = lon
+    #     ds["lat"] = lat
+    #     ds = ds.set_coords(["lon", "lat"])
+    # var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
+    # ds["depth"] = ds["depth"].broadcast_like(ds[var])
+    # ds = ds.reset_coords("depth")
+    # ds = ds.reindex(time=sorted(ds.time.values))
+    # ds.close()
     return ds
-
-# def open_decode_hycom(path_files):
-#     """
-#     Open HyCOM netcdf file(s) and store it into a ready-to-use dataset.
-    
-#     Parameters
-#     ----------
-#     path_files : str, list of str
-#         Path to the netcdf files.
-        
-#     Returns
-#     -------
-#     xarray.Dataset
-#         HyCOM dataset.
-#     """
-    
-#     # Pre-sort paths once
-#     sorted_paths = sorted(path_files)
-    
-#     # Get CF specs once
-#     cfspecs = xcf.get_cf_specs("hycom")
-    
-#     # Initialize collections
-#     variables_data = {}
-#     bathymetry = None
-#     velocity_u = []
-#     velocity_v = []
-    
-#     # Process each file
-#     for path in sorted_paths:
-#         logger.info(path)
-        
-#         with xcf.set_cf_specs(cfspecs):
-#             # Open and decode dataset
-#             ds = xr.open_dataset(path, engine="h5netcdf", chunks="auto")#.xoa.decode()
-#             # ds.close()
-#             #ds = ds.compute()
-#             ds = optimize_for_low_swap(ds)
-#             ds = ds.xoa.decode()
-
-#             # Extract bathymetry only once from non-velocity files
-#             if bathymetry is None and "bathy" in ds and not any(var in ['u', 'v'] for var in ds.data_vars):
-#                 bathymetry = ds.bathy
-            
-#             # Clean up coordinates and variables
-#             if "dens" in ds.coords:
-#                 ds = ds.reset_coords("dens")
-#             if "bathy" in ds:
-#                 ds = ds.drop_vars("bathy")
-#             # ds = ds.compute()
-#             # Process variables
-#             for varname in ds.data_vars:
-#                 if varname == "u":
-#                     logger.info("shift u")
-#                     shifted_u = ds.map_blocks(
-#                         lambda d: shift(d["u"], {"x": "right"}).xoa.reloc(u=False),
-#                         template=ds["u"]
-#                         )
-#                     # shifted_u = shifted_u.compute()
-#                     velocity_u.append(shifted_u)
-#                 elif varname == "v":
-#                     logger.info("shift v")
-#                     shifted_v = ds.map_blocks(
-#                         lambda d: shift(d["v"], {"y": "top"}).xoa.reloc(v=False),
-#                         template=ds["v"]
-#                         )
-#                     # shifted_v = shifted_v.compute()
-#                     velocity_v.append(shifted_v)
-#                 else:
-#                     # ds[varname] = ds[varname].compute()
-#                     variables_data.setdefault(varname, []).append(ds[varname])
-#             ds.close()
-#             del ds
-#             gc.collect()
-#     logger.info("concat") 
-#     # Concatenate and merge datasets
-#     datasets_to_merge = []
-    
-#     # Process regular variables
-#     for varname, data_list in variables_data.items():
-#         if data_list:
-#             concatenated = xr.concat(data_list, dim='time')
-#             concatenated = concatenated.sel(time=~concatenated.get_index("time").duplicated())
-#             datasets_to_merge.append(concatenated.to_dataset())
-#     del data_list
-#     gc.collect()
-#     # Merge all regular variables
-#     #datasets = [ds.compute() for ds in datasets_to_merge]
-#     merged_ds = xr.merge(datasets_to_merge) if datasets_to_merge else xr.Dataset()
-#     for ds in datasets_to_merge:
-#         del ds
-#     gc.collect()        
-#     #merged_ds =  optimize_for_low_swap(merged_ds, target_chunk_mb=128)
-#     # del datasets_to_merge
-#     # Add bathymetry if available
-#     logger.info("Add bathymetry")
-#     if bathymetry is not None:
-#         merged_ds = xr.merge([merged_ds, bathymetry])
-#         del bathymetry
-#     # Process velocity components
-#     logger.info("Add u")
-#     if velocity_u:
-#         u_concat = xr.concat(velocity_u, dim='time')
-#         del velocity_u
-#         u_concat = u_concat.sel(time=~u_concat.get_index("time").duplicated())
-#         merged_ds["u"] = u_concat.assign_coords(**merged_ds.coords)
-#         del u_concat
-#         gc.collect()
-#     logger.info("Add v")
-#     if velocity_v:
-#         v_concat = xr.concat(velocity_v, dim='time')
-#         del velocity_v
-#         v_concat = v_concat.sel(time=~v_concat.get_index("time").duplicated())
-#         merged_ds["v"] = v_concat.assign_coords(**merged_ds.coords)
-#         del v_concat
-#         gc.collect()
-#     logger.info("compute depth")
-#     # Handle depth coordinates
-#     if "dz" in merged_ds:
-#         merged_ds.coords["depth"] = dz2depth(merged_ds.dz, centered=True)
-#         merged_ds = merged_ds.drop_vars(["z", "dz"])
-    
-#     # Final deduplication
-#     logger.info("remove duplicated time index")
-#     if "time" in merged_ds.dims:
-#         merged_ds = merged_ds.sel(time=~merged_ds.get_index("time").duplicated())
-#     logger.info("rechunk")
-#     for var in ["depth", "ssh", "sst", "sss"]:
-#         if var in merged_ds:
-#             good_var = merged_ds[var]
-#             break
-#     chunk_dict = {}
-#     for dim, chunks in zip(good_var.dims, good_var.chunks):
-#         chunk_dict[dim] = chunks[0]
-#     merged_ds = merged_ds.chunk(chunk_dict)
-#     # merged_ds = merged_ds.unify_chunks()#.persist()
-#     # merged_ds = merged_ds.chunk({'time': 1})
-#     logger.info("persist")
-#     merged_ds = merged_ds.persist()
-    
-#     logger.info("End open_decode_hycom")
-#     return merged_ds
-
 
 def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
     """
@@ -584,8 +484,18 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
         engine="netcdf4",         # works with classic and netcdf4
         chunks={"time": 1, "lat": 200, "lon": 200},
         preprocess=preprocess_hycom,
-        parallel=True,
-        # compat="override"
+        # parallel=True,        # Avoid threading issues with netCDF4
+        cache=False,       # Cache can be disabled for huge datasets
+        # lock=False,
+        decode_times=True,     # Decode times properly
+        decode_coords=True,    # Decode coordinates
+        # Optimize I/O
+        decode_cf=True,
+        mask_and_scale=True,
+        # CRITICAL: Limit data variables to prevent reading everything at once
+        data_vars='minimal',   # Only load data variables, not coordinates as data
+        coords='minimal',      # Minimize coordinate loading
+        autoclose=True
     )
 
     try:
@@ -624,8 +534,6 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
     for dim, chunks in zip(good_var.dims, good_var.chunks):
         chunk_dict[dim] = chunks[0]
     ds = ds.chunk(chunk_dict)
-
-    gc.collect()
     return ds
 
 # def open_decode_hycom(path_files):

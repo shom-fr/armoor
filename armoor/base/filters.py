@@ -436,9 +436,11 @@ class ArmoorFilters:
                     result["mask"] = result.mask.isel(time=0)
             
             ds = result.copy()
-            result.close()
+            del result
+            del self.ds
         else:
             ds = self.ds
+            del self.ds
         
         if "bathy" in filters_config:
             ds = self.bathy_filter(
@@ -461,8 +463,8 @@ class ArmoorFilters:
 
         ds = self.clean_ds(ds, depth_was_coord)
 
-        ds = ds.compute(scheduler="processes")
-        print(ds.time)
+        # ds = ds.compute()
+        # print(ds.time)
         return ds
     
     def sel_closest(self, ds_obs):

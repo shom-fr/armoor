@@ -199,14 +199,14 @@ def write_dataset_to_zarr(
     **kwargs : arguments supplémentaires pour to_zarr()
     """
     # Correction automatique
-    ds_fixed = auto_fix_zarr_encoding(ds)
+    ds = auto_fix_zarr_encoding(ds)
     
     logger.info(f"\n Write: {path}")
     logger.debug(f"   Mode: {mode}")
     logger.debug(f"   Consolidated metadata: {consolidated}")
     
     # Écriture
-    result = ds_fixed.to_zarr(
+    result = ds.to_zarr(
         path,
         mode=mode,
         consolidated=consolidated,
@@ -342,7 +342,7 @@ def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, loca
     
     kw_client = dict(
         n_workers=n_workers,#os.cpu_count() - 2,  # Réduire le nombre de workers
-        threads_per_worker=1,
+        threads_per_worker=2,
         memory_limit=memory_limit,#'750MB',#'4GB',
         silence_logs=True,
         dashboard_address=dashboardaddress,#:8082,

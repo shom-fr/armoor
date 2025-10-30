@@ -78,8 +78,12 @@ def process_filters(fins, ifmt, fout, ofmt, filters_config, kw_dask):
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(fins, ifmt)
+            save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
+            del ds
+            ds = xr.open_dataset("tmp.zarr")
             ds = ds.armoorfilters.apply_combined_filters(filters_config)
-            save_output(ds, fout, ofmt)
+            save_output(ds, fout, ofmt=ofmt, scheduler="threads")
+            shutil.rmtree("tmp.zarr")
 
 
 def get_parser_filters_time():
@@ -319,7 +323,7 @@ def main_filters_horizontal():
     
     coords = args.polygon_coords
     if coords:
-        if len(coords) > 3:
+        if len(coords) >= 3:
             filters_config.update({
                 "polygon":{
                     "coords": coords,

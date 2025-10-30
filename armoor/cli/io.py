@@ -318,7 +318,7 @@ def add_dask_parser_arguments(parser):
     add_dask_dashboardaddress_parser_arguments(parser)
     add_dask_localdirectory_parser_arguments(parser)
 
-def save_output(ds, fout, ofmt="zarr"):
+def save_output(ds, fout, ofmt="zarr", scheduler=None):
     """Save xarray Dataset to file in specified format.
     
     Saves the provided xarray Dataset to the specified output path using
@@ -370,6 +370,10 @@ def save_output(ds, fout, ofmt="zarr"):
     - For netcdf format, uses standard xarray `to_netcdf()` method
     - Zarr format is preferred for large datasets due to better performance
     """
+    if scheduler:
+        kwargs = dict(scheduler=scheduler)
+    else:
+        kwargs = dict()
     logger.info(f"Saving {fout}")
     if ofmt == "zarr":
         # delayed = to_zarr(ds, fout)
@@ -379,14 +383,14 @@ def save_output(ds, fout, ofmt="zarr"):
             fout,
             mode="w",
             consolidated=True,
-            compute=True
+            compute=False,
             )
-        # with ProgressBar():
-        #     write_job.compute()
     elif ofmt == "netcdf":
-        ds.to_netcdf(fout, engine="h5netcdf")#, compute=False).compute()
+        write_job = ds.to_netcdf(fout, engine="h5netcdf", compute=False)
     else:
         raise ValueError(f"Unsupported output format: {ofmt}. Use 'zarr' or 'netcdf'.")
+    with ProgressBar():
+        write_job.compute(**kwargs)
 
 
 def to_zarr(ds, fout):
