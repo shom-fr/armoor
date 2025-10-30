@@ -301,22 +301,49 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     -------
     xarray.Dataset, xarray.Dataset
         Dataset interpolated over a section.
-    """
-    lat0, lon0 = coords[0]
-    lat1, lon1 = coords[1]
-    dx = dx * 1e3
+    """    
+    dx = dx * 1e3  # Convert to meters
     geod = Geod(ellps='WGS84')
-    d = geod.inv(lon0, lat0, lon1, lat1)
-    r = geod.inv_intermediate(lon0, lat0, lon1, lat1, int(d[-1] / dx))
-    section_dist = []
-    for npt in range(r.npts):
-        section_dist.append(npt * r.del_s)
+    
+    # Collect all interpolated points and distances for each segment
+    all_lats = []
+    all_lons = []
+    all_distances = []
+    cumulative_dist = 0.0
+    
+    # Process each segment between consecutive points
+    for i in range(len(coords) - 1):
+        lat0, lon0 = coords[i]
+        lat1, lon1 = coords[i + 1]
+        
+        # Calculate segment properties
+        d = geod.inv(lon0, lat0, lon1, lat1)
+        segment_length = d[-1]  # Total distance of segment
+        
+        # Get intermediate points for this segment
+        r = geod.inv_intermediate(lon0, lat0, lon1, lat1, int(segment_length / dx))
+        
+        # Add points from this segment
+        for npt in range(r.npts):
+            all_lats.append(r.lats[npt])
+            all_lons.append(r.lons[npt])
+            all_distances.append(cumulative_dist + npt * r.del_s)
+        
+        # Update cumulative distance for next segment
+        cumulative_dist += segment_length
+    
+    # Add the final point
+    all_lats.append(coords[-1][0])
+    all_lons.append(coords[-1][1])
+    all_distances.append(cumulative_dist)
+        
     dist = xr.Dataset(
         coords=dict(
-            distance=(["npts"], section_dist),
+            distance=(["npts"], all_distances),
             )
         )
-    ds = grid2loc(ds, list(zip(r.lats, r.lons)))
+    # ds = grid2loc(ds, list(zip(r.lats, r.lons)))
+    ds = grid2loc(ds, list(zip(all_lats, all_lons)))
     ds = xr.merge([ds, dist])
     return ds
     

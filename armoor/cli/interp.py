@@ -183,9 +183,9 @@ def get_parser_interp_horizontal():
         )
     parser.add_argument(
         '--section',
-        nargs=5,
+        nargs="*",
         type=float,
-        help="Linear section definition: lat0 lon0 lat1 lon1 step_km"
+        help="Linear section definition: lat0 lon0 lat1 lon1 .... step_km"
         )
     parser.add_argument(
         '--lon-grid',
@@ -290,6 +290,12 @@ def main_interp_horizontal():
         raise InterpError(
             "--lon-grid is mandatory since --lat-grid is specified."
             )
+    if section:
+        if len(section) %2 == 0:
+            raise InterpError(
+                "--section expects a odd length of arguments"
+                )
+            
     check = sum(1 for x in (cloud, section, lon_grid, ncgrid) if x is not None)
     if check > 1:
         raise InterpError(
@@ -301,7 +307,10 @@ def main_interp_horizontal():
     if cloud:
         params = ("cloud", cloud)
     elif section:
-        params = ("section", [section[:2], section[2:4]], section[4])
+        it = iter(section[:-1])
+        coords_pairs = list(zip(it, it))
+        dx = section[-1]
+        params = ("section", coords_pairs, dx)
     elif lon_grid:
         params = (
             "regrid_from_latlon", lon_grid, lat_grid
