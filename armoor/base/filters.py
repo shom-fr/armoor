@@ -379,7 +379,7 @@ class ArmoorFilters:
             Dataset with all filters applied
         """
         logger.info("Applying combined filters")
-        
+
         combined_mask = None
         mask2keep = None
         # Build combined boolean mask using existing methods
@@ -435,13 +435,13 @@ class ArmoorFilters:
                 if "time" in result["mask"].dims:
                     result["mask"] = result.mask.isel(time=0)
             
-            ds = result.copy()
+            self.ds = result.copy()
             del result
-            del self.ds
-        else:
-            ds = self.ds
-            del self.ds
-        
+            # del self.ds
+        # else:
+        #     ds = self.ds
+        #     # del self.ds
+        ds = self.ds
         if "bathy" in filters_config:
             ds = self.bathy_filter(
                 ds,
@@ -463,8 +463,7 @@ class ArmoorFilters:
 
         ds = self.clean_ds(ds, depth_was_coord)
 
-        # ds = ds.compute()
-        # print(ds.time)
+        ds = ds.compute()
         return ds
     
     def sel_closest(self, ds_obs):

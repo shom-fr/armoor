@@ -139,7 +139,7 @@ class PlotComp:
             gridlines_xlabel_style={'size': 6},
             gridlines_ylabel_style={'size': 6}
             )
-        ax_minimap = plot_minimap(dsref, ax=self.ax_minimap, **kw)
+        ax_minimap = plot_minimap(dsref, fig=fig, ax=self.ax_minimap, **kw)
         
         fig.suptitle(
             figtitle.format(**locals()),
@@ -221,6 +221,10 @@ class PlotComp:
                 if trange:
                     xtitle += f"{trange} "
                     ncname += f"_{trange}"
+                elif dsref.sizes["time"] == 1:
+                    time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
+                    xtitle += f"{time}"
+                    ncname += f"_{time}"
 
                 if "vlevel" in attrs:
                     vlevel = attrs.get("vlevel")
@@ -1389,6 +1393,10 @@ class PlotComp:
                     if trange:
                         xtitle += f"{trange} "
                         ncname += f"_{trange}"
+                    elif dsref.sizes["time"] == 1:
+                        time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
+                        xtitle += f"{time}"
+                        ncname += f"_{time}"
 
                     if "vlevel" in attrs:
                         vlevel = attrs.get("vlevel")
@@ -1541,6 +1549,7 @@ class PlotComp:
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, filename)
+        logger.info(f"{filename} saved")
         del fig
 
 def main_plot(ncins, metazones, func_comp):

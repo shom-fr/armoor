@@ -218,7 +218,7 @@ def open_decode(
         Model or observation dataset.
     """
     # Xoa initialisation
-    register_cf()
+    # register_cf()
     path_files = get_paths(path_files)
 
     # Open file
@@ -526,7 +526,7 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
         ds = ds.assign_coords(depth=depth).drop_vars(["dz", "z"])
 
     ds = ds.sel(time=~ds.get_index("time").duplicated())
-    for var in ["depth", "ssh", "sst", "sss"]:
+    for var in ["depth", "ssh", "ptemp"]:
         if var in ds:
             good_var = ds[var]
             break

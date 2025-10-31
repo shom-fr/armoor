@@ -146,8 +146,8 @@ class TimeColocation(AbstractColocation):
             self.dsprod["time"].attrs = self.dsref.time.attrs
         elif ref == "product":
             self.dsref = interp_time(self.dsref, self.dsprod.time, method=method)
-            self.dsre["time"].encoding = self.dsprod.time.encoding
-            self.dsre["time"].attrs = self.dsprod.time.attrs
+            self.dsref["time"].encoding = self.dsprod.time.encoding
+            self.dsref["time"].attrs = self.dsprod.time.attrs
         else:
             raise ArmoorError(
                 "Use 'reference' or 'product' to specify the reference time"

@@ -7,12 +7,10 @@ The interpolation operations are optimized for large datasets using Dask distrib
 import logging
 from argparse import ArgumentParser
 from dask.distributed import Client, LocalCluster
-import pandas as pd
 import xarray as xr
-import numpy as np
 
+from armoor.base.stats import diff, mean, std, bias, rms, crms
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
-from armoor.base.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_comp_io_parser_arguments,
     add_dask_parser_arguments,
@@ -20,10 +18,6 @@ from armoor.cli.io import (
     save_output
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.data.range import (
-    process_time_range,
-    process_vertical_range
-    )
 from armoor.data.open_decode import open_decode
 
 
@@ -38,6 +32,7 @@ class CompError(Exception):
     or execution, such as incompatible parameters, missing required arguments,
     or invalid comp specifications.
     """
+    
     pass
 
 
@@ -87,161 +82,6 @@ def rename_stat_var(ds, stat):
         })
     return ds.rename_vars(dico)
 
-    
-def diff(dsref, dsprod):
-    """
-    Calculate the difference between reference and product datasets.
-    
-    Parameters
-    ----------
-    dsref : xarray.Dataset
-        Reference dataset.
-    dsprod : xarray.Dataset
-        Product dataset.
-    
-    Returns
-    -------
-    xarray.Dataset
-        Element-wise difference (dsref - dsprod).
-    """
-    return dsref - dsprod
-
-
-def cdiff(dsref, dsprod, dim):
-    """
-    Calculate the centered difference between reference and product datasets.
-    
-    The centered difference removes the mean along the specified dimension
-    from both datasets before computing the difference.
-    
-    Parameters
-    ----------
-    dsref : xarray.Dataset
-        Reference dataset.
-    dsprod : xarray.Dataset
-        Product dataset.
-    dim : str or list of str
-        Dimension(s) along which to compute the mean.
-    
-    Returns
-    -------
-    xarray.Dataset
-        Centered difference: (dsref - mean(dsref)) - (dsprod - mean(dsprod)).
-    """
-    return ((
-        dsref - dsref.mean(dim=dim)
-    ) - (
-        dsprod - dsprod.mean(dim=dim)    
-    ))
-
-
-def mean(ds, dim):
-    """
-    Calculate the mean of a dataset along specified dimension(s).
-    
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset.
-    dim : str or list of str
-        Dimension(s) along which to compute the mean.
-    
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with mean values along the specified dimension(s).
-    """
-    return ds.mean(dim=dim)
-
-
-def std(ds, dim):
-    """
-    Calculate the standard deviation of a dataset along specified dimension(s).
-    
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        Input dataset.
-    dim : str or list of str
-        Dimension(s) along which to compute the standard deviation.
-    
-    Returns
-    -------
-    xarray.Dataset
-        Dataset with standard deviation values along the specified dimension(s).
-    """
-    return ds.std(dim=dim)
-
-
-def bias(dsref, dsprod, dim):
-    """
-    Calculate the bias between reference and product datasets.
-    
-    The bias is the mean difference between the reference and product datasets
-    along the specified dimension(s).
-    
-    Parameters
-    ----------
-    dsref : xarray.Dataset
-        Reference dataset.
-    dsprod : xarray.Dataset
-        Product dataset.
-    dim : str or list of str
-        Dimension(s) along which to compute the mean.
-    
-    Returns
-    -------
-    xarray.Dataset
-        Mean bias (mean of dsref - dsprod along dim).
-    """
-    return (dsref - dsprod).mean(dim=dim)
-
-    
-def rms(dsref, dsprod, dim):
-    """
-    Calculate the root mean square difference between reference and product datasets.
-    
-    Parameters
-    ----------
-    dsref : xarray.Dataset
-        Reference dataset.
-    dsprod : xarray.Dataset
-        Product dataset.
-    dim : str or list of str
-        Dimension(s) along which to compute the RMS.
-    
-    Returns
-    -------
-    xarray.Dataset
-        Root mean square of the difference.
-    """
-    return np.sqrt((diff(dsref, dsprod) ** 2).mean(dim=dim))
-
-    
-def crms(dsref, dsprod, dim):
-    """
-    Calculate the centered root mean square difference between datasets.
-    
-    The centered RMS removes the mean bias before computing the RMS,
-    measuring the variability difference independent of the mean bias.
-    
-    Parameters
-    ----------
-    dsref : xarray.Dataset
-        Reference dataset.
-    dsprod : xarray.Dataset
-        Product dataset.
-    dim : str or list of str
-        Dimension(s) along which to compute the centered RMS.
-    
-    Returns
-    -------
-    xarray.Dataset
-        Centered root mean square difference.
-    """
-    return np.sqrt((cdiff(dsref, dsprod, dim) ** 2).mean(dim=dim))
-
-    
 def process_diff(dsref, dsprod):
     """
     Process and merge reference, product, and difference datasets.
@@ -272,7 +112,7 @@ def process_diff(dsref, dsprod):
     """
     if "time_range" in dsref:
         dsref, dsprod = drop_time_range(dsref, dsprod)
-    ds = diff(dsref, dsprod)
+    ds = diff(dsprod, dsref)
     ds = rename_stat_var(ds, "diff")
     dsref = rename_stat_var(dsref, "ref")
     dsprod = rename_stat_var(dsprod, "prod")
@@ -322,7 +162,7 @@ def process_stat(dsref, dsprod, dim):
             ds1 = rename_stat_var(ds1, f"{dsname}_{fname}")
             ds = xr.merge([ds, ds1])
     for func in [bias, rms, crms]:
-        ds1 = func(dsref, dsprod, dim)
+        ds1 = func(dsprod, dsref, dim)
         ds1 = rename_stat_var(ds1, func.__name__)
         ds = xr.merge([ds, ds1])
     if "trange" in ds.sizes:
@@ -399,8 +239,6 @@ def main_comp():
         with Client(cluster):
             dsref = open_decode(args.ref_fins, args.ref_ifmt)
             dsprod = open_decode(args.fins, args.ifmt)
-            dsref = dsref.persist()
-            dsprod = dsprod.persist()
             if dsref.sizes != dsprod.sizes:
                 logger.error(f"Reference dims: {dsref.sizes}")
                 logger.error(f"Product dims: {dsprod.sizes}")

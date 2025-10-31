@@ -317,11 +317,11 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
         lat1, lon1 = coords[i + 1]
         
         # Calculate segment properties
-        d = geod.inv(lon0, lat0, lon1, lat1)
+        d = geod.inv(lon0, lat0, lon1, lat1, return_back_azimuth=True)
         segment_length = d[-1]  # Total distance of segment
         
         # Get intermediate points for this segment
-        r = geod.inv_intermediate(lon0, lat0, lon1, lat1, int(segment_length / dx))
+        r = geod.inv_intermediate(lon0, lat0, lon1, lat1, int(segment_length / dx), return_back_azimuth=True)
         
         # Add points from this segment
         for npt in range(r.npts):

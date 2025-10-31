@@ -139,7 +139,7 @@ def main_filters():
         raise ArmoorError(
             f"File not found: {args.cfgfile}."
             )
-    
+
     cfg = ConfigManager(DATA_INI).load(str(args.cfgfile))
     metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
     
@@ -274,7 +274,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
 
     if not cfg:
         raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
-        
+    
     # Metazones
     metazones = check_metazones_in(
         metazones,
@@ -309,9 +309,8 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
                 else:
 
                     zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp, **comp_args)
-                    
                     ofmt = cfg["outputs"].get("fmt")
-                    
+
                     if "png" in ofmt:
                         plot_comp(zarr_outputs, metazones, func_comp)
                 

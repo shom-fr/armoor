@@ -207,7 +207,6 @@ class OutputProcessor:
             # Cleanup
             del processed_datasets
             gc.collect()
-        
         return ncouts
     
     def _drifter(self, dsref, dsprod, output):
@@ -449,7 +448,6 @@ class OutputProcessor:
             try:
                 # Prepare statistics configuration
                 stats = output_params.get("stat").copy() if output_params.get("stat") else None
-                
                 # Compute statistics and comparisons
                 dt_prod, dt_ref, dt_comps = StatsComp(
                     mparams, ds_prod, ds_ref, stats
@@ -611,6 +609,7 @@ class OutputProcessor:
         dt.to_zarr(output_file, mode="w", encoding=encoding)
         # output_file = sort_dir / "all.netcdf"
         # dt.to_netcdf(output_file)
+        logger.info(f"{output_file} saved")
         return output_file
     
     def _save_separate_outputs(self, processed_datasets: Dict[str, Dict], 
@@ -650,6 +649,7 @@ class OutputProcessor:
             # output_file = sort_dir / f"{prod_name}.netcdf"
             # dt.to_netcdf(output_file)
             output_files.append(output_file)
+            logger.info(f"{output_file} saved")
         
         return output_files
 
@@ -859,7 +859,8 @@ def main_output(ncs: Dict[str, Any], metazones_in: Dict[str, Any],
         {'statistics': {'atlantic': ['validation/output/atlantic/ref1/statistics/file1.zarr']}}
     """
     manager = OutputPipelineManager(func_comp=func_comp)
-    return manager.process_all_outputs(ncs, metazones_in, outputs, **kwargs)
+    fouts = manager.process_all_outputs(ncs, metazones_in, outputs, **kwargs)
+    return fouts
 
 # def process_output(ocfg, func_comp):
     

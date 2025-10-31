@@ -218,8 +218,8 @@ def save_result(dsout, mz_name, func_comp):
         consolidated=True,
         compute=False
         )
-    # with ProgressBar():
-    #     write_job.compute()
+    with ProgressBar():
+        write_job.compute()
     dsout.close()
     del dsout
     logger.info(f"Saved: {nc}")
@@ -329,12 +329,12 @@ def load_datasets(data_cfg, metazones, dirout):
         # del dss
         ncs = process_all_combinations(zfiles, metazones, dirout)
         ncouts += ncs
-        
+
         if isinstance(zfiles, list):
             for zfile in zfiles:
                 shutil.rmtree(zfile)
         else:
-            shutil.rmtree(zfile)
+            shutil.rmtree(zfiles)
         
         # if isinstance(dataset, list):
         #     for ds in dataset:

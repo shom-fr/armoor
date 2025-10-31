@@ -463,11 +463,14 @@ def to_zarr(ds, fout):
 
 def get_dask_args(args):
     
+    dask_dashboardaddress = args.dask_dashboardaddress
+    if dask_dashboardaddress == "None":
+        dask_dashboardaddress = None
     return (
         args.dask_nworkers,
         args.dask_processes,
         args.dask_memorylimit,
-        args.dask_dashboardaddress,
+        dask_dashboardaddress,
         args.dask_localdirectory
         )
     
