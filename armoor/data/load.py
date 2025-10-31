@@ -236,7 +236,10 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     )
     if dsout:
         # dsout = optimize_for_low_swap(dsout)
-        dsout = dsout.chunk('auto')
+        try:
+            dsout = dsout.chunk('auto')
+        except:
+            logger.info("No chunks")
         ncout = save_result(dsout, mz_name, dirout)
         del dsout
         return ncout
@@ -323,7 +326,7 @@ def load_datasets(data_cfg, metazones, dirout):
         elapsed = time.time() - start_time
         logger.info(f"{dataset_name} load in {elapsed:.1f}s")
         
-        zfiles = zfiles if len(zfiles) > 1 else zfiles[0]
+        # zfiles = zfiles if len(zfiles) > 1 else zfiles[0]
         # for ds in dss:
         #     ds.close()
         # del dss

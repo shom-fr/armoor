@@ -916,15 +916,16 @@ class PlotComp:
                             plot_coords = "filledbox"
                         else:
                             plot_coords = "points"
-                    plot_minimap(
-                        da_ref if npts == 1 else da_ref.isel(npts=inpt),
-                        ax=self.ax_minimap,
-                        plot_coords=plot_coords,
-                        coords_markersize=4,
-                        gridlines_draw_labels=True,
-                        gridlines_xlabel_style={'size': 6},
-                        gridlines_ylabel_style={'size': 6},
-                        )
+                        plot_minimap(
+                            da_ref if npts == 1 else da_ref.isel(npts=inpt),
+                            ax=self.ax_minimap,
+                            fig=fig,
+                            plot_coords=plot_coords,
+                            coords_markersize=4,
+                            gridlines_draw_labels=True,
+                            gridlines_xlabel_style={'size': 6},
+                            gridlines_ylabel_style={'size': 6},
+                            )
                     
                     prod_name = dt_prod["data"].to_dataset().attrs["data_name"]
 
@@ -1068,15 +1069,16 @@ class PlotComp:
                         else:
                             plot_coords = "points"
                     
-                    plot_minimap(
-                        da_ref,
-                        ax=self.ax_minimap,
-                        plot_coords=plot_coords,
-                        coords_markersize=4,
-                        gridlines_draw_labels=True,
-                        gridlines_xlabel_style={'size': 6},
-                        gridlines_ylabel_style={'size': 6},
-                        )
+                        plot_minimap(
+                            da_ref,
+                            ax=self.ax_minimap,
+                            fig=fig,
+                            plot_coords=plot_coords,
+                            coords_markersize=4,
+                            gridlines_draw_labels=True,
+                            gridlines_xlabel_style={'size': 6},
+                            gridlines_ylabel_style={'size': 6},
+                            )
                     
                     prod_name = dss_prod[iprod].attrs["data_name"]
                     if "member" in da_prod.dims:
@@ -1550,6 +1552,7 @@ class PlotComp:
         filename.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, filename)
         logger.info(f"{filename} saved")
+        plt.close(fig)
         del fig
 
 def main_plot(ncins, metazones, func_comp):
