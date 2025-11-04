@@ -444,7 +444,6 @@ class OutputProcessor:
         for file_idx in range(num_files):
             ds_prod = xr.open_dataset(prod_files_list[file_idx])
             ds_ref = xr.open_dataset(ref_files_list[file_idx])
-
             try:
                 # Prepare statistics configuration
                 stats = output_params.get("stat").copy() if output_params.get("stat") else None
@@ -452,7 +451,6 @@ class OutputProcessor:
                 dt_prod, dt_ref, dt_comps = StatsComp(
                     mparams, ds_prod, ds_ref, stats
                 ).compute()
-                
                 if self.func_comp == "comp_drifter":
                     dt_comps = self._drifter(ds_ref, ds_prod, output)
                 

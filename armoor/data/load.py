@@ -245,9 +245,9 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
         return ncout
     return None
 
-    if 'ds' in locals():
-        ds.close()
-    gc.collect()
+    # if 'ds' in locals():
+    #     ds.close()
+    # gc.collect()
 
 def prepare_tasks(zfiles, metazones: Dict, dirout: Any) -> List[Tuple]:
     """Prepare all tasks for parallel processing."""
@@ -296,7 +296,9 @@ def load_datasets(data_cfg, metazones, dirout):
         if not isinstance(dss, list):
             dss = [dss]
             
-        logger.info("Add attributes")
+        logger.info("Add attributes and save in temporary zarr file")
+        ztmp = "tmp_{ids}.zarr"
+        zfiles = []
         for ids, ds in enumerate(dss):
             # Métadonnées
             if len(dss) == 1:
@@ -304,13 +306,7 @@ def load_datasets(data_cfg, metazones, dirout):
             else:
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
             ds.attrs["data_ref"] = str(cfg_data.get("ref"))
-            dss[ids] = ds
-            del ds
-        logger.info("Save in temporary zarr file")
-        ztmp = "tmp_{ids}.zarr"
-        zfiles = []
-        for ids, ds in enumerate(dss):
-            zfile = ztmp.format(**locals())
+            zfile = ztmp.format(ids=ids)
             write_job = ds.to_zarr(
                 store=zfile,
                 mode="w",
@@ -322,14 +318,28 @@ def load_datasets(data_cfg, metazones, dirout):
             zfiles.append(zfile)
             ds.close()
             del ds
+        del dss
+        
+        # logger.info("Save in temporary zarr file")
+        # ztmp = "tmp_{ids}.zarr"
+        # zfiles = []
+        # for ids, ds in enumerate(dss):
+        #     zfile = ztmp.format(**locals())
+        #     write_job = ds.to_zarr(
+        #         store=zfile,
+        #         mode="w",
+        #         compute=False,
+        #         consolidated=True,
+        #         )
+        #     with ProgressBar():
+        #         write_job.compute()
+        #     zfiles.append(zfile)
+        #     ds.close()
+        #     del ds
         
         elapsed = time.time() - start_time
         logger.info(f"{dataset_name} load in {elapsed:.1f}s")
         
-        # zfiles = zfiles if len(zfiles) > 1 else zfiles[0]
-        # for ds in dss:
-        #     ds.close()
-        # del dss
         ncs = process_all_combinations(zfiles, metazones, dirout)
         ncouts += ncs
 
@@ -338,12 +348,10 @@ def load_datasets(data_cfg, metazones, dirout):
                 shutil.rmtree(zfile)
         else:
             shutil.rmtree(zfiles)
-        
-        # if isinstance(dataset, list):
-        #     for ds in dataset:
-        #         ds.close()
-        # else:
-        #     dataset.close()
-        gc.collect()
+        del zfiles
+        # for ds in dss:
+        #     ds.close()
+        # del dss
 
+        # gc.collect()
     return ncouts

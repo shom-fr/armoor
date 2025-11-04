@@ -9,6 +9,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cmocean as cmo
 import dask
+from dask.diagnostics import ProgressBar
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -183,7 +184,6 @@ class PlotComp:
                     f"{self.func_comp}/plot/{self.metazone}/{ref_name}/"
                     f"diagdisp_glob_{var}_{prod_name}.png"
                     )
-                
                 self.diagdisp(
                     dsref,
                     dsprod,
@@ -350,7 +350,7 @@ class PlotComp:
             gridlines_xlabel_style={'size': 6},
             gridlines_ylabel_style={'size': 6}
             )
-        ax_minimap = plot_minimap(dsref, ax=self.ax_minimap, **kw)
+        ax_minimap = plot_minimap(dsref, fig=fig, ax=self.ax_minimap, **kw)
         fig.suptitle(
             figtitle.format(**locals()),
             y=1.02
@@ -511,7 +511,7 @@ class PlotComp:
                 gridlines_xlabel_style={'size': 6},
                 gridlines_ylabel_style={'size': 6},
                 )
-            plot_minimap(dsref_itime, ax=self.ax_minimap, **kw)
+            plot_minimap(dsref_itime, fig=fig, ax=self.ax_minimap, **kw)
             figname = (
                 f"{self.func_comp}/plot/{self.metazone}/{refname}/"
                 f"udiagts{xfigname}.png"
@@ -614,7 +614,7 @@ class PlotComp:
                 gridlines_xlabel_style={'size': 6},
                 gridlines_ylabel_style={'size': 6},
                 )
-            ax_minimap = plot_minimap(dsref, ax=self.ax_minimap, **kw)
+            ax_minimap = plot_minimap(dsref, fig=fig, ax=self.ax_minimap, **kw)
             
             fig.suptitle(
                 figtitle.format(**locals()),
@@ -738,10 +738,15 @@ class PlotComp:
             else:
                 vrange = vranges
             dsref_itime = dsref.isel(time=[itime])
-            dssprod_itime = [dsprod.isel(time=[itime]).squeeze() for dsprod in dssprod]
+            dssprod_itime = []
+            for dsprod in dssprod:
+                ds = dsprod.isel(time=[itime]).squeeze()
+                if "member" in ds.depth.dims:
+                    ds = ds.reset_coords("depth")
+                dssprod_itime.append(ds)
             dssprod_closest = [ds.armoorfilters.sel_closest(dsref_itime) for ds in dssprod_itime]
-            dssprod_mean = [ds.reset_coords("depth").mean(dim="member").set_coords("depth") for ds in dssprod_itime]
-            dssprod_std = [ds.reset_coords("depth").std(dim="member").set_coords("depth") for ds in dssprod_itime]
+            dssprod_mean = [ds.mean(dim="member") for ds in dssprod_itime]
+            dssprod_std = [ds.std(dim="member") for ds in dssprod_itime]
             del dssprod_itime
             time = pd.to_datetime(dsref_itime.time.values[0])
             mask = ~dsref_itime.ptemp.isnull()
@@ -814,7 +819,7 @@ class PlotComp:
                     gridlines_xlabel_style={'size': 6},
                     gridlines_ylabel_style={'size': 6},
                     )
-                ax_minimap = plot_minimap(daref, ax=self.ax_minimap, **kw)
+                ax_minimap = plot_minimap(daref, fig=fig, ax=self.ax_minimap, **kw)
                 
                 figname = (
                     f"{self.func_comp}/plot/{self.metazone}/{refname}/"
@@ -1575,4 +1580,7 @@ def main_plot(ncins, metazones, func_comp):
     # Execute in parallel
     # with setup_dask_client():
     logger.info("Start plot")
-    dask.compute(*tasks)
+    # for task in tasks:
+    #     dask.compute(task)
+    # with ProgressBar():
+    dask.compute(*tasks,  scheduler='processes')

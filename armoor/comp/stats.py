@@ -54,19 +54,20 @@ class StatsComp:
         self.mparams = mparams
         self.dsref = dsref
 
+        dims = list(dims) if dims else []
+        self.dims = self._filter_dims(dims, self.mparams)
+        self.extra_dims = extra_dims
+        self.exclude_dims = exclude_dims
+        
         # Mean over ensemble members if present
-        if "member" in dsprod.dims:
-            logger.debug("Averaging product dataset across 'member' dimension.")
+        if "member" in dsprod.dims and len(self.dims) > 0:
+            logger.info("Averaging product dataset across 'member' dimension.")
             dsprod = (
                 dsprod.reset_coords(["lon", "lat"])
                 .mean(dim="member")
                 .set_coords(["lon", "lat"])
-            )
+                )
         self.dsprod = dsprod
-
-        self.dims = list(dims) if dims else []
-        self.extra_dims = extra_dims
-        self.exclude_dims = exclude_dims
 
         self.dtref = xr.DataTree(name="ref")
         self.dtref.update(
@@ -91,13 +92,11 @@ class StatsComp:
         tuple
             (product_tree, reference_tree, comparison_tree or None)
         """
-        dims = self._filter_dims(self.dims, self.mparams)
-
-        if not dims:
+        if not self.dims:
             logger.debug("No dimensions to reduce. Returning direct diff.")
             return self.get_diff()
-        logger.debug("Computing statistics along dims=%s", dims)
-        return self.get_stats(dims)
+        logger.debug(f"Computing statistics along dims={self.dims}")
+        return self.get_stats(self.dims)
 
     # -------------------------------------------------------------------------
 

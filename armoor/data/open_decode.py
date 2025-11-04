@@ -402,7 +402,7 @@ def open_decode_cmems_model(path_files):
         combine="by_coords",
         engine="netcdf4",
         chunks={"time": 1, "lat": 100, "lon": 100},
-        parallel=True,        # Avoid threading issues with netCDF4
+        parallel=False,#True,        # Avoid threading issues with netCDF4
         cache=False,       # Cache can be disabled for huge datasets
         # lock=False,
         decode_times=True,     # Decode times properly

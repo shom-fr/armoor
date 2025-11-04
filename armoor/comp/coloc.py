@@ -245,15 +245,15 @@ class HorizontalColocation(AbstractColocation):
         """
         dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
         mask = dist_prod2ref < radius_meters
-        # OPTIMISATION 3: Appliquer le masque et drop en une seule opération
+        mask = mask.transpose("time", "member")
         for coord in ["lon", "lat"]:
             self.dsprod[coord] = self.dsprod[coord].expand_dims({"time": self.dsprod.time})
         self.dsprod = self.dsprod.reset_coords(["lon", "lat"])
+        
         coords = [coord for coord in mask.coords]
         mask = mask.drop_vars(coords)
         self.dsprod = self.dsprod.where(mask, drop=True)
         self.dsprod = self.dsprod.set_coords(["lon", "lat"])
-
  
     def radius(self, radius: float) -> Tuple[xr.Dataset, xr.Dataset]:
         """
@@ -592,6 +592,8 @@ def main_coloc(ncs, metazones, comp_func):
             logger.info(f"Use reference {ncref}")
             dsrefin = xr.open_dataset(ncref, engine="zarr")#, engine="h5netcdf")
             dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=512)
+            if "depth" in dsrefin.data_vars:
+                dsrefin = dsrefin.set_coords("depth")
             for var in COMP_VARS[comp_func]:
                 da = dsrefin.oceanvars.sel(var)
                 if isinstance(da, xr.DataArray):
@@ -676,7 +678,6 @@ def main_coloc(ncs, metazones, comp_func):
                 dsref = dsref.compute()
                 logger.info("Compute coloc prod")
                 dsprod = dsprod.compute()
-                
                 time_coloc = params.get("time")
                 if time_coloc != None:
                     if  "tfreq" in params.get("time")[0]:
@@ -736,10 +737,13 @@ def main_coloc(ncs, metazones, comp_func):
                     ncouts[metazone][ref_name][prod_name].append(ncout_prod)
                     dsref.close()
                     dsprod.close()
+                    del dsref
+                    del dsprod
                 del dssref
                 del dssprod
     
             dsrefin.close()
+            del dsrefin
             gc.collect()
         logger.info(f"End colocation for {metazone}.")
     return ncouts

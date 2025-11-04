@@ -488,10 +488,10 @@ class ArmoorFilters:
                     xgeo.get_distances(ds_model, ds_obs.isel(time=[itime]))
                     .squeeze()
                     .rename({"npts0": "member"})
-                )
+                    )
                 ds = ds_model.where(
                     dist_model2obs == dist_model2obs.min(), drop=True
-                ).squeeze()
+                    ).squeeze()
                 dss.append(ds)
             return xr.combine_nested(dss, "time")
         else:
@@ -499,11 +499,14 @@ class ArmoorFilters:
             dist_model2obs = (
                 xgeo.get_distances(ds_model, ds_obs)
                 .squeeze()
-                .rename({"npts0": "member"})
-            )
-            return ds_model.where(
-                dist_model2obs == dist_model2obs.min(), drop=True
-            ).squeeze()
+                )
+            if isinstance(dist_model2obs, xr.DataArray):
+                dist_model2obs = dist_model2obs.rename({"npts0": "member"})
+                return ds_model.where(
+                    dist_model2obs == dist_model2obs.min(), drop=True
+                    ).squeeze()
+            else:
+                return None
 
 
 def create_optimized_mask(ds, var_name, bins):
