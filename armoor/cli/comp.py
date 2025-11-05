@@ -18,7 +18,7 @@ from armoor.cli.io import (
     save_output
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.data.open_decode import open_decode
+from armoor.data.open_decode import open_decode, register_cf
 
 
 logger = logging.getLogger(__name__)
@@ -232,6 +232,8 @@ def main_comp():
     
     # Setup logging
     main_setup_logging(args)
+    
+    register_cf()
     
     kw_dask = get_dask_args(args)
     

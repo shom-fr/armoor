@@ -23,7 +23,7 @@ from armoor.data.interp import (
     process_horizontal_interpolation,
     process_vertical_interpolation
     )
-from armoor.data.open_decode import open_decode
+from armoor.data.open_decode import open_decode, register_cf
 
 
 logger = logging.getLogger(__name__)
@@ -124,6 +124,8 @@ def main_interp_time():
     
     # Setup logging
     main_setup_logging(args)
+    
+    register_cf()
     
     kw_dask = get_dask_args(args)
     
@@ -320,6 +322,8 @@ def main_interp_horizontal():
             "regrid_from_nc", ncgrid
             )
     
+    register_cf()
+    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
@@ -442,6 +446,8 @@ def main_interp_vertical():
     
     # Setup logging
     main_setup_logging(args)
+    
+    register_cf()
     
     vlevel = args.vlevel
     vfreq = args.vfreq

@@ -19,7 +19,7 @@ from armoor.cli.io import (
     save_output
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.data.open_decode import open_decode
+from armoor.data.open_decode import open_decode, register_cf
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,9 @@ def process_filters(fins, ifmt, fout, ofmt, filters_config, kw_dask):
     """
     if is_dict_empty(filters_config):
         raise FiltersError("No filters to be applied.")
-
+    
+    register_cf()
+    
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(fins, ifmt)
@@ -402,7 +404,6 @@ def get_parser_filters_quality():
         )
     return parser
 
-
 def main_filters_quality():
     """Apply quality control filters to input files via command line interface.
     
@@ -459,4 +460,78 @@ def main_filters_quality():
         args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
         kw_dask
         )
+
+def get_parser_filters_oceanvars():
+    """Create argument parser for ocean variables filtering operations.
     
+    Returns
+    -------
+    ArgumentParser
+        Configured argument parser with ocean variables filtering options.
+    
+    Examples
+    --------
+    >>> parser = get_parser_filters_oceanvars()
+    >>> args = parser.parse_args(['ptemp', 'sal'])
+    """
+    parser = ArgumentParser(
+        description="Apply ocean variables filters over a list of input files.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+        )
+    add_logging_parser_arguments(parser)
+    add_io_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
+    parser.add_argument(
+        'vnames',
+        type=str,
+        nargs="*",
+        help="List of ocean variables"
+        )
+    return parser
+
+def main_filters_oceanvars():
+    """Apply ocean variables filters to input files via command line interface.
+    
+    This function serves as the main entry point for ocean variables filtering operations.
+    It parses command line arguments, configures ocean variables filters based on
+    specified variable names, and processes the input files accordingly.
+    
+    Positional Arguments
+    --------------------
+    vnames : list
+        Names of the ocean variable to keep.
+    
+    Examples
+    --------
+    Command line usage:
+    
+    .. code-block:: bash
+    
+        armoor-filters-quality input.nc output.nc ptemp sal
+    
+    Notes
+    -----
+    - Leverages Dask for memory-efficient processing of large datasets
+    - Supports all input/output formats available in the ARMOOR ecosystem
+    """
+    # Get parser
+    parser = get_parser_filters_oceanvars()
+
+    # Parse
+    args = parser.parse_args()
+    
+    # Setup logging
+    main_setup_logging(args)
+    
+    filters_config = {}
+   
+    filters_config = {
+        "oceanvars": args.vnames
+        }
+    
+    kw_dask = get_dask_args(args)
+    
+    process_filters(
+        args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
+        kw_dask
+        )

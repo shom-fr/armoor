@@ -442,7 +442,7 @@ def get_parser_comp_argo():
     parser.add_argument(
         'radius',
         type=float,
-        help="Radius of disk to filter model point around observation."
+        help="Radius (in km) of disk to filter model point around observation."
         )
     parser.add_argument(
         '--qc',
@@ -499,7 +499,7 @@ def get_parser_comp_mooring():
     parser.add_argument(
         'radius',
         type=float,
-        help="Radius of disk to filter model point around observation."
+        help="Radius (in km) of disk to filter model point around observation."
         )
     parser.add_argument(
         '--qc',

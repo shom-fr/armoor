@@ -6,7 +6,7 @@ METAZONE_PARAMS = {
         "polygon",
         "href",
         "cloud",
-        "vars",
+        "oceanvars",
         "qc",
         "bathy"
         ],
@@ -16,8 +16,8 @@ METAZONE_PARAMS = {
         "vrange",
         "vlevel",
         "polygon",
-        "vars",
         "radius",
+        "oceanvars",
         "qc",
         "bathy"
         ],
@@ -26,7 +26,7 @@ METAZONE_PARAMS = {
         "tbound",
         "trange_seq",
         "polygon",
-        "vars",
+        "oceanvars",
         "radius",
         "qc",
         "bathy"
@@ -34,7 +34,7 @@ METAZONE_PARAMS = {
     "comp_drifter": [
         "tbound",
         "polygon",
-        "vars",
+        "oceanvars",
         "freq_drift",
         "period_drift",
         "tresample",
@@ -50,7 +50,7 @@ METAZONE_PARAMS = {
         "cloud",
         "vrange",
         "vlevel",
-        "vars",
+        "oceanvars",
         "bathy"
         ]
     }

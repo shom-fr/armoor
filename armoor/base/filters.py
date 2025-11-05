@@ -19,7 +19,9 @@ from matplotlib import path
 from scipy.ndimage import binary_dilation
 
 from armoor.base.interp import grid2loc, regrid
+import armoor.base.oceanvars
 from armoor.data.open_decode import open_decode
+
 
 R_terre = 6371
 logger = logging.getLogger(__name__)
@@ -359,7 +361,30 @@ class ArmoorFilters:
                 ds["bathy"] = bathy.isel(time=0)
                 
         return ds
-                    
+    
+    @staticmethod
+    def oceanvars_filter(ds, vnames):
+        logger.info("oceanvars filter")
+        coords = []
+        for coord in ["depth", "pdens", "time", "lon", "lat"]:
+            if coord in ds:
+                coords.append(coord)
+        dss = []
+        for vname in vnames:
+            logger.info(vname)
+            # da = ds.oceanvars.sel(vname)
+            dss.append(
+                ds.oceanvars.sel(vname).to_dataset(name=vname)
+                )
+        dso = xr.merge(dss)
+        coords2set = []
+        for coord in coords:
+            if coord not in dso:
+                coords2set.append(coord)
+                dso[coord] = ds[coord]
+        dso = dso.set_coords(coords2set)
+        return dso
+        
     def apply_combined_filters(self, filters_config: dict) -> xr.Dataset:
         """
         Apply multiple filters in a single operation to reduce memory usage.
@@ -463,7 +488,13 @@ class ArmoorFilters:
                 filters_config["bathy"].get("fmt"),
                 filters_config["bathy"].get('min'),
                 filters_config["bathy"].get('max'),
-            )
+                )
+            
+        if "oceanvars" in filters_config:
+            ds = self.oceanvars_filter(
+                ds,
+                filters_config["oceanvars"]
+                )
         
         return ds
     

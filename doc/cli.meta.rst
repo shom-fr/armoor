@@ -26,6 +26,7 @@ Hereafter we give some details about the available parameters:
 - ``href``: string defining the grid over which data will be interpolated for comparison computing.
 - ``vlevel``: list of type `"depth",[50,100,400,500]`. The first element defines the type of vertical reference, the second one the list of vertical levels.
 - ``vrange``: list of type `"reference","depth",[(50, 100), (400, 500), (800, 1000)]`. The first element defines the vertical coordinates over which data will be interpolated in z for comparison computing, the second element defines the type of vertical levels, the third one defines the list of vertical intevals (list of tuple).
+- ``oceanvars``: list of ocean variables to be processed.
 
 Some parameters are not compatible : 
 

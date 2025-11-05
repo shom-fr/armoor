@@ -22,7 +22,7 @@ from armoor.data.range import (
     process_time_range,
     process_vertical_range
     )
-from armoor.data.open_decode import open_decode
+from armoor.data.open_decode import open_decode, register_cf
 
 
 logger = logging.getLogger(__name__)
@@ -118,6 +118,8 @@ def main_range_time():
     # Setup logging
     main_setup_logging(args)
     
+    register_cf()
+    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
@@ -192,6 +194,8 @@ def main_range_vertical():
     
     # Setup logging
     main_setup_logging(args)
+    
+    register_cf()
     
     kw_dask = get_dask_args(args)
     

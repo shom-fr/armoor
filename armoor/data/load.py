@@ -59,6 +59,9 @@ def build_filters_config(mz_param, data_name):
             'min': None if bathy_min == "None" else float(bathy_min),
             'max': None if bathy_max == "None" else float(bathy_max)
             }
+    
+    if 'oceanvars' in mz_param:
+        filters_config["oceanvars"] = mz_param.get('oceanvars')
         
     # # Depth filters
     # if 'depth_min' in mz_param or 'depth_max' in mz_param:
