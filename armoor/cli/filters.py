@@ -258,10 +258,14 @@ def get_parser_filters_horizontal():
         help="Format of the bathymetry NetCDF file."
         )
     parser.add_argument(
-        '--bathy-thr',
+        '--bathy-thr-min',
         type=float,
-        nargs=2,
-        help="Bathymetry depth thresholds: minimum maximum (in meters)"
+        help="Bathymetry depth minimum threshold (in meters)"
+        )
+    parser.add_argument(
+        '--bathy-thr-max',
+        type=float,
+        help="Bathymetry depth maximum threshold (in meters)"
         )
     return parser
 
@@ -338,21 +342,22 @@ def main_filters_horizontal():
     bathy_file = args.bathy_file
     if bathy_file:
         bathy_fmt = args.bathy_fmt
-        bathy_thr = args.bathy_thr
+        bathy_thr_min = args.bathy_thr_min
+        bathy_thr_max = args.bathy_thr_max
         if not bathy_fmt:
             raise FiltersError(
                 "--bathy-fmt is mandatory since --bathy-file is specified."
                 )
-        if not bathy_thr:
+        if (not bathy_thr_min) and (not bathy_thr_max):
             raise FiltersError(
-                "--bathy-thr is mandatory since --bathy-file is specified."
+                "--bathy-thr-min and/or --bathy-thr-max is mandatory since --bathy-file is specified."
                 )
         filters_config.update({
             "bathy":{
                 "path": bathy_file,
                 "fmt": bathy_fmt,
-                "min": bathy_thr[0],
-                "max": bathy_thr[1]
+                "min": bathy_thr_min,
+                "max": bathy_thr_max
                 }
             })
         

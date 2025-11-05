@@ -1,12 +1,10 @@
 """Interpolation functions."""
 import logging
+from contextlib import contextmanager
 import re
-from pyproj import Proj, Geod
-
-import numpy as np
+from pyproj import Geod
 import pandas as pd
 import xarray as xr
-import xesmf as xe
 import xoa.regrid as xregrid
 
 from armoor.base.misc import geo_vars
@@ -346,50 +344,29 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     ds = grid2loc(ds, list(zip(all_lats, all_lons)))
     ds = xr.merge([ds, dist])
     return ds
-    
-    
+
+@contextmanager
+def create_regridder(dsi, dso, method="bilinear"):
+    """Context manager for safe regridder creation and cleanup."""
+    import xesmf as xe
+    regridder = None
+    try:
+        regridder = xe.Regridder(dsi, dso, method, parallel=False)
+        yield regridder
+    finally:
+        if regridder is not None:
+            del regridder
+        import gc
+        gc.collect()
+
 def regrid(dsi, dso) -> xr.Dataset:
-    """
-    Regrid a variable.
-
-    Parameters
-    ----------
-    dsi: xarray.Dataset
-        Dataset to regrid.
-    dso: xarray.Dataset
-        Dataset containing output grid.
-
-    Returns
-    -------
-    xarray.Dataset
-        Regridded dataset.
-    """
-    # dlon = dsi.lon.diff("x").max().values
-    # dlat = dsi.lat.diff("y").max().values
-    
+    """Regrid a variable."""
     vars2sub = geo_vars(dsi)
-    # dsi = dsi[vars2sub].where(
-    #     (dsi.lat >= dso.lat.min().values - 2 * dlat)
-    #     & (dsi.lat <= dso.lat.max().values + 2 * dlat)
-    #     & (dsi.lon >= dso.lon.min().values - 2 * dlon)
-    #     & (dsi.lon <= dso.lon.max().values + 2 * dlon),
-    #     # drop=True,
-    # )
     
-    # if "mask" in dsi.keys():
-    #     dsi = dsi.where(dsi.mask == 1 , drop=True)
-    regridder = xe.Regridder(dsi, dso, "bilinear", parallel=False)
-    dss = []
-    for var in vars2sub:
-        daio = regridder(dsi[var])
-        dsio = daio.to_dataset(name=var)
-        dss.append(dsio)
-    dsio = xr.merge(dss)
-    # dsio = regridder(dsi)
-    regridder.grid_in.destroy()
-    regridder.grid_out.destroy()
-    # for var in dsi.data_vars:
-    #     dsio[var].assign_attrs(**dsi[var].attrs)
+    with create_regridder(dsi, dso) as regridder:
+        dsi_subset = dsi[vars2sub]
+        dsio = regridder(dsi_subset, keep_attrs=True)
+    
     return dsio
 
 def vinterp(ds, vname, vlevels, method="linear"):

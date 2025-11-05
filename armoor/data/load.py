@@ -51,11 +51,13 @@ def build_filters_config(mz_param, data_name):
     
     if 'bathy' in mz_param:
         # Assuming quality variable name based on data_name or a specific field
+        bathy_min = mz_param.get('bathy')[2]
+        bathy_max = mz_param.get('bathy')[3]
         filters_config['bathy'] = {
             'path': mz_param.get('bathy')[0],
             'fmt': mz_param.get('bathy')[1],
-            'min': float(mz_param.get('bathy')[2]),
-            'max': float(mz_param.get('bathy')[3])
+            'min': None if bathy_min == "None" else float(bathy_min),
+            'max': None if bathy_max == "None" else float(bathy_max)
             }
         
     # # Depth filters
@@ -255,8 +257,7 @@ def prepare_tasks(zfiles, metazones: Dict, dirout: Any) -> List[Tuple]:
     if not isinstance(zfiles, list):
         zfiles = [zfiles]
     for zfile in zfiles:
-        ds = xr.open_dataset(zfile, chunks="auto")#{"time": 1, "y": 200, "x": 200})
-        # ds = ds.unify_chunks()
+        ds = xr.open_dataset(zfile, chunks="auto")
         for mz_name, mz_param in metazones.items():
             task = (ds, mz_name, mz_param, dirout)
             tasks.append(task)
@@ -271,11 +272,7 @@ def process_all_combinations(zfiles, metazones, dirout, max_workers=1):
     for task in tasks:
         ncout = process_single_task(task)
         ncouts.append(ncout)
-    # if isinstance(dataset, list):
-    #     for ds in dataset:
-    #         ds.close()
-    # else:
-    #     dataset.close()
+
     return ncouts
 
 def load_datasets(data_cfg, metazones, dirout):
@@ -319,24 +316,7 @@ def load_datasets(data_cfg, metazones, dirout):
             ds.close()
             del ds
         del dss
-        
-        # logger.info("Save in temporary zarr file")
-        # ztmp = "tmp_{ids}.zarr"
-        # zfiles = []
-        # for ids, ds in enumerate(dss):
-        #     zfile = ztmp.format(**locals())
-        #     write_job = ds.to_zarr(
-        #         store=zfile,
-        #         mode="w",
-        #         compute=False,
-        #         consolidated=True,
-        #         )
-        #     with ProgressBar():
-        #         write_job.compute()
-        #     zfiles.append(zfile)
-        #     ds.close()
-        #     del ds
-        
+
         elapsed = time.time() - start_time
         logger.info(f"{dataset_name} load in {elapsed:.1f}s")
         
@@ -349,9 +329,5 @@ def load_datasets(data_cfg, metazones, dirout):
         else:
             shutil.rmtree(zfiles)
         del zfiles
-        # for ds in dss:
-        #     ds.close()
-        # del dss
 
-        # gc.collect()
     return ncouts

@@ -526,7 +526,7 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
         ds = ds.assign_coords(depth=depth).drop_vars(["dz", "z"])
 
     ds = ds.sel(time=~ds.get_index("time").duplicated())
-    for var in ["depth", "ssh", "ptemp"]:
+    for var in ["depth", "ssh", "ptemp", "sst"]:
         if var in ds:
             good_var = ds[var]
             break

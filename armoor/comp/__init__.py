@@ -7,7 +7,8 @@ METAZONE_PARAMS = {
         "href",
         "cloud",
         "vars",
-        "qc"
+        "qc",
+        "bathy"
         ],
     "comp_argo": [
         "tbound",
@@ -17,7 +18,8 @@ METAZONE_PARAMS = {
         "polygon",
         "vars",
         "radius",
-        "qc"
+        "qc",
+        "bathy"
         ],
     "comp_mooring": [
         "tfreq",
@@ -26,7 +28,8 @@ METAZONE_PARAMS = {
         "polygon",
         "vars",
         "radius",
-        "qc"
+        "qc",
+        "bathy"
         ],
     "comp_drifter": [
         "tbound",
@@ -35,7 +38,8 @@ METAZONE_PARAMS = {
         "freq_drift",
         "period_drift",
         "tresample",
-        "tsmooth"
+        "tsmooth",
+        "bathy"
         ],
     "comp_models": [
         "tfreq",
@@ -47,6 +51,7 @@ METAZONE_PARAMS = {
         "vrange",
         "vlevel",
         "vars",
+        "bathy"
         ]
     }
 

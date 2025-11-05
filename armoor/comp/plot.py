@@ -1569,18 +1569,12 @@ def main_plot(ncins, metazones, func_comp):
         plotcomp.clean()
         del plotcomp
     
-    # Flatten the nested structure into a list of tasks
+    logger.info("Start plot")    
     tasks = []
     for output, metas in ncins.items():
         for metazone, ncs in metas.items():
             if metazone in metazones:
                 for nc in ncs:
+                    # process_task(nc, func_comp, metazone, output)
                     tasks.append(dask.delayed(process_task)(nc, func_comp, metazone, output))
-
-    # Execute in parallel
-    # with setup_dask_client():
-    logger.info("Start plot")
-    # for task in tasks:
-    #     dask.compute(task)
-    # with ProgressBar():
-    dask.compute(*tasks,  scheduler='processes')
+    dask.compute(*tasks)#,  scheduler='processes')

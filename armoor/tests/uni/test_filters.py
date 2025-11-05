@@ -1,8 +1,8 @@
+import os
 import pytest
 import numpy as np
 import xarray as xr
 import pandas as pd
-from unittest.mock import patch, MagicMock
 import logging
 from armoor.base.filters import ArmoorFilters  # Replace with actual import
 
@@ -71,6 +71,7 @@ def sample_ds_no_time():
 
 # Tests
 class TestArmoorFilters:
+    
     def test_get_mask(self, sample_ds):
         """Test get_mask with a simple polygon."""
         coords = [(2, 2), (2, 8), (8, 8), (8, 2)]
@@ -222,8 +223,8 @@ class TestArmoorFilters:
         assert result is not None
         assert isinstance(result, xr.Dataset)
 
-    @patch('armoor.base.filters.open_decode')
-    def test_bathy_filter(self, mock_open_decode, sample_ds_no_time):
+    # @patch('armoor.base.filters.open_decode')
+    def test_bathy_filter(self, sample_ds_no_time):
         """Test bathy_filter static method."""
         # Create mock bathymetry dataset
         mock_bathy = xr.Dataset({
@@ -232,17 +233,18 @@ class TestArmoorFilters:
             "lon": sample_ds_no_time.lon,
             "lat": sample_ds_no_time.lat
         })
-        mock_open_decode.return_value = mock_bathy
-        
+        # mock_open_decode.return_value = mock_bathy
+        mock_bathy_path = "mock_bathy_path.nc"
+        mock_bathy.to_netcdf(mock_bathy_path)
         # Note: Since bathy_filter is @dask.delayed, we need to call .compute() on the result
         result = ArmoorFilters.bathy_filter(
             sample_ds_no_time, 
-            path="/fake/path", 
-            fmt="netcdf",
+            path=mock_bathy_path, 
+            fmt="armoor",
             minimum=10,
             maximum=50
         ).compute()
-        
+        os.remove(mock_bathy_path)
         assert result is not None
         assert isinstance(result, xr.Dataset)
 

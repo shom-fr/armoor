@@ -1,14 +1,11 @@
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch, Mock
+import gc
 
 import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-import xesmf as xe
 
 from armoor.base.interp import grid2loc, interp_time, regrid, vinterp, grid2section
-from armoor.base.misc import geo_vars
 
 
 class TestInterpTime:
@@ -22,8 +19,8 @@ class TestInterpTime:
             'static_var': (['x', 'y'], np.random.rand(3, 3))
         }, coords={
             'time': dates,
-            'x': np.arange(3),
-            'y': np.arange(3)
+            'lon': np.arange(3),
+            'lat': np.arange(3)
         })
     
     def test_single_date_interpolation(self):
@@ -231,6 +228,12 @@ class TestInterpTime:
 class TestGrid2Loc:
     """Test suite for the grid2loc function."""
     
+    # @pytest.fixture(autouse=True)
+    # def cleanup_between_tests(self):
+    #     """Ensure cleanup between tests."""
+    #     yield
+    #     gc.collect()
+        
     def setup_method(self):
         """Create a gridded test dataset with 2D and 3D variables."""
         lon = np.linspace(-10, 0, 3)
@@ -340,6 +343,12 @@ class TestGrid2Loc:
 class TestGrid2Section:
     """Test suite for the grid2section function."""
     
+    # @pytest.fixture(autouse=True)
+    # def cleanup_between_tests(self):
+    #     """Ensure cleanup between tests."""
+    #     yield
+    #     gc.collect()
+    
     def setup_method(self):
         """Create a gridded test dataset."""
         lon = np.linspace(-10, 0, 10)
@@ -394,7 +403,7 @@ class TestGrid2Section:
 
 class TestRegrid:
     """Test suite for the regrid function."""
-    
+
     def setup_method(self):
         """Create source and target datasets for regridding tests."""
         lon = np.linspace(-10, 0, 4)
@@ -452,6 +461,12 @@ class TestRegrid:
 
 class TestVinterp:
     """Test suite for the vinterp function."""
+    
+    # @pytest.fixture(autouse=True)
+    # def cleanup_between_tests(self):
+    #     """Ensure cleanup between tests."""
+    #     yield
+    #     gc.collect()
     
     def setup_method(self):
         """Create a test dataset with vertical dimension."""
@@ -520,6 +535,12 @@ class TestVinterp:
 
 class TestIntegration:
     """Integration tests combining multiple functions."""
+    
+    # @pytest.fixture(autouse=True)
+    # def cleanup_between_tests(self):
+    #     """Ensure cleanup between tests."""
+    #     yield
+    #     gc.collect()
     
     def setup_method(self):
         """Setup for integration tests."""

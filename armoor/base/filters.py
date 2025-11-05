@@ -182,7 +182,6 @@ class ArmoorFilters:
         return None
 
     @staticmethod
-    @dask.delayed
     def bathy_filter(ds, path: str, fmt: str, minimum: float, maximum: float) -> xr.DataArray:
         """Filter dataset based on bathymetry depth range.
    
@@ -196,22 +195,22 @@ class ArmoorFilters:
             Filtered dataset where bathymetry is within specified range
         """
         logger.info("bathy filter")
-        ds_bathy = open_decode(path, fmt=fmt)
+        ds_bathy = open_decode(path, fmt=fmt)[["bathy"]]
         if "time" in ds.lon.dims:
             if "time" in ds.lon.dims:
-                dss = []
-                for itime, time in enumerate(ds.time):
-                    coord = ds.isel(time=[itime])
-                    ds0 = grid2loc(ds_bathy, [(coord.lat.data[0], coord.lon.data[0])])
-                    ds0 = ds0.swap_dims({"npts": "time"})
-                    dss.append(ds0)
-                ds_bathy = xr.combine_nested(dss, "time")
+                ds_bathy = grid2loc(ds_bathy, list(zip(ds.lat.values, ds.lon.values)))
+                ds_bathy = ds_bathy.swap_dims({"npts": "time"})
             else:
                 ds_bathy = grid2loc(ds_bathy, [(ds.lat.data[0], ds.lon.data[0])])
         else:
             ds_bathy = regrid(ds_bathy, ds[["lon", "lat"]])
         bathy = ds_bathy["bathy"]
-        mask = (bathy >= minimum) & (bathy <= maximum)
+        if minimum and maximum:
+            mask = (bathy >= minimum) & (bathy <= maximum)
+        elif minimum and not maximum:
+            mask = bathy >= minimum
+        elif maximum and not minimum:
+            mask = bathy <= maximum
         mask = mask.compute()
         ds = ds.where(mask, drop=False)
         return ds
@@ -442,15 +441,7 @@ class ArmoorFilters:
         #     ds = self.ds
         #     # del self.ds
         ds = self.ds
-        if "bathy" in filters_config:
-            ds = self.bathy_filter(
-                ds,
-                filters_config["bathy"].get("path"),
-                filters_config["bathy"].get("fmt"),
-                filters_config["bathy"].get('min'),
-                filters_config["bathy"].get('max'),
-            )
-            
+
         if "tide" in filters_config:
             filter_name = filters_config.get("tide")
             ds = self.tidal_filter(ds, filter_name=filter_name)
@@ -464,6 +455,16 @@ class ArmoorFilters:
         ds = self.clean_ds(ds, depth_was_coord)
 
         ds = ds.compute()
+        
+        if "bathy" in filters_config:
+            ds = self.bathy_filter(
+                ds,
+                filters_config["bathy"].get("path"),
+                filters_config["bathy"].get("fmt"),
+                filters_config["bathy"].get('min'),
+                filters_config["bathy"].get('max'),
+            )
+        
         return ds
     
     def sel_closest(self, ds_obs):
