@@ -11,11 +11,15 @@ dependencies:
   - colorlog
   - configobj=5.0.9
   - dask
+  - esmf=8.7.0
+  - esmpy=8.7.0
   - geojson
   - gitpython
   - gsw
   - h5netcdf
+  - ipython
   - matplotlib
+  - nbsphinx
   - numba
   - numbagg
   - parcels
@@ -24,8 +28,26 @@ dependencies:
   - python=3.11
   - scipy
   - seaborn
+  - setuptools
+  - sphinx=7.4.7
+  - sphinx-argparse
+  - sphinx-book-theme
+  - sphinx-gallery
+  - sphinx_rtd_theme
+  - sphinxcontrib-applehelp 
+  - sphinxcontrib-autoprogram
+  - sphinxcontrib-devhelp
+  - sphinx-design
+  - sphinxcontrib-htmlhelp
+  - sphinxcontrib-jquery
+  - sphinxcontrib-jsmath
+  - sphinxcontrib-programoutput
+  - sphinxcontrib-qthelp
+  - sphinxcontrib-serializinghtml
+  - sqlite=3.47.0
   - xarray=2025.1.1
   - xesmf=0.8.8
   - xoa
+  - zarr=2.18.7
   - pip:
     - .
