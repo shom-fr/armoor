@@ -15,7 +15,8 @@ from armoor.cli.io import (
     add_comp_io_parser_arguments,
     add_dask_parser_arguments,
     get_dask_args,
-    save_output
+    save_output,
+    check_insitu_platform
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.data.open_decode import open_decode, register_cf
@@ -235,12 +236,15 @@ def main_comp():
     
     register_cf()
     
+    check_insitu_platform(args.ifmt, args.platform)
+    check_insitu_platform(args.ref_ifmt, args.ref_platform)
+    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            dsref = open_decode(args.ref_fins, args.ref_ifmt)
-            dsprod = open_decode(args.fins, args.ifmt)
+            dsref = open_decode(args.ref_fins, args.ref_ifmt, platform=args.ref_platform)
+            dsprod = open_decode(args.fins, args.ifmt, platform=args.platform)
             if dsref.sizes != dsprod.sizes:
                 logger.error(f"Reference dims: {dsref.sizes}")
                 logger.error(f"Product dims: {dsprod.sizes}")

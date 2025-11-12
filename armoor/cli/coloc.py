@@ -16,7 +16,8 @@ from armoor.cli.io import (
     add_comp_io_parser_arguments,
     add_dask_parser_arguments,
     get_dask_args,
-    save_output
+    save_output,
+    check_insitu_platform
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.comp.coloc import (
@@ -125,12 +126,15 @@ def main_coloc_time():
     
     register_cf()
     
+    check_insitu_platform(args.ref_ifmt, args.ref_platform)
+    check_insitu_platform(args.ifmt, args.platform)
+    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            dsref = open_decode(args.ref_fins, args.ref_ifmt)
-            dsprod = open_decode(args.fins, args.ifmt)
+            dsref = open_decode(args.ref_fins, args.ref_ifmt, platform=args.ref_platform)
+            dsprod = open_decode(args.fins, args.ifmt, platform=args.platform)
             tbound = (dsref.time.min(), dsref.time.max())
             param = ("trange_seq", (None, "reference"))
             _, dsout = process_time_colocation(dsref, dsprod, param, tbound)
@@ -205,12 +209,15 @@ def main_coloc_horizontal():
     
     register_cf()
     
+    check_insitu_platform(args.ref_ifmt, args.ref_platform)
+    check_insitu_platform(args.ifmt, args.platform)
+    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            dsref = open_decode(args.ref_fins, args.ref_ifmt)
-            dsprod = open_decode(args.fins, args.ifmt)
+            dsref = open_decode(args.ref_fins, args.ref_ifmt, platform=args.ref_platform)
+            dsprod = open_decode(args.fins, args.ifmt, platform=args.platform)
             if set(("x", "y")).issubset(dsref.lon.dims):
                 param = ("href", "reference")
             elif (dsref.lon.dims == ("npts",)) or (dsref.lon.dims == ("time",)):
@@ -291,12 +298,15 @@ def main_coloc_vertical():
     
     register_cf()
     
+    check_insitu_platform(args.ref_ifmt, args.ref_platform)
+    check_insitu_platform(args.ifmt, args.platform)
+    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            dsref = open_decode(args.ref_fins, args.ref_ifmt)
-            dsprod = open_decode(args.fins, args.ifmt)
+            dsref = open_decode(args.ref_fins, args.ref_ifmt, platform=args.ref_platform)
+            dsprod = open_decode(args.fins, args.ifmt, platform=args.platform)
             if ("depth" in dsref) and ("depth"  in dsprod):
                 vname = "depth"
             elif ("pdens" in dsref) and ("pdens"  in dsprod):

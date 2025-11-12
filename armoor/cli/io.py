@@ -7,6 +7,7 @@ import logging
 
 from dask.diagnostics import ProgressBar
 
+from armoor import ArmoorError
 from armoor.base.io import write_dataset_to_zarr
 
 logger = logging.getLogger(__name__)
@@ -104,8 +105,19 @@ def add_input_fmt_parser_arguments(parser):
     parser.add_argument(
         "--ifmt",
         type=str,
-        choices=("hycom", "cmems_model", "croco", "armoor"),
+        choices=(
+            "hycom", "cmems_model", "croco", "armoor", 
+            "cmems_insitu", "cora_insitu",
+            "cmems_sst_l3", "cersat_sst_l3", "cmems_sst_l4"
+            ),
         help="Format of the input files",
+    )
+    parser.add_argument(
+        "--platform",
+        type=str,
+        choices=("argo", "drifter", "glider", "mooring"),
+        default=None,
+        help="Type of platform in case of in situ observation",
     )
 
 
@@ -210,9 +222,20 @@ def add_refinput_fmt_parser_arguments(parser):
     parser.add_argument(
         "--ref-ifmt",
         type=str,
-        choices=("hycom", "cmems_model", "croco", "armoor"),
+        choices=(
+            "hycom", "cmems_model", "croco", "armoor", 
+            "cmems_insitu", "cora_insitu",
+            "cmems_sst_l3", "cersat_sst_l3", "cmems_sst_l4"
+            ),
         help="Format of the input files",
-        )
+    )
+    parser.add_argument(
+        "--ref-platform",
+        type=str,
+        choices=("argo", "drifter", "glider", "mooring"),
+        default=None,
+        help="Type of platform in case of in situ observation",
+    )
     
 def add_comp_io_parser_arguments(parser):
     """Add all input/output related arguments to argument colocation/comparison parser.
@@ -473,5 +496,12 @@ def get_dask_args(args):
         dask_dashboardaddress,
         args.dask_localdirectory
         )
+    
+def check_insitu_platform(fmt, platform):
+    if (fmt == "cmems_insitu") and not platform:
+        raise ArmoorError("`--platform` option is mandatory is case of specifying `cmems_insitu` format.")
+        
+    
+    
     
     

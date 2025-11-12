@@ -16,7 +16,8 @@ from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
     get_dask_args,
-    save_output
+    save_output,
+    check_insitu_platform
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.data.open_decode import open_decode, register_cf
@@ -38,7 +39,7 @@ class FiltersError(Exception):
     pass
 
 
-def process_filters(fins, ifmt, fout, ofmt, filters_config, kw_dask):
+def process_filters(fins, ifmt, platform, fout, ofmt, filters_config, kw_dask):
     """Process input files by applying specified filters and saving output.
     
     This function opens input files, applies the configured filters using
@@ -77,9 +78,11 @@ def process_filters(fins, ifmt, fout, ofmt, filters_config, kw_dask):
     
     register_cf()
     
+    check_insitu_platform(ifmt, platform)
+    
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            ds = open_decode(fins, ifmt)
+            ds = open_decode(fins, ifmt, platform=platform)
             save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
             del ds
             ds = xr.open_dataset("tmp.zarr")
@@ -210,7 +213,7 @@ def main_filters_time():
     kw_dask = get_dask_args(args)
     
     process_filters(
-        args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
+        args.fins, args.ifmt, args.platform, args.fout, args.ofmt, filters_config,
         kw_dask
         )
 
@@ -366,7 +369,7 @@ def main_filters_horizontal():
     kw_dask = get_dask_args(args)
         
     process_filters(
-        args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
+        args.fins, args.ifmt, args.platform, args.fout, args.ofmt, filters_config,
         kw_dask
         )
 
@@ -457,7 +460,7 @@ def main_filters_quality():
     kw_dask = get_dask_args(args)
     
     process_filters(
-        args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
+        args.fins, args.ifmt, args.platform, args.fout, args.ofmt, filters_config,
         kw_dask
         )
 
@@ -532,6 +535,6 @@ def main_filters_oceanvars():
     kw_dask = get_dask_args(args)
     
     process_filters(
-        args.fins, args.ifmt, args.fout, args.ofmt, filters_config,
+        args.fins, args.ifmt, args.platform, args.fout, args.ofmt, filters_config,
         kw_dask
         )

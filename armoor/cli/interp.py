@@ -15,7 +15,8 @@ from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
     get_dask_args,
-    save_output
+    save_output,
+    check_insitu_platform
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.data.interp import (
@@ -127,11 +128,13 @@ def main_interp_time():
     
     register_cf()
     
+    check_insitu_platform(args.ifmt, args.platform)
+    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt)
+            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
             if args.ifmt != 'armoor':
                 save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
                 del ds
@@ -324,11 +327,13 @@ def main_interp_horizontal():
     
     register_cf()
     
+    check_insitu_platform(args.ifmt, args.platform)
+    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt)
+            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
             if args.ifmt != 'armoor':
                 save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
                 del ds
@@ -449,6 +454,8 @@ def main_interp_vertical():
     
     register_cf()
     
+    check_insitu_platform(args.ifmt, args.platform)
+    
     vlevel = args.vlevel
     vfreq = args.vfreq
     vname = args.vname
@@ -470,7 +477,7 @@ def main_interp_vertical():
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt)
+            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
             if args.ifmt != 'armoor':
                 save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
                 del ds

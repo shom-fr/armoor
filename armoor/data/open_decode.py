@@ -754,7 +754,8 @@ def open_decode_cmems_insitu(path_files, platform):
         ds.close()
     if platform == "argo":
         ds = concat_argo(dss)
-        ds = ds.drop_vars("TRAJECTORY")
+        if "TRAJECTORY" in ds:
+            ds = ds.drop_vars("TRAJECTORY")
         return ds
     else:
         for ids in range(len(dss)):
