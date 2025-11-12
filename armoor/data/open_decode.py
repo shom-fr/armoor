@@ -1152,26 +1152,29 @@ def open_decode_croco(path_file, fmt="croco"):
          Model dataset decoded.
     """
     cfspecs = xcf.get_cf_specs(fmt)
-    ds = xr.open_mfdataset(path_file)
+    ds = xr.open_mfdataset(path_file).xoa.decode()
     #ds = optimize_for_low_swap(ds)
-    for sig in ("s_rho", "s_w"):
+    for sig in ("sig_rho", "sig_w"):
         if sig in ds:
             if "formula_terms" not in ds[sig].attrs:
                 logger.warning(f"No formula_terms attributes in {sig}")
-                ds[sig].attrs["formula_terms"] = "s: sc_w C: Cs_w eta: zeta depth: h depth_c: hc"
+                if "hc" not in ds.data_vars:
+                    ds["hc"] = float(ds.attrs.get("hc"))
+                if sig == "sig_w":
+                    ds[sig].attrs["formula_terms"] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
+                elif sig == "sig_rho":
+                    ds[sig].attrs["formula_terms"] = "s: sig_rho C: cs_rho eta: ssh depth: bathy depth_c: hc"
             if "standard_name" not in ds[sig].attrs:
                 logger.warning(f"No standard_name attributes in {sig}")
-                if sig == "s_rho":
+                if sig == "sig_rho":
                     ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
-                elif sig == "s_w":
+                elif sig == "sig_w":
                     ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
-
     if 'scrum_time' in ds:   
         ds = ds.drop('scrum_time')  
-        
     with xcf.set_cf_specs(cfspecs):
         ds = ds.decode_sigma()
-        ds = ds.xoa.decode()
+
     for v in [
         "sig_rho",
         "sig_w",
@@ -1217,6 +1220,7 @@ def open_decode_croco(path_file, fmt="croco"):
     if "time_counter" in ds.dims:
         ds = ds.swap_dims({"time_counter": "time"})
     ds = ds.swap_dims({"sig_rho": "z"})
+    # ds = ds.swap_dims({"sig_w": "z_w"})
     ds = ds.isel(x_rho=slice(1, -1), y_rho=slice(1,-1))
     for varname in ds.data_vars:
         if varname == "u":
@@ -1230,7 +1234,7 @@ def open_decode_croco(path_file, fmt="croco"):
         if dim in ds.dims:
             ds = ds.drop_dims(dim)
     ds = ds.swap_dims({"x_rho": "x", "y_rho": "y"})
-    if "angle" in ds:
+    if "angle" in ds and (set(("u", "v")).issubset(ds.data_vars)):
         angle = ds["angle"]
         da_u = ds["u"] * np.cos(angle) - ds["v"] * np.sin(angle)
         da_v = ds["v"] * np.cos(angle) + ds["u"] * np.sin(angle)
@@ -1240,11 +1244,9 @@ def open_decode_croco(path_file, fmt="croco"):
     if "mask" in ds:
         ds = ds.where(ds["mask"] > 0)
 
-    # ds = ds.where(ds.ptemp > 0)
-    # ds = ds.where(ds.sal > 0)
     ds = ds.isel(z=slice(None, None, -1))
     ds = ds.assign_coords(depth=-ds.depth)
-
+    
     return ds
 
     # # Remove variables that are never used in the features. May need to be completed.
