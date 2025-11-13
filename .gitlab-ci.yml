@@ -30,8 +30,8 @@ tests:
     - source activate ./armoor_env
     - export PYTHONPATH=$PWD
     - pip install ".[test]"
-    - cd
-    - pytest -v -s armoor/armoor/tests/uni
+    - pwd
+    - pytest -v -s armoor/tests/uni
   cache:
     paths:
       - armoor_env/
