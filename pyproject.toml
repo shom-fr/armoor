@@ -44,6 +44,7 @@ doc = [
 ]
 
 test = [
+   "copernicusmarine",
    "pytest",
    "woom@git+https://github.com/shom-fr/woom.git@develop",
 ]

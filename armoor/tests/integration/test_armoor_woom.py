@@ -43,9 +43,7 @@ def test():
         print(e)
     
     workflow.run(update=True)
-    
-    # workflow.show_status(running=True)
-    
+        
     isend = False
     while isend == False:
         time.sleep(2.0)
@@ -55,4 +53,14 @@ def test():
             workflow.show_status()
     df = workflow.get_status()
     res = df[~df.STATUS.str.contains("SUCCESS")].copy()
+    
+    if not res.empty:
+        for submission_dir in res["SUBMISSION DIR"]:
+            for ext in [".err", ".out"]:
+                file = os.path.join(os.path.join(
+                    submission_dir, f"job{ext}")
+                    )
+                with open(file, 'r') as f:
+                    content = f.read()
+                    print(content)
     assert res.empty
