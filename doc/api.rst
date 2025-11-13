@@ -30,4 +30,9 @@ Package API
     armoor.comp.plot
     armoor.comp.stats
     armoor.data
+    armoor.data.interp
+    armoor.data.load
     armoor.data.open_decode
+    armoor.data.output
+    armoor.data.plot
+    armoor.data.range
