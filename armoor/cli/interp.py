@@ -227,9 +227,9 @@ def main_interp_horizontal():
     --section : float, float, float, float, float
         Linear section from (lat0,lon0) to (lat1,lon1) with step size in kilometers.
     --lon-grid : float, float, float
-        Regular longitude grid: minimum, maximum, and step size in degrees.
+        Regular longitude grid: minimum, maximum, and step size in km.
     --lat-grid : float, float, float  
-        Regular latitude grid: minimum, maximum, and step size in degrees.
+        Regular latitude grid: minimum, maximum, and step size in km.
         Required when --lon-grid is specified.
     --ncgrid : str
         Path to NetCDF file containing target grid coordinates.
