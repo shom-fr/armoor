@@ -29,8 +29,9 @@ tests:
   script:
     - source activate ./armoor_env
     - export PYTHONPATH=$PWD
-    - cd armoor/tests/uni
-    - pytest 
+    - pip install ".[test]"
+    - cd
+    - pytest -v -s armoor/tests/uni
   cache:
     paths:
       - armoor_env/
@@ -41,6 +42,7 @@ pages:
   script:
     - source activate ./armoor_env
     - export PYTHONPATH=$PWD
+    - pip install ".[doc]"
     - cd doc
     - make html
     - cd ..

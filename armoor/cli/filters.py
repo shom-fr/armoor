@@ -259,7 +259,7 @@ def get_parser_filters_horizontal():
     parser.add_argument(
         '--bathy-fmt',
         type=str,
-        choices=("croco", "hycom", "armoor"),
+        choices=("croco", "hycom", "armoor", "cmems_model"),
         help="Format of the bathymetry NetCDF file."
         )
     parser.add_argument(

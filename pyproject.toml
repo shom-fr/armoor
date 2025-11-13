@@ -24,21 +24,28 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-docs = [
-  "ipython",
-  "sphinx",#=7.4.7",
+
+doc = [
+  "sphinx=7.4.7",
   "sphinx-argparse",
   "sphinx-book-theme",
-  "sphinxcontrib-programoutput",
   "sphinx-gallery",
+  "sphinx_rtd_theme",
   "sphinxcontrib-applehelp",
   "sphinxcontrib-autoprogram",
   "sphinxcontrib-devhelp",
+  "sphinx-design",
   "sphinxcontrib-htmlhelp",
   "sphinxcontrib-jquery",
   "sphinxcontrib-jsmath",
+  "sphinxcontrib-programoutput",
   "sphinxcontrib-qthelp",
-  "sphinxcontrib-serializinghtml"
+  "sphinxcontrib-serializinghtml",
+]
+
+test = [
+   "pytest",
+   "woom@git+https://github.com/shom-fr/woom.git@develop",
 ]
 
 [project.urls]

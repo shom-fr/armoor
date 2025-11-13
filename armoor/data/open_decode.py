@@ -87,21 +87,24 @@ def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
     """
     if not path_files:
         raise ArmoorError("Pattern cannot be empty")
-
-    # Convert to Path object and resolve to absolute
-    pattern_path = Path(path_files).expanduser()
-    
-    # Check for list expansion syntax [item1,item2,...]
-    list_pattern = re.compile(r'\[([^\]]+)\]')
-    matches = list_pattern.findall(path_files)
-    
-    if not matches:
-        # Simple glob pattern without list expansion
-        return _glob_and_resolve(str(pattern_path), sort_results)
-    
-    # Handle list expansion
-    expanded_patterns = _expand_list_patterns(str(pattern_path), matches)
-    
+    if "*" in path_files:
+        # Convert to Path object and resolve to absolute
+        pattern_path = Path(path_files).expanduser()
+        
+        # Check for list expansion syntax [item1,item2,...]
+        list_pattern = re.compile(r'\[([^\]]+)\]')
+        matches = list_pattern.findall(path_files)
+        
+        if not matches:
+            # Simple glob pattern without list expansion
+            return _glob_and_resolve(str(pattern_path), sort_results)
+        
+        # Handle list expansion
+        expanded_patterns = _expand_list_patterns(str(pattern_path), matches)
+    elif "*" not in path_files and "," in path_files:
+        expanded_patterns = path_files.split(',')
+    else:
+        expanded_patterns = [path_files]
     # Apply glob to each expanded pattern
     all_paths = []
     for expanded_pattern in expanded_patterns:
@@ -381,9 +384,10 @@ def open_decode_cmems_model(path_files):
             ds["lon"] = lon
             ds["lat"] = lat
             ds = ds.set_coords(["lon", "lat"])
-        var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
-        ds["depth"] = ds["depth"].broadcast_like(ds[var])
-        ds = ds.reset_coords("depth")
+        if "time" in ds.dims:
+            var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
+            ds["depth"] = ds["depth"].broadcast_like(ds[var])
+            ds = ds.reset_coords("depth")
         return ds
     # Open
     cfspecs = xcf.get_cf_specs("cmems_model")
