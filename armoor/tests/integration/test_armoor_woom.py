@@ -65,5 +65,5 @@ def test():
                             content = f.read()
                         print(content)
                         print("--" * 30)
-                print("==" * 30)
+                print("==" * 10)
         assert res.empty
