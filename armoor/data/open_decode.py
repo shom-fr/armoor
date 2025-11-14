@@ -87,7 +87,7 @@ def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
     """
     if not path_files:
         raise ArmoorError("Pattern cannot be empty")
-    if "*" in path_files:
+    if "*" in path_files or "[" in path_files:
         # Convert to Path object and resolve to absolute
         pattern_path = Path(path_files).expanduser()
         
