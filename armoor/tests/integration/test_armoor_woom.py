@@ -56,7 +56,7 @@ def test():
         
         if not res.empty:
             for submission_dir in res["SUBMISSION DIR"]:
-                for ext in [".out", ".err"]:
+                for ext in [".out", ".err", ".sh"]:
                     file = os.path.join(os.path.join(
                         submission_dir, f"job{ext}")
                         )
