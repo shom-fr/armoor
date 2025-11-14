@@ -64,4 +64,6 @@ def test():
                         with open(file, 'r') as f:
                             content = f.read()
                         print(content)
+                        print("--" * 30)
+                print("==" * 30)
         assert res.empty
