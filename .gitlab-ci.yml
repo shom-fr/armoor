@@ -30,7 +30,7 @@ tests:
     - source activate ./armoor_env
     - export PYTHONPATH=$PWD
     - pip install ".[test]"
-    - pytest -v -s armoor/tests/integration
+    - pytest -v -s armoor/tests/
   cache:
     paths:
       - armoor_env/
