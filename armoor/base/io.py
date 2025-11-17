@@ -149,13 +149,13 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
         
         # TOUJOURS nettoyer l'encoding
         safe_encoding = {}
-        if '_FillValue' in ds_fixed[var_name].encoding:
-            safe_encoding['_FillValue'] = ds_fixed[var_name].encoding['_FillValue']
-        if 'dtype' in ds_fixed[var_name].encoding:
-            safe_encoding['dtype'] = ds_fixed[var_name].encoding['dtype']
-        
+        for encod in ["dtype", "scale_factor", "add_offset", "_FillValue"]:
+            if encod in ds_fixed[var_name].encoding:
+                safe_encoding[encod] = ds_fixed[var_name].encoding[encod]
         ds_fixed[var_name].encoding = safe_encoding
-        
+        for key, val in list(ds_fixed[var_name].attrs.items()):
+            if isinstance(val, (np.integer, int)):
+                ds_fixed[var_name].attrs[key] = float(val)
         if verbose:
             logger.debug(f"  Encoding cleaned (kept: {list(safe_encoding.keys())})")
     
