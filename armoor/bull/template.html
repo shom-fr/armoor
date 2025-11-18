@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ header.subtitle }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #1D1A5E;
+            background: linear-gradient(0deg, #DBDAF2 0%, #1D1A5E 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 50px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            border-radius: 10px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 4px solid #3498db;
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 30px;
+            border-radius: 8px;
+        }
+        .logo {
+            max-width: 250px;
+            max-height: 120px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 2.8em;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        h2 {
+            color: #34495e;
+            font-size: 2em;
+            border-left: 6px solid #3498db;
+            padding-left: 20px;
+            margin: 50px 0 25px 0;
+        }
+        h3 {
+            color: #16a085;
+            font-size: 1.6em;
+            margin: 30px 0 20px 0;
+        }
+        h4 {
+            color: #3498db;
+            font-size: 1.3em;
+            margin: 15px 0;
+        }
+        .date {
+            color: #7f8c8d;
+            font-size: 1.2em;
+            font-weight: 500;
+        }
+        .subtitle {
+            color: #34495e;
+            font-size: 1.5em;
+            margin: 10px 0;
+        }
+        .toc {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+            border: 2px solid #e9ecef;
+        }
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .toc ul li {
+            margin: 12px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        .toc ul li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #3498db;
+            font-weight: bold;
+        }
+        .toc a {
+            color: #2980b9;
+            text-decoration: none;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+        }
+        .toc a:hover {
+            color: #3498db;
+            padding-left: 5px;
+        }
+        .description-item {
+            background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #3498db;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .description-item p {
+            margin-top: 10px;
+            color: #555;
+            font-size: 1.05em;
+        }
+        .section {
+            margin: 50px 0;
+        }
+        .zone-block {
+            margin: 40px 0;
+            padding: 30px;
+            background: #ffffff;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .zone-title {
+            color: #2980b9;
+            font-size: 1.5em;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+            font-weight: 600;
+        }
+
+        /* Gallery Grid Layout */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 25px;
+        }
+
+        .image-container {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .image-container:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 280px;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.3s ease;
+            border: none;
+            border-radius: 0;
+        }
+
+        .image-container:hover img {
+            transform: scale(1.05);
+        }
+
+        .image-caption {
+            padding: 15px;
+            background: linear-gradient(to top, rgba(29, 26, 94, 0.9), transparent);
+            color: white;
+            font-size: 0.95em;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-weight: 500;
+            font-style: normal;
+            margin: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .image-container:hover .image-caption {
+            opacity: 1;
+        }
+
+        .error-message {
+            background: #ffe6e6;
+            color: #c0392b;
+            padding: 20px;
+            border-left: 5px solid #e74c3c;
+            border-radius: 8px;
+            margin: 15px 0;
+            grid-column: 1 / -1;
+            text-align: center;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 95%;
+            max-height: 90vh;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 8px;
+            animation: zoomIn 0.3s ease;
+        }
+
+        @keyframes zoomIn {
+            from { transform: translate(-50%, -50%) scale(0.8); }
+            to { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .close {
+            position: absolute;
+            top: 20px;
+            right: 45px;
+            color: #f1f1f1;
+            font-size: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+            z-index: 1001;
+        }
+
+        .close:hover {
+            color: #3498db;
+        }
+
+        /* Navigation Arrows */
+        .modal-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 60px;
+            color: #f1f1f1;
+            cursor: pointer;
+            padding: 20px;
+            user-select: none;
+            transition: all 0.3s ease;
+            z-index: 1001;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+        }
+
+        .modal-nav:hover {
+            color: #3498db;
+            background: rgba(0, 0, 0, 0.8);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .modal-prev {
+            left: 30px;
+        }
+
+        .modal-next {
+            right: 30px;
+        }
+
+        .modal-counter {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #f1f1f1;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1001;
+        }
+
+        @page {
+            size: A4 landscape;
+            margin: 2cm;
+        }
+
+        .footer {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 3px solid #ecf0f1;
+            text-align: center;
+            color: #95a5a6;
+            font-size: 1em;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 20px;
+            }
+            .zone-block:hover,
+            .image-container:hover {
+                transform: none;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .gallery-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+                page-break-inside: avoid;
+            }
+            .image-container {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .image-container img {
+                height: auto;
+                max-height: 400px;
+            }
+            .image-caption {
+                opacity: 1;
+                position: static;
+                background: #f8f9fa;
+                color: #2c3e50;
+                padding: 10px;
+                margin-top: 5px;
+            }
+            .zone-block {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .section {
+                page-break-before: auto;
+            }
+            h2 {
+                page-break-after: avoid;
+            }
+            h3 {
+                page-break-after: avoid;
+            }
+            /* Hide modal controls in print */
+            .modal,
+            .modal-nav,
+            .modal-counter,
+            .close {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            h1 {
+                font-size: 2em;
+            }
+            h2 {
+                font-size: 1.5em;
+            }
+            .gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 15px;
+            }
+            .image-container img {
+                height: 200px;
+            }
+            .modal-counter {
+                font-size: 16px;
+                padding: 8px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            {% if header.logo_data %}
+            <img src="data:{{ header.logo_mime }};base64,{{ header.logo_data }}" 
+                 class="logo" alt="Organization Logo">
+            {% endif %}
+            <h1>{{ header.title }}</h1>
+            {% if header.period %}
+            <p class="subtitle">{{ header.subtitle }}: {{ header.period }}</p>
+            {% else %}
+            <p class="subtitle">{{ header.subtitle }}</p>
+            {% endif %}
+            <p class="date">Generated: {{ header.date }}</p>
+        </div>
+
+        <!-- Table of Contents -->
+        <div class="toc">
+            <h2 style="border: none; margin: 0 0 20px 0; padding: 0;">Table of Contents</h2>
+            <ul>
+                {% if summary %}
+                <li><a href="#summary">Summary</a></li>
+                {% endif %}
+                <li><a href="#descriptions">Descriptions & Methodology</a></li>
+                {% for comp_type in comparison_types %}
+                <li>
+                    <a href="#{{ comp_type|lower|replace(' ', '-') }}">
+                        {{ comp_type }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% if summary %}
+        <div id="summary" class="section">
+            <h2>Summary</h2>
+            {% for name, description in summary.items() %}
+             <div class="description-item">
+                 <h4>{{ name.replace("_", " ") }}</h4>
+                 {% if description is string %}
+                 <p>{{ description }}</p>
+                 {% else %}
+                 <p>{{ description|join(", ") }}</p>
+                 {% endif %}
+             </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <!-- Descriptions Section -->
+        <div id="descriptions" class="section">
+            <h2>Descriptions & Methodology</h2>
+            
+            <h3>Comparison Types</h3>
+            {% for name, description in comparison_types.items() %}
+            <div class="description-item">
+                <h4>{{ name }}</h4>
+                <p>{{ description['description'] }}</p>
+            </div>
+            {% endfor %}
+
+            <h3>Zones of Interest</h3>
+            {% for name, description in zones.items() %}
+            <div class="description-item">
+                <h4>{{ name }}</h4>
+                <p>{{ description['description'] }}</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Results Sections with Gallery Layout -->
+        {% for comp_type, outputs_dict in images.items() %}
+        <div id="{{ comp_type|lower|replace(' ', '-') }}" class="section">
+            <h2>{{ comp_type }}</h2>
+            {% for output, zones_dict in outputs_dict.items() %}
+            <h3>{{ output }}</h3>
+                {% for zone, images_info in zones_dict.items() %}
+                <div class="zone-block">
+                    <div class="zone-title">{{ zone }}</div>
+                    <div class="gallery-grid">
+                        {% for image_info in images_info %}
+                            {% if image_info.found and image_info.data %}
+                            <div class="image-container" onclick="openModal(this.querySelector('img'))">
+                                <img src="data:image/png;base64,{{ image_info.data }}"
+                                     alt="{{ comp_type }} - {{ zone }}">
+                                <p class="image-caption">{{ comp_type }} - {{ zone }}</p>
+                            </div>
+                            {% else %}
+                            <div class="error-message">
+                                ⚠️ <strong>Image not found:</strong> {{ image_info.path }}
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+        {% endfor %}
+
+        <!-- Image Modal -->
+        <div id="imageModal" class="modal" onclick="closeModal()">
+            <span class="close">&times;</span>
+            <span class="modal-nav modal-prev" onclick="navigateImage(event, -1)">&#10094;</span>
+            <span class="modal-nav modal-next" onclick="navigateImage(event, 1)">&#10095;</span>
+            <div class="modal-counter" id="modalCounter"></div>
+            <img class="modal-content" id="modalImage">
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>by armoor-bull</strong></p>
+            <p>Generated on {{ header.date }}</p>
+        </div>
+    </div>
+
+    <script>
+        let currentImageIndex = 0;
+        let allImages = [];
+
+        // Collect all images on page load
+        function collectImages() {
+            allImages = Array.from(document.querySelectorAll('.image-container img'));
+        }
+
+        function openModal(imgElement) {
+            collectImages();
+            currentImageIndex = allImages.indexOf(imgElement);
+            showImage(currentImageIndex);
+            event.stopPropagation();
+        }
+
+        function showImage(index) {
+            const modal = document.getElementById("imageModal");
+            const modalImg = document.getElementById("modalImage");
+            const counter = document.getElementById("modalCounter");
+            
+            modal.style.display = "block";
+            modalImg.src = allImages[index].src;
+            counter.textContent = `${index + 1} / ${allImages.length}`;
+        }
+
+        function navigateImage(event, direction) {
+            event.stopPropagation();
+            currentImageIndex += direction;
+            
+            // Loop around
+            if (currentImageIndex >= allImages.length) {
+                currentImageIndex = 0;
+            } else if (currentImageIndex < 0) {
+                currentImageIndex = allImages.length - 1;
+            }
+            
+            showImage(currentImageIndex);
+        }
+
+        function closeModal() {
+            document.getElementById("imageModal").style.display = "none";
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            const modal = document.getElementById("imageModal");
+            if (modal.style.display === "block") {
+                if (event.key === 'Escape') {
+                    closeModal();
+                } else if (event.key === 'ArrowLeft') {
+                    navigateImage(event, -1);
+                } else if (event.key === 'ArrowRight') {
+                    navigateImage(event, 1);
+                }
+            }
+        });
+
+        // Initialize images on page load
+        window.addEventListener('load', collectImages);
+    </script>
+</body>
+</html>

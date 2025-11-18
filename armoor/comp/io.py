@@ -5,7 +5,43 @@ from pathlib import Path
 
 from dask.distributed import Client
 
+from armoor.base.misc import comma_separated
+
 logger = logging.getLogger(__name__)
+
+def add_comp_parser_arguments(parser, default_level="info"):
+    parser.add_argument(
+        'metazones',
+        type=comma_separated,
+        help="List of metazone to be processed."
+        )
+    parser.add_argument(
+        'cfgfile',
+        type=Path,
+        help="Path of the configuration file."
+        )
+    parser.add_argument(
+        '-m', '--metazonesfile',
+        type=Path,
+        help="Path of the configuration file dedicated to the description of metazones.",
+        default="metazones.cfg"
+        )
+    parser.add_argument(
+        '--jsonfile',
+        type=Path,
+        help="Path of the output json file.",
+        default='ncs_{func_comp}.json'
+        )
+    parser.add_argument(
+        '--filters-only',
+        action='store_true',
+        help="Use for exiting after filters processes.",
+        )
+    parser.add_argument(
+        '--coloc-only',
+        action='store_true',
+        help="Use for exiting after colocation processes.",
+        )
 
 def to_netcdf_ref_prods(dss, parent_dir, ncpat):
     """Save in netcdf files reference and products from data.

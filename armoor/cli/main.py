@@ -16,17 +16,18 @@ from armoor.base.io import (ArmoorArgumentHelpFormatter, create_fast_encoding,
 from armoor.base.misc import (comma_separated, dict_to_list,
                               optimize_for_low_swap, parse_coords,
                               parse_mixed_param, parse_qc_tuple)
-from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI
+from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI, BULL_INI
 from armoor.cli.io import add_dask_parser_arguments, get_dask_args
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.comp import METAZONE_PARAMS
 from armoor.comp.coloc import main_coloc
-from armoor.comp.misc import add_comp_parser_arguments
+from armoor.comp.io import add_comp_parser_arguments
 from armoor.comp.output import main_output as output_comp
 from armoor.comp.plot import main_plot as plot_comp
 from armoor.data.load import load_datasets
 from armoor.data.output import main_output as output_data
 from armoor.data.plot import main_plot as plot_data
+from armoor.bull.build import Bull
 
 logger = logging.getLogger(__name__)
 
@@ -599,6 +600,73 @@ def main_comp_drifter():
         kw_comp
         )
 
+def get_parser_bull():
+    """Get parser for building bull."""
+    # Setup argument parser
+    parser = ArgumentParser(
+        description="Build bull",
+        formatter_class=ArmoorArgumentHelpFormatter,
+        )
+    add_logging_parser_arguments(parser)
+    parser.add_argument(
+        'bullname',
+        type=str,
+        help="Name of html file generated."
+        )
+    parser.add_argument(
+        'cfgfile',
+        type=Path,
+        help="Path of the configuration file."
+        )
+    parser.add_argument(
+        '--period',
+        type=str,
+        help="Period covering bull."
+        )
+    parser.add_argument(
+        '--fmt',
+        type=str,
+        default="html",
+        choices=("html", "pdf"),
+        nargs="*",
+        help="Format of file generated."
+        )
+    
+    return parser
+
+def main_bull():
+    """Build bull."""
+    # Get parser
+    parser = get_parser_bull()
+
+    # Parse
+    args = parser.parse_args()
+    
+    # Setup logging
+    main_setup_logging(args)
+    
+    # Load configuration
+    if not args.cfgfile.exists():
+        raise ArmoorError(f"File not found: {args.cfgfile}.")
+    
+    cfg = ConfigManager(BULL_INI).load(str(args.cfgfile))
+    
+    if args.period:
+        cfg["header"]["period"] = args.period
+        if "summary" in cfg.keys():
+            cfg["summary"]["period"] = args.period
+    bull = Bull(cfg)
+    bull_fmt = args.fmt
+    bull_name = args.bullname
+    for fmt in ("html", "pdf"):
+        if fmt in bull_fmt:
+            file = f"{bull_name}.{fmt}"
+            if fmt == "html":
+                bull.generate_html(file)
+            else:
+                bull.generate_pdf(file)
+    
+
 # Fonction de diagnostic pour surveiller les performances
 def monitor_performance():
     """Surveille les performances du système."""
@@ -609,18 +677,18 @@ def monitor_performance():
         memory = psutil.virtual_memory()
         swap = psutil.swap_memory()
         
-        logger.info(f"💾 Mémoire: {memory.percent:.1f}% utilisée ({memory.available/1e9:.1f}GB libre)")
-        logger.info(f"🔄 Swap: {swap.percent:.1f}% utilisé ({swap.free/1e9:.1f}GB libre)")
+        logger.info(f"Mémoire: {memory.percent:.1f}% utilisée ({memory.available/1e9:.1f}GB libre)")
+        logger.info(f"Swap: {swap.percent:.1f}% utilisé ({swap.free/1e9:.1f}GB libre)")
         
         # CPU
         cpu_percent = psutil.cpu_percent(interval=1)
-        logger.info(f"⚡ CPU: {cpu_percent:.1f}% utilisé")
+        logger.info(f"CPU: {cpu_percent:.1f}% utilisé")
         
         # Alertes
         if memory.percent > 90:
-            logger.warning("⚠️ Mémoire critique (>90%)")
+            logger.warning("Mémoire critique (>90%)")
         if swap.percent > 50:
-            logger.warning("⚠️ Swap élevé (>50%)")
+            logger.warning("Swap élevé (>50%)")
             
     except ImportError:
         logger.debug("psutil non disponible")

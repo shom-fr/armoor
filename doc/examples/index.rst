@@ -82,3 +82,14 @@ Gallery of examples
          :linenos:
 
         :download:`Download comp_models.cfg <configs/comp_models.cfg>`
+    
+    .. grid-item-card:: Bull
+
+        Configuration for running a bull generation.
+
+        .. literalinclude:: configs/bull.cfg
+         :language: ini
+         :caption: bull.cfg
+         :linenos:
+
+        :download:`Download bull.cfg <configs/bull.cfg>`

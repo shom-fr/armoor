@@ -40,6 +40,7 @@ Some parameters are not compatible :
    cli.meta.comp
    cli.meta.data
    cli.meta.diag
+   cli.meta.bull
 
 
 
