@@ -8,7 +8,7 @@ import logging
 from dask.diagnostics import ProgressBar
 
 from armoor import ArmoorError
-from armoor.base.io import write_dataset_to_zarr
+from armoor.base.io import write_dataset_to_zarr, write_dataset_to_netcdf
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +409,7 @@ def save_output(ds, fout, ofmt="zarr", scheduler=None):
             compute=False,
             )
     elif ofmt == "netcdf":
-        write_job = ds.to_netcdf(fout, engine="h5netcdf", compute=False)
+        write_job = write_dataset_to_netcdf(ds, fout, compute=False)
     else:
         raise ValueError(f"Unsupported output format: {ofmt}. Use 'zarr' or 'netcdf'.")
     with ProgressBar():

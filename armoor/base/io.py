@@ -77,11 +77,11 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
         logger.debug("AUTO-FIX ZARR CHUNKS")
         logger.debug("=" * 70)
     
-    ds_fixed = ds.copy()
+    ds_fixed = ds.copy()   
     
+    encoding = {}
     # Traiter toutes les variables (data + coords)
     all_vars = list(ds_fixed.data_vars) + list(ds_fixed.coords)
-    
     for var_name in all_vars:
         var = ds_fixed[var_name]
         
@@ -89,73 +89,76 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
         if var.chunks is None:
             if verbose:
                 logger.debug(f"\n {var_name}: No chunks chunks (small array)")
-            continue
-        
-        if verbose:
-            logger.debug(f"\n{'─' * 70}")
-            logger.debug(f"Variable: {var_name}")
-            logger.debug(f"  Shape: {var.shape}")
-            logger.debug(f"  Dims: {var.dims}")
-            logger.debug(f"  Actual chunks: {var.chunks}")
-        
-        # Analyser chaque dimension
-        needs_rechunk = False
-        new_chunks = {}
-        
-        for dim_name, dim_size, dim_chunks in zip(var.dims, var.shape, var.chunks):
-            n_chunks = len(dim_chunks)
-            
-            if n_chunks <= 1:
-                # Un seul chunk - OK
-                new_chunks[dim_name] = dim_size
-                if verbose:
-                    logger.debug(f"  {dim_name}: 1 chunk ({dim_size}) - OK")
-                continue
-            
-            first_chunk = dim_chunks[0]
-            last_chunk = dim_chunks[-1]
-            
-            if last_chunk > first_chunk:
-                # PROBLÈME DÉTECTÉ
-                needs_rechunk = True
-                optimal_size = find_valid_chunk_size(dim_size, first_chunk)
-                new_chunks[dim_name] = optimal_size
-                
-                if verbose:
-                    logger.debug(f" {dim_name}: Detected problem!")
-                    logger.debug(f"    - Dimension size: {dim_size}")
-                    logger.debug(f"    - Actual chunks: {dim_chunks}")
-                    logger.debug(f"    - First chunk: {first_chunk}, Last: {last_chunk}")
-                    logger.debug(f"    - New chunk: {optimal_size}")
-                    
-                    # Calculer la nouvelle distribution
-                    n_full = dim_size // optimal_size
-                    remainder = dim_size % optimal_size
-                    if remainder > 0:
-                        logger.debug(f"    - Result: {n_full} chunks of {optimal_size} + 1 chunk of {remainder}")
-                    else:
-                        logger.debug(f"    - Result: {n_full} chunks of {optimal_size} (division exacte)")
-            else:
-                # Chunks OK - garder la taille du premier
-                new_chunks[dim_name] = first_chunk
-                if verbose:
-                    logger.debug(f"  {dim_name}: Chunks OK ({n_chunks} chunks: {first_chunk}...{last_chunk})")
-        
-        # Rechunker si nécessaire
-        if needs_rechunk:
+            # continue
+        else:
             if verbose:
-                logger.debug(f"  → Rechunking with: {new_chunks}")
-            ds_fixed[var_name] = var.chunk(new_chunks)
-        
-        # TOUJOURS nettoyer l'encoding
+                logger.debug(f"\n{'─' * 70}")
+                logger.debug(f"Variable: {var_name}")
+                logger.debug(f"  Shape: {var.shape}")
+                logger.debug(f"  Dims: {var.dims}")
+                logger.debug(f"  Actual chunks: {var.chunks}")
+            
+            # Analyser chaque dimension
+            needs_rechunk = False
+            new_chunks = {}
+            
+            for dim_name, dim_size, dim_chunks in zip(var.dims, var.shape, var.chunks):
+                n_chunks = len(dim_chunks)
+                
+                if n_chunks <= 1:
+                    # Un seul chunk - OK
+                    new_chunks[dim_name] = dim_size
+                    if verbose:
+                        logger.debug(f"  {dim_name}: 1 chunk ({dim_size}) - OK")
+                    continue
+                
+                first_chunk = dim_chunks[0]
+                last_chunk = dim_chunks[-1]
+                
+                if last_chunk > first_chunk:
+                    # PROBLÈME DÉTECTÉ
+                    needs_rechunk = True
+                    optimal_size = find_valid_chunk_size(dim_size, first_chunk)
+                    new_chunks[dim_name] = optimal_size
+                    
+                    if verbose:
+                        logger.debug(f" {dim_name}: Detected problem!")
+                        logger.debug(f"    - Dimension size: {dim_size}")
+                        logger.debug(f"    - Actual chunks: {dim_chunks}")
+                        logger.debug(f"    - First chunk: {first_chunk}, Last: {last_chunk}")
+                        logger.debug(f"    - New chunk: {optimal_size}")
+                        
+                        # Calculer la nouvelle distribution
+                        n_full = dim_size // optimal_size
+                        remainder = dim_size % optimal_size
+                        if remainder > 0:
+                            logger.debug(f"    - Result: {n_full} chunks of {optimal_size} + 1 chunk of {remainder}")
+                        else:
+                            logger.debug(f"    - Result: {n_full} chunks of {optimal_size} (division exacte)")
+                else:
+                    # Chunks OK - garder la taille du premier
+                    new_chunks[dim_name] = first_chunk
+                    if verbose:
+                        logger.debug(f"  {dim_name}: Chunks OK ({n_chunks} chunks: {first_chunk}...{last_chunk})")
+            
+            # Rechunker si nécessaire
+            if needs_rechunk:
+                if verbose:
+                    logger.debug(f"  → Rechunking with: {new_chunks}")
+                ds_fixed[var_name] = var.chunk(new_chunks)
+
         safe_encoding = {}
-        for encod in ["dtype", "scale_factor", "add_offset", "_FillValue"]:
+        for encod in ["dtype", "scale_factor", "add_offset", "_FillValue", "units", "calendar"]:
             if encod in ds_fixed[var_name].encoding:
-                safe_encoding[encod] = ds_fixed[var_name].encoding[encod]
+                e = ds_fixed[var_name].encoding[encod]
+                safe_encoding[encod] = e
+        encoding[var_name] = safe_encoding
         ds_fixed[var_name].encoding = safe_encoding
         for key, val in list(ds_fixed[var_name].attrs.items()):
             if isinstance(val, (np.integer, int)):
                 ds_fixed[var_name].attrs[key] = float(val)
+            elif isinstance(val, str):
+                ds_fixed[var_name].attrs[key] = str(val)
         if verbose:
             logger.debug(f"  Encoding cleaned (kept: {list(safe_encoding.keys())})")
     
@@ -171,7 +174,24 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
             if var.chunks is not None:
                 logger.debug(f"  {var_name}: {var.chunks}")
     
-    return ds_fixed
+    return ds_fixed, encoding
+
+def write_dataset_to_netcdf(ds: xr.Dataset, path: str, compute: bool = True):
+    """
+    Sauvegarde Netcdf avec attrs et encoding.
+    
+    Parameters:
+    -----------
+    ds : xr.Dataset
+        Dataset à sauvegarder
+    path : str
+        Chemin de sortie Zarr
+    compute : bool
+        Calculer immédiatement (True) ou retourner delayed (False)
+    """
+    ds, encoding = auto_fix_zarr_encoding(ds)
+    res = ds.to_netcdf(path, compute=compute, encoding=encoding, format="NETCDF4")
+    return res
 
 def write_dataset_to_zarr(
     ds: xr.Dataset,
@@ -199,7 +219,7 @@ def write_dataset_to_zarr(
     **kwargs : arguments supplémentaires pour to_zarr()
     """
     # Correction automatique
-    ds = auto_fix_zarr_encoding(ds)
+    ds, encoding = auto_fix_zarr_encoding(ds)
     
     logger.info(f"\n Write: {path}")
     logger.debug(f"   Mode: {mode}")
@@ -211,6 +231,7 @@ def write_dataset_to_zarr(
         mode=mode,
         consolidated=consolidated,
         compute=compute,
+        encoding=encoding,
         **kwargs
     )
     
