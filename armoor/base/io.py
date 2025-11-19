@@ -4,9 +4,11 @@ import logging
 from typing import Dict, List, Tuple
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
+import cftime
 import zarr
 import dask
 import numpy as np
+import pandas as pd
 import xarray as xr
 from dask.distributed import Client
 from numcodecs import Blosc
@@ -146,22 +148,42 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                 if verbose:
                     logger.debug(f"  → Rechunking with: {new_chunks}")
                 ds_fixed[var_name] = var.chunk(new_chunks)
-
+        da_fixed = ds_fixed[var_name]
         safe_encoding = {}
-        for encod in ["dtype", "scale_factor", "add_offset", "_FillValue", "units", "calendar"]:
-            if encod in ds_fixed[var_name].encoding:
-                e = ds_fixed[var_name].encoding[encod]
+        for encod in ["units", "calendar"]:
+            if encod in da_fixed.encoding:
+                e = da_fixed.encoding[encod]
                 safe_encoding[encod] = e
+        if var_name == "time":
+            safe_encoding["dtype"] = np.float32
+        safe_encoding["_FillValue"] = -99999
         encoding[var_name] = safe_encoding
-        ds_fixed[var_name].encoding = safe_encoding
-        for key, val in list(ds_fixed[var_name].attrs.items()):
+        da_fixed.encoding = safe_encoding
+        for key, val in list(da_fixed.attrs.items()):
             if isinstance(val, (np.integer, int)):
-                ds_fixed[var_name].attrs[key] = float(val)
+                da_fixed.attrs[key] = float(val)
             elif isinstance(val, str):
-                ds_fixed[var_name].attrs[key] = str(val)
+                da_fixed.attrs[key] = str(val)
+        vmin = da_fixed.min().values
+        vmax = da_fixed.max().values
+        if var_name == "time":
+            units = da_fixed.encoding['units']
+            calendar = da_fixed.encoding.get('calendar', 'standard')
+            dtvmin = pd.to_datetime(vmin).to_pydatetime()
+            dtvmax = pd.to_datetime(vmax).to_pydatetime()
+            vmin = cftime.date2num(dtvmin, units, calendar)
+            vmax = cftime.date2num(dtvmax, units, calendar)
+        da_fixed.attrs["valid_min"] = float(vmin)
+        da_fixed.attrs["valid_max"] = float(vmax)
+        if var_name in ("lon", "lat", "depth"):
+            if "axis" in da_fixed.attrs:
+                da_fixed.attrs.pop("axis")
+            if "step" in da_fixed.attrs:
+                da_fixed.attrs.pop("step")
+        da_fixed.attrs["coordinates"] = str(list(da_fixed.dims))
+        ds_fixed[var_name] = da_fixed
         if verbose:
             logger.debug(f"  Encoding cleaned (kept: {list(safe_encoding.keys())})")
-    
     if verbose:
         logger.debug("\n" + "=" * 70)
         logger.debug("Every problem corrected?")
@@ -173,7 +195,7 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
             var = ds_fixed[var_name]
             if var.chunks is not None:
                 logger.debug(f"  {var_name}: {var.chunks}")
-    
+
     return ds_fixed, encoding
 
 def write_dataset_to_netcdf(ds: xr.Dataset, path: str, compute: bool = True):
