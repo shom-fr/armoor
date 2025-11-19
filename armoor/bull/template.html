@@ -138,8 +138,23 @@
             padding-bottom: 15px;
             border-bottom: 2px solid #3498db;
             font-weight: 600;
+            position: relative;
+            cursor: pointer;
         }
-
+        .zone-title::after {
+            content: "▸"; /* triangle arrow */
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%) rotate(0deg);
+            font-size: 1.2em;
+            color: #2980b9;
+            transition: transform 0.3s ease;
+        }
+        
+        .zone-block.open .zone-title::after {
+            transform: translateY(-50%) rotate(90deg);
+        }
         /* Gallery Grid Layout */
         .gallery-grid {
             display: grid;
@@ -147,7 +162,12 @@
             gap: 25px;
             margin-top: 25px;
         }
-
+        .zone-block .gallery-grid {
+            display: none;
+        }
+        .zone-block.open .gallery-grid {
+            display: grid; /* restores your existing grid layout */
+        }
         .image-container {
             position: relative;
             border-radius: 10px;
@@ -580,6 +600,20 @@
                     navigateImage(event, 1);
                 }
             }
+        });
+        document.addEventListener("DOMContentLoaded", function () {
+            const zoneBlocks = document.querySelectorAll(".zone-block");
+        
+            zoneBlocks.forEach(block => {
+                const title = block.querySelector(".zone-title");
+        
+                title.style.cursor = "pointer";
+                
+                title.addEventListener("click", function (event) {
+                    event.stopPropagation();
+                    block.classList.toggle("open");
+                });
+            });
         });
 
         // Initialize images on page load
