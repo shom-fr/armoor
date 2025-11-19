@@ -395,9 +395,9 @@ def get_parser_filters_quality():
     add_io_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     parser.add_argument(
-        'qc_name',
+        'vname',
         type=str,
-        help="Quality control variable name in the input files"
+        help="Name of the armoor variable from which the quality tresholds will be applied."
         )
     parser.add_argument(
         'qc_thr',
@@ -451,7 +451,7 @@ def main_filters_quality():
    
     filters_config = {
         "quality":{
-            "qname": args.qc_name,
+            "qname": args.vname,
             "qmin": args.qc_thr[0],
             "qmax": args.qc_thr[1]
             }
