@@ -223,7 +223,6 @@ def open_decode(
     # Xoa initialisation
     # register_cf()
     path_files = get_paths(path_files)
-
     # Open file
     if fmt== "forecaster":
         logger.info("forecaster")
