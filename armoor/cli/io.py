@@ -4,14 +4,67 @@ This module provides utility functions for adding standardized command-line argu
 related to input/output operations and saving xarray datasets in various formats.
 """
 import logging
-
+from pathlib import Path
 from dask.diagnostics import ProgressBar
 
 from armoor import ArmoorError
 from armoor.base.io import write_dataset_to_zarr, write_dataset_to_netcdf
+from armoor.base.misc import comma_separated
 
 logger = logging.getLogger(__name__)
 
+
+def add_comp_parser_arguments(parser, default_level="info"):
+    parser.add_argument(
+        'metazones',
+        type=comma_separated,
+        help="List of metazone to be processed."
+        )
+    parser.add_argument(
+        'cfgfile',
+        type=Path,
+        help="Path of the configuration file."
+        )
+    parser.add_argument(
+        '-m', '--metazonesfile',
+        type=Path,
+        help="Path of the configuration file dedicated to the description of metazones.",
+        default="metazones.cfg"
+        )
+    add_tbound_parser_arguments(parser)
+    parser.add_argument(
+        '--jsonfile',
+        type=Path,
+        help="Path of the output json file.",
+        default='ncs_{func_comp}.json'
+        )
+    parser.add_argument(
+        '--filters-only',
+        action='store_true',
+        help="Use for exiting after filters processes.",
+        )
+    parser.add_argument(
+        '--coloc-only',
+        action='store_true',
+        help="Use for exiting after colocation processes.",
+        )
+
+def add_tbound_parser_arguments(parser):
+    """Add tbound argument to argument parser.
+    
+    Adds a optional argument 'tbound' for specifying time bounds
+    
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        The argument parser to which the input file argument will be added.
+    """
+    parser.add_argument(
+        "--tbound",
+        type=str,
+        nargs=2,
+        help="Time bounds: begin_date end_date",
+    )
 
 def add_input_parser_arguments(parser):
     """Add input file pattern argument to argument parser.
@@ -215,7 +268,7 @@ def add_refinput_parser_arguments(parser):
         type=str,
         help="Pattern of reference input file. Ex: croco_*.zarr",
         )
-    
+ 
 def add_refinput_fmt_parser_arguments(parser):
     """Add reference input file format argument to argument parser.
     """

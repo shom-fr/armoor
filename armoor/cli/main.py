@@ -17,11 +17,10 @@ from armoor.base.misc import (comma_separated, dict_to_list,
                               optimize_for_low_swap, parse_coords,
                               parse_mixed_param, parse_qc_tuple)
 from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI, BULL_INI
-from armoor.cli.io import add_dask_parser_arguments, get_dask_args
+from armoor.cli.io import add_dask_parser_arguments, get_dask_args, add_comp_parser_arguments
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.comp import METAZONE_PARAMS
 from armoor.comp.coloc import main_coloc
-from armoor.comp.io import add_comp_parser_arguments
 from armoor.comp.output import main_output as output_comp
 from armoor.comp.plot import main_plot as plot_comp
 from armoor.data.load import load_datasets
@@ -367,7 +366,7 @@ def main_comp_models():
             f"File not found: {args.cfgfile}."
             )
     kw_dask = get_dask_args(args)
-    
+    kw_comp = {"tbound": args.tbound}
     main_comp(
         args.cfgfile,
         args.metazonesfile,
@@ -376,7 +375,8 @@ def main_comp_models():
         args.jsonfile,
         args.filters_only,
         args.coloc_only,
-        kw_dask
+        kw_dask,
+        comp_args=kw_comp
         )
 
 def get_parser_comp_sst():
@@ -414,7 +414,10 @@ def main_comp_sst():
         raise ArmoorError(
             f"File not found: {args.cfgfile}."
             )
-    kw_comp = {"qc": args.qc}
+    kw_comp = {
+        "qc": args.qc,
+        "tbound": args.tbound
+        }
     
     kw_dask = get_dask_args(args)
 
@@ -427,7 +430,7 @@ def main_comp_sst():
         args.filters_only,
         args.coloc_only,
         kw_dask,
-        kw_comp
+        comp_args=kw_comp
         )
     
 def get_parser_comp_argo():
@@ -471,7 +474,7 @@ def main_comp_argo():
     if not args.cfgfile.exists():
         raise ArmoorError(f"File not found: {args.cfgfile}.")
     
-    kw_comp = {"radius": args.radius, "qc": args.qc}
+    kw_comp = {"radius": args.radius, "qc": args.qc, "tbound": args.tbound}
     
     kw_dask = get_dask_args(args)
     
@@ -484,7 +487,7 @@ def main_comp_argo():
         args.filters_only,
         args.coloc_only,
         kw_dask,
-        kw_comp
+        comp_args=kw_comp
         )
 
 def get_parser_comp_mooring():
@@ -527,7 +530,7 @@ def main_comp_mooring():
     if not args.cfgfile.exists():
         raise ArmoorError(f"File not found: {args.cfgfile}.")
     
-    kw_comp = {"radius": args.radius, "qc": args.qc}
+    kw_comp = {"radius": args.radius, "qc": args.qc, "tbound": args.tbound}
 
     kw_dask = get_dask_args(args)
 
@@ -540,7 +543,7 @@ def main_comp_mooring():
         args.filters_only,
         args.coloc_only,
         kw_dask,
-        kw_comp
+        comp_args=kw_comp
         )
 
 def get_parser_comp_drifter():
@@ -583,7 +586,8 @@ def main_comp_drifter():
     
     kw_comp = {
         "period_drift": args.period,
-        "freq_drift": args.freq
+        "freq_drift": args.freq,
+        "tbound": args.tbound
         }
     
     kw_dask = get_dask_args(args)
@@ -597,7 +601,7 @@ def main_comp_drifter():
         args.filters_only,
         args.coloc_only,
         kw_dask,
-        kw_comp
+        comp_args=kw_comp
         )
 
 def get_parser_bull():
