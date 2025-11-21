@@ -164,19 +164,20 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                 da_fixed.attrs[key] = float(val)
             elif isinstance(val, str):
                 da_fixed.attrs[key] = str(val)
-        vmin = da_fixed.min().values
-        vmax = da_fixed.max().values
-        if var_name == "time":
-            if "units" in da_fixed.encoding:
-                units = da_fixed.encoding['units']
-                calendar = da_fixed.encoding.get('calendar', 'standard')
-                dtvmin = pd.to_datetime(vmin).to_pydatetime()
-                dtvmax = pd.to_datetime(vmax).to_pydatetime()
-                vmin = cftime.date2num(dtvmin, units, calendar)
-                vmax = cftime.date2num(dtvmax, units, calendar)
-                
-        da_fixed.attrs["valid_min"] = float(vmin)
-        da_fixed.attrs["valid_max"] = float(vmax)
+        if np.issubdtype(da_fixed.dtype, np.number):
+            vmin = da_fixed.min().values
+            vmax = da_fixed.max().values
+            if var_name == "time":
+                if "units" in da_fixed.encoding:
+                    units = da_fixed.encoding['units']
+                    calendar = da_fixed.encoding.get('calendar', 'standard')
+                    dtvmin = pd.to_datetime(vmin).to_pydatetime()
+                    dtvmax = pd.to_datetime(vmax).to_pydatetime()
+                    vmin = cftime.date2num(dtvmin, units, calendar)
+                    vmax = cftime.date2num(dtvmax, units, calendar)
+            
+            da_fixed.attrs["valid_min"] = float(vmin)
+            da_fixed.attrs["valid_max"] = float(vmax)
         if var_name in ("lon", "lat", "depth"):
             if "axis" in da_fixed.attrs:
                 da_fixed.attrs.pop("axis")
