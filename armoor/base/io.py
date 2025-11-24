@@ -183,7 +183,7 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                 da_fixed.attrs.pop("axis")
             if "step" in da_fixed.attrs:
                 da_fixed.attrs.pop("step")
-        da_fixed.attrs["coordinates"] = str(list(da_fixed.dims))
+        da_fixed.attrs["coordinates"] = ','.join(list(da_fixed.dims))
         ds_fixed[var_name] = da_fixed
         if verbose:
             logger.debug(f"  Encoding cleaned (kept: {list(safe_encoding.keys())})")
