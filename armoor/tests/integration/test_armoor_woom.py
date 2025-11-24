@@ -41,29 +41,31 @@ def test():
         workflow.run(dry=True)
     except Exception as e:
         print(e)
-    try:
-        workflow.run(update=True)
-    finally:  
-        isend = False
-        while isend == False:
-            time.sleep(2.0)
-            df = workflow.get_status(running=True)
-            if df.empty:
-                isend = True
-                workflow.show_status()
-        df = workflow.get_status()
-        res = df[~df.STATUS.str.contains("SUCCESS")].copy()
-        
-        if not res.empty:
-            for submission_dir in res["SUBMISSION DIR"]:
-                for ext in [".out", ".err", ".sh"]:
-                    file = os.path.join(os.path.join(
-                        submission_dir, f"job{ext}")
-                        )
-                    if os.path.exists(file):
-                        with open(file, 'r') as f:
-                            content = f.read()
-                        print(content)
-                        print("--" * 30)
-                print("==" * 10)
-        assert res.empty
+        assert False
+    else:
+        try:
+            workflow.run(update=True)
+        finally:  
+            isend = False
+            while isend == False:
+                time.sleep(2.0)
+                df = workflow.get_status(running=True)
+                if df.empty:
+                    isend = True
+                    workflow.show_status()
+            df = workflow.get_status()
+            res = df[~df.STATUS.str.contains("SUCCESS")].copy()
+            
+            if not res.empty:
+                for submission_dir in res["SUBMISSION DIR"]:
+                    for ext in [".out", ".err", ".sh"]:
+                        file = os.path.join(os.path.join(
+                            submission_dir, f"job{ext}")
+                            )
+                        if os.path.exists(file):
+                            with open(file, 'r') as f:
+                                content = f.read()
+                            print(content)
+                            print("--" * 30)
+                    print("==" * 10)
+            assert res.empty
