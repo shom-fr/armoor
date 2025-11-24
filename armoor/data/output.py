@@ -54,9 +54,10 @@ def get_datatrees(dsins, dim, mparams):
     
     dts = []
     for ds in dsins:
-        if "depth" in ds.coords:
-            if "time" in ds["depth"].dims:
-                ds = ds.reset_coords("depth")
+        for coord in ["lon", "lat", "depth"]:
+            if coord in ds.coords:
+                if "time" in ds[coord].dims:
+                    ds = ds.reset_coords("depth")
         dt = xr.DataTree(name=ds.attrs["data_name"])
         dt.update(xr.DataTree.from_dict({
             "data": ds

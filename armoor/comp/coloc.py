@@ -252,7 +252,7 @@ class HorizontalColocation(AbstractColocation):
         
         coords = [coord for coord in mask.coords]
         mask = mask.drop_vars(coords)
-        self.dsprod = self.dsprod.where(mask, drop=True)
+        self.dsprod = self.dsprod.where(mask)#, drop=True)
         self.dsprod = self.dsprod.set_coords(["lon", "lat"])
  
     def radius(self, radius: float) -> Tuple[xr.Dataset, xr.Dataset]:
@@ -279,7 +279,7 @@ class HorizontalColocation(AbstractColocation):
         if "time" not in self.dsref.lon.dims:
             # Cas time-independent (unchanged)
             dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
-            filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters, drop=True)
+            filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters)#, drop=True)
             self.dsprod = self._clean_coordinates(filtered_ds)
         else:
             self._handle_time_dependent(radius_meters)

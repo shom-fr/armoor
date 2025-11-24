@@ -1373,6 +1373,9 @@ class PlotComp:
                 else:
                     data = "data"
                     field = None
+                ds = node_prod["ref/data"].to_dataset()
+                lon = ds.lon
+                lat = ds.lat
                 dsprod_all = node_prod[f"prod/{data}"].to_dataset()
                 dsref_all = node_prod[f"ref/{data}"].to_dataset()
                 if "member" in dsprod_all.dims:
@@ -1449,9 +1452,21 @@ class PlotComp:
                         vmax = np.max([dsprod.max(), dsref.max()])
                         vmin = np.min([dsprod.min(), dsref.min()])
                     
-                    dlat = dsprod.lat.max() - dsprod.lat.min()
-                    dlon = dsprod.lon.max() - dsprod.lon.min()
-                    aspect_ratio = 3 / 2 * dlat / dlon
+                    lonmin = lon.min()
+                    lonmax = lon.max()
+                    latmin = lat.min()
+                    latmax = lat.max()
+                    dlat = latmax - latmin
+                    dlon = lonmax - lonmin
+                    if dlon > 0 and dlat > 0:
+                        aspect_ratio = 3 / 2 * dlat / dlon
+                    else:
+                        pad = 1.0
+                        lonmin = lon.min() - pad
+                        lonmax = lon.max() + pad
+                        latmin = lat.min() - pad
+                        latmax = lat.max() + pad
+                        aspect_ratio = 3 / 2
                     fig, axes = create_subplots(
                             layout_type='top_two_bottom_one',
                             figsize=(8 / aspect_ratio, 8),
@@ -1533,6 +1548,10 @@ class PlotComp:
                             )
                         gl.top_labels = False
                         gl.right_labels = False
+                        axes[iax].set_extent(
+                            [lonmin, lonmax, latmin, latmax],
+                            crs=ccrs.PlateCarree()
+                            )
                     
                     figname = (
                         f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
