@@ -66,7 +66,9 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
             )
     if kwargs:
         for metazone in metazones_arg:
-            metazones_cfg[metazone].update(kwargs)
+            for k, v in kwargs.items():
+                if v != None:
+                    metazones_cfg[metazone].update({k: v})
     metazones = {}
     for metazone in metazones_arg:
         for k, v in metazones_cfg[metazone].items():
