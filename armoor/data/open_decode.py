@@ -739,7 +739,8 @@ def open_decode_cmems_insitu(path_files, platform):
                     continue
             if platform == "drifter":
                 ds = ds.isel(z=[-1])
-                ds["depth"] = ds.depth.isel(time=1)
+                if "time" in ds.depth.dims:
+                    ds["depth"] = ds.depth.isel(time=1)
                 if "u" not in ds.data_vars:
                     ds["u"] = (
                         ds.lon.differentiate("time", datetime_unit="s")
@@ -1168,14 +1169,14 @@ def open_decode_croco(path_file, fmt="croco"):
     #ds = optimize_for_low_swap(ds)
     for sig in ("sig_rho", "sig_w"):
         if sig in ds:
-            if "formula_terms" not in ds[sig].attrs:
-                logger.warning(f"No formula_terms attributes in {sig}")
-                if "hc" not in ds.data_vars:
-                    ds["hc"] = float(ds.attrs.get("hc"))
-                if sig == "sig_w":
-                    ds[sig].attrs["formula_terms"] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
-                elif sig == "sig_rho":
-                    ds[sig].attrs["formula_terms"] = "s: sig_rho C: cs_rho eta: ssh depth: bathy depth_c: hc"
+            # if "formula_terms" not in ds[sig].attrs:
+            logger.warning(f"No formula_terms attributes in {sig}")
+            if "hc" not in ds.data_vars:
+                ds["hc"] = float(ds.attrs.get("hc"))
+            if sig == "sig_w":
+                ds[sig].attrs["formula_terms"] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
+            elif sig == "sig_rho":
+                ds[sig].attrs["formula_terms"] = "s: sig_rho C: cs_rho eta: ssh depth: bathy depth_c: hc"
             if "standard_name" not in ds[sig].attrs:
                 logger.warning(f"No standard_name attributes in {sig}")
                 if sig == "sig_rho":
