@@ -897,6 +897,7 @@ class PlotComp:
                             )
                         lw = 2
                         da = dt_ref["mean"].to_dataset()[var]
+                        da = da.squeeze()
                         if npts > 1:
                             da = da.isel(npts=inpt)
                         axes[0].plot(
@@ -935,6 +936,7 @@ class PlotComp:
                     prod_name = dt_prod["data"].to_dataset().attrs["data_name"]
 
                     da = dt_prod["mean"].to_dataset()[var]
+                    da = da.squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[0].plot(
@@ -945,6 +947,7 @@ class PlotComp:
                         label=prod_name
                         )
                     da = dt_prod["std"].to_dataset()[var]
+                    da = da.squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[1].plot(
@@ -955,6 +958,7 @@ class PlotComp:
                         label=prod_name
                         )
                     da = dt_comp["bias"].to_dataset()[var]
+                    da = da.squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[2].plot(
@@ -964,6 +968,7 @@ class PlotComp:
                         label=f"{prod_name} vs {ref_name}"
                         )
                     da = dt_comp["rmse"].to_dataset()[var]
+                    da = da.squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[3].plot(
@@ -973,6 +978,7 @@ class PlotComp:
                         linewidth=lw
                         )
                     da = dt_comp["rmsec"].to_dataset()[var]
+                    da = da.squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[4].plot(
@@ -1088,6 +1094,7 @@ class PlotComp:
                     prod_name = dss_prod[iprod].attrs["data_name"]
                     if "member" in da_prod.dims:
                         da_prod = da_prod.mean("member")
+                    da_prod = da_prod.squeeze()
                     axes[0].plot(
                         da_prod["time"],
                         da_prod,
@@ -1095,10 +1102,13 @@ class PlotComp:
                         linewidth=lw,
                         label=prod_name
                         )
-                    
+                    da_comp = das_comp[iprod]
+                    if "member" in da_comp.dims:
+                        da_comp = da_comp.mean("member")
+                    da_comp = da_comp.squeeze()
                     axes[1].plot(
-                        das_comp[iprod]["time"],
-                        das_comp[iprod],
+                        da_comp["time"],
+                        da_comp,
                         color=LINE_COLORS[iprod],
                         linewidth=lw,
                         label=prod_name

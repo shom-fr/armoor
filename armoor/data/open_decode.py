@@ -761,10 +761,19 @@ def open_decode_cmems_insitu(path_files, platform):
             ds = ds.drop_vars("TRAJECTORY")
         return ds
     else:
-        for ids in range(len(dss)):
-            dss[ids].attrs["name"] = f"{dss[ids].attrs['platform_code']}"
+        dss_by_platform = dict()
+        for ds in dss:
+            platform_code = ds.attrs.get("platform_code")
+            if platform_code not in dss_by_platform.keys():
+                dss_by_platform.update({platform_code: []})
+            dss_by_platform[platform_code].append(ds)
+        dss = []
+        for platform_code, dss0 in dss_by_platform.items():
+            ds = xr.merge(dss0)
+            ds = ds.sortby("time")
+            ds.attrs["name"] = f"{ds.attrs['platform_code']}"
+            dss.append(ds)
         return dss
-    return ds
 
 def open_decode_l_adcp(path_file):
     """
