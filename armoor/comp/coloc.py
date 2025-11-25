@@ -233,7 +233,7 @@ class HorizontalColocation(AbstractColocation):
         if "time" in ref_data.lon.dims:
             rename_dims["npts1"] = "time"
         dist = (xgeo.get_distances(prod_data, ref_data)
-                .squeeze()
+                #.squeeze()
                 .rename(rename_dims)
                 .assign_coords(member=prod_data.member)
             )
