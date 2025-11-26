@@ -207,7 +207,7 @@ def get_parser_interp_horizontal():
     parser.add_argument(
         '--ncgrid',
         type=str,
-        help="NetCDF file containing target grid lat/lon coordinates."
+        help="NetCDF file in armoor format containing target grid lat/lon coordinates."
         )
     
     return parser
