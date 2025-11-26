@@ -155,7 +155,7 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                 e = da_fixed.encoding[encod]
                 safe_encoding[encod] = e
         if var_name == "time":
-            safe_encoding["dtype"] = np.float32
+            safe_encoding["dtype"] = np.float64
         safe_encoding["_FillValue"] = -99999
         encoding[var_name] = safe_encoding
         da_fixed.encoding = safe_encoding
@@ -245,7 +245,7 @@ def write_dataset_to_zarr(
     """
     # Correction automatique
     ds, encoding = auto_fix_zarr_encoding(ds)
-    
+
     logger.info(f"\n Write: {path}")
     logger.debug(f"   Mode: {mode}")
     logger.debug(f"   Consolidated metadata: {consolidated}")
