@@ -75,34 +75,39 @@ def preproc_comp_drifter(zins, odt, runtime=None):
                     )
                 dsprod.to_netcdf(ncprod)
             dsref = xr.open_dataset(zref)
-            dsref = dsref.reset_coords(["lon", "lat"]).drop("depth")
-            dsref = process_time_interpolation(
-                dsref,
+            dsref_update = process_time_interpolation(
+                dsref.reset_coords(["lon", "lat"]).drop("depth"),
                 ("tfreq", odt),
                 [dsref.time.min().values, dsref.time.max().values]
+                )
+            zref = str(zref)
+            dsref_update = dsref_update.compute()
+            write_job = write_dataset_to_zarr(
+                dsref_update,
+                zref.replace(".zarr", "_tmp.zarr"),
+                mode="w",
+                consolidated=True,
+                compute=True
                 )
             timeref = [
                 float((pd.to_datetime(time) - pd.to_datetime("1950-01-01")
                 ) / pd.to_timedelta("1s")) - timeprod[0]
-                for time in dsref.time.values
+                for time in dsref_update.time.values
                 ]
             ptc_coords_start = {
                 "time": timeref,
-                "lon": dsref.lon.values,
-                "lat": dsref.lat.values
+                "lon": dsref_update.lon.values,
+                "lat": dsref_update.lat.values
                 }
             if runtime:
                 rruntime = pd.to_timedelta(runtime) / pd.to_timedelta("1s")
             else:
                 rruntime = (
-                    dsref.time.max() - dsref.time.min()
+                    dsref_update.time.max() - dsref_update.time.min()
                     ) / pd.to_timedelta("1s")
             rruntime = float(rruntime)
-            dsref.close()
-            shutil.rmtree(zref)
-            dsref = dsref.load()
-            dsref.to_zarr(zref)
-            del dsref    
+            # dsref.close()
+            del dsref_update
             Parcels(
                 ncprod,
                 ptc_coords_start,
@@ -119,7 +124,6 @@ def preproc_comp_drifter(zins, odt, runtime=None):
                     consolidated=True,
                     compute=True
                     )
-                
             zins[drifter].update({
                 prod: [zref, zprod]
                 })
