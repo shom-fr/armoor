@@ -41,13 +41,13 @@ def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
     """Generate absolute paths from a pattern string with wildcard and list expansion.
     
     Supports patterns like :
-    - '/path/to/files/\*.txt' (standard glob)
-    - '/path/to/files/\*[option1,option2].txt' (list expansion)
+    - '/path/to/files/*.txt' (standard glob)
+    - '/path/to/files/*[option1,option2].txt' (list expansion)
     
     Parameters
     ----------
     pattern : str
-        Path pattern with wildcards (\*) and optional list expansions [item1,item2,...]
+        Path pattern with wildcards (*) and optional list expansions [item1,item2,...]
     sort_results : bool, default True
         Whether to sort the resulting paths alphabetically
         
@@ -207,10 +207,6 @@ def open_decode(
     # register_cf()
     path_files = get_paths(path_files)
     # Open file
-    if fmt== "forecaster":
-        logger.info("forecaster")
-        return open_forecaster(path_files, type)
-
     if fmt == "cmems_insitu":
         logger.info("Opening/decoding insitu cmems files")
         return open_decode_cmems_insitu(path_files, platform=platform)
@@ -243,21 +239,6 @@ def open_decode(
         return open_decode_woa18(path_files)
     else:
         raise logger.error("Unknow format")
-    # if type == "scanfish":
-    #     logger.info("Opening Scanfish")
-    #     return open_decode_scanfish(path_files[0], steps=steps)
-    # if type == "seasoar":
-    #     logger.info("Opening Seasoar")
-    #     return open_decode_seasoar(path_files[0], steps=steps)
-    # if type == "LADCP":
-    #     logger.info("Opening L-ADCP")
-    #     return open_decode_l_adcp(path_files[0])
-    # if type == "mouillage":
-    #     logger.info("Opening Mooring")
-    #     return open_decode_mouillages(path_files[0])
-    # if type == "VMADCP":
-    #     logger.info("Opening VMADCP")
-    #     return open_decode_vmadcp(path_files[0], steps=steps)
     
 
 def open_decode_arpege_insta(path_files):
@@ -738,7 +719,7 @@ def open_decode_croco(path_file, fmt="croco"):
     if 'scrum_time' in ds:   
         ds = ds.drop_vars('scrum_time') 
     with xcf.set_cf_specs(cfspecs):
-        ds = ds.xoa.decode()
+        ds = ds.xcf.decode()
     for sig in ("sig_rho", "sig_w"):
         if sig in ds:
             # if "formula_terms" not in ds[sig].attrs:
