@@ -734,7 +734,10 @@ def open_decode_croco(path_file, fmt="croco"):
          Model dataset decoded.
     """
     cfspecs = xcf.get_cf_specs(fmt)
-    ds = xr.open_mfdataset(path_file).xoa.decode()
+    ds = xr.open_mfdataset(path_file)
+    if 'scrum_time' in ds:   
+        ds = ds.drop_vars('scrum_time') 
+    ds = ds.xoa.decode()
     for sig in ("sig_rho", "sig_w"):
         if sig in ds:
             # if "formula_terms" not in ds[sig].attrs:
@@ -750,9 +753,7 @@ def open_decode_croco(path_file, fmt="croco"):
                 if sig == "sig_rho":
                     ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
                 elif sig == "sig_w":
-                    ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
-    if 'scrum_time' in ds:   
-        ds = ds.drop_vars('scrum_time')  
+                    ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location" 
     with xcf.set_cf_specs(cfspecs):
         ds = ds.decode_sigma()
 
