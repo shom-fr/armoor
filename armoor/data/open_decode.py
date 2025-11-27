@@ -174,14 +174,15 @@ def _glob_and_resolve(pattern: str, sort_results: bool = True) -> List[str]:
         raise e
 
 def register_cf():
-    
+    xcf.reset_cache()
     cfg_files = glob.glob(
-        os.path.join(ROOTDIR, "data", "cf*.cfg")
+        os.path.join(ROOTDIR, "data", "cf_*.cfg")
     )
     for cfg_file in cfg_files:
         logger.info(f"register {cfg_file}")
-        xcf.register_cf_specs(cfg_file)
-
+        mycfspecs = xcf.CFSpecs(cfg_file, default=False, user=False)
+        xcf.register_cf_specs(mycfspecs)
+    
 def open_decode(
     path_files, fmt, platform=None, func=None, type=None
 ) -> xr.Dataset:
@@ -440,12 +441,9 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
         autoclose=True
     )
 
-    try:
-        cfspecs = xcf.get_cf_specs("hycom")
-        with xcf.set_cf_specs(cfspecs):
-            ds = ds.xoa.decode()
-    except Exception:
-        logger.warning("xoa.decode skipped (xcf not available or failed)")
+    cfspecs = xcf.get_cf_specs("hycom")
+    with xcf.set_cf_specs(cfspecs):
+        ds = ds.xoa.decode()
 
     ds = ds.unify_chunks()
 
@@ -462,9 +460,8 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
 
     if bathy is not None:
         ds = xr.merge([ds, bathy.to_dataset(name="bathy")])
-
     if "dz" in ds:
-        depth = dz2depth(ds["dz"], centered=True)
+        depth = dz2depth(ds.dz, centered=True)
         ds = ds.assign_coords(depth=depth).drop_vars(["dz", "z"])
 
     ds = ds.sel(time=~ds.get_index("time").duplicated())
@@ -603,7 +600,7 @@ def open_decode_cmems_insitu(path_files, platform):
         ds = ds.drop_vars(vars2drop)
         if "depth" in ds.dims:
             ds = ds.swap_dims({"depth": "z"})
-        elif "DEPTH" in ds.dims:
+        elif ("DEPTH" in ds.dims) or ("depth" in ds.dims):
             ds = ds.swap_dims({"DEPTH": "z"})
         if "DEPH" in ds.coords:
             ds = ds.rename({"DEPH": "depth"})
@@ -714,7 +711,8 @@ def open_decode_croco(path_file, fmt="croco"):
     croco : xarray.Dataset
          Model dataset decoded.
     """
-    cfspecs = xcf.get_cf_specs(fmt)
+    cfspecs = xcf.get_cf_specs("croco")
+    # cfspecs.pprint()
     ds = xr.open_mfdataset(path_file)
     if 'scrum_time' in ds:   
         ds = ds.drop_vars('scrum_time') 
