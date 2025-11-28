@@ -59,6 +59,7 @@ def setup_test_data():
     test_files['cmems_insitu_mooring'] = TEST_DATA_DIR / "*_TS_MO_*.nc"
     test_files['cmems_insitu_drifter'] = TEST_DATA_DIR / "*_TS_DB_*.nc"
     test_files['croco'] = TEST_DATA_DIR / "croco_his.nc"
+    test_files['croco_v1'] = TEST_DATA_DIR / "croco_v1.3.nc"
     
     yield test_files
     
@@ -537,6 +538,28 @@ class TestOpenDecodeCroco:
             Fixture containing test file paths.
         """
         filepath = setup_test_data['croco']
+        result = open_decode_croco([filepath])
+        
+        assert isinstance(result, xr.Dataset)
+        assert set(('time', 'z', 'y', 'x')).issubset(result.dims)
+        assert 'lon' in result.coords
+        assert 'lat' in result.coords
+        assert 'time' in result.coords
+        assert len(result.lon.dims) == 2
+        assert len(result.lat.dims) == 2
+        assert set(('y', 'x')).issubset(result.lon.dims)
+        assert set(('y', 'x')).issubset(result.lat.dims)
+        
+    def test_open_decode_croco_v1(self, setup_test_data):
+        """
+        Test basic functionality of open_decode_croco.
+        
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['croco_v1']
         result = open_decode_croco([filepath])
         
         assert isinstance(result, xr.Dataset)

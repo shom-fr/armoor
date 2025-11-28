@@ -726,7 +726,11 @@ def open_decode_croco(path_file, fmt="croco"):
                 if sig == "sig_w":
                     ds[sig].attrs["formula_terms"] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
                 elif sig == "sig_rho":
-                    ds[sig].attrs["formula_terms"] = "s: sig_rho C: cs_rho eta: ssh depth: bathy depth_c: hc"
+                    if "cs_r" in ds:
+                        cs_rho = "cs_r"
+                    elif "cs_rho" in ds:
+                        cs_rho = "cs_rho"
+                    ds[sig].attrs["formula_terms"] = f"s: sig_rho C: {cs_rho} eta: ssh depth: bathy depth_c: hc"
                 if "standard_name" not in ds[sig].attrs:
                     logger.warning(f"No standard_name attributes in {sig}")
                     if sig == "sig_rho":
@@ -734,7 +738,7 @@ def open_decode_croco(path_file, fmt="croco"):
                     elif sig == "sig_w":
                         ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
         ds = ds.decode_sigma()
-
+    
     for v in [
         "sig_rho",
         "sig_w",
