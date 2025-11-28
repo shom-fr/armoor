@@ -808,7 +808,7 @@ def open_decode_croco(path_file, fmt="croco"):
         ds["u"] = da_u
         ds["v"] = da_v
     if "mask" in ds:
-        ds = ds.where(ds["mask"] > 0)
+        ds = ds.where(ds["mask"] > 0, drop=False)
     ds = ds.isel(z=slice(None, None, -1))
     ds = ds.assign_coords(depth=-ds.depth)
     return ds
