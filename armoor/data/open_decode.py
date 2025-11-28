@@ -730,6 +730,8 @@ def open_decode_croco(path_file, fmt="croco"):
                         cs_rho = "cs_r"
                     elif "cs_rho" in ds:
                         cs_rho = "cs_rho"
+                    else:
+                        raise ArmoorError("cs_r and cs_rho are missing. Armoor should find one of them.")
                     ds[sig].attrs["formula_terms"] = f"s: sig_rho C: {cs_rho} eta: ssh depth: bathy depth_c: hc"
                 if "standard_name" not in ds[sig].attrs:
                     logger.warning(f"No standard_name attributes in {sig}")
