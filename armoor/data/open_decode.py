@@ -712,7 +712,6 @@ def open_decode_croco(path_file, fmt="croco"):
          Model dataset decoded.
     """
     cfspecs = xcf.get_cf_specs("croco")
-    cfspecs.pprint()
     ds = xr.open_mfdataset(path_file)
     if 'scrum_time' in ds:   
         ds = ds.drop_vars('scrum_time') 

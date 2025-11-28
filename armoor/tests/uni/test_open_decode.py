@@ -51,6 +51,9 @@ def setup_test_data():
     test_files['cmems_model'] = TEST_DATA_DIR / "cmems_glo12.nc"
     test_files['hycom'] = TEST_DATA_DIR / "hycom_*.nc"
     test_files['woa18'] = TEST_DATA_DIR / "woa18_*.nc"
+    test_files['cmems_sst_l4'] = TEST_DATA_DIR / "20220310120000-UKMO-L4_GHRSST-SSTfnd-OSTIAanom-GLOB-v02.0-fv02.0.nc"
+    test_files['cmems_sst_l3'] = TEST_DATA_DIR / "20230412080000-OSISAF-L3C_GHRSST-SSTsubskin-SEVIRI_IO_SST-ssteqc_meteosat09_20230412_080000-v02.0-fv01.0.nc"
+    test_files['cersat_sst_l3'] = TEST_DATA_DIR / "20210623-IFR-L3C_GHRSST-SSTsubskin-ODYSSEA-GLOB_010_adjusted-v2.0-fv1.0.nc"
     test_files['cmems_insitu_argo'] = TEST_DATA_DIR / "*_PR_PF_*.nc"
     test_files['cmems_insitu_glider'] = TEST_DATA_DIR / "*_PR_GL_*.nc"
     test_files['cmems_insitu_mooring'] = TEST_DATA_DIR / "*_TS_MO_*.nc"
@@ -137,6 +140,60 @@ class TestGetPaths:
         with pytest.raises(Exception):  # Should raise ArmoorError
             get_paths(pattern)
             
+
+class TestOpenDecodeSST:
+    """Tests for open_decode_cmems_model function."""
+    
+    def test_open_decode_cmems_sst_l4(self, setup_test_data):
+        """
+        Test basic functionality of open_decode_cmems_model.
+        
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['cmems_sst_l4']
+        result = open_decode_sst_satellite([filepath], fmt="cmems_sst_l4")
+        
+        assert isinstance(result, xr.Dataset)
+        assert 'x' in result.dims
+        assert 'y' in result.dims
+        assert 'time' in result.dims
+        
+    def test_open_decode_cmems_sst_l3(self, setup_test_data):
+        """
+        Test basic functionality of open_decode_cmems_model.
+        
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['cmems_sst_l3']
+        result = open_decode_sst_satellite([filepath], fmt="cmems_sst_l3")
+        
+        assert isinstance(result, xr.Dataset)
+        assert 'x' in result.dims
+        assert 'y' in result.dims
+        assert 'time' in result.dims
+        
+    def test_open_decode_cersat_sst_l3(self, setup_test_data):
+        """
+        Test basic functionality of open_decode_cmems_model.
+        
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['cersat_sst_l3']
+        result = open_decode_sst_satellite([filepath], fmt="cersat_sst_l3")
+        
+        assert isinstance(result, xr.Dataset)
+        assert 'x' in result.dims
+        assert 'y' in result.dims
+        assert 'time' in result.dims
 
 # ============================================================================
 # Test open_decode_cmems_model
