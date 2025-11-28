@@ -712,29 +712,28 @@ def open_decode_croco(path_file, fmt="croco"):
          Model dataset decoded.
     """
     cfspecs = xcf.get_cf_specs("croco")
-    # cfspecs.pprint()
+    cfspecs.pprint()
     ds = xr.open_mfdataset(path_file)
     if 'scrum_time' in ds:   
         ds = ds.drop_vars('scrum_time') 
     with xcf.set_cf_specs(cfspecs):
         ds = ds.xcf.decode()
-    for sig in ("sig_rho", "sig_w"):
-        if sig in ds:
-            # if "formula_terms" not in ds[sig].attrs:
-            logger.warning(f"No formula_terms attributes in {sig}")
-            if "hc" not in ds.data_vars:
-                ds["hc"] = float(ds.attrs.get("hc"))
-            if sig == "sig_w":
-                ds[sig].attrs["formula_terms"] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
-            elif sig == "sig_rho":
-                ds[sig].attrs["formula_terms"] = "s: sig_rho C: cs_rho eta: ssh depth: bathy depth_c: hc"
-            if "standard_name" not in ds[sig].attrs:
-                logger.warning(f"No standard_name attributes in {sig}")
-                if sig == "sig_rho":
-                    ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
-                elif sig == "sig_w":
-                    ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location" 
-    with xcf.set_cf_specs(cfspecs):
+        for sig in ("sig_rho", "sig_w"):
+            if sig in ds:
+                # if "formula_terms" not in ds[sig].attrs:
+                logger.warning(f"No formula_terms attributes in {sig}")
+                if "hc" not in ds.data_vars:
+                    ds["hc"] = float(ds.attrs.get("hc"))
+                if sig == "sig_w":
+                    ds[sig].attrs["formula_terms"] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
+                elif sig == "sig_rho":
+                    ds[sig].attrs["formula_terms"] = "s: sig_rho C: cs_rho eta: ssh depth: bathy depth_c: hc"
+                if "standard_name" not in ds[sig].attrs:
+                    logger.warning(f"No standard_name attributes in {sig}")
+                    if sig == "sig_rho":
+                        ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
+                    elif sig == "sig_w":
+                        ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
         ds = ds.decode_sigma()
 
     for v in [
