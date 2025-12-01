@@ -39,7 +39,11 @@ def build_filters_config(mz_param, data_name):
             'minimum': mz_param.get('tbound')[0],
             'maximum': mz_param.get('tbound')[1]
         }
-        
+    if 'thours' in mz_param:
+        filters_config['hours_selection'] = {
+            'minimum': mz_param.get('thours')[0],
+            'maximum': mz_param.get('thours')[1]
+        }
     if 'tide' in mz_param:
         filters_config['tide'] = mz_param.get("tide")
     

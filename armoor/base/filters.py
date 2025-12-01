@@ -7,8 +7,10 @@ import math
 import re
 import sys
 
+import datetime
 from scipy.signal.windows import gaussian
 import dask.array as da
+from typing import Union, Tuple
 import dask
 import numpy as np
 import pandas as pd
@@ -349,6 +351,101 @@ class ArmoorFilters:
         else:
             return (self.ds.time >= start) & (self.ds.time <= end)
 
+    def _get_time_hours_range_mask(
+        self,
+        start: Union[str, int],
+        end: Union[str, int]
+        ) -> xr.Dataset:
+        """
+        Filter an xarray Dataset to retain only data within a specified hourly range for all days.
+        
+        This function selects data from the input dataset where the time of day falls
+        within the specified hour range. This range is applied to every day in the dataset.
+        The function handles ranges that cross midnight (e.g., 23:00 to 04:00).
+        
+        Parameters
+        ----------
+        dataset : xr.Dataset
+            The input xarray Dataset containing a 'time' dimension.
+        start : str or int
+            The start of the hourly range. Can be an integer (0-23) for the hour,
+            or a string in 'HH:MM:SS' format (e.g., '23:00:00' or '23:30:00').
+        end : str or int
+            The end of the hourly range. Can be an integer (0-23) for the hour,
+            or a string in 'HH:MM:SS' format.
+        
+        Returns
+        -------
+        xr.Dataset
+            A new Dataset containing only the data within the specified hourly range
+            for all days in the original dataset.
+        
+        Raises
+        ------
+        ValueError
+            If the dataset does not contain a 'time' dimension.
+        ValueError
+            If hour values are outside the valid range (0-23 for integers).
+        
+        Examples
+        --------
+        >>> import xarray as xr
+        >>> import pandas as pd
+        >>> import numpy as np
+        >>> 
+        >>> # Create a sample dataset with hourly data
+        >>> time = pd.date_range('2020-01-01', periods=72, freq='H')
+        >>> ds = xr.Dataset({'temperature': ('time', np.random.rand(72))},
+        ...                 coords={'time': time})
+        >>> 
+        >>> # Filter to keep only nighttime hours (23:00 to 04:00)
+        >>> filtered = filter_time_hours_range_mask(ds, '23:00:00', '04:00:00')
+        >>> 
+        >>> # Filter to keep only daytime hours (08:00 to 18:00)
+        >>> filtered = filter_time_hours_range_mask(ds, 8, 18)
+        
+        Notes
+        -----
+        - When the hour range crosses midnight (e.g., start_hour > end_hour in terms
+          of clock time), the function correctly handles the wrap-around.
+        - Time comparison is based on hour, minute, and second components.
+        - The comparison is inclusive for start_hour and exclusive for end_hour.
+        """
+        # Check if 'time' dimension exists
+        if 'time' not in self.ds.dims:
+            raise ValueError("Dataset must contain a 'time' dimension")
+        
+        # Convert hour inputs to time strings if they are integers or date.time
+        def parse_hour(hour_input):
+            if isinstance(hour_input, int):
+                if not 0 <= hour_input <= 23:
+                    raise ValueError(f"Hour must be between 0 and 23, got {hour_input}")
+                return pd.Timestamp(f"1900-01-01 {hour_input:02d}:00:00").time()
+            elif isinstance(hour_input, str) or isinstance(hour_input, datetime.time):
+                return pd.Timestamp(f"1900-01-01 {hour_input}").time()
+            else:
+                raise ValueError(f"Hour must be int or string, got {type(hour_input)}")
+        
+        start_time = parse_hour(start)
+        end_time = parse_hour(end)
+        
+        # Extract time of day from the dataset's time coordinate
+        times = pd.DatetimeIndex(self.ds.time.values)
+        time_of_day = times.time
+        
+        # Handle the case where the range crosses midnight
+        if start_time <= end_time:
+            # Normal case: e.g., 08:00 to 18:00
+            mask = (time_of_day >= start_time) & (time_of_day <= end_time)
+        else:
+            # Crosses midnight: e.g., 23:00 to 04:00
+            mask = (time_of_day >= start_time) | (time_of_day <= end_time)
+        
+        mask = xr.DataArray(mask, coords={"time": self.ds.time.values})
+        
+        return mask
+
+
     @staticmethod
     @dask.delayed
     def clean_ds(ds, depth_was_coord):
@@ -435,6 +532,12 @@ class ArmoorFilters:
                 
             elif filter_type == 'time_selection':
                 mask = self._get_time_bounds_mask(
+                    start=config.get('minimum'),
+                    end=config.get('maximum'),
+                )
+                
+            elif filter_type == 'hours_selection':
+                mask = self._get_time_hours_range_mask(
                     start=config.get('minimum'),
                     end=config.get('maximum'),
                 )

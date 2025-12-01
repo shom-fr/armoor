@@ -11,7 +11,7 @@ import dask.config
 import xarray as xr
 
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
-from armoor.base.misc import parse_date, is_dict_empty, parse_coords
+from armoor.base.misc import parse_date, parse_hours, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
@@ -119,6 +119,12 @@ def get_parser_filters_time():
         help="Start and end dates for time selection"
         )
     parser.add_argument(
+        '--hours-range',
+        nargs=2,
+        type=parse_hours,
+        help="Start and end hours for hours selection"
+        )
+    parser.add_argument(
         '--tides',
         type=str,
         choices=("mean", "godin", "demerliac"),
@@ -186,6 +192,16 @@ def main_filters_time():
             'time_selection': {
                 'minimum': date_range[0],
                 'maximum': date_range[1]
+                }
+            })
+
+    # Date range
+    hours_range = args.hours_range
+    if hours_range:
+        filters_config.update({
+            'hours_selection': {
+                'minimum': hours_range[0],
+                'maximum': hours_range[1]
                 }
             })
 

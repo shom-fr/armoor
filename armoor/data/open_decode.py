@@ -174,7 +174,6 @@ def _glob_and_resolve(pattern: str, sort_results: bool = True) -> List[str]:
         raise e
 
 def register_cf():
-    xcf.reset_cache()
     cfg_files = glob.glob(
         os.path.join(ROOTDIR, "data", "cf_*.cfg")
     )

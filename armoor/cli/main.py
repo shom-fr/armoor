@@ -71,6 +71,8 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
                     metazones_cfg[metazone].update({k: v})
     metazones = {}
     for metazone in metazones_arg:
+        if (metazones_cfg[metazone].get("tfreq") != None) & (metazones_cfg[metazone].get("thours") != None):
+            raise ArmoorError(f"`tfreq` and `thours` cannot be configured together in {metazone}")
         for k, v in metazones_cfg[metazone].items():
             if v == None:
                 del metazones_cfg[metazone][k]
