@@ -13,7 +13,8 @@ Multiple metazones can be defined. A metazone is a combination of filters applie
 Hereafter we give some details about the available parameters:
 
 - ``name``: name of the metazone.
-- ``tbound``: [date_min, date_max] used to filter out not needed time.
+- ``tbound``: [date_min, date_max] used to filter out not needed dates.
+- ``thours``: [hour_min, hour_max] used to filter out not needed times.
 - ``tide``: string (demerliac, godin, mean) to apply a tidal filter.
 - ``tfreq``: frequency (1D, 1Y... )to define a series of terms equaly spaced (see pandas offset alias).
 - ``trange_seq``: [1D,reference] list of two strings. The first one define the period of time intervals, the second one, the time axis over which data will be interpolated in time for comparison computing.
@@ -30,6 +31,7 @@ Hereafter we give some details about the available parameters:
 
 Some parameters are not compatible : 
 
+- ``tfreq`` and ``thours``
 - ``trange_seq`` and ``tfreq``
 - ``href`` and ``cloud``
 
