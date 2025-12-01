@@ -1,6 +1,7 @@
 METAZONE_PARAMS = {
     "comp_sst": [
         "tbound",
+        "thours",
         "trange_seq",
         "tfreq",
         "polygon",
@@ -12,6 +13,7 @@ METAZONE_PARAMS = {
         ],
     "comp_argo": [
         "tbound",
+        "thours",
         "trange_seq",
         "vrange",
         "vlevel",
@@ -23,6 +25,7 @@ METAZONE_PARAMS = {
         ],
     "comp_mooring": [
         "tfreq",
+        "thours",
         "tbound",
         "trange_seq",
         "polygon",
@@ -44,6 +47,7 @@ METAZONE_PARAMS = {
     "comp_models": [
         "tfreq",
         "tbound",
+        "thours",
         "trange_seq",
         "polygon",
         "href",

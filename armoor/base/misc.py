@@ -325,6 +325,17 @@ def parse_date(date_string):
     raise ArgumentTypeError(
         f"Invalid date format: {date_string}. Use YYYY-MM-DD, MM/DD/YYYY, or DD-MM-YYYY"
     )
+    
+def parse_hours(hours_string):
+    formats = ['%H:%M:%S', '%H%M%S']
+    for fmt in formats:
+        try:
+            return datetime.strptime(hours_string, fmt).time()
+        except ValueError:
+            continue
+    raise ArgumentTypeError(
+        f"Invalid date format: {hours_string}. Use hh:mm:ss or hhmmss"
+    )
 
 def geo_vars(ds):
 

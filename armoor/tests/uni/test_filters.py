@@ -158,6 +158,22 @@ class TestArmoorFilters:
         assert mask is not None
         assert isinstance(mask, xr.DataArray)
 
+    def test__get_time_hours_range_mask_not_crossing_midnight(self, sample_ds):
+        """Test _get_time_hours_range_mask when not crossing midnight"""
+        af = ArmoorFilters(sample_ds)
+        mask = af._get_time_hours_range_mask('08:00:00', '12:00:00')
+        filtered = sample_ds.where(mask, drop=True)
+        hours = pd.DatetimeIndex(filtered.time.values).hour
+        assert all((hours >= 8) & (hours <= 12))
+    
+    def test__get_time_hours_range_mask_crossing_midnight(self, sample_ds):
+        """Test _get_time_hours_range_mask when not crossing midnight"""
+        af = ArmoorFilters(sample_ds)
+        mask = af._get_time_hours_range_mask('22:00:00', '3:00:00')
+        filtered = sample_ds.where(mask, drop=True)
+        hours = pd.DatetimeIndex(filtered.time.values).hour
+        assert all((hours >= 22) | (hours <= 3))
+
     def test_apply_combined_filters_quality_and_polygon(self, sample_ds):
         """Test apply_combined_filters with quality and polygon filters."""
         filters_config = {
