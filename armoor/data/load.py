@@ -1,6 +1,7 @@
 import gc
 import logging
 import shutil
+import sys
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -166,8 +167,8 @@ def process_single_combination(ds, mz_name, mz_param):
         logger.info(f"Applying combined filters for {combination_id}")
         dsout = ds.armoorfilters.apply_combined_filters(filters_config)
         if dsout is None:
-            logger.warning(f"No data left after filtering for {combination_id}")
-            return None
+            logger.info(f"No data left after filtering for {combination_id}")
+            sys.exit()
     else:
         logger.info(f"No filters to apply for {combination_id}")
     
