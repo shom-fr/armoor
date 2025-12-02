@@ -375,7 +375,8 @@ def open_decode_cmems_model(path_files):
         preprocess=preprocess_cmems_model,
         autoclose=True
         )
-    ds = ds.set_coords("depth")
+    if "depth" in ds:
+        ds = ds.set_coords("depth")
     return ds
 
 def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
