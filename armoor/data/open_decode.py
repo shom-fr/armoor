@@ -328,7 +328,11 @@ def open_decode_cmems_model(path_files):
     def preprocess_cmems_model(ds):
         with xcf.set_cf_specs(cfspecs):
             ds = ds.xoa.decode()
-        ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
+        if "bathy" in ds.data_vars:
+            ds = ds[["bathy"]]
+        ds = ds.swap_dims({"lon": "x", "lat": "y"})
+        if "depth" in ds.dims:
+            ds = ds.swap_dims({"depth": "z"})
         if len(ds.lon.dims) == 1:
             lat, lon = xr.broadcast(ds["lat"], ds["lon"])
             ds = ds.drop_vars(["lon", "lat"])
