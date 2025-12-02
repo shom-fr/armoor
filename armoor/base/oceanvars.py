@@ -2,6 +2,7 @@ import logging
 
 import gsw
 import xarray as xr
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +32,45 @@ class OceanVars:
         elif varname == "pdens":
             return self.ds.oceanvars.sel_pdens()
         elif varname == "u":
-            return self.ds.oceanvars.sel_zonal_velocity()
+            return self.ds.oceanvars.sel_current_zonal()
         elif varname == "v":
-            return self.ds.oceanvars.sel_meridional_velocity()
+            return self.ds.oceanvars.sel_current_meridional()
+        elif varname == "cdir":
+            return self.ds.oceanvars.sel_current_direction()
+        elif varname == "cspeed":
+            return self.ds.oceanvars.sel_current_speed()
     
-    def sel_zonal_velocity(self):
+    def sel_current_direction(self):
+        if "cdir" in self.ds:
+            return self.ds["cdir"]
+        elif set(("u", "v")).issubset(self.ds.data_vars):
+            return np.arctan2(self.ds.v, self.ds.u)
+        else:
+            logger.warning("cdir cannot be infered or computed")
+            
+    def sel_current_speed(self):
+        if "cspeed" in self.ds:
+            return self.ds["cspeed"]
+        elif set(("u", "v")).issubset(self.ds.data_vars):
+            return (self.ds.u ** 2 + self.ds.v ** 2) ** 0.5
+        else:
+            logger.warning("cspeed cannot be infered or computed")        
+            
+    def sel_current_zonal(self):
         if "u" in self.ds:
             return self.ds["u"]
+        elif set(("cdir", "cspeed")).issubset(self.ds.data_vars):
+            return self.ds.cspeed * np.cos(self.ds.cdir * np.pi / 180.0)
+        else:
+            logger.warning("u cannot be infered or computed")
     
-    def sel_meridional_velocity(self):
+    def sel_current_meridional(self):
         if "v" in self.ds:
             return self.ds["v"]
+        elif set(("cdir", "cspeed")).issubset(self.ds.data_vars):
+            return self.ds.cspeed * np.sin(self.ds.cdir * np.pi / 180.0)
+        else:
+            logger.warning("v cannot be infered or computed")
     
     def sel_ptemp(self):
         if "ptemp" in self.ds:
