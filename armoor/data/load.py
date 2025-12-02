@@ -298,7 +298,7 @@ def load_datasets(data_cfg, metazones, dirout):
             )
         if not isinstance(dss, list):
             dss = [dss]
-            
+        logger.debug(dss)
         logger.info("Add attributes and save in temporary zarr file")
         ztmp = "tmp_{ids}.zarr"
         zfiles = []

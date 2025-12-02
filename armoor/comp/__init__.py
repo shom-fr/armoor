@@ -239,7 +239,7 @@ OUTPUTS_PARAMS = {
 COMP_VARS = {
     "comp_sst": ["ptemp"],
     "comp_argo": ["ptemp", "sal", "pdens", "temp", "sndspeed"],
-    "comp_mooring": ["ptemp", "sal", "pdens", "temp", "sndspeed"],
+    "comp_mooring": ["ptemp", "sal", "pdens", "temp", "sndspeed", "cdir", "cspeed"],
     "comp_drifter": ["ptemp", "sal", "u", "v"],
     "comp_models": ["ptemp", "sal", "pdens", "sndspeed"]
     }
