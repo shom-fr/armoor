@@ -424,7 +424,8 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
     sorted_paths = sorted(map(str, path_files))
 
     logger.info(f"Using {len(sorted_paths)} files.")
-
+    logger.debug(f"sorted_paths : {sorted_paths}")
+    
     ds = xr.open_mfdataset(
         sorted_paths,
         combine="by_coords",
