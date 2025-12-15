@@ -44,7 +44,7 @@ def test():
         assert False
     else:
         try:
-            workflow.run(update=True)
+            workflow.run()
         finally:  
             isend = False
             while isend == False:
