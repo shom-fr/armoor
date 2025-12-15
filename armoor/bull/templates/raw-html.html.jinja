@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <title>{{report.title}}</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 1cm;
+        }
+
+        ul {
+            list-style-type: none;
+        }
+
+        img.property-image {
+            max-height: 22cm;
+        }
+
+        .output-img {
+            text-align: center;
+        }
+
+        .no-margin {
+            margin: 0;
+        }
+
+        .small-margin-bottom {
+            margin-bottom: 0.5rem;
+        }
+
+        header>* {
+            padding: 0.5cm;
+            height: 2.5cm;
+        }
+
+        header {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+        }
+
+        .index header .title {
+            width: 600px;
+        }
+
+        header .metazone-img {
+            right: 0;
+            width: 180px;
+        }
+
+        header img {
+            height: 100%;
+        }
+
+        h2,
+        h3,
+        h5 {
+            color: #002554;
+            position: relative;
+        }
+
+        .underline::after {
+            content: "";
+            background: #5bc2e7;
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+        }
+
+        h1.underline::after {
+            height: 10px;
+            width: 100px;
+        }
+
+        h2.underline::after {
+            height: 8px;
+            width: 80px;
+        }
+
+        h3.underline::after,
+        li.underline::after {
+            height: 5px;
+            width: 50px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">
+            <img src="sources/logo_shom.png">
+        </div>
+
+        <div class="title">
+            <h2 class="underline">
+                {{report.title}} - {{report.date}}
+            </h2>
+            <h3>
+                Index
+            </h3>
+        </div>
+    </header>
+
+    <div class="body">
+        <!-- Index -->
+        <h2 class="underline">
+            Liste des méta-zones
+        </h2>
+        <ul>
+            {% for metazone in report.metazones %}
+            <li>
+                <h4 class="small-margin-bottom">{{metazone.properties.name}}</h4>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <h2 class="underline">
+            Metazones
+        </h2>
+        {% for metazone in report.metazones %}
+        <h3>
+            {{metazone.properties.name}}
+        </h3>
+        <ul>
+            {% for functionality in metazone.functionalities %}
+            <li>
+                <h5 class="no-margin">{{functionalities_desc[functionality.functionality]}}</h5>
+                <ul>
+                    {% for output in functionality.outputs %}
+                    <li>
+                        {{sub_functionalities_desc[output.plot]}}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endfor %}
+
+        {% for metazone in report.metazones %}
+        <h3 class="underline">
+            {{metazone.properties.name}}
+        </h3>
+        <h4>
+            {{metazone.properties.description}}
+        </h4>
+        <div>
+            {% for property in metazone.properties %}
+            {% if property != 'name' and property != 'description' and property != 'path' %}
+
+            <b>{{meta_zone_desc[property]}}</b> {{metazone.properties[property]}}<br>
+
+            {% endif %}
+            {% endfor %}
+            {% if 'path' in metazone.properties %}
+            <img src="sources/{{metazone.properties.path}}" class="property-image">
+            {% endif %}
+        </div>
+
+        {% endfor %}
+
+        <!-- Metazones -->
+        {% for metazone in report.metazones %}
+        <!-- Properties -->
+        {% for property in metazone.properties %}
+        {% if property not in ['description', 'path', 'name'] %}
+        <b>{{meta_zone_desc[property]}}</b> {{property}}<br>
+        {% endif %}
+        {% endfor %}
+        {% if 'path' in metazone.properties %}
+        <img src="sources/{{metazone.properties.path}}" class="property-image">
+        {% endif %}
+
+        <!-- Functionalities -->
+        {% for functionality in metazone.functionalities %}
+        <h5 class="no-margin">{{functionalities_desc[functionality.functionality]}}</h5>
+        {% for output in functionality.outputs %}
+        {{sub_functionalities_desc[output.plot]}}
+        {% for file in output.files %}
+        <div class="output-img">
+            <img src="sources/{{functionality.output_path + '/' + output.folder_name + '/' + file}}" class="property-image">
+        </div>
+        {% endfor %}
+        {% endfor %}
+        {% endfor %}
+        {% endfor %}
+
+    </div>
+
+</body>
+
+</html>

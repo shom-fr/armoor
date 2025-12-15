@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <title>{{report.title}}</title>
+    <style>
+        @page {
+            margin: 0;
+            padding-top: 3.5cm;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        div.break {
+            break-before: always;
+        }
+
+        ul {
+            list-style-type: none;
+        }
+
+        img.property-image {
+            max-height: 22cm;
+            max-width: 19cm;
+        }
+
+        .output-img {
+            text-align: center;
+        }
+
+        .no-margin {
+            margin: 0;
+        }
+
+        .small-margin-bottom {
+            margin-bottom: 0.5rem;
+        }
+
+        header>* {
+            position: fixed;
+            padding: 0.5cm;
+            top: -3.5cm;
+            height: 2.5cm;
+        }
+
+        header .logo {
+            left: 0;
+            width: 130px;
+        }
+
+        header .title {
+            margin: auto;
+            left: 150px;
+            width: 380px;
+        }
+
+        .index header .title {
+            width: 600px;
+        }
+
+        header .metazone-img {
+            right: 0;
+            width: 180px;
+        }
+
+        .body {
+            padding: 1cm;
+            box-decoration-break: clone
+        }
+
+        header img {
+            height: 100%;
+        }
+
+        h2,
+        h3,
+        h4,
+        h5 {
+            color: #002554;
+            position: relative;
+        }
+
+        h6 {
+            color: #002554;
+            position: relative;
+        }
+
+        .underline::after {
+            content: "";
+            background: #5bc2e7;
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+        }
+
+        h1.underline::after {
+            height: 10px;
+            width: 100px;
+        }
+
+        h2.underline::after {
+            height: 8px;
+            width: 80px;
+        }
+
+        h3.underline::after,
+        li.underline::after {
+            height: 5px;
+            width: 50px;
+        }
+
+        h4.underline::after,
+        li.underline::after {
+            height: 5px;
+            width: 50px;
+        }
+        .special-paragraph {
+          font-size: 24px;
+          font-weight: bold;
+          color: #002554;
+          position: relative;
+        }
+
+        .special-paragraph::after {
+          content: ''; /* Required for pseudo-element content */
+          display: block; /* Ensures the pseudo-element behaves as a block element */
+          height: 8px;
+          width: 80px;
+          background-color: #5bc2e7; /* Just for demonstration */
+          position: absolute; /* Position the pseudo-element */
+          bottom: -10px; /* Adjust as needed to position the pseudo-element */
+          left: 0; /* Adjust as needed to position the pseudo-element */
+        }
+        .hidden-title {
+          position: absolute;
+          left: -9999px;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+        }
+    </style>
+</head>
+
+    {% for functionality in metazone.functionalities %}
+    <body>
+
+        <div class='break'>
+            <header>
+                <div class="logo">
+                    <img src="logo_shom.png">
+                </div>
+
+                <div class="title">
+
+                    <p class="special-paragraph">
+                        {{metazone.properties.name}}</p>
+                    <p style="color: #002554; font-size: 16px; font-weight: bold; margin-bottom: 15px;">
+                        {{functionalities_desc[functionality.functionality]}}
+                    </p>
+                </div>
+
+                <div class="metazone-img">
+                    <img src="{{metazone.properties.path}}" class="meta-zone-header-image">
+                </div>
+
+            </header>
+
+            <div class="body">
+                <h4 class="hidden-title">{{functionalities_desc[functionality.functionality]}}</h4>
+                {% for output in functionality.outputs %}
+                    <h5 class="hidden-title">{{sub_functionalities_desc[output.plot]}}</h5>
+                    {% if loop.index != 1 %}
+                        <div style="break-before: always;">
+                    {% else %}
+                        <div>
+                    {% endif %}
+                        {% for file in output.files %}
+                        <h6 class="hidden-title">{{file.replace(".png", "").replace("_", " ")}}</h6>
+                        <div class="output-img">
+                            <img src="{{functionality.output_path + '/' + output.folder_name + '/' + file}}" class="property-image">
+                        </div>
+                        {% endfor %}
+                        <br>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+    </body>
+    {% endfor %}
+</html>
