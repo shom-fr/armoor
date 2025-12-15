@@ -1,8 +1,10 @@
 __pycache__/
 *.pyc
-/docs/build/
-/docs/_build/
+/doc/_api/
+/doc/build/
+/doc/_build/
 build/
 .eggs/
 armoor.egg-info/
 dist
+
