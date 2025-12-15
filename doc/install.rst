@@ -1,0 +1,74 @@
+.. _install:
+
+How to install
+==============
+
+.. highlight:: bash
+
+Dependencies
+------------
+
+armoor requires ``python>3.11`` and depends on the following packages:
+
+.. list-table::
+   :widths: 10 90
+
+   * - `platformdirs <https://github.com/tox-dev/platformdirs>`_
+     - A small Python module for determining appropriate platform-specific dirs, e.g. a "user data dir".
+   * - `cmocean <https://matplotlib.org/cmocean>`_
+     - Beautiful colormaps for oceanography.
+   * - `configobj <https://configobj.readthedocs.io/en/latest/configobj.html>`_
+     - ConfigObj is a simple but powerful config file reader and writer:
+       an ini file round-tripper.
+   * - `gsw <https://teos-10.github.io/GSW-Python/>`_
+     - gsw is the python implementation of the Thermodynamic Equation of
+       Seawater 2010 (TEOS-10).
+   * - `matplotlib <https://matplotlib.org/>`_
+     - Matplotlib is a comprehensive library for creating static, animated,
+       and interactive visualisations in Python.
+   * - `numba <https://numba.pydata.org/>`_
+     - A high performance python compiler.
+   * - `pandas <https://pandas.pydata.org/>`_
+     - pandas is a fast, powerful, flexible and easy-to-use open source
+       data analysis and manipulation tool, built on top of the
+       Python programming language.
+   * - `scipy <https://www.scipy.org/scipylib/index.html>`_
+     - Scipy provides many user-friendly and efficient numerical routines,
+       such as routines for numerical integration, interpolation,
+       optimization, linear algebra, and statistics.
+   * - `xarray <http://xarray.pydata.org/en/stable/>`_
+     - xarray is an open source project and Python package that makes working
+       with labelled multi-dimensional arrays simple, efficient, and fun!
+   * - `xesmf <https://xesmf.readthedocs.io/en/stable/>`_
+     - xESMF is a Python package for regridding.
+
+
+A complete list of dependencies is given in ``requirements.txt``:
+
+    .. literalinclude:: ../requirements.txt
+           :language: text
+
+From sources
+------------
+
+Clone the repository::
+
+    $ git clone https://gitlab.com/GitShom/STM/armoor.git
+
+Run the installation command::
+
+    $ cd armoor
+    $ mamba install -n base -c conda-forge -y --file requirements.txt
+    $ pip install .
+
+Alternatively, use ``environment.yml``::
+
+    $ cd armoor
+    $ mamba env create -f environment.yml
+
+Then, run tests::
+
+    $ export PYTHONPATH=$PWD
+    $ cd armoor/tests/uni
+    $ pytest
+

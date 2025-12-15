@@ -1,10 +1,9 @@
-name: armoor_env
+name: armoor-env
 channels:
   - conda-forge
 dependencies:
   - appdirs
   - bottleneck
-  - build
   - cartopy
   - cfgrib
   - cftime
@@ -14,44 +13,41 @@ dependencies:
   - dask
   - esmf=8.7.0
   - esmpy=8.7.0
-  - fastapi=0.104.1
   - geojson
   - gitpython
   - gsw
   - h5netcdf
   - ipython
-  - jinja2=3.1.2
-  - ldap3=2.9.1
   - matplotlib
   - nbsphinx
   - numba
   - numbagg
-  - opendrift
+  - parcels
   - pip
-  - pycryptodome=3.19.0
-  - pydantic=2.4.2
-  - pylint
-  - PyPDF2=2.11.1
-  - pytest
+  #- pytest
   - python=3.11
-  - python-gitlab=3.15.0
-  - pytz
-  - requests
   - scipy
+  - seaborn
   - setuptools
-  - sphinx
-  - sphinx-argparse
-  - sphinx_rtd_theme
-  - sphinxcontrib-applehelp
-  - sphinxcontrib-devhelp
-  - sphinxcontrib-htmlhelp
-  - sphinxcontrib-jsmath
-  - sphinxcontrib-programoutput
-  - sphinxcontrib-qthelp
-  - sphinxcontrib-serializinghtml
-  - uvicorn=0.23.2
-  - weasyprint=60.1
+  # - sphinx=7.4.7
+  # - sphinx-argparse
+  # - sphinx-book-theme
+  # - sphinx-gallery
+  # - sphinx_rtd_theme
+  # - sphinxcontrib-applehelp 
+  # - sphinxcontrib-autoprogram
+  # - sphinxcontrib-devhelp
+  # - sphinx-design
+  # - sphinxcontrib-htmlhelp
+  # - sphinxcontrib-jquery
+  # - sphinxcontrib-jsmath
+  # - sphinxcontrib-programoutput
+  # - sphinxcontrib-qthelp
+  # - sphinxcontrib-serializinghtml
+  - sqlite=3.47.0
   - xarray=2025.1.1
   - xesmf=0.8.8
+  - xoa
+  - zarr=2.18.7
   - pip:
-    - git+https://github.com/shom-fr/xoa.git@develop
+    - .
