@@ -483,7 +483,7 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
         Name for the reference dataset file.
     prod_name: str
         Name for the product dataset file.
-    
+
     Returns
     -------
     tuple
@@ -495,66 +495,381 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
         ncname += f"_{attrs['time']}"
     elif "trange" in attrs:
         ncname += f"_{attrs['trange']}"
-    else:
-        pass
-    
+
     if "vlevel" in attrs:
         ncname += f"_{attrs['vlevel']}"
     elif "vrange" in attrs:
         ncname += f"_{attrs['vrange']}"
-    else:
-        pass
-    
+
     ncout_ref = dirout / f"ref{ncname}.zarr"
     ncout_prod = dirout / f"prod{ncname}.zarr"
-   
+
     logger.info(f"Save {ncout_ref}")
     if "mask" in dsref.data_vars:
         dsref = dsref.drop_vars("mask")
-    # encoding = create_fast_encoding(dsref)
     dsref = dsref.chunk("auto")
     encoding = get_zarr_encoding(dsref)
-    # dsref.to_netcdf(
-    #     ncout_ref,
-    #     encoding=encoding,
-    #     format='NETCDF4',
-    #     engine='netcdf4',
-    #     compute=True  # Forcer le compute immédiat
-    #     )
-    dsref.to_zarr(
-        store=ncout_ref,
-        mode="w",
-        encoding=encoding,
-        #safe_chunks=False
-        # format='NETCDF4',
-        # engine='netcdf4',
-        #compute=True  # Forcer le compute immédiat
-        )
+    dsref.to_zarr(store=ncout_ref, mode="w", encoding=encoding)
     dsref.close()
+
     logger.info(f"Save {ncout_prod}")
     if "mask" in dsprod.data_vars:
         dsprod = dsprod.drop_vars("mask")
-    # encoding = create_fast_encoding(dsprod)
     dsprod = dsprod.chunk("auto")
     encoding = get_zarr_encoding(dsprod)
-    # dsprod.to_netcdf(
-    #     ncout_prod,
-    #     encoding=encoding,
-    #     format='NETCDF4',
-    #     engine='netcdf4',
-    #     compute=True  # Forcer le compute immédiat
-    #     )
-    dsprod.to_zarr(
-        store=ncout_prod,
-        mode="w",
-        encoding=encoding,
-        #safe_chunks=False
-        # format='NETCDF4',
-        # engine='netcdf4',
-        #compute=True  # Forcer le compute immédiat
-        )
+    dsprod.to_zarr(store=ncout_prod, mode="w", encoding=encoding)
     dsprod.close()
+
     return ncout_ref, ncout_prod
+
+
+def _prepare_dataset(ds, comp_func, is_reference=False):
+    """Prepare a dataset for colocation.
+
+    Parameters
+    ----------
+    ds: xr.Dataset
+        Dataset to prepare.
+    comp_func: str
+        Comparison function identifier.
+    is_reference: bool
+        Whether this is a reference dataset.
+
+    Returns
+    -------
+    xr.Dataset
+        Prepared dataset.
+    """
+    ds = optimize_for_low_swap(ds, target_chunk_mb=512)
+
+    if "depth" in ds.data_vars:
+        ds = ds.set_coords("depth")
+
+    for var in COMP_VARS[comp_func]:
+        da = ds.oceanvars.sel(var)
+        if isinstance(da, xr.DataArray):
+            ds[var] = da
+
+    vars_to_keep = set(COMP_VARS[comp_func])
+    if is_reference:
+        vars_to_keep.add("mask")
+
+    for var in list(ds.data_vars):
+        if var not in vars_to_keep:
+            ds = ds.drop_vars(var)
+
+    if "depth" in ds.coords and "time" in ds.depth.dims:
+        ds = ds.reset_coords("depth")
+
+    return ds
+
+
+def _apply_colocations(dsref, dsprod, params, tbound):
+    """Apply time, horizontal, and vertical colocations.
+
+    Parameters
+    ----------
+    dsref: xr.Dataset
+        Reference dataset.
+    dsprod: xr.Dataset
+        Product dataset.
+    params: dict
+        Colocation parameters.
+    tbound: tuple
+        Time bounds.
+
+    Returns
+    -------
+    tuple
+        Colocated (dsref, dsprod).
+    """
+    if params.get("time"):
+        dsref, dsprod = process_time_colocation(
+            dsref, dsprod, params["time"], tbound
+        )
+        gc.collect()
+
+    if params.get("horizontal"):
+        dsref, dsprod = process_horizontal_colocation(
+            dsref, dsprod, params["horizontal"]
+        )
+        gc.collect()
+
+    if params.get("vertical"):
+        dsref, dsprod = process_vertical_colocation(
+            dsref, dsprod, params["vertical"]
+        )
+        gc.collect()
+
+    return dsref, dsprod
+
+
+def _apply_time_ranges(dsref, dsprod, params, tbound):
+    """Apply time ranging to datasets.
+
+    Parameters
+    ----------
+    dsref: xr.Dataset
+        Reference dataset.
+    dsprod: xr.Dataset
+        Product dataset.
+    params: dict
+        Colocation parameters containing time settings.
+    tbound: tuple
+        Time bounds.
+
+    Returns
+    -------
+    tuple
+        Lists of (dsref_list, dsprod_list) after ranging.
+    """
+    time_coloc = params.get("time")
+
+    if time_coloc is None:
+        return [dsref], [dsprod]
+
+    if "tfreq" in time_coloc[0]:
+        return ranges.tfreq(dsref), ranges.tfreq(dsprod)
+
+    if "trange_seq" in time_coloc[0]:
+        if time_coloc[1][0] != "*":
+            return (
+                ranges.trange_seq(dsref, *tbound, time_coloc[1][0]),
+                ranges.trange_seq(dsprod, *tbound, time_coloc[1][0])
+            )
+
+    return [dsref], [dsprod]
+
+
+def _apply_vertical_ranges(dsref_list, dsprod_list, params, comp_func):
+    """Apply vertical ranging to dataset lists.
+
+    Parameters
+    ----------
+    dsref_list: list
+        List of reference datasets.
+    dsprod_list: list
+        List of product datasets.
+    params: dict
+        Colocation parameters containing vertical settings.
+    comp_func: str
+        Comparison function identifier.
+
+    Returns
+    -------
+    tuple
+        Lists of (dsref_list, dsprod_list) after vertical ranging.
+    """
+    vertical_coloc = params.get("vertical")
+
+    if vertical_coloc is None:
+        return dsref_list, dsprod_list
+
+    if "vlevel" in vertical_coloc[0] or comp_func in ("comp_mooring", "comp_drifter"):
+        if comp_func in ("comp_mooring", "comp_drifter"):
+            vname = "depth"
+        else:
+            vname = vertical_coloc[1][0]
+
+        if comp_func != "comp_sst":
+            return (
+                ranges.vlevels(dsref_list, vname),
+                ranges.vlevels(dsprod_list, vname)
+            )
+
+    elif "vrange" in vertical_coloc[0]:
+        vname = vertical_coloc[1][1]
+        vbins = vertical_coloc[1][2]
+        return (
+            ranges.vrange(dsref_list, vname, vbins),
+            ranges.vrange(dsprod_list, vname, vbins)
+        )
+
+    return dsref_list, dsprod_list
+
+
+def _save_colocation_results(dssref, dssprod, comp_func, metazone, ncouts, ref_name, prod_name):
+    """Save colocation results to files.
+
+    Parameters
+    ----------
+    dssref: list
+        List of reference datasets.
+    dssprod: list
+        List of product datasets.
+    comp_func: str
+        Comparison function identifier.
+    metazone: str
+        Metazone name.
+    ncouts: dict
+        Dictionary to store output paths.
+    ref_name: str
+        Reference dataset name.
+    prod_name: str
+        Product dataset name.
+    """
+    logger.info("Save coloc data in zarr")
+
+    for ids in range(len(dssref)):
+        dsref = dssref[ids]
+        dsprod = dssprod[ids]
+
+        dirout = Path(
+            f"{comp_func}/coloc/{metazone}/"
+            f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
+        )
+        dirout.mkdir(parents=True, exist_ok=True)
+
+        ncout_ref, ncout_prod = save_datasets(
+            dsref, dsprod, dirout,
+            dsref.attrs['data_name'],
+            dsprod.attrs['data_name']
+        )
+
+        ncouts[metazone][ref_name][prod_name].append(ncout_ref)
+        ncouts[metazone][ref_name][prod_name].append(ncout_prod)
+
+        dsref.close()
+        dsprod.close()
+
+
+def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone, ncouts):
+    """Process colocation for a single product against a reference.
+
+    Parameters
+    ----------
+    dsrefin: xr.Dataset
+        Reference dataset (already prepared).
+    ncin: Path
+        Path to product file.
+    params: dict
+        Colocation parameters.
+    tbound: tuple
+        Time bounds.
+    comp_func: str
+        Comparison function identifier.
+    metazone: str
+        Metazone name.
+    ncouts: dict
+        Dictionary to store output paths.
+    """
+    logger.info(f"-- Process {ncin}")
+
+    dsprodin = xr.open_dataset(ncin)
+    if "depth" in dsprodin and "depth" not in dsprodin.coords:
+        dsprodin = dsprodin.set_coords("depth")
+    dsprodin = _prepare_dataset(dsprodin, comp_func, is_reference=False)
+    logger.info(dsprodin.sizes)
+
+    dsref = dsrefin.copy()
+    dsprod = dsprodin.copy()
+    gattrs_ref = dsref.attrs
+    gattrs_prod = dsprod.attrs
+
+    prod_name = dsprodin.attrs['data_name']
+    ref_name = dsrefin.attrs['data_name']
+
+    # Initialize output structure
+    if ref_name not in ncouts[metazone]:
+        ncouts[metazone][ref_name] = {}
+    if prod_name not in ncouts[metazone][ref_name]:
+        ncouts[metazone][ref_name][prod_name] = []
+
+    # Apply colocations
+    dsref, dsprod = _apply_colocations(dsref, dsprod, params, tbound)
+
+    # Set depth as coordinate if needed
+    if "depth" in dsref.data_vars:
+        dsref = dsref.set_coords("depth")
+    if "depth" in dsprod.data_vars:
+        dsprod = dsprod.set_coords("depth")
+
+    dsref = dsref.assign_attrs(gattrs_ref)
+    dsprod = dsprod.assign_attrs(gattrs_prod)
+
+    # Compute
+    logger.info("Compute coloc ref")
+    dsref = dsref.compute()
+    logger.info("Compute coloc prod")
+    dsprod = dsprod.compute()
+
+    # Apply ranges
+    dssref, dssprod = _apply_time_ranges(dsref, dsprod, params, tbound)
+    dssref, dssprod = _apply_vertical_ranges(dssref, dssprod, params, comp_func)
+
+    # Save results
+    _save_colocation_results(
+        dssref, dssprod, comp_func, metazone, ncouts, ref_name, prod_name
+    )
+
+
+def _process_reference(ncref, ncs, params, tbound, comp_func, metazone, ncouts):
+    """Process all products for a single reference.
+
+    Parameters
+    ----------
+    ncref: Path
+        Path to reference file.
+    ncs: list
+        List of all NetCDF file paths.
+    params: dict
+        Colocation parameters.
+    tbound: tuple
+        Time bounds.
+    comp_func: str
+        Comparison function identifier.
+    metazone: str
+        Metazone name.
+    ncouts: dict
+        Dictionary to store output paths.
+    """
+    logger.info(f"Use reference {ncref}")
+
+    dsrefin = xr.open_dataset(ncref, engine="zarr")
+    dsrefin = _prepare_dataset(dsrefin, comp_func, is_reference=True)
+
+    ncins = [nc for nc in ncs if metazone in str(nc) and "ref" not in str(nc)]
+
+    for ncin in ncins:
+        _process_single_product(
+            dsrefin, ncin, params, tbound, comp_func, metazone, ncouts
+        )
+
+    dsrefin.close()
+    gc.collect()
+
+
+def _process_metazone(metazone, params, ncs, metazones, comp_func, ncouts):
+    """Process colocation for a single metazone.
+
+    Parameters
+    ----------
+    metazone: str
+        Metazone name.
+    params: dict
+        Colocation parameters for this metazone.
+    ncs: list
+        List of all NetCDF file paths.
+    metazones: dict
+        Dictionary containing all metazone information.
+    comp_func: str
+        Comparison function identifier.
+    ncouts: dict
+        Dictionary to store output paths.
+    """
+    logger.info(f"Start colocation for {metazone}.")
+    logger.info(f"Colocation parameters are: {params}")
+
+    tbound = metazones[metazone].get("tbound")
+    ncouts[metazone] = {}
+
+    ncrefs = [nc for nc in ncs if (metazone in str(nc)) and ("ref" in str(nc))]
+
+    for ncref in ncrefs:
+        _process_reference(ncref, ncs, params, tbound, comp_func, metazone, ncouts)
+
+    logger.info(f"End colocation for {metazone}.")
+
 
 def main_coloc(ncs, metazones, comp_func):
     """Colocate reference and products.
@@ -567,183 +882,24 @@ def main_coloc(ncs, metazones, comp_func):
         Dictionary containing metazone information.
     comp_func: str
         Comparison function identifier.
-    
+
     Returns
     -------
+    dict
         Dict of paths to the saved reference and product NetCDF files.
     """
-    
     coloc_check = validate_and_get_params(metazones, comp_func)
+
+    # Filter valid metazones
     coloc_params = {}
     for metazone, params in coloc_check.items():
         if not params:
             logger.info(f"Skip {metazone}: colocation is not possible for this functionnality.")
         else:
             coloc_params[metazone] = params
+
     ncouts = {}
     for metazone, params in coloc_params.items():
-        logger.info(f"Start colocation for {metazone}.")
-        logger.info(f"Colocation parameters are: {params}")
-        tbound = metazones[metazone].get("tbound")
-        ncrefs = [
-            nc for nc in ncs if (metazone in str(nc)) & ("ref" in str(nc))
-            ]
-        for ncref in ncrefs:
-            logger.info(f"Use reference {ncref}")
-            dsrefin = xr.open_dataset(ncref, engine="zarr")#, engine="h5netcdf")
-            dsrefin = optimize_for_low_swap(dsrefin, target_chunk_mb=512)
-            if "depth" in dsrefin.data_vars:
-                dsrefin = dsrefin.set_coords("depth")
-            for var in COMP_VARS[comp_func]:
-                da = dsrefin.oceanvars.sel(var)
-                if isinstance(da, xr.DataArray):
-                    dsrefin[var] = da
-            for var in dsrefin.data_vars:
-                if (
-                    var not in COMP_VARS[comp_func]
-                    ) and (
-                    var != "mask"
-                    ):
-                    dsrefin = dsrefin.drop_vars(var)
-            if (
-                "depth" in dsrefin.coords
-            ) and (
-                "time" in dsrefin.depth.dims
-            ):
-                dsrefin = dsrefin.reset_coords("depth")
-            ncins = [
-                nc for nc in ncs if metazone in str(nc) and "ref" not in str(nc)
-                ]
-            for ncin in ncins:
-                logger.info(f"-- Process {ncin}")
-                dsprodin = xr.open_dataset(ncin)
-                if "depth" in dsprodin:
-                    if "depth" not in dsprodin.coords:
-                        dsprodin = dsprodin.set_coords("depth")
-                dsprodin = optimize_for_low_swap(dsprodin, target_chunk_mb=512)
-                logger.info(dsprodin.sizes)
-                for var in COMP_VARS[comp_func]:
-                    dsprodin[var] = dsprodin.oceanvars.sel(var)
-                for var in dsprodin.data_vars:
-                    if var not in COMP_VARS[comp_func]:
-                        dsprodin = dsprodin.drop_vars(var)
-                if (
-                    "depth" in dsprodin.coords
-                    ) and (
-                    "time" in dsprodin.depth.dims
-                    ):
-                    dsprodin = dsprodin.reset_coords("depth")
-                dsref = dsrefin.copy()
-                dsprod = dsprodin.copy()
-                gattrs_ref = dsref.attrs
-                gattrs_prod = dsprod.attrs
-                prod_name = dsprodin.attrs['data_name']
-                ref_name = dsrefin.attrs['data_name']
-                if not ncouts.get(metazone):
-                    ncouts[metazone] = {}
-                if not ncouts[metazone].get(ref_name):
-                    ncouts[metazone][ref_name] = {}
-                if not ncouts[metazone][ref_name].get(prod_name):
-                    ncouts[metazone][ref_name].update({prod_name: []})
-                if params.get("time"):
-                    dsref, dsprod = process_time_colocation(
-                        dsref,
-                        dsprod,
-                        params.get("time"),
-                        tbound
-                        )
-                    gc.collect()
-                if params.get("horizontal"):
-                    dsref, dsprod = process_horizontal_colocation(
-                        dsref,
-                        dsprod,
-                        params.get("horizontal"),
-                        )
-                    gc.collect()
-                if params.get("vertical"):
-                    dsref, dsprod = process_vertical_colocation(
-                        dsref,
-                        dsprod,
-                        params.get("vertical"),
-                        )
-                    gc.collect()
-                if "depth" in dsref.data_vars:
-                    dsref = dsref.set_coords("depth")
-                if "depth" in dsprod.data_vars:
-                    dsprod = dsprod.set_coords("depth")
-                dsref = dsref.assign_attrs(gattrs_ref)
-                dsprod = dsprod.assign_attrs(gattrs_prod)
-                # with setup_dask_client():
-                logger.info("Compute coloc ref")
-                dsref = dsref.compute()
-                logger.info("Compute coloc prod")
-                dsprod = dsprod.compute()
-                time_coloc = params.get("time")
-                if time_coloc != None:
-                    if  "tfreq" in params.get("time")[0]:
-                        dsref = ranges.tfreq(dsref)
-                        dsprod = ranges.tfreq(dsprod)
-                    elif "trange_seq" in params.get("time")[0]:
-                        if params.get("time")[1][0] != "*":
-                            dsref = ranges.trange_seq(dsref, *tbound, params.get("time")[1][0])
-                            dsprod = ranges.trange_seq(dsprod, *tbound, params.get("time")[1][0])
-                        else:
-                            dsref = [dsref]
-                            dsprod = [dsprod]
-                else:
-                    dsref = [dsref]
-                    dsprod = [dsprod]
-    
-                vertical_coloc = params.get("vertical")
-                if vertical_coloc != None:
-                    if (
-                        "vlevel" in params.get("vertical")[0]
-                        ) or (
-                        comp_func in ("comp_mooring", "comp_drifter")    
-                        ):
-                        if comp_func in ("comp_mooring", "comp_drifter"):
-                            vname = "depth"
-                        else:
-                            vname  = params.get("vertical")[1][0]
-                        if comp_func != "comp_sst":
-                            dsref = ranges.vlevels(dsref, vname)
-                            dsprod = ranges.vlevels(dsprod, vname)
-                    elif "vrange" in params.get("vertical")[0]:
-                        vname = params.get("vertical")[1][1]
-                        vbins = params.get("vertical")[1][2]
-                        dsref = ranges.vrange(dsref, vname, vbins)
-                        dsprod = ranges.vrange(dsprod, vname, vbins)
-                dssref = dsref
-                dssprod = dsprod
-                del dsref; del dsprod
-                # with setup_dask_client():
-                logger.info("Save coloc data in netcdf")
-                for ids in range(len(dssref)):
-                    dsref = dssref[ids]
-                    dsprod = dssprod[ids]
-                    dirout = Path(
-                        f"{comp_func}/coloc/{metazone}/"
-                        f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
-                        )
-                    dirout.mkdir(parents=True, exist_ok=True)
-                    ncout_ref, ncout_prod = save_datasets(
-                        dsref,
-                        dsprod,
-                        dirout,
-                        dsref.attrs['data_name'],
-                        dsprod.attrs['data_name']
-                        )
-                    ncouts[metazone][ref_name][prod_name].append(ncout_ref)
-                    ncouts[metazone][ref_name][prod_name].append(ncout_prod)
-                    dsref.close()
-                    dsprod.close()
-                    del dsref
-                    del dsprod
-                del dssref
-                del dssprod
-    
-            dsrefin.close()
-            del dsrefin
-            gc.collect()
-        logger.info(f"End colocation for {metazone}.")
+        _process_metazone(metazone, params, ncs, metazones, comp_func, ncouts)
+
     return ncouts

@@ -4,7 +4,7 @@ from woom.util import WoomDate
 def filter_woomdate(date: str):
     """Convert a string into a WoomDate object."""
     if date == "today":
-        return WoomDate.today()
+        return WoomDate(WoomDate.today().round('D'))
     else:
         return WoomDate(date)
 
