@@ -188,15 +188,22 @@ class ArmoorFilters:
     @staticmethod
     def bathy_filter(ds, path: str, fmt: str, minimum: float, maximum: float) -> xr.DataArray:
         """Filter dataset based on bathymetry depth range.
-   
-        Parameters:
-            path: Path to bathymetry data file
-            fmt: File format for reading bathymetry data
-            minimum: Minimum depth threshold
-            maximum: Maximum depth threshold
-            
-        Returns:
-            Filtered dataset where bathymetry is within specified range
+
+        Parameters
+        ----------
+        path : str
+            Path to bathymetry data file.
+        fmt : str
+            File format for reading bathymetry data.
+        minimum : float
+            Minimum depth threshold.
+        maximum : float
+            Maximum depth threshold.
+
+        Returns
+        -------
+        xr.DataArray
+            Filtered dataset where bathymetry is within specified range.
         """
         logger.info("bathy filter")
         ds_bathy = open_decode(path, fmt=fmt)[["bathy"]]

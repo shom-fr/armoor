@@ -14,15 +14,16 @@ def validate_colocation(metazones, params):
 
     Parameters
     ----------
-    metazones (dict): A dictionary of metazones with their parameters.
-    param1: str
-        The first parameter to check.
-    param2: str
-        The second parameter to check.
-        
+    metazones : dict
+        A dictionary of metazones with their parameters.
+    params : dict
+        A dictionary where keys are colocation types and values are lists
+        of parameter pairs to validate.
+
     Raises
     ------
-        ArmoorError: If both parameters are defined or neither is defined.
+    ArmoorError
+        If both parameters are defined or neither is defined.
     """
     for mz_name, mz_param in metazones.items():
         for k, v in params.items():

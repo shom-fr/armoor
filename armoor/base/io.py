@@ -24,17 +24,18 @@ def find_valid_chunk_size(dim_size: int, current_first_chunk: int) -> int:
     """
     Trouve une taille de chunk valide qui divise exactement la dimension
     ou dont le dernier chunk est plus petit que le premier.
-    
-    Parameters:
-    -----------
+
+    Parameters
+    ----------
     dim_size : int
         Taille totale de la dimension
     current_first_chunk : int
         Taille actuelle du premier chunk
-        
-    Returns:
-    --------
-    int : Taille de chunk optimale
+
+    Returns
+    -------
+    int
+        Taille de chunk optimale
     """
     # Option 1: Divise exactement
     for chunk_size in range(current_first_chunk, 0, -1):
@@ -70,7 +71,8 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
     verbose : bool
         Afficher les détails (défaut: True)
         
-    Returns:
+    Returns
+    -------
     --------
     xr.Dataset : Dataset corrigé, prêt pour to_zarr()
     """
@@ -301,12 +303,16 @@ def get_zarr_encoding(ds: xr.Dataset, rechunk: bool = True) -> dict:
     """
     Create encoding dict for fast zarr save/load of large datasets.
     
-    Args:
-        ds: xarray dataset
-        rechunk: if True, rechunk dataset to avoid conflicts
+    Parameters
+    ----------
+    ds
+        xarray dataset
+    rechunk
+        if True, rechunk dataset to avoid conflicts
         
-    Returns:
-        encoding dict for .to_zarr()
+    Returns
+    -------
+    encoding dict for .to_zarr()
     """
     encoding = {}
     
@@ -402,11 +408,15 @@ def extract_suffix_from_filename(filename):
     """
     Extracts 'time' and 'z' values from a filename in the format ref_[time]_[z].nc
     
-    Args:
-        filename (str): Filename to analyze
+    Parameters
+    ----------
+    filename : str
+        Filename to analyze
         
-    Returns:
-        dict: Dictionary with 'time' and 'z' keys (values None if not found)
+    Returns
+    -------
+    dict
+        Dictionary with 'time' and 'z' keys (values None if not found)
     """
     result = {'time': None, 'z': None}
     

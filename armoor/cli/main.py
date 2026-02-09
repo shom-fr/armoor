@@ -54,7 +54,7 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
 
     Raises
     ------
-        ValueError: If any element of list1 is not found in list2.
+    ValueError: If any element of list1 is not found in list2.
     """
     metazones_bad = []
     for metazone in metazones_arg:
