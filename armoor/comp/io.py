@@ -28,7 +28,7 @@ def to_netcdf_ref_prods(dss, parent_dir, ncpat):
 
     Returns
     -------
-        tuple: Two list, one for reference and one for products.
+    tuple: Two list, one for reference and one for products.
     """
     ncs_prod = []
     for mz_name, datasets in dss.items():

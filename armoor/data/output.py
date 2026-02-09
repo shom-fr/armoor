@@ -103,7 +103,7 @@ def validate_interpolation(metazones):
         
     Raises
     ------
-        ArmoorError: If both parameters are defined or neither is defined.
+    ArmoorError: If both parameters are defined or neither is defined.
     """
     for mz_name, mz_param in metazones.items():
         for k, v in INTERP_PARAMS_USER.items():
@@ -248,9 +248,11 @@ class OutputProcessor:
     def __init__(self, target_chunk_mb: int = 512):
         """
         Initialize the DataProcessor.
-        
-        Args:
-            target_chunk_mb: Target chunk size in MB for memory optimization
+
+        Parameters
+        ----------
+        target_chunk_mb
+            Target chunk size in MB for memory optimization
         """
         self.target_chunk_mb = target_chunk_mb
     
@@ -259,16 +261,23 @@ class OutputProcessor:
         """
         Main processing function for NetCDF datasets.
         
-        Args:
-            ncs: List of NetCDF file paths to process
-            metazones: Dictionary containing metazone configurations
-            outputs: Dictionary containing output configurations (will be modified)
+        Parameters
+        ----------
+        ncs
+            List of NetCDF file paths to process
+        metazones
+            Dictionary containing metazone configurations
+        outputs
+            Dictionary containing output configurations (will be modified)
             
-        Returns:
-            Dictionary mapping output names to metazones to list of output files
+        Returns
+        -------
+        Dictionary mapping output names to metazones to list of output files
             
-        Raises:
-            ArmoorError: When processing fails
+        Raises
+        ------
+        ArmoorError
+            When processing fails
         """
         # Remove 'fmt' from outputs as it's not needed
         outputs.pop("fmt", None)
@@ -290,11 +299,14 @@ class OutputProcessor:
         """
         Validate metazones and prepare interpolation parameters.
         
-        Args:
-            metazones: Dictionary containing metazone configurations
+        Parameters
+        ----------
+        metazones
+            Dictionary containing metazone configurations
             
-        Returns:
-            Dictionary mapping metazone names to interpolation parameters
+        Returns
+        -------
+        Dictionary mapping metazone names to interpolation parameters
         """
         interp_check = validate_and_get_params(metazones)
         interp_params = {}
@@ -315,15 +327,22 @@ class OutputProcessor:
         """
         Process a single NetCDF file for all metazones.
         
-        Args:
-            nc_file: Path to NetCDF file
-            metazones: Metazone configurations
-            interp_params: Interpolation parameters for each metazone
-            outputs: Output configurations
-            ncouts: Accumulator for output file paths
+        Parameters
+        ----------
+        nc_file
+            Path to NetCDF file
+        metazones
+            Metazone configurations
+        interp_params
+            Interpolation parameters for each metazone
+        outputs
+            Output configurations
+        ncouts
+            Accumulator for output file paths
             
-        Returns:
-            Updated ncouts dictionary
+        Returns
+        -------
+        Updated ncouts dictionary
         """
         # Load and prepare dataset
         dsin = self._load_and_prepare_dataset(nc_file)
@@ -352,11 +371,14 @@ class OutputProcessor:
         """
         Load and prepare a NetCDF dataset for processing.
         
-        Args:
-            nc_file: Path to NetCDF file
+        Parameters
+        ----------
+        nc_file
+            Path to NetCDF file
             
-        Returns:
-            Loaded and prepared xarray Dataset
+        Returns
+        -------
+        Loaded and prepared xarray Dataset
         """
         dsin = xr.open_dataset(nc_file)
         
@@ -375,15 +397,22 @@ class OutputProcessor:
         """
         Process a dataset for a specific metazone.
         
-        Args:
-            dsin: Input dataset
-            metazone: Name of the metazone
-            mparams: Metazone parameters
-            params: Interpolation parameters
-            attrs_in: Original dataset attributes
+        Parameters
+        ----------
+        dsin
+            Input dataset
+        metazone
+            Name of the metazone
+        mparams
+            Metazone parameters
+        params
+            Interpolation parameters
+        attrs_in
+            Original dataset attributes
             
-        Returns:
-            List of output file paths
+        Returns
+        -------
+        List of output file paths
         """
         ds = dsin.copy()
         
@@ -415,13 +444,18 @@ class OutputProcessor:
         """
         Apply various interpolations to the dataset.
         
-        Args:
-            ds: Dataset to interpolate
-            params: Interpolation parameters
-            mparams: Metazone parameters
+        Parameters
+        ----------
+        ds
+            Dataset to interpolate
+        params
+            Interpolation parameters
+        mparams
+            Metazone parameters
             
-        Returns:
-            Interpolated dataset
+        Returns
+        -------
+        Interpolated dataset
         """
         logger.info("Start interpolation")
         
@@ -448,11 +482,14 @@ class OutputProcessor:
         """
         Remove unnecessary variables from dataset.
         
-        Args:
-            ds: Dataset to clean up
+        Parameters
+        ----------
+        ds
+            Dataset to clean up
             
-        Returns:
-            Cleaned dataset
+        Returns
+        -------
+        Cleaned dataset
         """
         vars_to_drop = []
         for varname in ("bathy", "mask"):
@@ -466,12 +503,16 @@ class OutputProcessor:
         """
         Apply time and vertical range processing to dataset.
         
-        Args:
-            ds: Dataset to process
-            mparams: Metazone parameters
+        Parameters
+        ----------
+        ds
+            Dataset to process
+        mparams
+            Metazone parameters
             
-        Returns:
-            List of processed datasets
+        Returns
+        -------
+        List of processed datasets
         """
         # Time range processing
         if "tfreq" in mparams:
@@ -499,12 +540,16 @@ class OutputProcessor:
         """
         Save processed datasets to disk.
         
-        Args:
-            dss: List of datasets to save
-            metazone: Metazone name for directory structure
+        Parameters
+        ----------
+        dss
+            List of datasets to save
+        metazone
+            Metazone name for directory structure
             
-        Returns:
-            List of saved file paths
+        Returns
+        -------
+        List of saved file paths
         """
         logger.info("Save interpolated data")
         fouts = []
@@ -531,16 +576,24 @@ class OutputProcessor:
         """
         Generate output files for a metazone.
         
-        Args:
-            fouts: List of intermediate file paths
-            metazone: Metazone name
-            mparams: Metazone parameters
-            outputs: Output configurations
-            prod_name: Product name
-            ncouts: Accumulator for output paths
+        Parameters
+        ----------
+        fouts
+            List of intermediate file paths
+        metazone
+            Metazone name
+        mparams
+            Metazone parameters
+        outputs
+            Output configurations
+        prod_name
+            Product name
+        ncouts
+            Accumulator for output paths
             
-        Returns:
-            Updated ncouts dictionary
+        Returns
+        -------
+        Updated ncouts dictionary
         """
         for oname, output in outputs.items():
             logger.info(f"Processing output: {oname}")
@@ -570,13 +623,18 @@ class OutputProcessor:
         """
         Validate if an output type is compatible with the metazone parameters.
         
-        Args:
-            output: Output configuration
-            mparams: Metazone parameters
-            metazone: Metazone name
+        Parameters
+        ----------
+        output
+            Output configuration
+        mparams
+            Metazone parameters
+        metazone
+            Metazone name
             
-        Returns:
-            True if compatible, False otherwise
+        Returns
+        -------
+        True if compatible, False otherwise
         """
         oparams = OUTPUTS_PARAMS.get(output.get("otype"))
         if not oparams:
@@ -611,16 +669,24 @@ class OutputProcessor:
         """
         Process a specific output type.
         
-        Args:
-            fouts: Input file paths
-            output: Output configuration
-            metazone: Metazone name
-            mparams: Metazone parameters
-            prod_name: Product name
-            oname: Output name
+        Parameters
+        ----------
+        fouts
+            Input file paths
+        output
+            Output configuration
+        metazone
+            Metazone name
+        mparams
+            Metazone parameters
+        prod_name
+            Product name
+        oname
+            Output name
             
-        Returns:
-            List of generated output files
+        Returns
+        -------
+        List of generated output files
         """
         oparams = OUTPUTS_PARAMS.get(output.get("otype"))
         logger.info(f"Output parameters: {oparams}")
@@ -651,18 +717,28 @@ class OutputProcessor:
         """
         Process a sorted group of files to create a single output.
         
-        Args:
-            fins_sorted: Sorted list of input files
-            oparams: Output parameters
-            mparams: Metazone parameters
-            metazone: Metazone name
-            oname: Output name
-            name_sort: Sorted group name
-            prod_name: Product name
-            concat_dim: Concatenation dimensions
+        Parameters
+        ----------
+        fins_sorted
+            Sorted list of input files
+        oparams
+            Output parameters
+        mparams
+            Metazone parameters
+        metazone
+            Metazone name
+        oname
+            Output name
+        name_sort
+            Sorted group name
+        prod_name
+            Product name
+        concat_dim
+            Concatenation dimensions
             
-        Returns:
-            Path to generated output file, or None if failed
+        Returns
+        -------
+        Path to generated output file, or None if failed
         """
         # Load datasets
         dss = [xr.open_dataset(fin) for fin in fins_sorted]
@@ -696,13 +772,18 @@ class OutputProcessor:
         """
         Process a single dataset from the data tree.
         
-        Args:
-            dts0: List of data trees
-            ds_name: Name of dataset to extract
-            concat_dim: Concatenation dimensions
+        Parameters
+        ----------
+        dts0
+            List of data trees
+        ds_name
+            Name of dataset to extract
+        concat_dim
+            Concatenation dimensions
             
-        Returns:
-            Processed dataset
+        Returns
+        -------
+        Processed dataset
         """
         dss0 = [dt[ds_name].to_dataset() for dt in dts0]
         
@@ -738,15 +819,22 @@ class OutputProcessor:
         """
         Save processed datasets as a DataTree zarr file.
         
-        Args:
-            dsouts: Dictionary of datasets to save
-            metazone: Metazone name
-            oname: Output name
-            name_sort: Sorted group name
-            prod_name: Product name
+        Parameters
+        ----------
+        dsouts
+            Dictionary of datasets to save
+        metazone
+            Metazone name
+        oname
+            Output name
+        name_sort
+            Sorted group name
+        prod_name
+            Product name
             
-        Returns:
-            Path to saved file
+        Returns
+        -------
+        Path to saved file
         """
         dirout = Path(f"data/output/{metazone}/{oname}/{name_sort}/")
         dirout.mkdir(parents=True, exist_ok=True)
@@ -773,30 +861,39 @@ def main_output(ncs: List[str], metazones: Dict[str, Any],
     This function processes a list of NetCDF files according to specified metazone
     configurations and generates various output formats.
     
-    Args:
-        ncs: List of paths to NetCDF files to process
-        metazones: Dictionary containing metazone configurations with parameters
-                  for interpolation, time/vertical ranges, etc.
-        outputs: Dictionary containing output configurations. The 'fmt' key will
-                be removed if present.
+    Parameters
+    ----------
+    ncs
+        List of paths to NetCDF files to process
+    metazones
+        Dictionary containing metazone configurations with parameters
+              for interpolation, time/vertical ranges, etc.
+    outputs
+        Dictionary containing output configurations. The 'fmt' key will
+            be removed if present.
     
-    Returns:
-        Dictionary mapping output names to metazones to lists of output file paths.
-        Structure: {output_name: {metazone_name: [file_path1, file_path2, ...]}}
+    Returns
+    -------
+    Dictionary mapping output names to metazones to lists of output file paths.
+    Structure
+        {output_name: {metazone_name: [file_path1, file_path2, ...]}}
     
-    Raises:
-        ArmoorError: When processing fails due to configuration or data issues
+    Raises
+    ------
+    ArmoorError
+        When processing fails due to configuration or data issues
     
-    Example:
-        >>> ncs = ['data1.nc', 'data2.nc']
-        >>> metazones = {
-        ...     'zone1': {'tbound': ['2020-01-01', '2020-12-31']},
-        ...     'zone2': {'vlevel': ['surface']}
-        ... }
-        >>> outputs = {'monthly': {'otype': 'timeseries'}}
-        >>> result = main_output(ncs, metazones, outputs)
-        >>> print(result)
-        {'monthly': {'zone1': [Path('data/output/zone1/monthly/...')], ...}}
+    Examples
+    --------
+    >>> ncs = ['data1.nc', 'data2.nc']
+    >>> metazones = {
+    ...     'zone1': {'tbound': ['2020-01-01', '2020-12-31']},
+    ...     'zone2': {'vlevel': ['surface']}
+    ... }
+    >>> outputs = {'monthly': {'otype': 'timeseries'}}
+    >>> result = main_output(ncs, metazones, outputs)
+    >>> print(result)
+    {'monthly': {'zone1': [Path('data/output/zone1/monthly/...')], ...}}
     """
     processor = OutputProcessor()
     return processor.process_datasets(ncs, metazones, outputs)

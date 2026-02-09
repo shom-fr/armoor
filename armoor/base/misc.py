@@ -10,15 +10,21 @@ logger = logging.getLogger(__name__)
 def is_dict_empty(dictionary: Optional[Dict[Any, Any]]) -> bool:
     """
     Check if a dictionary is empty.
-    
-    Args:
-        dictionary: The dictionary to check. Can be None.
-        
-    Returns:
+
+    Parameters
+    ----------
+    dictionary
+        The dictionary to check. Can be None.
+
+    Returns
+    -------
+    bool
         True if the dictionary is empty or None, False otherwise.
-        
-    Raises:
-        TypeError: If the input is not a dictionary or None.
+
+    Raises
+    ------
+    TypeError
+        If the input is not a dictionary or None.
     """
     if dictionary is None:
         return True
@@ -290,7 +296,7 @@ def parse_coords(s):
     
     Raises
     ------
-        ArmoorError: If the string is not in the correct format.
+    ArmoorError: If the string is not in the correct format.
     """
     try:
         if not isinstance(s, str):
@@ -369,7 +375,7 @@ def string_to_tuples_float(s):
 
     Returns
     -------
-        list: A list of tuples.
+    list: A list of tuples.
     """
     s = s.replace(" ", "")
     tuples_str = s.split("),(")
@@ -394,28 +400,34 @@ def get_last_keys_generator(d):
 def dict_to_list(d):
     """
     Convert a nested dictionary to a flattened list.
-    
+
     This function processes a nested dictionary structure and returns a flat list
-    containing all values from the deepest level of nesting. It uses the 
+    containing all values from the deepest level of nesting. It uses the
     get_last_keys_generator() function to traverse the dictionary and extract
     the final key-value pairs or leaf values.
-    
-    Args:
-        d (dict): A dictionary that may contain nested dictionaries or other values.
-    
-    Returns:
-        list: A flattened list containing items from the deepest level of the 
-              dictionary structure. The exact content depends on what 
-              get_last_keys_generator() yields.
-    
-    Example:
-        >>> nested_dict = {'a': {'b': [1, 2]}, 'c': {'d': [3, 4]}}
-        >>> dict_to_list(nested_dict)
-        [1, 2, 3, 4]  # Assuming get_last_keys_generator yields the leaf values
-    
-    Note:
-        This function depends on get_last_keys_generator(d) which should yield
-        iterable objects that will be flattened into the final list.
+
+    Parameters
+    ----------
+    d : dict
+        A dictionary that may contain nested dictionaries or other values.
+
+    Returns
+    -------
+    list
+        A flattened list containing items from the deepest level of the
+        dictionary structure. The exact content depends on what
+        get_last_keys_generator() yields.
+
+    Examples
+    --------
+    >>> nested_dict = {'a': {'b': [1, 2]}, 'c': {'d': [3, 4]}}
+    >>> dict_to_list(nested_dict)
+    [1, 2, 3, 4]  # Assuming get_last_keys_generator yields the leaf values
+
+    Notes
+    -----
+    This function depends on get_last_keys_generator(d) which should yield
+    iterable objects that will be flattened into the final list.
     """
     return [
         item for sublist in get_last_keys_generator(d) for item in sublist

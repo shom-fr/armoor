@@ -21,9 +21,12 @@ class Bull:
         """
         Initialize bulletin from configuration files.
         
-        Args:
-            config: Dict of bull configuration
-            template_file: Optional custom Jinja2 template file path
+        Parameters
+        ----------
+        config
+            Dict of bull configuration
+        template_file
+            Optional custom Jinja2 template file path
         """
         self.config = config
         self.template_file = template_file

@@ -40,7 +40,7 @@ class AbstractColocation:
 
         Returns
         -------
-            The registered method.
+        The registered method.
         """
         self.methods[func.__name__] = func
         return func
@@ -64,11 +64,11 @@ class AbstractColocation:
 
         Returns
         -------
-            The result of the called method.
+        The result of the called method.
 
         Raises
         ------
-            AttributeError: If the method is not found.
+        AttributeError: If the method is not found.
         """
         method = self.methods.get(method_name)
         if method:

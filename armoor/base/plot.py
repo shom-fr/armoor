@@ -10,9 +10,17 @@ def create_figure(width, height):
     """
     Creates and returns a Matplotlib Figure object with the specified dimensions.
 
-    :param width: Width of the figure in inches.
-    :param height: Height of the figure in inches.
-    :return: Matplotlib Figure object.
+    Parameters
+    ----------
+    width : float
+        Width of the figure in inches.
+    height : float
+        Height of the figure in inches.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Matplotlib Figure object.
     """
     fig = plt.figure(figsize=(width, height))
     return fig
