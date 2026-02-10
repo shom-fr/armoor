@@ -1,12 +1,7 @@
 import logging
-import os
-import re
-from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 import cmocean as cmo
 import dask
 from dask.diagnostics import ProgressBar
@@ -15,21 +10,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
-from cartopy.mpl.ticker import (LatitudeFormatter, LatitudeLocator,
-                                LongitudeFormatter, LongitudeLocator)
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts
 
 from armoor.__init__ import ArmoorError
 from armoor.base import FILTERS, LINE_COLORS, CMAP_VARS
-from armoor.base.filters import create_optimized_mask
-from armoor.base.interp import vinterp
-from armoor.base.io import setup_dask_client
 from armoor.base.plot import create_subplots, diagdisp, save_figure
 from armoor.comp import METRIC_LABELS, TITLE_PLOTS
-from armoor.comp.stats import StatsComp
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +182,9 @@ class PlotComp:
                 
                 dsprod.close()
                 dsref.close()
-    
+            dsprod_all.close()
+            dsref_all.close()
+
     def diagdisp_sel(self):
         """Plot a dispersion diagram per product and range."""
         for prod, node_prod in self.dt.children.items():
@@ -264,6 +254,8 @@ class PlotComp:
                 
                 dsprod.close()
                 dsref.close()
+            dsprod_all.close()
+            dsref_all.close()
         return None
     
     def _mdiagts(self, dsref, dsprod, figtitle, figname):
@@ -364,12 +356,17 @@ class PlotComp:
         """Plot multi-profiles theta-saln."""
         for prod, node_prod in self.dt.children.items():
             logger.debug(f"{prod}, Path: {node_prod.path}")
+            dsref = None
+            dsprod = None
             for data, dt_data in node_prod.items():
                 logger.debug(f"{data}, Path: {dt_data.path}")
                 if "ref" in data:
                     dsref = dt_data["data"].to_dataset()
                 elif "prod" in data:
                     dsprod = dt_data["data"].to_dataset()
+            if dsref is None or dsprod is None:
+                logger.warning(f"Missing ref or prod data for {prod}, skipping")
+                continue
             dsprod = dsprod.stack({"npt": list(dsprod.sizes.keys())})
             dsref = dsref.stack({"npt": list(dsref.sizes.keys())})
             dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
@@ -403,10 +400,13 @@ class PlotComp:
                 )
                 
             self._mdiagts(dsref, dsprod, figtitle, figname)
-    
+            dsref.close()
+            dsprod.close()
+
     def udiagts(self):
         """Plot uniquely profiles theta-saln."""
         dssprod = []
+        dsref = None
         for prod, node_prod in self.dt.children.items():
             logger.info(f"{prod}, Path: {node_prod.path}")
             for data, dt_data in node_prod.items():
@@ -415,6 +415,9 @@ class PlotComp:
                     dsref = dt_data["data"].to_dataset()
                 elif "prod" in data:
                     dssprod.append(dt_data["data"].to_dataset())
+        if dsref is None:
+            logger.warning("No reference data found, skipping udiagts")
+            return
         refname = dsref.attrs.get("data_name")
         vranges = dsref.attrs.get('vrange')
         vlevels = dsref.attrs.get('vlevel')
@@ -448,10 +451,10 @@ class PlotComp:
             xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
             if vrange:
                 xtitle += f"\n {vrange}"
-                xfigname  += "_{vrange}"
+                xfigname  += f"_{vrange}"
             if vlevel:
                 xtitle += f"\n {vlevel}"
-                xfigname  += "_{vlevel}"
+                xfigname  += f"_{vlevel}"
 
             fig, ax = create_subplots(
                 nrows=1,
@@ -497,7 +500,6 @@ class PlotComp:
                     )
                 ax = tsprod["axes"]
             ax.legend(
-                #loc='upper left', 
                 fontsize=11, frameon=True, fancybox=True
                 )
             ax = tsref["axes"]
@@ -528,10 +530,6 @@ class PlotComp:
 
         dsprod = dsprod.reset_coords("depth")
         dsref = dsref.reset_coords("depth")
-        dsprod_mean = dsprod.mean(dim=["time", "member"])
-        dsref_mean = dsref.mean(dim="time")
-        dsprod_std = dsprod.std(dim=["time", "member"])
-        dsref_std = dsref.std(dim="time")
         dsref = dsref.set_coords("depth")
         
         mask = ~dsref.ptemp.isnull()
@@ -554,13 +552,7 @@ class PlotComp:
             daprod = dsprod[var]
             
             vmin = np.nanmin([daref.min(), daprod.min()])
-            vmax = np.nanmin([daref.max(), daprod.max()])
-            
-            daref_mean = dsref_mean[var]
-            daprod_mean = dsprod_mean[var]
-
-            daref_std = dsref_std[var]
-            daprod_std = dsprod_std[var]
+            vmax = np.nanmax([daref.max(), daprod.max()])
 
             ref_data = daref.values
             ref_depth = -dsref["depth"]
@@ -579,26 +571,7 @@ class PlotComp:
                              for i in range(n_times) for j in range(n_members)]
             prod_lc = LineCollection(prod_segments, colors=prod_color, linewidths=2.0, alpha=0.5, label=dsprod.attrs["data_name"])
             ax.add_collection(prod_lc)
-            
-            # ax.plot(
-            #     daref_mean, -dsref_mean.depth, color=ref_color, linewidth=2.0,
-            #     label=f"mean {dsref.attrs['data_name']}"
-            #     )
-            # ax.fill_betweenx(
-            #     -dsref_mean.depth, daref_mean - daref_std, daref_mean + daref_std, color=ref_color,
-            #     alpha=0.25,
-            #     label=f"{dsref.attrs['data_name']} mean +/- std"
-            #     )
-            # ax.plot(
-            #     daprod_mean, -dsprod_mean.depth, color=prod_color, linewidth=2.0,
-            #     label=f"{dsprod.attrs['data_name']}"    
-            #     )
-            # ax.fill_betweenx(
-            #     -dsprod_mean.depth, daprod_mean - daprod_std, daprod_mean + daprod_std, color=prod_color,
-            #     alpha=0.25,
-            #     label=f"{dsprod.attrs['data_name']} mean +/- std"
-            #     )
-            
+
             ax.legend(
                 fontsize=11, frameon=True, fancybox=True
                 )
@@ -630,12 +603,17 @@ class PlotComp:
         """Plot multiple vertical profiles per product."""
         for prod, node_prod in self.dt.children.items():
             logger.debug(f"{prod}, Path: {node_prod.path}")
+            dsref = None
+            dsprod = None
             for data, dt_data in node_prod.items():
                 logger.debug(f"{data}, Path: {dt_data.path}")
                 if "ref" in data:
                     dsref = dt_data["data"].to_dataset()
                 elif "prod" in data:
                     dsprod = dt_data["data"].to_dataset()
+            if dsref is None or dsprod is None:
+                logger.warning(f"Missing ref or prod data for {prod}, skipping")
+                continue
             dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
             dsref = dsref.where(~dsref.ptemp.isnull(), drop=True)
             trange = dsprod.attrs.get("trange")
@@ -666,62 +644,14 @@ class PlotComp:
                 f"mvprofiles_{prod}_{var}{xfigname}.png"
                 )
 
-            self._mvprofiles(dsref, dsprod, figtitle, figname)  
-        # concat_dim = ["time"]
-        # if ("trange_seq" in self.mparams) or ("tfreq" in self.mparams):
-        #     concat_dim.append("time")
-        # for ref_name, prods in self.mparams.get("ncins").items():
-        #     logger.info(f"Process comparison for reference: {ref_name}")
-        #     for prod, ncins in prods.items():
-        #         logger.info(f"Product: {prod}")
-        #         ncins_ref = [nc for nc in ncins if "ref_" in str(nc)]
-        #         ncins_prod = [nc for nc in ncins if "prod_" in str(nc)]
-        #         dsprod = xr.open_mfdataset(ncins_prod, combine="nested", concat_dim="time")
-        #         dsref = xr.open_mfdataset(ncins_ref, combine="nested", concat_dim="time")
-        #         figtitle = (
-        #             f"{self.plot_title} \n"
-        #             f"{self.metazone}\n "
-        #             )
-        #         figname = (
-        #             f"{self.func_comp}/plot/{self.metazone}/{ref_name}"
-        #             "/{var}/"
-        #             f"mvprofiles_{prod}.png"
-        #             )
-                    
-        #         self._mvprofiles(dsref, dsprod, figtitle, figname)
-                
-        #         dsref.close(); dsprod.close()
-        #         del dsref; del dsprod
-                
-        #         if "trange_seq" in self.mparams:
-        #             for icomp in range(len(ncins["ref"])):
-        #                 dsref = xr.open_dataset(ncins['ref'][icomp])
-        #                 dsprod = xr.open_dataset(ncins['prod'][icomp])
-                        
-        #                 icomp_name = os.path.basename(ncins['prod'][icomp])[:-3]
-        #                 for string in ["prod_", "ref_"]:
-        #                     if string in icomp_name:
-        #                         icomp_name = icomp_name.replace(string, "")
-        #                 figname = (
-        #                     f"{self.func_comp}/plot/{self.metazone}" + 
-        #                     "/{var}/" + 
-        #                     f"mvprofiles_sel_{prod}_{icomp_name}.png"
-        #                     )
-                        
-        #                 time = f"{dsprod.attrs['trange']}"
-    
-        #                 figtitle = (
-        #                     f"{self.plot_title} \n"
-        #                     f"{self.metazone} {time}\n "
-        #                     )
-        #                 self._mvprofiles(dsref, dsprod, figtitle, figname)
-                        
-        #                 dsref.close(); dsprod.close()
-        #                 del dsref; del dsprod
+            self._mvprofiles(dsref, dsprod, figtitle, figname)
+            dsref.close()
+            dsprod.close()
 
     def uvprofiles(self):
         """Plot uniquely vertical profiles."""
         dssprod = []
+        dsref = None
         for prod, node_prod in self.dt.children.items():
             logger.info(f"{prod}, Path: {node_prod.path}")
             for data, dt_data in node_prod.items():
@@ -730,6 +660,9 @@ class PlotComp:
                     dsref = dt_data["data"].to_dataset()
                 elif "prod" in data:
                     dssprod.append(dt_data["data"].to_dataset())
+        if dsref is None:
+            logger.warning("No reference data found, skipping uvprofiles")
+            return
         refname = dsref.attrs.get("data_name")
         vranges = dsref.attrs.get('vrange')
         for itime in range(dsref.sizes["time"]):
@@ -759,12 +692,10 @@ class PlotComp:
             xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
             if vrange:
                 xtitle += f"\n {vrange}"
-                xfigname  += "_{vrange}"
+                xfigname  += f"_{vrange}"
             for varname in dsref.data_vars:
                 units = dsref[varname].attrs.get("units")
                 daref = dsref_itime[varname].squeeze()
-                #dasprod_mean= [ds[[varname]].squeeze() for ds in dssprod_mean]
-                #dasprod_std= [ds[[varname]].squeeze() for ds in dssprod_std]
                 dasprod_closest= [ds[[varname]].squeeze() for ds in dssprod_closest]
                 fig, ax = create_subplots(
                     nrows=1,
@@ -804,7 +735,6 @@ class PlotComp:
                         label=f"{prod_name} mean +/- std"
                         )
                 ax.legend(
-                    #loc='upper left', 
                     fontsize=11, frameon=True, fancybox=True
                     )
                 
@@ -838,9 +768,12 @@ class PlotComp:
         dt_ref = self.dt.children[f"{prods[0]}"]["ref"]
         dts_prod = [self.dt.children[f"{prod}"]["prod"] for prod in prods]
         dts_comp = [self.dt.children[f"{prod}"]["comp"] for prod in prods]
-        
-        ref_name = dt_ref["data"].to_dataset().attrs.get("data_name")
-        attrs = dt_ref["data"].attrs
+
+        ds_ref_data = dt_ref["data"].to_dataset()
+        ds_ref_mean = dt_ref["mean"].to_dataset()
+        ds_ref_std = dt_ref["std"].to_dataset()
+        ref_name = ds_ref_data.attrs.get("data_name")
+        attrs = ds_ref_data.attrs
         ncname = ""
         xtitle = ""
 
@@ -858,20 +791,28 @@ class PlotComp:
             xtitle += f" {vrange}"
         else:
             pass
-        
-        if "npts" in dt_ref["mean"].dims:
-            npts = dt_ref["mean"].sizes["npts"]
+
+        if "npts" in ds_ref_mean.dims:
+            npts = ds_ref_mean.sizes["npts"]
             figname = (
-                "{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                "{self.func_comp}/plot/{self.metazone}/{ref_name}/" +
                 "timeseries_stats_{var}_{lat_pt}_{lon_pt}{ncname}.png"
                 )
         else:
             npts = 1
             figname = (
-                "{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                "{self.func_comp}/plot/{self.metazone}/{ref_name}/" +
                 "timeseries_stats_{var}{ncname}.png"
                 )
-        for var in dt_ref["data"].to_dataset().data_vars:
+
+        dss_prod_data = [dt_prod["data"].to_dataset() for dt_prod in dts_prod]
+        dss_prod_mean = [dt_prod["mean"].to_dataset() for dt_prod in dts_prod]
+        dss_prod_std = [dt_prod["std"].to_dataset() for dt_prod in dts_prod]
+        dss_comp_bias = [dt_comp["bias"].to_dataset() for dt_comp in dts_comp]
+        dss_comp_rmse = [dt_comp["rmse"].to_dataset() for dt_comp in dts_comp]
+        dss_comp_rmsec = [dt_comp["rmsec"].to_dataset() for dt_comp in dts_comp]
+
+        for var in ds_ref_data.data_vars:
             for inpt in range(npts):
                 fig, axes = create_subplots(
                     nrows=5, figsize=(10, 8),
@@ -879,15 +820,14 @@ class PlotComp:
                     sharex=True
                     )
                 if npts > 1:
-                    lon_pt = f"{dt_ref['data'].to_dataset().lon.isel(npts=inpt):.2f}"
-                    lat_pt = f"{dt_ref['data'].to_dataset().lat.isel(npts=inpt):.2f}"
+                    lon_pt = f"{ds_ref_data.lon.isel(npts=inpt):.2f}"
+                    lat_pt = f"{ds_ref_data.lat.isel(npts=inpt):.2f}"
                     xcoord = f"{lat_pt}°N; {lon_pt}°E\n"
                 else:
                     xcoord = ""
-                for iprod, dt_prod in enumerate(dts_prod):
-                    dt_comp = dts_comp[iprod]
+                for iprod in range(len(dts_prod)):
                     if iprod == 0:
-                        da_ref = dt_ref["data"].to_dataset()[var]
+                        da_ref = ds_ref_data[var]
                         units = da_ref.attrs.get("units")
                         fig.suptitle(
                             f"{self.plot_title} \n"
@@ -896,8 +836,7 @@ class PlotComp:
                             y=1.01
                             )
                         lw = 2
-                        da = dt_ref["mean"].to_dataset()[var]
-                        da = da.squeeze()
+                        da = ds_ref_mean[var].squeeze()
                         if npts > 1:
                             da = da.isel(npts=inpt)
                         axes[0].plot(
@@ -907,7 +846,7 @@ class PlotComp:
                             linewidth=lw,
                             label=ref_name
                             )
-                        da = dt_ref["std"].to_dataset()[var]
+                        da = ds_ref_std[var]
                         if npts > 1:
                             da = da.isel(npts=inpt)
                         axes[1].plot(
@@ -917,7 +856,7 @@ class PlotComp:
                             linewidth=lw,
                             label=ref_name
                             )
-                        
+
                         if da_ref.lon.dims == ("x", "y"):
                             plot_coords = "filledbox"
                         else:
@@ -932,11 +871,10 @@ class PlotComp:
                             gridlines_xlabel_style={'size': 6},
                             gridlines_ylabel_style={'size': 6},
                             )
-                    
-                    prod_name = dt_prod["data"].to_dataset().attrs["data_name"]
 
-                    da = dt_prod["mean"].to_dataset()[var]
-                    da = da.squeeze()
+                    prod_name = dss_prod_data[iprod].attrs["data_name"]
+
+                    da = dss_prod_mean[iprod][var].squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[0].plot(
@@ -946,8 +884,7 @@ class PlotComp:
                         linewidth=lw,
                         label=prod_name
                         )
-                    da = dt_prod["std"].to_dataset()[var]
-                    da = da.squeeze()
+                    da = dss_prod_std[iprod][var].squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[1].plot(
@@ -957,48 +894,51 @@ class PlotComp:
                         linewidth=lw,
                         label=prod_name
                         )
-                    da = dt_comp["bias"].to_dataset()[var]
-                    da = da.squeeze()
+                    da = dss_comp_bias[iprod][var].squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[2].plot(
                         da.time,
-                        da, 
+                        da,
                         linewidth=lw,
                         label=f"{prod_name} vs {ref_name}"
                         )
-                    da = dt_comp["rmse"].to_dataset()[var]
-                    da = da.squeeze()
+                    da = dss_comp_rmse[iprod][var].squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[3].plot(
                         da.time,
                         da,
-                        color=LINE_COLORS[iprod], 
+                        color=LINE_COLORS[iprod],
                         linewidth=lw
                         )
-                    da = dt_comp["rmsec"].to_dataset()[var]
-                    da = da.squeeze()
+                    da = dss_comp_rmsec[iprod][var].squeeze()
                     if npts > 1:
                         da = da.isel(npts=inpt)
                     axes[4].plot(
                         da.time,
                         da,
-                        color=LINE_COLORS[iprod], 
+                        color=LINE_COLORS[iprod],
                         linewidth=lw
                         )
-                
+
                 handles, labels = axes[0].get_legend_handles_labels()
                 fig.legend(handles, labels, ncol=1, loc='center left',
                            edgecolor='gray', bbox_to_anchor=(0.11,1.0))
- 
+
                 axes[0].set_ylabel("Mean")
                 axes[1].set_ylabel("St.D")
                 axes[2].set_ylabel("Bias")
                 axes[3].set_ylabel("Rmse")
                 axes[4].set_ylabel("Ce.Rmse")
-    
+
                 self.save_figure(fig, figname.format(**locals()))
+
+        ds_ref_data.close()
+        ds_ref_mean.close()
+        ds_ref_std.close()
+        for ds in dss_prod_data + dss_prod_mean + dss_prod_std + dss_comp_bias + dss_comp_rmse + dss_comp_rmsec:
+            ds.close()
         return None
         
     def timeseries_sel(self):
@@ -1051,18 +991,19 @@ class PlotComp:
                     das_comp = [ds[var].isel(npts=inpt) for ds in dss_comp]
                     lon_pt = f"{ds_ref.lon.isel(npts=inpt):.2f}"
                     lat_pt = f"{ds_ref.lat.isel(npts=inpt):.2f}"
-                    xtitle += f"{lat_pt}°N; {lon_pt}°E"
+                    xtitle_pt = xtitle + f"{lat_pt}°N; {lon_pt}°E"
                 else:
                     da_ref = ds_ref[var]
                     das_prod = [ds[var] for ds in dss_prod]
                     das_comp = [ds[var] for ds in dss_comp]
+                    xtitle_pt = xtitle
                 for iprod, da_prod in enumerate(das_prod):
-                    
+
                     if iprod == 0:
                         units = da_ref.attrs.get("units")
                         fig.suptitle(
                             f"{self.plot_title} \n"
-                            f"{self.metazone} \n {xtitle}\n"
+                            f"{self.metazone} \n {xtitle_pt}\n"
                             f"{var}, {units} \n",
                             y=1.01
                             )
@@ -1121,9 +1062,12 @@ class PlotComp:
                 axes[1].set_ylabel("Diff.")
     
                 self.save_figure(fig, figname.format(**locals()))
+        ds_ref.close()
+        for ds in dss_prod + dss_comp:
+            ds.close()
         return None
-    
-    
+
+
     def timeseries(self):
         """Plot time series."""
         for prod, node_prod in self.dt.children.items():
@@ -1206,9 +1150,12 @@ class PlotComp:
         axes[1].set_ylabel("Direction diff., °")
 
         self.save_figure(fig, figname.format(**locals()))
+        ds_ref.close()
+        for ds in dss_prod + dss_comp:
+            ds.close()
         del axes
         return None
-    
+
     def maps_trajectory_drifter(self):
         """Plot maps per product."""
         for prod, node_prod in self.dt.children.items():
@@ -1265,7 +1212,6 @@ class PlotComp:
             fig.legend(handles, labels, ncol=1, loc='center left',
                        edgecolor='gray', bbox_to_anchor=(0.11,0.94)) 
             
-            #plt.subplots_adjust(hspace=0.02, wspace=0.01)
             for iax, ax in enumerate(axes):
                 gl = axes[iax].gridlines(
                     crs=ccrs.PlateCarree(),
@@ -1277,19 +1223,21 @@ class PlotComp:
                     )
                 gl.top_labels = False
                 gl.right_labels = False
-            
+
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" +
                 f"map_drifter_trajectories_{prod_name}.png"
                 )
             
             fig.suptitle(figtitle, fontsize="x-large", y=0.95)
             
             self.save_figure(fig, figname)
-                        
+            dsprod.close()
+            dsref.close()
+
         return None
-    
-    
+
+
     def maps_current_drifter(self):
         """Plot maps per product."""
         for prod, node_prod in self.dt.children.items():
@@ -1366,12 +1314,17 @@ class PlotComp:
             fig.suptitle(figtitle, fontsize="x-large", y=0.95)
             
             self.save_figure(fig, figname)
+            dsprod.close()
+            dsref.close()
             del axes
         return None
-     
+
     def maps(self):
         """Plot maps per product."""
         for prod, node_prod in self.dt.children.items():
+            ds_ref_data = node_prod["ref/data"].to_dataset()
+            lon = ds_ref_data.lon
+            lat = ds_ref_data.lat
             for comp, dt_comp in node_prod["comp"].items():
                 dscomp_all = dt_comp.to_dataset()
                 if comp == "bias":
@@ -1383,9 +1336,6 @@ class PlotComp:
                 else:
                     data = "data"
                     field = None
-                ds = node_prod["ref/data"].to_dataset()
-                lon = ds.lon
-                lat = ds.lat
                 dsprod_all = node_prod[f"prod/{data}"].to_dataset()
                 dsref_all = node_prod[f"ref/{data}"].to_dataset()
                 if "member" in dsprod_all.dims:
@@ -1576,8 +1526,9 @@ class PlotComp:
                     fig.suptitle(figtitle)
                     
                     self.save_figure(fig, figname)
-                        
-        
+
+            ds_ref_data.close()
+
         return None
     
     def save_figure(self, fig, filename):
@@ -1604,6 +1555,5 @@ def main_plot(ncins, metazones, func_comp):
         for metazone, ncs in metas.items():
             if metazone in metazones:
                 for nc in ncs:
-                    # process_task(nc, func_comp, metazone, output)
                     tasks.append(dask.delayed(process_task)(nc, func_comp, metazone, output))
-    dask.compute(*tasks)#,  scheduler='processes')
+    dask.compute(*tasks)
