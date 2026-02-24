@@ -16,12 +16,12 @@ from armoor.__init__ import ArmoorError
 from armoor.base.interp import grid2loc, interp_time, regrid, vinterp
 from armoor.base.io import (create_fast_encoding, get_zarr_encoding,
                             setup_dask_client)
-from armoor.base.misc import optimize_for_low_swap
 from armoor.comp import (COLOCATION_PARAMS_DEFAULT, COLOCATION_PARAMS_USER,
                          COMP_VARS)
 from armoor.comp.misc import get_colocation_params, validate_colocation
 
 logger = logging.getLogger(__name__)
+
 
 class AbstractColocation:
     """Abstract class for coloction."""
@@ -246,13 +246,68 @@ class HorizontalColocation(AbstractColocation):
         dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
         mask = dist_prod2ref < radius_meters
         mask = mask.transpose("time", "member")
+
+        # Drop members outside radius at ALL timesteps (compaction)
+        any_valid = mask.any(dim="time")
+        if not any_valid.any():
+            logger.warning(
+                "No product member is ever within the radius; "
+                "skipping where(mask) to avoid an all-NaN dataset."
+            )
+            return
+        if not any_valid.all():
+            n_before = self.dsprod.sizes["member"]
+            valid_idx = np.where(any_valid.values)[0]
+            self.dsprod = self.dsprod.isel(member=valid_idx)
+            mask = mask.isel(member=valid_idx)
+            logger.info(
+                f"Compacted members: {n_before} -> {self.dsprod.sizes['member']}"
+            )
+
+        # Drop members whose ocean data are all-NaN at every (time, z) point.
+        # These are land/masked cells in the model that passed the geographic
+        # distance filter but carry no usable data (e.g. coastal or shelf cells).
+        _geo = {"lon", "lat", "depth"}
+        _ocean_vars = [v for v in self.dsprod.data_vars if v not in _geo]
+        if _ocean_vars:
+            # A member is valid if at least one ocean variable has at least one
+            # non-NaN value across all times (and depths if 3-D).
+            sample_var = _ocean_vars[0]
+            reduce_dims = [d for d in self.dsprod[sample_var].dims if d != "member"]
+            valid_member = (~self.dsprod[sample_var].isnull()).any(dim=reduce_dims)
+            if not valid_member.all():
+                n_before = self.dsprod.sizes["member"]
+                ocean_valid_idx = np.where(valid_member.values)[0]
+                if len(ocean_valid_idx) == 0:
+                    logger.warning(
+                        f"All {n_before} compacted members have NaN ocean data "
+                        f"(lon [{float(self.dsprod.lon.min()):.2f}, "
+                        f"{float(self.dsprod.lon.max()):.2f}], "
+                        f"lat [{float(self.dsprod.lat.min()):.2f}, "
+                        f"{float(self.dsprod.lat.max()):.2f}]). "
+                        "Skipping colocation for this reference."
+                    )
+                    return
+                self.dsprod = self.dsprod.isel(member=ocean_valid_idx)
+                mask = mask.isel(member=ocean_valid_idx)
+                logger.warning(
+                    f"Dropped {n_before - len(ocean_valid_idx)} members with "
+                    f"all-NaN ocean data; {len(ocean_valid_idx)} remain."
+                )
+
         for coord in ["lon", "lat"]:
             self.dsprod[coord] = self.dsprod[coord].expand_dims({"time": self.dsprod.time})
         self.dsprod = self.dsprod.reset_coords(["lon", "lat"])
-        
+
+        # Promote depth to coordinate before masking so where(mask) does not
+        # NaN-fill it. A NaN source coordinate in vinterp causes regrid1d to
+        # produce all-NaN output for every affected profile.
+        if "depth" in self.dsprod.data_vars:
+            self.dsprod = self.dsprod.set_coords("depth")
+
         coords = [coord for coord in mask.coords]
         mask = mask.drop_vars(coords)
-        self.dsprod = self.dsprod.where(mask)#, drop=True)
+        self.dsprod = self.dsprod.where(mask)
         self.dsprod = self.dsprod.set_coords(["lon", "lat"])
  
     def radius(self, radius: float) -> Tuple[xr.Dataset, xr.Dataset]:
@@ -272,21 +327,19 @@ class HorizontalColocation(AbstractColocation):
             raise ValueError("Radius must be positive")
         
         radius_meters = radius * 1e3
-        
-        # Préparation des données (unchanged)
-        self.dsprod = xcoords.geo_stack(self.dsprod, "member")
-        # OPTIMISATION: Choix de la méthode selon le cas
+        if "member" not in self.dsprod.dims:
+            self.dsprod = xcoords.geo_stack(self.dsprod, "member")
         if "time" not in self.dsref.lon.dims:
             # Cas time-independent (unchanged)
             dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
             filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters)#, drop=True)
             self.dsprod = self._clean_coordinates(filtered_ds)
         else:
+            logger.info("time dependent")
             self._handle_time_dependent(radius_meters)
-        
         # Set depth coordinate if needed (unchanged)
-        if "depth" not in self.dsprod.coords and "depth" in self.dsprod.data_vars:
-            self.dsprod = self.dsprod.set_coords("depth")
+        #if "depth" not in self.dsprod.coords and "depth" in self.dsprod.data_vars:
+        #    self.dsprod = self.dsprod.set_coords("depth")
         return self.dsref, self.dsprod
     
 
@@ -359,6 +412,8 @@ class VerticalColocation(AbstractColocation):
                 self.dsprod.chunk(dict(z=-1)), vcoord, self.dsref[vcoord].chunk(dict(z=-1))
                 )
             self.dsprod.attrs.update(attrs)
+            all_nan = self.dsprod[list(self.dsprod.data_vars)].to_array().isnull().all()
+            logger.info(all_nan)
         elif vref == "product":
             attrs = self.dsref.attrs
             self.dsref = vinterp(
@@ -504,20 +559,21 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     ncout_ref = dirout / f"ref{ncname}.zarr"
     ncout_prod = dirout / f"prod{ncname}.zarr"
 
-    logger.info(f"Save {ncout_ref}")
+    logger.info(f"Save {ncout_ref} and {ncout_prod}")
     if "mask" in dsref.data_vars:
         dsref = dsref.drop_vars("mask")
     dsref = dsref.chunk("auto")
-    encoding = get_zarr_encoding(dsref)
-    dsref.to_zarr(store=ncout_ref, mode="w", encoding=encoding)
-    dsref.close()
+    encoding_ref = get_zarr_encoding(dsref)
+    job_ref = dsref.to_zarr(store=ncout_ref, mode="w", encoding=encoding_ref, compute=False)
 
-    logger.info(f"Save {ncout_prod}")
     if "mask" in dsprod.data_vars:
         dsprod = dsprod.drop_vars("mask")
     dsprod = dsprod.chunk("auto")
-    encoding = get_zarr_encoding(dsprod)
-    dsprod.to_zarr(store=ncout_prod, mode="w", encoding=encoding)
+    encoding_prod = get_zarr_encoding(dsprod)
+    job_prod = dsprod.to_zarr(store=ncout_prod, mode="w", encoding=encoding_prod, compute=False)
+
+    dask.compute(job_ref, job_prod)
+    dsref.close()
     dsprod.close()
 
     return ncout_ref, ncout_prod
@@ -525,6 +581,11 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
 
 def _prepare_dataset(ds, comp_func, is_reference=False):
     """Prepare a dataset for colocation.
+
+    Only loads the raw source variables that already exist in the dataset.
+    Derived oceanographic variables (pdens, sndspeed, temp-from-ptemp, …)
+    are computed later in ``main_output`` when the colocated data is
+    re-opened — at that point the data is sparse and tiny.
 
     Parameters
     ----------
@@ -540,19 +601,33 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
     xr.Dataset
         Prepared dataset.
     """
-    ds = optimize_for_low_swap(ds, target_chunk_mb=512)
-
     if "depth" in ds.data_vars:
         ds = ds.set_coords("depth")
 
-    for var in COMP_VARS[comp_func]:
-        da = ds.oceanvars.sel(var)
-        if isinstance(da, xr.DataArray):
-            ds[var] = da
-
-    vars_to_keep = set(COMP_VARS[comp_func])
+    # Keep only raw variables already present that are needed (directly or
+    # as inputs for derived variables computed later in output).
+    # Map each derived variable to its required raw inputs.
+    _OCEANVAR_INPUTS = {
+        "ptemp": {"temp", "sal", "pres"},
+        "temp":  {"ptemp", "sal", "pres"},
+        "pdens": {"ptemp", "temp", "sal", "pres"},
+        "sndspeed": {"ptemp", "temp", "sal", "pres"},
+        "u":     {"cdir", "cspeed"},
+        "v":     {"cdir", "cspeed"},
+        "cdir":  {"u", "v"},
+        "cspeed": {"u", "v"},
+    }
+    needed = set(COMP_VARS[comp_func])
+    vars_to_keep = needed & set(ds.data_vars)
+    # Add raw inputs required to derive any missing requested variable.
+    for var in needed:
+        if var not in ds.data_vars:
+            for inp in _OCEANVAR_INPUTS.get(var, ()):
+                if inp in ds.data_vars:
+                    vars_to_keep.add(inp)
     if is_reference:
-        vars_to_keep.add("mask")
+        if "mask" in ds.data_vars:
+            vars_to_keep.add("mask")
 
     for var in list(ds.data_vars):
         if var not in vars_to_keep:
@@ -561,7 +636,30 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
     if "depth" in ds.coords and "time" in ds.depth.dims:
         ds = ds.reset_coords("depth")
 
+    ds = ds.load()
     return ds
+
+
+_GEO_VARS = {"lon", "lat", "depth"}
+
+
+def _ocean_all_nan(dsprod: xr.Dataset) -> bool:
+    """Return True if all ocean (non-geo) data variables are entirely NaN.
+
+    Parameters
+    ----------
+    dsprod : xr.Dataset
+        Product dataset after a colocation step.
+
+    Returns
+    -------
+    bool
+        True when every ocean variable is NaN across all dimensions.
+    """
+    ocean_vars = [v for v in dsprod.data_vars if v not in _GEO_VARS]
+    if not ocean_vars:
+        return False
+    return bool(dsprod[ocean_vars].to_array().isnull().all().values)
 
 
 def _apply_colocations(dsref, dsprod, params, tbound):
@@ -587,18 +685,30 @@ def _apply_colocations(dsref, dsprod, params, tbound):
         dsref, dsprod = process_time_colocation(
             dsref, dsprod, params["time"], tbound
         )
+        all_nan = _ocean_all_nan(dsprod)
+        logger.info(f"Ocean vars all-NaN after time colocation: {all_nan}")
         gc.collect()
+        if all_nan:
+            logger.warning("Skipping horizontal/vertical colocation: ocean data is all-NaN after time colocation.")
+            return dsref, dsprod
 
     if params.get("horizontal"):
         dsref, dsprod = process_horizontal_colocation(
             dsref, dsprod, params["horizontal"]
         )
+        all_nan = _ocean_all_nan(dsprod)
+        logger.info(f"Ocean vars all-NaN after horizontal colocation: {all_nan}")
         gc.collect()
+        if all_nan:
+            logger.warning("Skipping vertical colocation: ocean data is all-NaN after horizontal colocation.")
+            return dsref, dsprod
 
     if params.get("vertical"):
         dsref, dsprod = process_vertical_colocation(
             dsref, dsprod, params["vertical"]
         )
+        all_nan = _ocean_all_nan(dsprod)
+        logger.info(f"Ocean vars all-NaN after vertical colocation: {all_nan}")
         gc.collect()
 
     return dsref, dsprod
@@ -688,7 +798,7 @@ def _apply_vertical_ranges(dsref_list, dsprod_list, params, comp_func):
     return dsref_list, dsprod_list
 
 
-def _save_colocation_results(dssref, dssprod, comp_func, metazone, ncouts, ref_name, prod_name):
+def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, prod_name):
     """Save colocation results to files.
 
     Parameters
@@ -701,14 +811,18 @@ def _save_colocation_results(dssref, dssprod, comp_func, metazone, ncouts, ref_n
         Comparison function identifier.
     metazone: str
         Metazone name.
-    ncouts: dict
-        Dictionary to store output paths.
     ref_name: str
         Reference dataset name.
     prod_name: str
         Product dataset name.
+
+    Returns
+    -------
+    list
+        List of output file paths.
     """
     logger.info("Save coloc data in zarr")
+    paths = []
 
     for ids in range(len(dssref)):
         dsref = dssref[ids]
@@ -726,14 +840,16 @@ def _save_colocation_results(dssref, dssprod, comp_func, metazone, ncouts, ref_n
             dsprod.attrs['data_name']
         )
 
-        ncouts[metazone][ref_name][prod_name].append(ncout_ref)
-        ncouts[metazone][ref_name][prod_name].append(ncout_prod)
+        paths.append(ncout_ref)
+        paths.append(ncout_prod)
 
         dsref.close()
         dsprod.close()
 
+    return paths
 
-def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone, ncouts):
+
+def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
     """Process colocation for a single product against a reference.
 
     Parameters
@@ -750,30 +866,29 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone, 
         Comparison function identifier.
     metazone: str
         Metazone name.
-    ncouts: dict
-        Dictionary to store output paths.
+
+    Returns
+    -------
+    tuple
+        (ref_name, prod_name, paths) where paths is a list of output file paths.
     """
     logger.info(f"-- Process {ncin}")
 
-    dsprodin = xr.open_dataset(ncin)
+    dsprodin = xr.open_dataset(ncin, chunks="auto")
     if "depth" in dsprodin and "depth" not in dsprodin.coords:
         dsprodin = dsprodin.set_coords("depth")
     dsprodin = _prepare_dataset(dsprodin, comp_func, is_reference=False)
     logger.info(dsprodin.sizes)
 
     dsref = dsrefin.copy()
-    dsprod = dsprodin.copy()
-    gattrs_ref = dsref.attrs
-    gattrs_prod = dsprod.attrs
-
     prod_name = dsprodin.attrs['data_name']
     ref_name = dsrefin.attrs['data_name']
+    gattrs_prod = dsprodin.attrs.copy()
+    # Move instead of copy: avoids holding two full datasets in memory.
+    dsprod = dsprodin
+    del dsprodin
 
-    # Initialize output structure
-    if ref_name not in ncouts[metazone]:
-        ncouts[metazone][ref_name] = {}
-    if prod_name not in ncouts[metazone][ref_name]:
-        ncouts[metazone][ref_name][prod_name] = []
+    gattrs_ref = dsref.attrs
 
     # Apply colocations
     dsref, dsprod = _apply_colocations(dsref, dsprod, params, tbound)
@@ -787,31 +902,33 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone, 
     dsref = dsref.assign_attrs(gattrs_ref)
     dsprod = dsprod.assign_attrs(gattrs_prod)
 
-    # Compute
-    logger.info("Compute coloc ref")
-    dsref = dsref.compute()
-    logger.info("Compute coloc prod")
-    dsprod = dsprod.compute()
+    # # Ensure results are numpy-backed (some colocation ops may create dask arrays).
+    # # Limit threads to avoid OOM from too many concurrent allocations.
+    # logger.info("Compute coloc ref and prod")
+    # with dask.config.set(num_workers=4):
+    #     dsref = dsref.load()
+    #     dsprod = dsprod.load()
 
     # Apply ranges
     dssref, dssprod = _apply_time_ranges(dsref, dsprod, params, tbound)
     dssref, dssprod = _apply_vertical_ranges(dssref, dssprod, params, comp_func)
 
-    # Save results
-    _save_colocation_results(
-        dssref, dssprod, comp_func, metazone, ncouts, ref_name, prod_name
+    # Save results and return paths
+    paths = _save_colocation_results(
+        dssref, dssprod, comp_func, metazone, ref_name, prod_name
     )
+    return ref_name, prod_name, paths
 
 
-def _process_reference(ncref, ncs, params, tbound, comp_func, metazone, ncouts):
+def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts):
     """Process all products for a single reference.
 
     Parameters
     ----------
     ncref: Path
         Path to reference file.
-    ncs: list
-        List of all NetCDF file paths.
+    ncins: list
+        Pre-filtered list of product file paths for this metazone.
     params: dict
         Colocation parameters.
     tbound: tuple
@@ -825,21 +942,29 @@ def _process_reference(ncref, ncs, params, tbound, comp_func, metazone, ncouts):
     """
     logger.info(f"Use reference {ncref}")
 
-    dsrefin = xr.open_dataset(ncref, engine="zarr")
+    dsrefin = xr.open_dataset(ncref, engine="zarr", chunks="auto")
     dsrefin = _prepare_dataset(dsrefin, comp_func, is_reference=True)
 
-    ncins = [nc for nc in ncs if metazone in str(nc) and "ref" not in str(nc)]
-
+    results = []
     for ncin in ncins:
-        _process_single_product(
-            dsrefin, ncin, params, tbound, comp_func, metazone, ncouts
+        result = _process_single_product(
+            dsrefin, ncin, params, tbound, comp_func, metazone
         )
+        results.append(result)
+ 
+    # Merge results into ncouts
+    for ref_name, prod_name, paths in results:
+        if ref_name not in ncouts[metazone]:
+            ncouts[metazone][ref_name] = {}
+        if prod_name not in ncouts[metazone][ref_name]:
+            ncouts[metazone][ref_name][prod_name] = []
+        ncouts[metazone][ref_name][prod_name].extend(paths)
 
     dsrefin.close()
     gc.collect()
 
 
-def _process_metazone(metazone, params, ncs, metazones, comp_func, ncouts):
+def _process_metazone(metazone, params, mz_files, metazones, comp_func, ncouts):
     """Process colocation for a single metazone.
 
     Parameters
@@ -848,8 +973,8 @@ def _process_metazone(metazone, params, ncs, metazones, comp_func, ncouts):
         Metazone name.
     params: dict
         Colocation parameters for this metazone.
-    ncs: list
-        List of all NetCDF file paths.
+    mz_files: dict
+        Pre-filtered file index with keys "ref" and "prod".
     metazones: dict
         Dictionary containing all metazone information.
     comp_func: str
@@ -863,10 +988,11 @@ def _process_metazone(metazone, params, ncs, metazones, comp_func, ncouts):
     tbound = metazones[metazone].get("tbound")
     ncouts[metazone] = {}
 
-    ncrefs = [nc for nc in ncs if (metazone in str(nc)) and ("ref" in str(nc))]
+    ncrefs = mz_files["ref"]
+    ncins = mz_files["prod"]
 
     for ncref in ncrefs:
-        _process_reference(ncref, ncs, params, tbound, comp_func, metazone, ncouts)
+        _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts)
 
     logger.info(f"End colocation for {metazone}.")
 
@@ -898,8 +1024,22 @@ def main_coloc(ncs, metazones, comp_func):
         else:
             coloc_params[metazone] = params
 
+    # Build file index once (avoid repeated list scans)
+    ncs_index = {}
+    for nc in ncs:
+        nc_str = str(nc)
+        for metazone in coloc_params:
+            if metazone in nc_str:
+                if metazone not in ncs_index:
+                    ncs_index[metazone] = {"ref": [], "prod": []}
+                if "ref" in nc_str:
+                    ncs_index[metazone]["ref"].append(nc)
+                else:
+                    ncs_index[metazone]["prod"].append(nc)
+
     ncouts = {}
     for metazone, params in coloc_params.items():
-        _process_metazone(metazone, params, ncs, metazones, comp_func, ncouts)
+        mz_files = ncs_index.get(metazone, {"ref": [], "prod": []})
+        _process_metazone(metazone, params, mz_files, metazones, comp_func, ncouts)
 
     return ncouts

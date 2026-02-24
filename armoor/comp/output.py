@@ -19,6 +19,7 @@ from armoor.base.io import (
     )
 from armoor.comp import COMP_VARS, OUTPUTS_PARAMS
 from armoor.comp.stats import StatsComp
+import armoor.base.oceanvars  # noqa: F401 — registers .oceanvars accessor
 from armoor.data.interp import process_time_interpolation
 from armoor.diags.parcels import Parcels
 
@@ -32,6 +33,21 @@ _DRIFTER_OTYPE_REMAP = {
     "maps_current": "maps_current_drifter",
     "maps_trajectory": "maps_trajectory_drifter",
 }
+
+
+def _compute_oceanvars(ds, func_comp):
+    """Compute derived oceanographic variables on a colocated dataset.
+
+    Derived variables (pdens, sndspeed, temp-from-ptemp, …) are computed
+    here rather than during colocation so that the expensive gsw calls
+    run on the small colocated data, not the full product grid.
+    """
+    for var in COMP_VARS[func_comp]:
+        if var not in ds.data_vars:
+            da = ds.oceanvars.sel(var)
+            if isinstance(da, xr.DataArray):
+                ds[var] = da
+    return ds
 
 
 def check_output(func_name, outputs):
@@ -500,14 +516,26 @@ class OutputProcessor:
         prod_files_list = prod_files["prod"][sort_key]
         ref_files_list = prod_files["ref"][sort_key]
         num_files = len(prod_files_list)
-        
+
         # Initialize storage for computed data trees
         computed_data = {data_type: [] for data_type in DATA_TYPES}
 
-        # Process each file pair
-        for file_idx in range(num_files):
-            with xr.open_dataset(prod_files_list[file_idx]) as ds_prod, \
-                 xr.open_dataset(ref_files_list[file_idx]) as ds_ref:
+        # Open all files upfront to avoid repeated open/close overhead
+        prod_datasets = []
+        ref_datasets = []
+        try:
+            prod_datasets = [
+                _compute_oceanvars(xr.open_dataset(f), self.func_comp)
+                for f in prod_files_list
+            ]
+            ref_datasets = [
+                _compute_oceanvars(xr.open_dataset(f), self.func_comp)
+                for f in ref_files_list
+            ]
+            # Process each file pair
+            for file_idx in range(num_files):
+                ds_prod = prod_datasets[file_idx]
+                ds_ref = ref_datasets[file_idx]
                 # Prepare statistics configuration
                 stats = output_params.get("stat").copy() if output_params.get("stat") else None
                 # Compute statistics and comparisons
@@ -521,7 +549,11 @@ class OutputProcessor:
                 computed_data["prod"].append(dt_prod)
                 computed_data["ref"].append(dt_ref)
                 computed_data["comp"].append(dt_comps)
-        
+        finally:
+            # Close all files at end
+            for ds in prod_datasets + ref_datasets:
+                ds.close()
+
         return computed_data
     
     def _concatenate_datasets(self, data_trees: List[Any], 

@@ -6,6 +6,15 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
+def _gsw_ufunc(func, *args):
+    """Wrap a gsw function so it works with both numpy and dask arrays."""
+    return xr.apply_ufunc(
+        func, *args,
+        dask="parallelized",
+        output_dtypes=[np.float32],
+    )
+
 @xr.register_dataarray_accessor("oceanvars")
 @xr.register_dataset_accessor("oceanvars")
 class OceanVars:
@@ -81,10 +90,10 @@ class OceanVars:
                     pres = self.ds.oceanvars.sel_pres()
                 else:
                     pres = self.ds["pres"]
-                ptemp = gsw.conversions.pt0_from_t(
-                    self.ds.sal.data, self.ds.temp.data, pres.data
-                    )
-                ptemp = xr.DataArray(data=ptemp, coords=self.ds.temp.coords)
+                ptemp = _gsw_ufunc(
+                    gsw.conversions.pt0_from_t,
+                    self.ds.sal, self.ds.temp, pres,
+                )
                 ptemp.attrs["standard_name"] = (
                     "sea_water_potential_temperature"
                 )
@@ -112,8 +121,8 @@ class OceanVars:
             sal = self.sel_sal()
             ptemp = self.sel_ptemp()
             pres = self.sel_pres()
-            cons_temp = gsw.CT_from_pt(sal, ptemp)
-            temp = gsw.t_from_CT(sal, cons_temp, pres)
+            cons_temp = _gsw_ufunc(gsw.CT_from_pt, sal, ptemp)
+            temp = _gsw_ufunc(gsw.t_from_CT, sal, cons_temp, pres)
             temp.attrs["units"] = "degC"
             return temp
     
@@ -135,7 +144,16 @@ class OceanVars:
         if "pres" in self.ds:
             return self.ds["pres"]
         elif "depth" in self.ds:
-            return gsw.conversions.p_from_z(-self.ds.depth, self.ds.lat)
+            # Use mean latitude to avoid broadcasting depth against lat's
+            # spatial dimensions, which can create huge intermediate arrays
+            # on gridded products. The lat dependence in p_from_z is only
+            # a minor gravity correction (~0.5%).
+            lat = float(self.ds.lat.mean())
+            pres = gsw.conversions.p_from_z(-self.ds.depth, lat)
+            # Cache to avoid recomputing (sel_pdens calls sel_pres
+            # multiple times via sel_ptemp / SA_from_SP).
+            self.ds["pres"] = pres
+            return self.ds["pres"]
         
     def sel_pdens(self, ref_dens=None):
         """
@@ -155,12 +173,13 @@ class OceanVars:
             if not isinstance(sal, xr.DataArray):
                 logger.warning("Potential density cannot be computed")
                 return None
-            asal = gsw.conversions.SA_from_SP(
-                self.sel_sal(), self.sel_pres(), self.ds.lon, self.ds.lat
-                )
-            ctemp = gsw.CT_from_pt(
-                asal, self.sel_ptemp()
-                )
+            ptemp = self.sel_ptemp()
+            asal = _gsw_ufunc(
+                gsw.conversions.SA_from_SP,
+                sal, pres, self.ds.lon, self.ds.lat,
+            )
+            ctemp = _gsw_ufunc(gsw.CT_from_pt, asal, ptemp)
+            del ptemp
             if not asal is None and not ctemp is None:
                 if ref_dens is None or ref_dens not in [
                     0,
@@ -185,7 +204,7 @@ class OceanVars:
                     func = gsw.sigma3
                 elif ref_dens == 4000:
                     func = gsw.sigma4
-                pdens = func(asal, ctemp)
+                pdens = _gsw_ufunc(func, asal, ctemp)
                 self.ds["pdens"] = pdens
                 self.ds["pdens"] = self.ds["pdens"].assign_attrs(
                     {"units": "kg/m3"}
@@ -215,13 +234,14 @@ class OceanVars:
         if not isinstance(sal, xr.DataArray):
             logger.warning("Potential density cannot be computed")
             return None
-        cons_temp = gsw.CT_from_pt(sal, ptemp)
-            
+        cons_temp = _gsw_ufunc(gsw.CT_from_pt, sal, ptemp)
+
         pres = self.sel_pres()
-        sal = gsw.conversions.SA_from_SP(
-            self.sel_sal(), pres, self.ds.lon, self.ds.lat
+        sal = _gsw_ufunc(
+            gsw.conversions.SA_from_SP,
+            self.sel_sal(), pres, self.ds.lon, self.ds.lat,
         )
-        snd_speed = gsw.sound_speed(sal, cons_temp, pres)
+        snd_speed = _gsw_ufunc(gsw.sound_speed, sal, cons_temp, pres)
         snd_speed.attrs["units"] = "m/s"
         self.ds["sndspeed"] = snd_speed
         return self.ds["sndspeed"]

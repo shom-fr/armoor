@@ -19,6 +19,12 @@ def test():
         WOOMTMPDIR,
         dirs_exist_ok=True
         )
+    # Remove stale job scripts so woom regenerates them for the current host.
+    # Old scripts generated under a different host (e.g. gitlab-ci) would
+    # reference wrong conda/module paths and cause immediate failures.
+    jobs_dir = os.path.join(WOOMTMPDIR, "jobs")
+    if os.path.exists(jobs_dir):
+        shutil.rmtree(jobs_dir)
     os.chdir(WOOMTMPDIR)
     
     wext.load_jinja_filters(os.path.join(WOOMTMPDIR, "ext/jinja_filters.py"))

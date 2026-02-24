@@ -10,6 +10,7 @@ from dask.distributed import Client, LocalCluster
 import dask.config
 import xarray as xr
 
+from armoor.base.filters import ArmoorFilters  # registers armoorfilters accessor
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
 from armoor.base.misc import parse_date, parse_hours, is_dict_empty, parse_coords
 from armoor.cli.io import (

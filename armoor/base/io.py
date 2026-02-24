@@ -4,11 +4,9 @@ import logging
 from typing import Dict, List, Tuple
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
-import cftime
 import zarr
 import dask
 import numpy as np
-import pandas as pd
 import xarray as xr
 from dask.distributed import Client
 from numcodecs import Blosc
@@ -84,11 +82,14 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
     ds_fixed = ds.copy()   
     
     encoding = {}
+    lazy_minmax = []
+    minmax_vars = []
+
     # Traiter toutes les variables (data + coords)
     all_vars = list(ds_fixed.data_vars) + list(ds_fixed.coords)
     for var_name in all_vars:
         var = ds_fixed[var_name]
-        
+
         # Skip si pas de chunks
         if var.chunks is None:
             if verbose:
@@ -101,37 +102,37 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                 logger.debug(f"  Shape: {var.shape}")
                 logger.debug(f"  Dims: {var.dims}")
                 logger.debug(f"  Actual chunks: {var.chunks}")
-            
+
             # Analyser chaque dimension
             needs_rechunk = False
             new_chunks = {}
-            
+
             for dim_name, dim_size, dim_chunks in zip(var.dims, var.shape, var.chunks):
                 n_chunks = len(dim_chunks)
-                
+
                 if n_chunks <= 1:
                     # Un seul chunk - OK
                     new_chunks[dim_name] = dim_size
                     if verbose:
                         logger.debug(f"  {dim_name}: 1 chunk ({dim_size}) - OK")
                     continue
-                
+
                 first_chunk = dim_chunks[0]
                 last_chunk = dim_chunks[-1]
-                
+
                 if last_chunk > first_chunk:
                     # PROBLÈME DÉTECTÉ
                     needs_rechunk = True
                     optimal_size = find_valid_chunk_size(dim_size, first_chunk)
                     new_chunks[dim_name] = optimal_size
-                    
+
                     if verbose:
                         logger.debug(f" {dim_name}: Detected problem!")
                         logger.debug(f"    - Dimension size: {dim_size}")
                         logger.debug(f"    - Actual chunks: {dim_chunks}")
                         logger.debug(f"    - First chunk: {first_chunk}, Last: {last_chunk}")
                         logger.debug(f"    - New chunk: {optimal_size}")
-                        
+
                         # Calculer la nouvelle distribution
                         n_full = dim_size // optimal_size
                         remainder = dim_size % optimal_size
@@ -144,7 +145,7 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                     new_chunks[dim_name] = first_chunk
                     if verbose:
                         logger.debug(f"  {dim_name}: Chunks OK ({n_chunks} chunks: {first_chunk}...{last_chunk})")
-            
+
             # Rechunker si nécessaire
             if needs_rechunk:
                 if verbose:
@@ -167,19 +168,9 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
             elif isinstance(val, str):
                 da_fixed.attrs[key] = str(val)
         if np.issubdtype(da_fixed.dtype, np.number):
-            vmin = da_fixed.min().values
-            vmax = da_fixed.max().values
-            if var_name == "time":
-                if "units" in da_fixed.encoding:
-                    units = da_fixed.encoding['units']
-                    calendar = da_fixed.encoding.get('calendar', 'standard')
-                    dtvmin = pd.to_datetime(vmin).to_pydatetime()
-                    dtvmax = pd.to_datetime(vmax).to_pydatetime()
-                    vmin = cftime.date2num(dtvmin, units, calendar)
-                    vmax = cftime.date2num(dtvmax, units, calendar)
-            
-            da_fixed.attrs["valid_min"] = float(vmin)
-            da_fixed.attrs["valid_max"] = float(vmax)
+            lazy_minmax.append(da_fixed.min())
+            lazy_minmax.append(da_fixed.max())
+            minmax_vars.append(var_name)
         if var_name in ("lon", "lat", "depth"):
             if "axis" in da_fixed.attrs:
                 da_fixed.attrs.pop("axis")
@@ -189,11 +180,12 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
         ds_fixed[var_name] = da_fixed
         if verbose:
             logger.debug(f"  Encoding cleaned (kept: {list(safe_encoding.keys())})")
+
     if verbose:
         logger.debug("\n" + "=" * 70)
         logger.debug("Every problem corrected?")
         logger.debug("=" * 70)
-        
+
         # Résumé
         logger.debug("\nFinal chunks:")
         for var_name in ds_fixed.data_vars:
@@ -201,24 +193,153 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
             if var.chunks is not None:
                 logger.debug(f"  {var_name}: {var.chunks}")
 
-    return ds_fixed, encoding
+    return ds_fixed, encoding, (lazy_minmax, minmax_vars)
+
+def _apply_minmax_to_zarr(path, minmax_vars, computed_minmax, ds):
+    """Update zarr store attrs with computed valid_min/valid_max."""
+    import cftime
+    import pandas as pd
+
+    store = zarr.open(str(path), mode='r+')
+    for idx, var_name in enumerate(minmax_vars):
+        vmin = computed_minmax[2 * idx].values
+        vmax = computed_minmax[2 * idx + 1].values
+        if var_name == "time":
+            da_t = ds[var_name]
+            if "units" in da_t.encoding:
+                units = da_t.encoding['units']
+                calendar = da_t.encoding.get('calendar', 'standard')
+                vmin = float(cftime.date2num(
+                    pd.to_datetime(vmin).to_pydatetime(), units, calendar))
+                vmax = float(cftime.date2num(
+                    pd.to_datetime(vmax).to_pydatetime(), units, calendar))
+        store[var_name].attrs['valid_min'] = float(vmin)
+        store[var_name].attrs['valid_max'] = float(vmax)
+    zarr.consolidate_metadata(str(path))
+
+
+class _BundledNetcdfWrite:
+    """Bundles netcdf write + min/max computation into a single dask pass."""
+
+    def __init__(self, write_delayed, lazy_minmax, minmax_vars, path, ds):
+        self._write_delayed = write_delayed
+        self._lazy_minmax = lazy_minmax
+        self._minmax_vars = minmax_vars
+        self._path = path
+        self._ds = ds
+
+    def compute(self):
+        results = dask.compute(self._write_delayed, *self._lazy_minmax)
+        if self._lazy_minmax:
+            _apply_minmax_to_netcdf(
+                self._path, self._minmax_vars, results[1:], self._ds)
+        return results[0]
+
+
+class _BundledZarrWrite:
+    """Bundles zarr write + min/max computation into a single dask pass.
+
+    When .compute() is called, both the zarr write and the min/max
+    reductions share the same task graph, so each data chunk is read
+    only once instead of twice.
+    """
+
+    def __init__(self, write_delayed, lazy_minmax, minmax_vars, path, ds):
+        self._write_delayed = write_delayed
+        self._lazy_minmax = lazy_minmax
+        self._minmax_vars = minmax_vars
+        self._path = path
+        self._ds = ds
+
+    def compute(self):
+        results = dask.compute(self._write_delayed, *self._lazy_minmax)
+        if self._lazy_minmax:
+            _apply_minmax_to_zarr(
+                self._path, self._minmax_vars, results[1:], self._ds)
+        return results[0]
+
+
+def compute_bundled_zarr_writes(write_jobs):
+    """Compute multiple _BundledZarrWrite objects in a single dask pass.
+
+    Dask merges all task graphs into one and the scheduler reuses shared
+    upstream nodes — in practice each source chunk (e.g. a NetCDF4/HDF5
+    tile) is read exactly once even when it feeds several output zarr files.
+    This is the key optimisation for per-metazone staging: N metazones that
+    share the same source data pay for one read pass, not N.
+
+    Parameters
+    ----------
+    write_jobs : list of _BundledZarrWrite
+        Write jobs returned by ``write_dataset_to_zarr(..., compute=False)``.
+    """
+    all_delayed = []
+    for job in write_jobs:
+        all_delayed.append(job._write_delayed)
+        all_delayed.extend(job._lazy_minmax)
+
+    results = dask.compute(*all_delayed)
+
+    offset = 0
+    for job in write_jobs:
+        n = len(job._lazy_minmax)
+        if job._lazy_minmax:
+            _apply_minmax_to_zarr(
+                job._path, job._minmax_vars, results[offset + 1: offset + 1 + n], job._ds)
+        offset += 1 + n
+
+
+def _apply_minmax_to_netcdf(path, minmax_vars, computed_minmax, ds):
+    """Update netcdf file attrs with computed valid_min/valid_max."""
+    import cftime
+    import pandas as pd
+    import netCDF4
+
+    with netCDF4.Dataset(str(path), mode='a') as nc:
+        for idx, var_name in enumerate(minmax_vars):
+            vmin = computed_minmax[2 * idx].values
+            vmax = computed_minmax[2 * idx + 1].values
+            if var_name == "time":
+                da_t = ds[var_name]
+                if "units" in da_t.encoding:
+                    units = da_t.encoding['units']
+                    calendar = da_t.encoding.get('calendar', 'standard')
+                    vmin = float(cftime.date2num(
+                        pd.to_datetime(vmin).to_pydatetime(), units, calendar))
+                    vmax = float(cftime.date2num(
+                        pd.to_datetime(vmax).to_pydatetime(), units, calendar))
+            if var_name in nc.variables:
+                nc.variables[var_name].setncattr('valid_min', float(vmin))
+                nc.variables[var_name].setncattr('valid_max', float(vmax))
+
 
 def write_dataset_to_netcdf(ds: xr.Dataset, path: str, compute: bool = True):
     """
     Sauvegarde Netcdf avec attrs et encoding.
-    
+
+    Computes the netcdf write and valid_min/valid_max in a single dask pass
+    so that data chunks are read only once.
+
     Parameters:
     -----------
     ds : xr.Dataset
         Dataset à sauvegarder
     path : str
-        Chemin de sortie Zarr
+        Chemin de sortie NetCDF
     compute : bool
         Calculer immédiatement (True) ou retourner delayed (False)
     """
-    ds, encoding = auto_fix_zarr_encoding(ds)
-    res = ds.to_netcdf(path, compute=compute, encoding=encoding, format="NETCDF4")
-    return res
+    ds, encoding, (lazy_minmax, minmax_vars) = auto_fix_zarr_encoding(ds)
+    write_delayed = ds.to_netcdf(path, compute=False, encoding=encoding, format="NETCDF4")
+
+    if compute:
+        results = dask.compute(write_delayed, *lazy_minmax)
+        if lazy_minmax:
+            _apply_minmax_to_netcdf(path, minmax_vars, results[1:], ds)
+        return results[0]
+    else:
+        return _BundledNetcdfWrite(
+            write_delayed, lazy_minmax, minmax_vars, path, ds)
 
 def write_dataset_to_zarr(
     ds: xr.Dataset,
@@ -230,7 +351,10 @@ def write_dataset_to_zarr(
 ):
     """
     Sauvegarde sécurisée vers Zarr avec correction automatique.
-    
+
+    Computes the zarr write and valid_min/valid_max in a single dask pass
+    so that data chunks are read only once.
+
     Parameters:
     -----------
     ds : xr.Dataset
@@ -246,28 +370,33 @@ def write_dataset_to_zarr(
     **kwargs : arguments supplémentaires pour to_zarr()
     """
     # Correction automatique
-    ds, encoding = auto_fix_zarr_encoding(ds)
+    ds, encoding, (lazy_minmax, minmax_vars) = auto_fix_zarr_encoding(ds)
 
     logger.info(f"\n Write: {path}")
     logger.debug(f"   Mode: {mode}")
     logger.debug(f"   Consolidated metadata: {consolidated}")
-    
-    # Écriture
-    result = ds.to_zarr(
+
+    # Create delayed write job
+    write_delayed = ds.to_zarr(
         path,
         mode=mode,
         consolidated=consolidated,
-        compute=compute,
+        compute=False,
         encoding=encoding,
         **kwargs
     )
-    
+
     if compute:
+        # Compute write + min/max in a single dask pass
+        results = dask.compute(write_delayed, *lazy_minmax)
+        if lazy_minmax:
+            _apply_minmax_to_zarr(path, minmax_vars, results[1:], ds)
         logger.info("Successfully written.")
+        return results[0]
     else:
         logger.info("Delayed writting.")
-    
-    return result
+        return _BundledZarrWrite(
+            write_delayed, lazy_minmax, minmax_vars, path, ds)
 
 def create_fast_encoding(ds):
     """Crée un encoding optimisé pour la vitesse de sauvegarde."""
@@ -362,12 +491,17 @@ def zarrs2netcdfs(fins):
     """
     extin = "zarr"
     extout = "nc"
-    fouts = []
-    for fin in fins:
-        if fin:
-            fout = str(fin).replace(extin, extout)
-            xr.open_zarr(fin).to_netcdf(fout)
-            fouts.append(fout)
+
+    def _convert_single(fin):
+        fout = str(fin).replace(extin, extout)
+        xr.open_zarr(fin).to_netcdf(fout)
+        return fout
+
+    delayed_results = [dask.delayed(_convert_single)(fin) for fin in fins if fin]
+    if delayed_results:
+        fouts = list(dask.compute(*delayed_results))
+    else:
+        fouts = []
     return fouts
 
 def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, localdirectory):
