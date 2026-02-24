@@ -2,13 +2,14 @@
 
 This module provides utility functions for adding standardized command-line arguments
 related to input/output operations and saving xarray datasets in various formats.
+
+Heavy imports (dask, armoor.base.io) are deferred to the functions that need them
+so that importing this module for argument-parser setup is fast.
 """
 import logging
 from pathlib import Path
-from dask.diagnostics import ProgressBar
 
 from armoor import ArmoorError
-from armoor.base.io import write_dataset_to_zarr, write_dataset_to_netcdf
 from armoor.base.misc import comma_separated
 
 logger = logging.getLogger(__name__)
@@ -446,14 +447,12 @@ def save_output(ds, fout, ofmt="zarr", scheduler=None):
     - For netcdf format, uses standard xarray `to_netcdf()` method
     - Zarr format is preferred for large datasets due to better performance
     """
-    if scheduler:
-        kwargs = dict(scheduler=scheduler)
-    else:
-        kwargs = dict()
+    import dask
+    from dask.diagnostics import ProgressBar
+    from armoor.base.io import write_dataset_to_zarr, write_dataset_to_netcdf
+
     logger.info(f"Saving {fout}")
     if ofmt == "zarr":
-        # delayed = to_zarr(ds, fout)
-        # delayed.compute()
         write_job = write_dataset_to_zarr(
             ds,
             fout,
@@ -465,8 +464,13 @@ def save_output(ds, fout, ofmt="zarr", scheduler=None):
         write_job = write_dataset_to_netcdf(ds, fout, compute=False)
     else:
         raise ValueError(f"Unsupported output format: {ofmt}. Use 'zarr' or 'netcdf'.")
-    with ProgressBar():
-        write_job.compute(**kwargs)
+    # Use dask.config.set so the scheduler override propagates into
+    # write_job.compute() → dask.compute() without needing to thread
+    # kwargs through _BundledZarrWrite / _BundledNetcdfWrite.
+    cfg = {"scheduler": scheduler} if scheduler else {}
+    with dask.config.set(cfg):
+        with ProgressBar():
+            write_job.compute()
 
 
 def to_zarr(ds, fout):

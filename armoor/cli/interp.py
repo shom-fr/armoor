@@ -146,7 +146,7 @@ def main_interp_time():
                 ("tfreq", args.tfreq),
                 [ds.time.min().values, ds.time.max().values]
                 )
-            save_output(ds, args.fout, ofmt=args.ofmt)#, scheduler="processes")
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
             if args.ifmt != 'armoor':
                 shutil.rmtree("tmp.zarr")
                 
@@ -341,7 +341,7 @@ def main_interp_horizontal():
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
             ds = process_horizontal_interpolation(ds, params)
-            save_output(ds, args.fout, ofmt=args.ofmt)#, scheduler="processes")
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
             if args.ifmt != 'armoor':
                 shutil.rmtree("tmp.zarr")
         
@@ -485,7 +485,7 @@ def main_interp_vertical():
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
             ds = process_vertical_interpolation(ds.chunk(dict(z=-1)), params)
-            save_output(ds, args.fout, ofmt=args.ofmt)#, scheduler="processes")
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
             if args.ifmt != 'armoor':
                 shutil.rmtree("tmp.zarr")
             

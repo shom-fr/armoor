@@ -1,39 +1,58 @@
-"""Command-line interface for armoor."""
-import gc
+"""Command-line interface for armoor.
+
+Heavy imports (dask.distributed, cartopy, scipy, xoa, …) are deferred to
+the functions that actually need them so that CLI startup is fast even on
+slow HPC parallel file-systems.
+"""
+import os
+# Limit OpenMP/BLAS to 1 thread per process. Must happen before numpy is
+# imported anywhere so that libgomp picks it up during initialisation.
+# Parallelism is achieved via multiple processes (dask workers), not threads.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
 import json
 import logging
 import time
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
-from dask.distributed import Client, LocalCluster
-from xoa.cfgm import ConfigManager, register_validation_functions
 
-import armoor.base.oceanvars
+from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
+
 from armoor import ArmoorError
-from armoor.base.io import (ArmoorArgumentHelpFormatter, create_fast_encoding,
-                            setup_dask_client, zarrs2netcdfs)
-from armoor.base.misc import (comma_separated, dict_to_list,
-                              optimize_for_low_swap, parse_coords,
+from armoor.base.misc import (comma_separated, parse_coords,
                               parse_mixed_param, parse_qc_tuple)
+
+
+class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
+                                 ArgumentDefaultsHelpFormatter):
+    pass
 from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI, BULL_INI
 from armoor.cli.io import add_dask_parser_arguments, get_dask_args, add_comp_parser_arguments
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.comp import METAZONE_PARAMS
-from armoor.comp.coloc import main_coloc
-from armoor.comp.output import main_output as output_comp
-from armoor.comp.plot import main_plot as plot_comp
-from armoor.data.load import load_datasets
-from armoor.data.output import main_output as output_data
-from armoor.data.plot import main_plot as plot_data
-from armoor.bull.build import Bull
 
 logger = logging.getLogger(__name__)
 
-logging.getLogger('distributed').setLevel(logging.ERROR)
 
-register_validation_functions(coordinates=parse_coords)
-register_validation_functions(mlist=parse_mixed_param)
+_heavy_done = False
+
+def _init_heavy():
+    """One-time lazy initialisation of heavy dependencies."""
+    global _heavy_done
+    if _heavy_done:
+        return
+    _heavy_done = True
+    import os
+    for var in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS'):
+         os.environ.setdefault(var, '1')
+
+    logging.getLogger('distributed').setLevel(logging.ERROR)
+    import armoor.base.filters  # noqa: F401 — registers xarray accessor
+    import armoor.base.oceanvars  # noqa: F401 — registers xarray accessor
+    from xoa.cfgm import register_validation_functions
+    register_validation_functions(coordinates=parse_coords)
+    register_validation_functions(mlist=parse_mixed_param)
 
 
 def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
@@ -129,12 +148,24 @@ def get_parser_filters():
 
 def main_filters():
     """Apply filters over metazones."""
+    import dask
+    from xoa.cfgm import ConfigManager
+    from armoor.base.io import zarrs2netcdfs
+    from armoor.data.load import load_datasets
+    _init_heavy()
+
+    dask.config.set({
+        'scheduler': 'threads',
+        'array.slicing.split_large_chunks': True,
+        'optimization.fuse.active': True,
+    })
+
     # Get parser
     parser = get_parser_filters()
 
     # Parse
     args = parser.parse_args()
-    
+
     # Setup logging
     main_setup_logging(args)
 
@@ -146,24 +177,20 @@ def main_filters():
 
     cfg = ConfigManager(DATA_INI).load(str(args.cfgfile))
     metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
-    
+
     metazones = check_metazones_in(
        args. metazones,
        metazones
        )
 
-    logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    
-    kw_dask = get_dask_args(args)
-    
-    with LocalCluster(**setup_dask_client(**kw_dask)) as cluster:
-        with Client(cluster): 
-            zarrs = load_datasets(cfg["data"], metazones, None)
-            ncs = zarrs2netcdfs(zarrs)
+    logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
+
+    zarrs = load_datasets(cfg["data"], metazones, None)
+    ncs = zarrs2netcdfs(zarrs)
 
     with open(args.jsonfile, 'w') as f:
         json.dump(ncs, f, indent=4)
-        
+
     logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
 
 def get_parser_data():
@@ -207,12 +234,26 @@ def get_parser_data():
 
 def main_data():
     """Process data over metazones."""
+    import dask
+    from xoa.cfgm import ConfigManager
+    from armoor.base.io import zarrs2netcdfs
+    from armoor.base.misc import dict_to_list
+    from armoor.data.load import load_datasets
+    from armoor.data.output import main_output as output_data
+    _init_heavy()
+
+    dask.config.set({
+        'scheduler': 'threads',
+        'array.slicing.split_large_chunks': True,
+        'optimization.fuse.active': True,
+    })
+
     # Get parser
     parser = get_parser_data()
 
     # Parse
     args = parser.parse_args()
-    
+
     # Setup logging
     main_setup_logging(args)
 
@@ -221,64 +262,78 @@ def main_data():
         raise ArmoorError(
             f"File not found: {args.cfgfile}."
             )
-    
+
     cfg = ConfigManager(DATA_INI).load(str(args.cfgfile))
     metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
-    
+
     metazones = check_metazones_in(
        args. metazones,
        metazones
        )
-    
-    kw_dask = get_dask_args(args)
-    
-    logger.info(f"🚀 Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster): 
-            zarrs = load_datasets(cfg["data"], metazones, "data")
-        
-            if args.filters_only:
-        
-                ncs = zarrs2netcdfs(zarrs)
-            
-                with open(args.jsonfile, 'w') as f:
-                    json.dump(ncs, f, indent=4)
-                    
-                logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
-            
-            else:
-                
-                zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs").copy())
-        
-                ofmt = cfg["outputs"].get("fmt")
-                
-                if "png" in ofmt:
-                    plot_data(zarr_outputs, metazones)
-            
-                zarr_outputs = dict_to_list(zarr_outputs)
-                
-                if "zarr" in ofmt:
-                    with open(args.jsonfile, 'w') as f:
-                        json.dump(zarr_outputs, f, indent=4)
-                        
-                if "netcdf" in ofmt:
-                    ncs_outputs = zarrs2netcdfs(zarr_outputs)
-                    with open(args.jsonfile, 'w') as f:
-                        json.dump(ncs_outputs, f, indent=4)
+
+    logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
+
+    zarrs = load_datasets(cfg["data"], metazones, "data")
+
+    if args.filters_only:
+
+        ncs = zarrs2netcdfs(zarrs)
+
+        with open(args.jsonfile, 'w') as f:
+            json.dump(ncs, f, indent=4)
+
+        logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
+
+    else:
+
+        zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs").copy())
+
+        ofmt = cfg["outputs"].get("fmt")
+
+        if "png" in ofmt:
+            from armoor.data.plot import main_plot as plot_data
+            plot_data(zarr_outputs, metazones)
+
+        zarr_outputs = dict_to_list(zarr_outputs)
+
+        if "zarr" in ofmt:
+            with open(args.jsonfile, 'w') as f:
+                json.dump(zarr_outputs, f, indent=4)
+
+        if "netcdf" in ofmt:
+            ncs_outputs = zarrs2netcdfs(zarr_outputs)
+            with open(args.jsonfile, 'w') as f:
+                json.dump(ncs_outputs, f, indent=4)
 
 def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, kw_dask, comp_args={}):
-    
+    import dask
+    from xoa.cfgm import ConfigManager
+    from armoor.base.io import zarrs2netcdfs
+    from armoor.base.misc import dict_to_list
+    from armoor.comp import METAZONE_PARAMS
+    from armoor.comp.coloc import main_coloc
+    from armoor.data.load import load_datasets
+
+    # No distributed cluster — use local threaded scheduler for I/O,
+    # synchronous where already set in colocation code.
+    # This avoids worker memory interference and GIL contention.
+    dask.config.set({
+        'scheduler': 'threads',
+        'array.slicing.split_large_chunks': True,
+        'optimization.fuse.active': True,
+    })
+
     logger.info("Initial diagnostic:")
     monitor_performance()
-    
+
     start_time = time.time()
-    
+
     cfg = ConfigManager(COMP_INI).load(str(cfgfile))
     metas = ConfigManager(METAZONES_INI).load(str(metafile))
 
     if not cfg:
         raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
-    
+
     # Metazones
     metazones = check_metazones_in(
         metazones,
@@ -290,50 +345,50 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
     jsonfile = str(jsonfile).format(**locals())
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            zarr = load_datasets(cfg["data"], metazones, func_comp)
-            if ofilter:
-                zarr = [str(z) for z in zarr]
-                ncs_outputs = zarrs2netcdfs(zarr)
+
+    zarr = load_datasets(cfg["data"], metazones, func_comp)
+
+    if ofilter:
+        zarr = [str(z) for z in zarr]
+        ncs_outputs = zarrs2netcdfs(zarr)
+        with open(jsonfile, 'w') as f:
+            json.dump(ncs_outputs, f, indent=4)
+
+    else:
+        zarr_coloc = main_coloc(zarr, metazones, func_comp)
+
+        if ocoloc:
+            zarr_coloc = dict_to_list(zarr_coloc)
+            zarr_coloc = [str(z) for z in zarr_coloc]
+            ncs_outputs = zarrs2netcdfs(zarr_coloc)
+            with open(jsonfile, 'w') as f:
+                json.dump(ncs_outputs, f, indent=4)
+
+        else:
+            from armoor.comp.output import main_output as output_comp
+            zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp, **comp_args)
+            ofmt = cfg["outputs"].get("fmt")
+
+            if "png" in ofmt:
+                from armoor.comp.plot import main_plot as plot_comp
+                plot_comp(zarr_outputs, metazones, func_comp, kw_dask=kw_dask)
+
+            zarr_outputs = dict_to_list(zarr_outputs)
+
+            if "zarr" in ofmt:
+                with open(jsonfile, 'w') as f:
+                    json.dump(zarr_outputs, f, indent=4)
+
+            if "netcdf" in ofmt:
+                ncs_outputs = zarrs2netcdfs(zarr_outputs)
                 with open(jsonfile, 'w') as f:
                     json.dump(ncs_outputs, f, indent=4)
-                
-            else:
-            
-                zarr_coloc = main_coloc(zarr, metazones, func_comp)
-                
-                if ocoloc:
-                    zarr_coloc = dict_to_list(zarr_coloc)
-                    zarr_coloc = [str(z) for z in zarr_coloc]
-                    ncs_outputs = zarrs2netcdfs(zarr_coloc)
-                    with open(jsonfile, 'w') as f:
-                        json.dump(ncs_outputs, f, indent=4)
-                
-                else:
 
-                    zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp, **comp_args)
-                    ofmt = cfg["outputs"].get("fmt")
-
-                    if "png" in ofmt:
-                        plot_comp(zarr_outputs, metazones, func_comp)
-                
-                    zarr_outputs = dict_to_list(zarr_outputs)
-                    
-                    if "zarr" in ofmt:
-                        with open(jsonfile, 'w') as f:
-                            json.dump(zarr_outputs, f, indent=4)
-                            
-                    if "netcdf" in ofmt:
-                        ncs_outputs = zarrs2netcdfs(zarr_outputs)
-                        with open(jsonfile, 'w') as f:
-                            json.dump(ncs_outputs, f, indent=4)
-        
     logger.info(f"Find the list of generated files in: {jsonfile}")
-    
+
     elapsed = time.time() - start_time
-    logger.info(f"Execution time: {elapsed:.1f} seconds")    
-    
+    logger.info(f"Execution time: {elapsed:.1f} seconds")
+
     logger.info("Final diagnostic:")
     monitor_performance()
 
@@ -353,7 +408,7 @@ def get_parser_comp_models():
 
 def main_comp_models():
     """Compare a model reference with other products."""
-    
+    _init_heavy()
     # Get parser
     parser = get_parser_comp_sst()
     func_comp = "comp_models"
@@ -403,6 +458,7 @@ def get_parser_comp_sst():
 
 def main_comp_sst():
     """Compare sst reference with other products."""
+    _init_heavy()
     # Get parser
     parser = get_parser_comp_sst()
     func_comp = "comp_sst"
@@ -463,7 +519,7 @@ def get_parser_comp_argo():
 
 def main_comp_argo():
     """Compare argo with other products."""
-        
+    _init_heavy()
     # Get parser
     parser = get_parser_comp_argo()
     func_comp = "comp_argo"
@@ -520,6 +576,7 @@ def get_parser_comp_mooring():
 
 def main_comp_mooring():
     """Compare argo with other products."""
+    _init_heavy()
     # Get parser
     parser = get_parser_comp_mooring()
     func_comp = "comp_mooring"
@@ -574,6 +631,7 @@ def get_parser_comp_drifter():
 
 def main_comp_drifter():
     """Compare drifter trajectory with other products."""
+    _init_heavy()
     # Get parser
     parser = get_parser_comp_drifter()
     func_comp = "comp_drifter"
@@ -644,21 +702,24 @@ def get_parser_bull():
 
 def main_bull():
     """Build bull."""
+    from xoa.cfgm import ConfigManager
+    from armoor.bull.build import Bull
+
     # Get parser
     parser = get_parser_bull()
 
     # Parse
     args = parser.parse_args()
-    
+
     # Setup logging
     main_setup_logging(args)
-    
+
     # Load configuration
     if not args.cfgfile.exists():
         raise ArmoorError(f"File not found: {args.cfgfile}.")
-    
+
     cfg = ConfigManager(BULL_INI).load(str(args.cfgfile))
-    
+
     if args.period:
         cfg["header"]["period"] = args.period
         if "summary" in cfg.keys():

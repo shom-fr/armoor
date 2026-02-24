@@ -21,9 +21,11 @@ def interp_time(
     diurnal_vars=None,
     persistency=None,
     ):
-    """Interpolate a dataset in time - OPTIMIZED VERSION.
+    """Interpolate a dataset in time.
 
-    A single interpolation per time step, with persistency.
+    Vectorized: all in-range dates are interpolated in a single
+    ``ds.interp()`` call, then concatenated as 2-3 bulk chunks
+    instead of thousands of single-timestep datasets.
 
     Parameters
     ----------
@@ -35,30 +37,25 @@ def interp_time(
     Returns
     -------
     xarray.Dataset
-
-    """    
-    # Conversion et tri des dates (une seule fois)
+    """
+    # Parse and sort target dates
     dates = pd.to_datetime(dates)
     if hasattr(dates, '__len__') and len(dates) > 1:
         dates = sorted(dates)
     elif not hasattr(dates, '__len__'):
         dates = [dates]
-    
-    # Classification des variables (une seule fois)
+
     varstime = [var for var in ds if "time" in ds[var].dims]
     varsnotime = [var for var in ds if "time" not in ds[var].dims]
 
-    # Time dim et bornes
     time_name = "time"
     time = ds.indexes[time_name]
     begindate_nc = time[0]
     enddate_nc = time[-1]
-    
-    # Pré-calcul des datasets de persistance
+
     ds_first = ds.isel({time_name: slice(0, 1)})
     ds_last = ds.isel({time_name: slice(-1, None)})
-    
-    # Parsing persistency une seule fois
+
     persistency_config = None
     if persistency:
         m = re.search(r"mean_(?P<term>.*)(?P<units>.)", persistency, re.DOTALL)
@@ -68,152 +65,122 @@ def interp_time(
                 'term': int(m["term"]),
                 'units': m["units"]
                 }
-    
-    # Classification des dates pour traitement par lot
-    dates_in_range = []
+
+    # Classify dates
     dates_before = []
     dates_after = []
-    dates_exact = []
-    
+    dates_main = []     # exact matches + in-range → single vectorized interp
+
     for date in dates:
-        if date in time:
-            dates_exact.append(date)
-        elif date < begindate_nc:
+        if date < begindate_nc:
             dates_before.append(date)
         elif date > enddate_nc:
             dates_after.append(date)
         else:
-            dates_in_range.append(date)
-    
-    # Traitement par lots
-    dss = []
-    
-    # 1. Dates exactes (sélection directe par lot)
-    if dates_exact:
-        exact_ds = ds.sel({time_name: dates_exact})
-        for i, date in enumerate(dates_exact):
-            this_ds = exact_ds.isel({time_name: i}).expand_dims(time_name)
-            this_ds = this_ds.assign_coords({time_name: [date]})
-            dss.append((date, this_ds))
-    
-    # 2. Dates avant la plage (persistance)
+            dates_main.append(date)
+
+    # --- Build result parts (bulk multi-timestep datasets) ---
+    parts = []          # [(dataset, sort_key)]
+
+    # 1. Exact + in-range: single vectorized interpolation
+    #    (scipy returns exact values at data points, no precision issue)
+    if dates_main:
+        sorted_main = sorted(dates_main)
+        interp_ds = ds[varstime].interp(
+            {time_name: sorted_main},
+            method=method,
+            assume_sorted=True
+        )
+        parts.append(interp_ds)
+
+    # 2. Before range (persistency / extrapolation)
     if dates_before:
-        base_ds = ds_first
-        
-        # Pré-calcul persistency pour toutes les dates avant
+        base_ds = ds_first[varstime]
         if persistency_config:
             date_target = begindate_nc + persistency_config['timedelta']
-            ds_pers = ds.where(ds[time_name] <= date_target).mean(dim=time_name, keepdims=True)
-        
-        for date in dates_before:
+            ds_pers = ds.where(ds[time_name] <= date_target).mean(
+                dim=time_name, keepdims=True)
+
+        before_dss = []
+        for date in sorted(dates_before):
             this_ds = base_ds.copy(deep=False)
             this_ds = this_ds.assign_coords({time_name: [date]})
-            
             if persistency_config:
                 for vname in ds_pers:
                     if vname in this_ds:
-                        this_ds[vname] = this_ds[vname].copy(data=ds_pers[vname].data)
-            
-            dss.append((date, this_ds))
-    
-    # 3. Dates après la plage (persistance)
+                        this_ds[vname] = this_ds[vname].copy(
+                            data=ds_pers[vname].data)
+            before_dss.append(this_ds)
+        parts.append(xr.concat(before_dss, time_name))
+
+    # 3. After range (persistency / extrapolation)
     if dates_after:
-        base_ds = ds_last
-        
-        # Pré-calcul persistency pour toutes les dates après
+        base_ds = ds_last[varstime]
         if persistency_config:
             date_target = enddate_nc - persistency_config['timedelta']
-            ds_pers = ds.where(ds[time_name] >= date_target).mean(dim=time_name, keepdims=True)
-        
-        for date in dates_after:
+            ds_pers = ds.where(ds[time_name] >= date_target).mean(
+                dim=time_name, keepdims=True)
+
+        after_dss = []
+        for date in sorted(dates_after):
             this_ds = base_ds.copy(deep=False)
             this_ds = this_ds.assign_coords({time_name: [date]})
-            
             if persistency_config:
                 for vname in ds_pers:
                     if vname in this_ds:
-                        this_ds[vname] = this_ds[vname].copy(data=ds_pers[vname].data)
-            
-            dss.append((date, this_ds))
-    
-    # 4. Interpolations par lot (plus efficace)
-    if dates_in_range:        
-        # Grouper les interpolations adjacentes pour réduire les lectures
-        sorted_dates_in_range = sorted(dates_in_range)
-        
-        for date in sorted_dates_in_range:            
-            # Trouver les indices pour l'interpolation
-            it = ds.indexes[time_name].get_indexer([date], method="ffill")[0]
-            
-            # Charger seulement 2 time steps avec chunking optimal
-            tmp_ds = ds.isel({time_name: slice(it, it + 2)}).chunk({time_name: 2})
-            
-            # Interpolation avec options optimisées
-            this_ds = tmp_ds.interp(
-                {time_name: [date]}, 
-                method=method,  # Explicite plus rapide
-                assume_sorted=True  # Optimisation
-                )
-            
-            # Éviter .load() si possible - garder lazy
-            this_ds = this_ds.assign_coords({time_name: [date]})
-            
-            # Préserver encoding seulement si demandé
-            if preserve_encoding:
-                for vname, var in tmp_ds.items():
-                    if vname in this_ds:
-                        this_ds[vname].encoding.update(var.encoding)
-            
-            dss.append((date, this_ds))
-            del tmp_ds  # Libération mémoire explicite
-    
-    # Traitement diurnal optimisé (si nécessaire)
-    if diurnal_vars:
-        dss_dict = {date: ds_item for date, ds_item in dss}
-        
-        for date, this_ds in dss:
-            if date < begindate_nc:
-                time_target = date + pd.to_timedelta("24h")
-            elif date > enddate_nc:
-                time_target = date - pd.to_timedelta("24h")
-            else:
-                continue
-                
-            if time_target in dss_dict:
-                target_ds = dss_dict[time_target]
-                for vname in diurnal_vars:
-                    if vname in this_ds and vname in target_ds:
-                        this_ds[vname] = this_ds[vname].copy(data=target_ds[vname].data)
-    
-    # Tri par date et extraction des datasets
-    dss.sort(key=lambda x: x[0])
-    sorted_datasets = [ds_item for _, ds_item in dss]
+                        this_ds[vname] = this_ds[vname].copy(
+                            data=ds_pers[vname].data)
+            after_dss.append(this_ds)
+        parts.append(xr.concat(after_dss, time_name))
 
-    # Concaténation avec paramètres optimisés
-    dso = xr.concat(
-        [ds_item[varstime] for ds_item in sorted_datasets],
-        time_name,
-        compat="no_conflicts",
-        coords="minimal",  # Plus rapide que "different"
-        data_vars="all",
-    )
-    
-    # Ajout des variables sans temps
+    # Diurnal correction (only affects before/after dates)
+    if diurnal_vars and (dates_before or dates_after):
+        # Lookup from main interp result for ±24h targets
+        main_ds = parts[0] if dates_main else None
+        edge_parts = parts[1:]  # before and/or after chunks
+        for part in edge_parts:
+            for i in range(part.sizes[time_name]):
+                date = pd.Timestamp(part[time_name].values[i])
+                if date < begindate_nc:
+                    time_target = date + pd.to_timedelta("24h")
+                elif date > enddate_nc:
+                    time_target = date - pd.to_timedelta("24h")
+                else:
+                    continue
+                target_ds = None
+                if main_ds is not None and time_target in main_ds[time_name].values:
+                    target_ds = main_ds.sel({time_name: time_target})
+                if target_ds is not None:
+                    for vname in diurnal_vars:
+                        if vname in part and vname in target_ds:
+                            part[vname].values[i] = target_ds[vname].values
+
+    # Concat 2-3 bulk parts (not N single-timestep datasets)
+    if len(parts) == 1:
+        dso = parts[0]
+    else:
+        dso = xr.concat(
+            parts, time_name,
+            compat="no_conflicts",
+            coords="minimal",
+            data_vars="all",
+        ).sortby(time_name)
+
+    # Add non-time variables
     for var in varsnotime:
         dso[var] = ds[var]
-    
-    # Attributs et encoding (optimisé)
+
+    # Preserve attrs and encoding
     dso[time_name].attrs.update(ds[time_name].attrs)
     dso[time_name].encoding.update(ds[time_name].encoding)
-    
+
     if preserve_encoding:
         for vname, var in ds.items():
             if vname in dso:
                 dso[vname].encoding.update(var.encoding)
-    
-    # Transpose final
+
     dso = dso.transpose(time_name, ...)
-    
+
     return dso
 
 def grid2loc(ds, coords: [(float, float)]): 

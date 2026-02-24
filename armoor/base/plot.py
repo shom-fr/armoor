@@ -189,7 +189,7 @@ def save_figure(fig, filename, dpi=300):
     """
     # Save the figure with the specified filename and DPI
     fig.savefig(filename, dpi=dpi, bbox_inches='tight')
-    plt.close()
+    plt.close(fig)
     
 def diagdisp(x_data, y_data, ax, x_label, y_label):
     

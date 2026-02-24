@@ -356,22 +356,19 @@ def open_decode_cmems_model(path_files):
     #     cache=False,
     #     # lock=False,
     #     )
-    ds = xr.open_mfdataset(#sorted_paths)
+    ds = xr.open_mfdataset(
         sorted_paths,
         combine="by_coords",
         engine="netcdf4",
-        chunks={"time": 1, "lat": 100, "lon": 100},
-        parallel=False,#True,        # Avoid threading issues with netCDF4
-        cache=False,       # Cache can be disabled for huge datasets
-        # lock=False,
-        decode_times=True,     # Decode times properly
-        decode_coords=True,    # Decode coordinates
-        # Optimize I/O
+        chunks={"time": 1, "latitude": 100, "longitude": 100},
+        parallel=False,
+        cache=False,
+        decode_times=True,
+        decode_coords=True,
         decode_cf=True,
         mask_and_scale=True,
-        # CRITICAL: Limit data variables to prevent reading everything at once
-        data_vars='minimal',   # Only load data variables, not coordinates as data
-        coords='minimal',      # Minimize coordinate loading
+        data_vars='minimal',
+        coords='minimal',
         preprocess=preprocess_cmems_model,
         autoclose=True
         )
@@ -595,7 +592,7 @@ def open_decode_cmems_insitu(path_files, platform):
     dss = []
     for path in path_files:
         with xcf.set_cf_specs(cfspecs):
-            ds = xr.open_dataset(path).load().xcf.decode()
+            ds = xr.open_dataset(path, chunks={}).xcf.decode()
         object_vars = [var for var in ds.data_vars if ds[var].dtype == 'object']
         ds = ds.drop_vars(object_vars)
         vars2drop = []

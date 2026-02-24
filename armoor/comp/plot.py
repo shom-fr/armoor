@@ -1,4 +1,7 @@
+import os
 import logging
+import re
+from collections import defaultdict
 from pathlib import Path
 
 import cartopy.crs as ccrs
@@ -259,6 +262,9 @@ class PlotComp:
         return None
     
     def _mdiagts(self, dsref, dsprod, figtitle, figname):
+        if dsref.depth.size == 0 or dsprod.depth.size == 0:
+            logger.warning(f"Empty depth array, skipping mdiagts plot: {figname}")
+            return
         fig, axes = create_subplots(
             ncols=2,
             figsize=(15, 8),
@@ -524,7 +530,10 @@ class PlotComp:
                 )    
         
     def _mvprofiles(self, dsref, dsprod, figtitle, figname):
-        
+        if dsref.depth.size == 0 or dsprod.depth.size == 0:
+            logger.warning(f"Empty depth array, skipping mvprofiles plot: {figname}")
+            return
+
         ref_color = "k"
         prod_color = "slateblue"
 
@@ -678,8 +687,15 @@ class PlotComp:
                     ds = ds.reset_coords("depth")
                 dssprod_itime.append(ds)
             dssprod_closest = [ds.armoorfilters.sel_closest(dsref_itime) for ds in dssprod_itime]
-            dssprod_mean = [ds.mean(dim="member") for ds in dssprod_itime]
-            dssprod_std = [ds.std(dim="member") for ds in dssprod_itime]
+            def _safe_reduce(ds, method):
+                agg_vars = [v for v in ds.data_vars if "member" in ds[v].dims and ds[v].ndim > 1]
+                other_vars = [v for v in ds.data_vars if v not in agg_vars]
+                result = getattr(ds[agg_vars], method)(dim="member")
+                for v in other_vars:
+                    result[v] = ds[v].isel(member=0, drop=True) if "member" in ds[v].dims else ds[v]
+                return result
+            dssprod_mean = [_safe_reduce(ds, "mean") for ds in dssprod_itime]
+            dssprod_std = [_safe_reduce(ds, "std") for ds in dssprod_itime]
             del dssprod_itime
             time = pd.to_datetime(dsref_itime.time.values[0])
             mask = ~dsref_itime.ptemp.isnull()
@@ -1352,6 +1368,8 @@ class PlotComp:
                         dsref_all = dsref_all.set_coords(["lon", "lat"])
 
                 for var in dscomp_all.data_vars:
+                    if var not in CMAP_VARS:
+                        continue
                     dscomp = dscomp_all[[var]]
                     dsref = dsref_all[[var]]
                     dsprod = dsprod_all[[var]]
@@ -1540,20 +1558,35 @@ class PlotComp:
         plt.close(fig)
         del fig
 
-def main_plot(ncins, metazones, func_comp):
-    """Process using dask.bag for functional mapping"""
+def _plot_task(nc, func_comp, metazone, output):
+    """Single plot task — must be module-level for spawn pickling."""
+    plotcomp = PlotComp(nc, func_comp, metazone)
+    plotcomp.call(output)
+    plotcomp.clean()
+    del plotcomp
 
-    def process_task(nc, func_comp, metazone, output):
-        plotcomp = PlotComp(nc, func_comp, metazone)
-        plotcomp.call(output)
-        plotcomp.clean()
-        del plotcomp
-    
-    logger.info("Start plot")    
-    tasks = []
+
+def main_plot(ncins, metazones, func_comp, kw_dask=None):
+    """Process plot tasks in parallel using a multiprocessing pool."""
+    import multiprocessing
+
+    logger.info("Start plot")
+    task_args = []
     for output, metas in ncins.items():
         for metazone, ncs in metas.items():
             if metazone in metazones:
                 for nc in ncs:
-                    tasks.append(dask.delayed(process_task)(nc, func_comp, metazone, output))
-    dask.compute(*tasks)
+                    task_args.append((nc, func_comp, metazone, output))
+
+    if not task_args:
+        return
+
+    # Use the same n_workers as the CLI dask config (e.g. --dask-nworkers 4).
+    num_workers = kw_dask[0] if kw_dask else 4
+    num_workers = min(num_workers, len(task_args))
+    logger.info(f"Plotting {len(task_args)} tasks with {num_workers} workers")
+    # Use 'spawn' to create clean child processes: avoids both the
+    # "fork() after OpenMP" crash and inherited memory bloat.
+    ctx = multiprocessing.get_context("spawn")
+    with ctx.Pool(num_workers) as pool:
+        pool.starmap(_plot_task, task_args)

@@ -783,19 +783,14 @@ class TestPrepareDataset:
         assert "comp_func" in params
         assert "is_reference" in params
 
-    @patch("armoor.comp.coloc.optimize_for_low_swap")
     @patch("armoor.comp.coloc.COMP_VARS", {"comp_test": ["ptemp"]})
-    def test_prepare_dataset_calls_optimize(self, mock_optimize):
-        """Test that _prepare_dataset calls optimize_for_low_swap."""
-        # Create a full mock that returns expected values through the chain
+    def test_prepare_dataset_loads_data(self):
+        """Test that _prepare_dataset calls load() to ensure numpy-backed data."""
         mock_ds = MagicMock()
         mock_ds.data_vars = {"ptemp": MagicMock()}
         mock_ds.coords = {}
         mock_ds.__contains__ = lambda self, x: x in ["ptemp"]
-        mock_ds.__getitem__ = lambda self, x: self.ds["ptemp"] if x == "ptemp" else MagicMock()
-        mock_ds.oceanvars.sel.return_value = MagicMock()
 
-        # The function should call optimize_for_low_swap
         result_ds = MagicMock()
         result_ds.data_vars = {"ptemp": MagicMock()}
         result_ds.coords = {}
@@ -805,11 +800,11 @@ class TestPrepareDataset:
         result_ds.drop_vars.return_value = result_ds
         result_ds.reset_coords.return_value = result_ds
 
-        mock_optimize.return_value = result_ds
+        mock_ds.load.return_value = result_ds
 
         _prepare_dataset(mock_ds, "comp_test")
 
-        mock_optimize.assert_called_once()
+        mock_ds.load.assert_called_once()
 
     def test_prepare_dataset_depth_in_data_vars_condition(self):
         """Test the depth handling logic by checking function structure."""
@@ -1075,14 +1070,13 @@ class TestProcessFunctions:
         """Test that _save_colocation_results creates output directories."""
         mock_save.return_value = (tmp_path / "ref.zarr", tmp_path / "prod.zarr")
 
-        ncouts = {"zone1": {"reference": {"product": []}}}
         self.dsref.attrs["data_name"] = "reference"
         self.dsprod.attrs["data_name"] = "product"
 
         with patch("pathlib.Path.mkdir") as mock_mkdir:
             _save_colocation_results(
                 [self.dsref], [self.dsprod],
-                "comp_argo", "zone1", ncouts, "reference", "product"
+                "comp_argo", "zone1", "reference", "product"
             )
 
             mock_mkdir.assert_called()
@@ -1102,14 +1096,14 @@ class TestProcessFunctions:
         mock_coloc.return_value = (self.dsref, self.dsprod)
         mock_trange.return_value = ([self.dsref], [self.dsprod])
         mock_vrange.return_value = ([self.dsref], [self.dsprod])
+        mock_save.return_value = [Path("/out/ref.zarr"), Path("/out/prod.zarr")]
 
-        ncouts = {"zone1": {}}
         params = {}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
 
         _process_single_product(
             self.dsref, Path("/fake/path.nc"),
-            params, tbound, "comp_argo", "zone1", ncouts
+            params, tbound, "comp_argo", "zone1"
         )
 
         mock_open.assert_called_once()
@@ -1122,10 +1116,10 @@ class TestProcessFunctions:
         """Test _process_reference function flow."""
         mock_open.return_value = self.dsref
         mock_prep.return_value = self.dsref
+        mock_single.return_value = ("reference", "product", [Path("/out/ref.zarr")])
 
         ncouts = {"zone1": {}}
-        ncs = [
-            Path("/data/zone1/ref.zarr"),
+        ncins = [
             Path("/data/zone1/prod1.nc"),
             Path("/data/zone1/prod2.nc"),
         ]
@@ -1133,7 +1127,7 @@ class TestProcessFunctions:
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
 
         _process_reference(
-            Path("/data/zone1/ref.zarr"), ncs,
+            Path("/data/zone1/ref.zarr"), ncins,
             params, tbound, "comp_argo", "zone1", ncouts
         )
 
@@ -1145,15 +1139,15 @@ class TestProcessFunctions:
     def test_process_metazone(self, mock_ref):
         """Test _process_metazone function flow."""
         ncouts = {}
-        ncs = [
-            Path("/data/zone1/ref.zarr"),
-            Path("/data/zone1/prod.nc"),
-        ]
+        mz_files = {
+            "ref": [Path("/data/zone1/ref.zarr")],
+            "prod": [Path("/data/zone1/prod.nc")],
+        }
         metazones = {"zone1": {"tbound": ("2023-01-01", "2023-01-03")}}
         params = {}
 
         _process_metazone(
-            "zone1", params, ncs, metazones, "comp_argo", ncouts
+            "zone1", params, mz_files, metazones, "comp_argo", ncouts
         )
 
         mock_ref.assert_called_once()
@@ -1166,25 +1160,23 @@ class TestProcessFunctions:
 
         with patch("armoor.comp.coloc._process_reference"):
             _process_metazone(
-                "zone1", {}, [], metazones, "comp_argo", ncouts
+                "zone1", {}, {"ref": [], "prod": []}, metazones, "comp_argo", ncouts
             )
 
         assert "zone1" in ncouts
         assert ncouts["zone1"] == {}
 
-    def test_save_colocation_results_appends_paths(self):
-        """Test that _save_colocation_results appends paths to ncouts."""
-        ncouts = {"zone1": {"ref": {"prod": []}}}
-
+    def test_save_colocation_results_returns_paths(self):
+        """Test that _save_colocation_results returns output paths."""
         with patch("armoor.comp.coloc.save_datasets") as mock_save:
             mock_save.return_value = (Path("/out/ref.zarr"), Path("/out/prod.zarr"))
             with patch("pathlib.Path.mkdir"):
-                _save_colocation_results(
+                paths = _save_colocation_results(
                     [self.dsref], [self.dsprod],
-                    "comp_argo", "zone1", ncouts, "ref", "prod"
+                    "comp_argo", "zone1", "ref", "prod"
                 )
 
-        assert len(ncouts["zone1"]["ref"]["prod"]) == 2
+        assert len(paths) == 2
 
     @patch("armoor.comp.coloc._apply_colocations")
     def test_process_single_product_sets_depth_coord(

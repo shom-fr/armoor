@@ -1,6 +1,8 @@
 import logging
 from typing import List, Optional, Tuple, Dict
 
+import dask
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -142,6 +144,10 @@ class StatsComp:
         """
         Compute mean/std and comparison metrics along dimensions.
 
+        All 7 statistics are built as a single lazy dask graph and computed
+        in one ``dask.compute()`` call so the scheduler can share work
+        (e.g. the common ``diff = dsprod - dsref``).
+
         Parameters
         ----------
         dims : list of str
@@ -152,18 +158,33 @@ class StatsComp:
         tuple
             (product_tree, reference_tree, comparison_tree)
         """
-        # Reference stats
-        self._update_tree(self.dtref, "mean", stats.mean(self.dsref, dims))
-        self._update_tree(self.dtref, "std", stats.std(self.dsref, dims))
+        # Build shared lazy computations
+        diff = self.dsprod - self.dsref
 
-        # Product stats
-        self._update_tree(self.dtprod, "mean", stats.mean(self.dsprod, dims))
-        self._update_tree(self.dtprod, "std", stats.std(self.dsprod, dims))
+        ref_mean = self.dsref.mean(dim=dims)
+        ref_std = self.dsref.std(dim=dims)
+        prod_mean = self.dsprod.mean(dim=dims)
+        prod_std = self.dsprod.std(dim=dims)
+        comp_bias = diff.mean(dim=dims)
+        comp_rmse = np.sqrt((diff ** 2).mean(dim=dims))
+        cdiff = (self.dsprod - prod_mean) - (self.dsref - ref_mean)
+        comp_rmsec = np.sqrt((cdiff ** 2).mean(dim=dims))
 
-        # Comparisons
-        self._update_tree(self.dtcomps, "bias", stats.bias(self.dsprod, self.dsref, dims))
-        self._update_tree(self.dtcomps, "rmse", stats.rms(self.dsprod, self.dsref, dims))
-        self._update_tree(self.dtcomps, "rmsec", stats.crms(self.dsprod, self.dsref, dims))
+        # Single dask.compute() call for all stats
+        (ref_mean, ref_std, prod_mean, prod_std,
+         comp_bias, comp_rmse, comp_rmsec) = dask.compute(
+            ref_mean, ref_std, prod_mean, prod_std,
+            comp_bias, comp_rmse, comp_rmsec
+        )
+
+        # Update trees with computed results
+        self._update_tree(self.dtref, "mean", ref_mean)
+        self._update_tree(self.dtref, "std", ref_std)
+        self._update_tree(self.dtprod, "mean", prod_mean)
+        self._update_tree(self.dtprod, "std", prod_std)
+        self._update_tree(self.dtcomps, "bias", comp_bias)
+        self._update_tree(self.dtcomps, "rmse", comp_rmse)
+        self._update_tree(self.dtcomps, "rmsec", comp_rmsec)
 
         # Handle time aggregation for trange view
         if "trange_seq" in self.mparams and "time" in dims:
@@ -215,7 +236,7 @@ class StatsComp:
             ds = ds.drop_vars("time")
 
         ds = ds.expand_dims("time")
-        ds = ds.assign_coords(time=[pd.to_datetime(timestamp)])
+        ds = ds.assign_coords(time=[pd.to_datetime(timestamp).as_unit("ns")])
         return ds
 
     # -------------------------------------------------------------------------

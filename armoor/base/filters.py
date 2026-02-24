@@ -227,7 +227,6 @@ class ArmoorFilters:
         return ds
     
     @staticmethod
-    @dask.delayed
     def tidal_filter(ds, filter_name="demerliac"):
         """
         Apply a tidal filter to time-dependent variables in the dataset.
@@ -275,7 +274,6 @@ class ArmoorFilters:
         return ds
     
     @staticmethod
-    @dask.delayed
     def tresample(ds, freq):
         """
         """
@@ -288,7 +286,6 @@ class ArmoorFilters:
         return ds
 
     @staticmethod
-    @dask.delayed
     def tsmooth(ds, freq: str) -> xr.Dataset:
         """
         Apply 1D convolution along 'time' dimension using a custom kernel.
@@ -454,7 +451,6 @@ class ArmoorFilters:
 
 
     @staticmethod
-    @dask.delayed
     def clean_ds(ds, depth_was_coord):
         if depth_was_coord and "depth" in ds:
             ds = ds.set_coords("depth")
@@ -589,8 +585,6 @@ class ArmoorFilters:
 
         ds = self.clean_ds(ds, depth_was_coord)
 
-        ds = ds.compute()
-        
         if "bathy" in filters_config:
             ds = self.bathy_filter(
                 ds,
