@@ -155,9 +155,9 @@ class PlotComp:
             ref_name = dsref_all.attrs["data_name"]
             
             if "member" in dsprod_all.dims:
-                dsprod_all = dsprod_all.mean(dim="member")
+                dsprod_all = dsprod_all.mean(dim="member", keep_attrs=True)
             if "member" in dsref_all.dims:
-                dsref_all = dsref_all.mean(dim="member")
+                dsref_all = dsref_all.mean(dim="member", keep_attrs=True)
             
             for var in dsprod_all.data_vars:
                 dsref = dsref_all[[var]]
@@ -199,9 +199,9 @@ class PlotComp:
             ref_name = dsref_all.attrs["data_name"]
             
             if "member" in dsprod_all.dims:
-                dsprod_all = dsprod_all.mean(dim="member")
+                dsprod_all = dsprod_all.mean(dim="member", keep_attrs=True)
             if "member" in dsref_all.dims:
-                dsref_all = dsref_all.mean(dim="member")
+                dsref_all = dsref_all.mean(dim="member", keep_attrs=True)
             
             for var in dsprod_all.data_vars:
                 dsref = dsref_all[[var]]
