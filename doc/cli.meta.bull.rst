@@ -1,6 +1,6 @@
 .. _clibull:
 
-Commandeline interfaces for generating bulletin
+Command-line interfaces for generating bulletin
 ###############################################
 
 Configuration file

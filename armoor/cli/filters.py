@@ -454,6 +454,7 @@ def main_filters_quality():
     commonly used to remove poor quality observations from oceanographic datasets.
     - Leverages Dask for memory-efficient processing of large datasets
     - Supports all input/output formats available in the ARMOOR ecosystem
+    
     """
     # Get parser
     parser = get_parser_filters_quality()

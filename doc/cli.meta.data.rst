@@ -1,6 +1,6 @@
 .. _clidata:
 
-Commandeline interfaces for data
+Command-line interfaces for data
 ################################
 
 Configuration file
@@ -25,22 +25,65 @@ ouputs
         Multiple outputs can be configured. The available outputs depend on the metazone parameters.
         For instance, a vertical profile of salinity is not possible with ``vlevel``.
 
-        - ``maps``: maps of mean and standard deviation (``tfreq`` is not permitted).
+	.. grid:: 3
+
+            .. grid-item-card:: Maps of statistics (``maps``)
+
+                Maps of statistical metrics (mean and standard deviation). ``tfreq`` is not permitted.
+
+                .. image:: images/data_map.png
+                
+                :download:`Download <images/data_map.png>`
+		
+            .. grid-item-card:: Time series (``timeseries``)
+
+                Time series of statistical metrics (mean and standard deviation).
+                
+                .. image:: images/data_timeseries.png
+                
+                :download:`Download <images/data_timeseries.png>`
+
+            .. grid-item-card:: Multiple vertical profiles (``mvprofiles``)
+
+                Plot of multiple vertical profiles. ``vlevel`` is not permitted.
+                
+                .. image:: images/data_mvprofiles.png
+                
+                :download:`Download <images/data_mvprofiles.png>`
+
+            .. grid-item-card:: Theta-S diagrams for multiple vertical profiles (``mdiagts``)
+
+                Plot of a theta-s diagram of every vertical profiles.
+                
+                .. image:: images/data_mdiagts.png
+                
+                :download:`Download <images/data_mdiagts.png>`
+
+            .. grid-item-card:: Unique vertical profiles (``uvprofiles``)
+
+                Plot of unique vertical profiles. ``vlevel`` is not permitted.
+                
+            .. grid-item-card:: Theta-S diagram for a unique vertical profiles (``udiagts``)
+
+                Plot of a theta-s diagram by profile. ``vlevel`` is not permitted.
+
+Execution
+---------
+
+.. program-output:: armoor-data -h
+   :shell:
+   :returncode: 0
         
-        .. image:: images/data_map.png
-            
-        - ``timeseries``: time series of mean and standard deviation.
-        
-        .. image:: images/data_timeseries.png
-        
-        - ``mvprofiles``: plot of multiple vertical profiles (``vlevel`` is not permitted).
-        
-        .. image:: images/data_mvprofiles.png
-        
-        - ``mdiagts``: theta-s diagram of multiple vertical profiles.
-        
-        .. image:: images/data_mdiagts.png
-        
-        - ``uvprofiles``: plot of a vertical profile over time (``vlevel`` is not permitted).
-        
-        - ``udiagts``: theta-s diagram of an vertical over time (``vlevel`` is not permitted).
+Workflow
+--------
+
+    1. Open, decode input files and apply filters --> Zarr files stored at ``./data/metazones/{metazone.name}/{data.name}/``.
+    2. Interpolate/organize data in time and space if necessary, cleanup unecessary variables --> Zarr files stored at ``./data/interp/{metazone.name}/{data.name}/``.
+    3. Compute outputs --> Zarr files stored at ``./data/output/{metazone.name}/{data.name}/{otype}/``.
+    4. (if png format is given) Plots --> png files stored at ``./data/plot/{metazone.name}/``.
+
+
+.. argparse::
+    :module: armoor.cli.main
+    :prog: armoor-data
+    :nosubcommands:

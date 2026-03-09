@@ -3,11 +3,13 @@
 Gallery of examples
 ===================
 
+Hereafter are presented some examples of configuration files for metazone-based Armoor executables.
+
 .. grid:: 3
 
     .. grid-item-card:: Metazones structure
 
-        Configuration defining some metazones.
+        Configuration defining some metazones. See details in the :ref:`dedicated section <climeta>`.
 
         .. literalinclude:: configs/metazones.cfg
          :language: ini

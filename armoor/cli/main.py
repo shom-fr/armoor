@@ -28,7 +28,7 @@ from armoor.base.misc import (comma_separated, parse_coords,
 class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
                                  ArgumentDefaultsHelpFormatter):
     pass
-from armoor.cli import COMP_INI, DATA_INI, METAZONES_INI, BULL_INI
+from armoor.cli import FILTERS_INI, COMP_INI, DATA_INI, METAZONES_INI, BULL_INI
 from armoor.cli.io import add_dask_parser_arguments, get_dask_args, add_comp_parser_arguments
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 
@@ -175,11 +175,11 @@ def main_filters():
             f"File not found: {args.cfgfile}."
             )
 
-    cfg = ConfigManager(DATA_INI).load(str(args.cfgfile))
+    cfg = ConfigManager(FILTERS_INI).load(str(args.cfgfile))
     metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
 
     metazones = check_metazones_in(
-       args. metazones,
+       args.metazones,
        metazones
        )
 
@@ -197,7 +197,7 @@ def get_parser_data():
     """Get parser for data."""
     # Setup argument parser
     parser = ArgumentParser(
-        description="Apply filters over metazones.",
+        description="Plot and compute on data.",
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
@@ -267,7 +267,7 @@ def main_data():
     metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
 
     metazones = check_metazones_in(
-       args. metazones,
+       args.metazones,
        metazones
        )
 

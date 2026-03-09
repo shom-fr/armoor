@@ -203,6 +203,10 @@ def main_comp():
     It parses command line arguments and processes input files 
     using Dask distributed computing for optimal performance.
     
+    Returns
+    --------------------
+    xarray.Datatree
+    
     Positional Arguments
     --------------------
     dim : str

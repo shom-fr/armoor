@@ -1,6 +1,6 @@
 .. _clidiag:
 
-Commandeline interfaces for diagnostics
+Command-line interfaces for diagnostics
 #######################################
 
 
