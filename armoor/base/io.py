@@ -348,7 +348,7 @@ def write_dataset_to_zarr(
     consolidated: bool = True,
     compute: bool = True,
     **kwargs
-):
+    ):
     """
     Sauvegarde sécurisée vers Zarr avec correction automatique.
 

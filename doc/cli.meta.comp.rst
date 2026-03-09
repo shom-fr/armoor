@@ -78,7 +78,7 @@ ouputs
                 
                 :download:`Download <images/comp_uvprofiles.png>`
                 
-            .. grid-item-card:: theta-s diagram of an unique vertical profiles (``udiagts``)
+            .. grid-item-card:: theta-s diagram of a unique vertical profiles (``udiagts``)
 
                 Plot of a theta-s diagram by observed profile.
                 

@@ -1,5 +1,9 @@
+.. _cli:
+
 Command-line interfaces
 #######################
+
+.. _opendecode:
 
 Open-decode
 ===========
@@ -14,7 +18,9 @@ The open functions of armoor are based wether on xarray or pandas libraries depe
 Decode data
 -----------
 
-To decode data, armoor uses `xoa.cf <https://xoa.readthedocs.io/develop/uses.cf.html>`_.
+To decode data, armoor uses `xoa.cf <https://xoa.readthedocs.io/v0.8.0/uses.cf.html>`_.
+
+Armoor can decode data from model outputs or observations, either in situ or satellite.
                
 The list of configuration files used can be found at ``armoor/data/`` :
     
@@ -36,11 +42,18 @@ Decoding data consists in following armoor conventions:
     - along longitude dimension --> ``x``
     - depth coordinate --> ``depth``
     - pressure coordinate --> ``pres``
-    - potential density coordinate --> ``pdens``
+    - density --> ``dens``
+    - potential density --> ``pdens``
+    - temperature --> ``temp``
     - potential temperature --> ``ptemp``
-    - in-situ temperature --> ``temp``
-    - practical salinity --> ``sal``
-
+    - sea surface temperature --> ``sst``
+    - salinity --> ``sal``
+    - sea surface salinity --> ``sss``
+    - sea surface height --> ``ssh``
+    - sea water velocity along X - Eastward velocity --> ``u``
+    - sea water velocity along Y - Northward velocity --> ``v``
+    
+See armoor conventions for more variables in the :download:`cf.cfg <../armoor/data/cf.cfg>` file.
 
 .. toctree::
    :maxdepth: 1

@@ -13,8 +13,9 @@ armoor requires ``python>3.11`` and depends on the following packages:
 .. list-table::
    :widths: 10 90
 
-   * - `platformdirs <https://github.com/tox-dev/platformdirs>`_
-     - A small Python module for determining appropriate platform-specific dirs, e.g. a "user data dir".
+   * - `cartopy <https://cartopy.readthedocs.io/stable/>`_
+     - Cartopy is a Python package designed for geospatial data processing 
+       in order to produce maps and other geospatial data analyses.
    * - `cmocean <https://matplotlib.org/cmocean>`_
      - Beautiful colormaps for oceanography.
    * - `configobj <https://configobj.readthedocs.io/en/latest/configobj.html>`_
@@ -32,6 +33,8 @@ armoor requires ``python>3.11`` and depends on the following packages:
      - pandas is a fast, powerful, flexible and easy-to-use open source
        data analysis and manipulation tool, built on top of the
        Python programming language.
+   * - `platformdirs <https://github.com/tox-dev/platformdirs>`_
+     - A small Python module for determining appropriate platform-specific dirs, e.g. a "user data dir".
    * - `scipy <https://www.scipy.org/scipylib/index.html>`_
      - Scipy provides many user-friendly and efficient numerical routines,
        such as routines for numerical integration, interpolation,
@@ -43,6 +46,7 @@ armoor requires ``python>3.11`` and depends on the following packages:
      - xESMF is a Python package for regridding.
 
 
+
 A complete list of dependencies is given in ``requirements.txt``:
 
     .. literalinclude:: ../requirements.txt
@@ -51,11 +55,11 @@ A complete list of dependencies is given in ``requirements.txt``:
 From sources
 ------------
 
-Clone the repository::
+\1. Clone the repository::
 
     $ git clone https://gitlab.com/GitShom/STM/armoor.git
 
-Run the installation command::
+\2. Run the installation command::
 
     $ cd armoor
     $ mamba install -n base -c conda-forge -y --file requirements.txt
@@ -66,7 +70,7 @@ Alternatively, use ``environment.yml``::
     $ cd armoor
     $ mamba env create -f environment.yml
 
-Then, run tests::
+\3. Then, run tests::
 
     $ export PYTHONPATH=$PWD
     $ cd armoor/tests/uni
