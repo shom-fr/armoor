@@ -48,8 +48,7 @@ def _init_heavy():
          os.environ.setdefault(var, '1')
 
     logging.getLogger('distributed').setLevel(logging.ERROR)
-    import armoor.base.filters  # noqa: F401 — registers xarray accessor
-    import armoor.base.oceanvars  # noqa: F401 — registers xarray accessor
+    import armoor  # noqa: F401 — registers all xarray accessors
     from xoa.cfgm import register_validation_functions
     register_validation_functions(coordinates=parse_coords)
     register_validation_functions(mlist=parse_mixed_param)
@@ -305,7 +304,99 @@ def main_data():
             with open(args.jsonfile, 'w') as f:
                 json.dump(ncs_outputs, f, indent=4)
 
-def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc, kw_dask, comp_args={}):
+def _write_json(path, data):
+    """Serialize data to JSON, converting Path objects to strings."""
+    def _to_str(obj):
+        if isinstance(obj, dict):
+            return {k: _to_str(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_to_str(x) for x in obj]
+        return str(obj)
+    with open(path, 'w') as f:
+        json.dump(_to_str(data), f, indent=4)
+
+
+def _detect_scheduler(hosts_cfg=None):
+    """Detect the HPC scheduler via woom HostManager.
+
+    Returns (scheduler_name, host) or ("background", None) if woom is
+    unavailable or no hosts_cfg is provided.
+    """
+    if hosts_cfg is None:
+        logger.info("No --hosts-cfg provided — running in background mode.")
+        return "background", None
+    try:
+        import woom.hosts as whosts
+    except ImportError:
+        logger.info("woom not available — running in background mode.")
+        return "background", None
+
+    hosts_cfg = Path(hosts_cfg)
+    if not hosts_cfg.exists():
+        logger.warning(f"hosts.cfg not found: {hosts_cfg} — running in background mode.")
+        return "background", None
+
+    import fnmatch
+    import socket
+    fqdn = socket.getfqdn()
+    hostname = socket.gethostname()
+    logger.info(f"Detected FQDN: {fqdn!r}  (gethostname: {hostname!r})")
+
+    try:
+        mgr = whosts.HostManager()
+        mgr.load_config(str(hosts_cfg))
+    except Exception as e:
+        logger.warning(
+            f"Could not load woom host config from {hosts_cfg}: {type(e).__name__}: {e}\n"
+            "Running in background mode. "
+            "Check that your hosts.cfg format matches the installed woom version "
+            f"(see docs/hosts.cfg.example for a reference template)."
+        )
+        return "background", None
+
+    # Bypass infer_host() and Host.scheduler (both broken after configobj merge).
+    # Read scheduler directly from the Section to avoid dict() defaulting issue.
+    matched_name = None
+    scheduler = "background"
+    for name, section in mgr.config.items():
+        if name == "local":
+            continue
+        patterns = section.get("patterns") or []
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        for test_name in (fqdn, hostname):
+            for pattern in patterns:
+                if fnmatch.fnmatch(test_name, pattern.strip()):
+                    matched_name = name
+                    scheduler = section.get("scheduler") or "background"
+                    break
+            if matched_name:
+                break
+        if matched_name:
+            break
+
+    host = mgr.get_host(matched_name or "local")
+
+    if scheduler == "background":
+        known_hosts = {
+            name: list(section.get("patterns") or [])
+            for name, section in mgr.config.items()
+            if name != "local"
+        }
+        logger.info(
+            f"Host not matched in {hosts_cfg} — running in background mode.\n"
+            f"  FQDN tested     : {fqdn!r}\n"
+            f"  hostname tested : {hostname!r}\n"
+            f"  Known hosts     : {known_hosts}"
+        )
+    else:
+        logger.info(f"HPC target detected: scheduler={scheduler!r}, host={matched_name!r}.")
+    return scheduler, host
+
+
+def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
+              ofilter, ocoloc, no_plot, plot_only, input_json,
+              kw_dask, comp_args={}, load_only=None, input_zarrs=None):
     import dask
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs
@@ -314,11 +405,9 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
     from armoor.comp.coloc import main_coloc
     from armoor.data.load import load_datasets
 
-    # No distributed cluster — use local threaded scheduler for I/O,
-    # synchronous where already set in colocation code.
-    # This avoids worker memory interference and GIL contention.
     dask.config.set({
         'scheduler': 'threads',
+        'num_workers': kw_dask[0],
         'array.slicing.split_large_chunks': True,
         'optimization.fuse.active': True,
     })
@@ -329,12 +418,38 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
     start_time = time.time()
 
     cfg = ConfigManager(COMP_INI).load(str(cfgfile))
-    metas = ConfigManager(METAZONES_INI).load(str(metafile))
 
     if not cfg:
         raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
 
-    # Metazones
+    ofmt = cfg["outputs"].get("fmt")
+    jsonfile = str(jsonfile).format(**locals())
+
+    # --- plot-only mode: skip the full pipeline, read outputs from JSON ---
+    if plot_only is not None:
+        if input_json is None:
+            raise ArmoorError("--plot-only requires --input-json.")
+        if "png" not in ofmt:
+            logger.warning("--plot-only requested but 'png' not in outputs fmt — nothing to do.")
+            return
+        from armoor.comp.plot import main_plot as plot_comp
+        metas = ConfigManager(METAZONES_INI).load(str(metafile))
+        metazones = check_metazones_in(metazones, metas, func_param=METAZONE_PARAMS[func_comp])
+        with open(input_json) as f:
+            zarr_outputs = json.load(f)
+        if plot_only not in zarr_outputs:
+            logger.warning(f"otype '{plot_only}' not found in {input_json} — skipping.")
+            return
+        png_paths = plot_comp({plot_only: zarr_outputs[plot_only]}, metazones, func_comp, kw_dask=kw_dask)
+        if png_paths:
+            _write_json(jsonfile, png_paths)
+            logger.info(f"Find the list of generated files in: {jsonfile}")
+        elapsed = time.time() - start_time
+        logger.info(f"Execution time: {elapsed:.1f} seconds")
+        return
+
+    # --- Normal pipeline ---
+    metas = ConfigManager(METAZONES_INI).load(str(metafile))
     metazones = check_metazones_in(
         metazones,
         metas,
@@ -342,17 +457,40 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
         **comp_args
         )
 
-    jsonfile = str(jsonfile).format(**locals())
+    if load_only is not None:
+        # Wave 0 mode: load a single dataset for all metazones.
+        dataset_cfg = {load_only: cfg["data"][load_only]}
+        logger.info(f"Wave 0: loading dataset '{load_only}' × {len(metazones)} metazone(s)")
+        ncouts = load_datasets(dataset_cfg, metazones, func_comp)
+        mz_paths = {}
+        for nc in (ncouts or []):
+            if nc is None:
+                continue
+            mz_name = Path(nc).parts[2]
+            mz_paths.setdefault(mz_name, []).append(str(Path(nc).resolve()))
+        _write_json(jsonfile, mz_paths)
+        return
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
 
-    zarr = load_datasets(cfg["data"], metazones, func_comp)
+    if input_zarrs is not None:
+        # Wave 1 mode: read pre-loaded zarrs, skip load_datasets
+        mz_name = list(metazones.keys())[0]
+        zarr = []
+        for zarr_json in input_zarrs:
+            try:
+                with open(zarr_json) as f:
+                    paths = json.load(f)
+                zarr.extend(paths.get(mz_name, []))
+            except FileNotFoundError:
+                logger.warning(f"Input zarr JSON not found (skipping): {zarr_json}")
+    else:
+        zarr = load_datasets(cfg["data"], metazones, func_comp)
 
     if ofilter:
         zarr = [str(z) for z in zarr]
         ncs_outputs = zarrs2netcdfs(zarr)
-        with open(jsonfile, 'w') as f:
-            json.dump(ncs_outputs, f, indent=4)
+        _write_json(jsonfile, ncs_outputs)
 
     else:
         zarr_coloc = main_coloc(zarr, metazones, func_comp)
@@ -361,28 +499,29 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
             zarr_coloc = dict_to_list(zarr_coloc)
             zarr_coloc = [str(z) for z in zarr_coloc]
             ncs_outputs = zarrs2netcdfs(zarr_coloc)
-            with open(jsonfile, 'w') as f:
-                json.dump(ncs_outputs, f, indent=4)
+            _write_json(jsonfile, ncs_outputs)
 
         else:
             from armoor.comp.output import main_output as output_comp
             zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp, **comp_args)
-            ofmt = cfg["outputs"].get("fmt")
 
-            if "png" in ofmt:
-                from armoor.comp.plot import main_plot as plot_comp
-                plot_comp(zarr_outputs, metazones, func_comp, kw_dask=kw_dask)
+            if no_plot:
+                # HPC sub-job: save nested dict {otype: {mz: [paths]}} for merge step
+                _write_json(jsonfile, zarr_outputs)
+            else:
+                png_paths = []
+                if "png" in ofmt:
+                    from armoor.comp.plot import main_plot as plot_comp
+                    png_paths = plot_comp(zarr_outputs, metazones, func_comp, kw_dask=kw_dask)
 
-            zarr_outputs = dict_to_list(zarr_outputs)
-
-            if "zarr" in ofmt:
-                with open(jsonfile, 'w') as f:
-                    json.dump(zarr_outputs, f, indent=4)
-
-            if "netcdf" in ofmt:
-                ncs_outputs = zarrs2netcdfs(zarr_outputs)
-                with open(jsonfile, 'w') as f:
-                    json.dump(ncs_outputs, f, indent=4)
+                zarr_outputs = dict_to_list(zarr_outputs)
+                if "png" in ofmt and png_paths:
+                    _write_json(jsonfile, png_paths)
+                elif "netcdf" in ofmt:
+                    ncs_outputs = zarrs2netcdfs(zarr_outputs)
+                    _write_json(jsonfile, ncs_outputs)
+                elif "zarr" in ofmt:
+                    _write_json(jsonfile, zarr_outputs)
 
     logger.info(f"Find the list of generated files in: {jsonfile}")
 
@@ -391,6 +530,44 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile, ofilter, ocoloc
 
     logger.info("Final diagnostic:")
     monitor_performance()
+
+
+def _dispatch_comp(func_comp, parser, kw_comp_factory):
+    """Common dispatch logic for all main_comp_* entry points."""
+    _init_heavy()
+    args = parser.parse_args()
+    main_setup_logging(args)
+
+    if not args.cfgfile.exists():
+        raise ArmoorError(f"File not found: {args.cfgfile}.")
+
+    kw_comp = kw_comp_factory(args)
+    kw_dask = get_dask_args(args)
+
+    hosts_cfg = getattr(args, "hosts_cfg", None)
+    scheduler, host = _detect_scheduler(hosts_cfg)
+    if scheduler != "background" \
+            and not args.filters_only \
+            and not args.coloc_only \
+            and not args.no_plot \
+            and args.plot_only is None \
+            and getattr(args, "load_only", None) is None:
+        from armoor.cli.hpc import run_hpc
+        import sys
+        run_hpc(host, scheduler, args.cfgfile, args.metazonesfile, args.metazones,
+                func_comp, args.jsonfile, args.filters_only, args.coloc_only,
+                kw_comp, kw_dask, sys.argv)
+        return
+
+    main_comp(
+        args.cfgfile, args.metazonesfile, args.metazones,
+        func_comp, args.jsonfile,
+        args.filters_only, args.coloc_only,
+        args.no_plot, args.plot_only, args.input_json,
+        kw_dask, comp_args=kw_comp,
+        load_only=getattr(args, "load_only", None),
+        input_zarrs=getattr(args, "input_zarrs", None),
+    )
 
 
 def get_parser_comp_models():
@@ -408,35 +585,8 @@ def get_parser_comp_models():
 
 def main_comp_models():
     """Compare a model reference with other products."""
-    _init_heavy()
-    # Get parser
-    parser = get_parser_comp_sst()
-    func_comp = "comp_models"
-
-    # Parse
-    args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-
-    # Load configuration
-    if not args.cfgfile.exists():
-        raise ArmoorError(
-            f"File not found: {args.cfgfile}."
-            )
-    kw_dask = get_dask_args(args)
-    kw_comp = {"tbound": args.tbound}
-    main_comp(
-        args.cfgfile,
-        args.metazonesfile,
-        args.metazones,
-        func_comp,
-        args.jsonfile,
-        args.filters_only,
-        args.coloc_only,
-        kw_dask,
-        comp_args=kw_comp
-        )
+    _dispatch_comp("comp_models", get_parser_comp_models(),
+                   lambda args: {"tbound": args.tbound})
 
 def get_parser_comp_sst():
     """Get parser for sst comparison."""
@@ -458,41 +608,10 @@ def get_parser_comp_sst():
 
 def main_comp_sst():
     """Compare sst reference with other products."""
-    _init_heavy()
-    # Get parser
-    parser = get_parser_comp_sst()
-    func_comp = "comp_sst"
+    _dispatch_comp("comp_sst", get_parser_comp_sst(),
+                   lambda args: {"qc": args.qc, "tbound": args.tbound})
 
-    # Parse
-    args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
 
-    # Load configuration
-    if not args.cfgfile.exists():
-        raise ArmoorError(
-            f"File not found: {args.cfgfile}."
-            )
-    kw_comp = {
-        "qc": args.qc,
-        "tbound": args.tbound
-        }
-    
-    kw_dask = get_dask_args(args)
-
-    main_comp(
-        args.cfgfile,
-        args.metazonesfile,
-        args.metazones,
-        func_comp,
-        args.jsonfile,
-        args.filters_only,
-        args.coloc_only,
-        kw_dask,
-        comp_args=kw_comp
-        )
-    
 def get_parser_comp_argo():
     """Get parser for argo comparison."""
     # Setup argument parser
@@ -519,36 +638,8 @@ def get_parser_comp_argo():
 
 def main_comp_argo():
     """Compare argo with other products."""
-    _init_heavy()
-    # Get parser
-    parser = get_parser_comp_argo()
-    func_comp = "comp_argo"
-
-    # Parse
-    args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    # Load configuration
-    if not args.cfgfile.exists():
-        raise ArmoorError(f"File not found: {args.cfgfile}.")
-    
-    kw_comp = {"radius": args.radius, "qc": args.qc, "tbound": args.tbound}
-    
-    kw_dask = get_dask_args(args)
-    
-    main_comp(
-        args.cfgfile,
-        args.metazonesfile,
-        args.metazones,
-        func_comp,
-        args.jsonfile,
-        args.filters_only,
-        args.coloc_only,
-        kw_dask,
-        comp_args=kw_comp
-        )
+    _dispatch_comp("comp_argo", get_parser_comp_argo(),
+                   lambda args: {"radius": args.radius, "qc": args.qc, "tbound": args.tbound})
 
 def get_parser_comp_mooring():
     """Get parser for mooring comparison."""
@@ -575,37 +666,9 @@ def get_parser_comp_mooring():
     return parser
 
 def main_comp_mooring():
-    """Compare argo with other products."""
-    _init_heavy()
-    # Get parser
-    parser = get_parser_comp_mooring()
-    func_comp = "comp_mooring"
-
-    # Parse
-    args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    # Load configuration
-    if not args.cfgfile.exists():
-        raise ArmoorError(f"File not found: {args.cfgfile}.")
-    
-    kw_comp = {"radius": args.radius, "qc": args.qc, "tbound": args.tbound}
-
-    kw_dask = get_dask_args(args)
-
-    main_comp(
-        args.cfgfile,
-        args.metazonesfile,
-        args.metazones,
-        func_comp,
-        args.jsonfile,
-        args.filters_only,
-        args.coloc_only,
-        kw_dask,
-        comp_args=kw_comp
-        )
+    """Compare mooring with other products."""
+    _dispatch_comp("comp_mooring", get_parser_comp_mooring(),
+                   lambda args: {"radius": args.radius, "qc": args.qc, "tbound": args.tbound})
 
 def get_parser_comp_drifter():
     """Get parser for drifter comparison."""
@@ -631,40 +694,10 @@ def get_parser_comp_drifter():
 
 def main_comp_drifter():
     """Compare drifter trajectory with other products."""
-    _init_heavy()
-    # Get parser
-    parser = get_parser_comp_drifter()
-    func_comp = "comp_drifter"
-
-    # Parse
-    args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    # Load configuration
-    if not args.cfgfile.exists():
-        raise ArmoorError(f"File not found: {args.cfgfile}.")
-    
-    kw_comp = {
-        "period_drift": args.period,
-        "freq_drift": args.freq,
-        "tbound": args.tbound
-        }
-    
-    kw_dask = get_dask_args(args)
-    
-    main_comp(
-        args.cfgfile,
-        args.metazonesfile,
-        args.metazones,
-        func_comp,
-        args.jsonfile,
-        args.filters_only,
-        args.coloc_only,
-        kw_dask,
-        comp_args=kw_comp
-        )
+    _dispatch_comp("comp_drifter", get_parser_comp_drifter(),
+                   lambda args: {"period_drift": args.period,
+                                 "freq_drift": args.freq,
+                                 "tbound": args.tbound})
 
 def get_parser_bull():
     """Get parser for building bull."""

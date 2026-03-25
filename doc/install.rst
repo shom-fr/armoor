@@ -52,6 +52,33 @@ A complete list of dependencies is given in ``requirements.txt``:
     .. literalinclude:: ../requirements.txt
            :language: text
 
+GitHub access prerequisite
+--------------------------
+
+armoor depends on two packages hosted on GitHub (``shom-fr/woom`` and
+``shom-fr/xoa``).  Before installing armoor, git must be able to authenticate
+against GitHub.
+
+Configure the URL rewrite once on your machine:
+
+.. code-block:: bash
+
+   git config --global \
+     url."https://<USERNAME>:<TOKEN>@github.com".insteadOf \
+     "https://github.com"
+
+Replace ``<USERNAME>`` with your GitHub username and ``<TOKEN>`` with a
+`Personal Access Token (PAT) <https://github.com/settings/tokens>`_ with at
+least the ``repo`` (read) scope.
+
+To create a token: **GitHub → Settings → Developer settings →
+Personal access tokens → Generate new token**, check the ``repo`` scope.
+
+.. note::
+
+   This configuration is persistent (stored in ``~/.gitconfig``) and only
+   needs to be done once per machine.
+
 From sources
 ------------
 

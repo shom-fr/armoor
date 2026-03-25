@@ -412,8 +412,6 @@ class VerticalColocation(AbstractColocation):
                 self.dsprod.chunk(dict(z=-1)), vcoord, self.dsref[vcoord].chunk(dict(z=-1))
                 )
             self.dsprod.attrs.update(attrs)
-            all_nan = self.dsprod[list(self.dsprod.data_vars)].to_array().isnull().all()
-            logger.info(all_nan)
         elif vref == "product":
             attrs = self.dsref.attrs
             self.dsref = vinterp(
@@ -637,29 +635,12 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
         ds = ds.reset_coords("depth")
 
     ds = ds.load()
+    # Ensure time coordinate is in nanosecond precision to avoid xarray warnings
+    # when the zarr stores times as datetime64[s] or datetime64[ms].
+    if "time" in ds.coords and ds["time"].dtype != np.dtype("datetime64[ns]"):
+        ds["time"] = ds["time"].astype("datetime64[ns]")
     return ds
 
-
-_GEO_VARS = {"lon", "lat", "depth"}
-
-
-def _ocean_all_nan(dsprod: xr.Dataset) -> bool:
-    """Return True if all ocean (non-geo) data variables are entirely NaN.
-
-    Parameters
-    ----------
-    dsprod : xr.Dataset
-        Product dataset after a colocation step.
-
-    Returns
-    -------
-    bool
-        True when every ocean variable is NaN across all dimensions.
-    """
-    ocean_vars = [v for v in dsprod.data_vars if v not in _GEO_VARS]
-    if not ocean_vars:
-        return False
-    return bool(dsprod[ocean_vars].to_array().isnull().all().values)
 
 
 def _apply_colocations(dsref, dsprod, params, tbound):
@@ -685,30 +666,18 @@ def _apply_colocations(dsref, dsprod, params, tbound):
         dsref, dsprod = process_time_colocation(
             dsref, dsprod, params["time"], tbound
         )
-        all_nan = _ocean_all_nan(dsprod)
-        logger.info(f"Ocean vars all-NaN after time colocation: {all_nan}")
         gc.collect()
-        if all_nan:
-            logger.warning("Skipping horizontal/vertical colocation: ocean data is all-NaN after time colocation.")
-            return dsref, dsprod
 
     if params.get("horizontal"):
         dsref, dsprod = process_horizontal_colocation(
             dsref, dsprod, params["horizontal"]
         )
-        all_nan = _ocean_all_nan(dsprod)
-        logger.info(f"Ocean vars all-NaN after horizontal colocation: {all_nan}")
         gc.collect()
-        if all_nan:
-            logger.warning("Skipping vertical colocation: ocean data is all-NaN after horizontal colocation.")
-            return dsref, dsprod
 
     if params.get("vertical"):
         dsref, dsprod = process_vertical_colocation(
             dsref, dsprod, params["vertical"]
         )
-        all_nan = _ocean_all_nan(dsprod)
-        logger.info(f"Ocean vars all-NaN after vertical colocation: {all_nan}")
         gc.collect()
 
     return dsref, dsprod
@@ -874,7 +843,7 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
     """
     logger.info(f"-- Process {ncin}")
 
-    dsprodin = xr.open_dataset(ncin, chunks="auto")
+    dsprodin = xr.open_dataset(ncin, chunks={})
     if "depth" in dsprodin and "depth" not in dsprodin.coords:
         dsprodin = dsprodin.set_coords("depth")
     dsprodin = _prepare_dataset(dsprodin, comp_func, is_reference=False)
@@ -942,7 +911,7 @@ def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts
     """
     logger.info(f"Use reference {ncref}")
 
-    dsrefin = xr.open_dataset(ncref, engine="zarr", chunks="auto")
+    dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={})
     dsrefin = _prepare_dataset(dsrefin, comp_func, is_reference=True)
 
     results = []

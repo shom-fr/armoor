@@ -22,7 +22,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts
 
 from armoor.__init__ import ArmoorError
-from armoor.base import FILTERS, LINE_COLORS, CMAP_VARS
+from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.filters import create_optimized_mask
 from armoor.base.interp import vinterp
 from armoor.base.io import setup_dask_client

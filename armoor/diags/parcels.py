@@ -34,7 +34,7 @@ def outofbounds(particle, fieldset, time):
 #     particle.delete()
 
 class  Parcels(object):
-    
+
     def __init__(self, ncin, ptc_coords_start, runtime, outputdt=None):
         self.ncin = ncin
         self.ptc_coords_start = ptc_coords_start
@@ -56,14 +56,14 @@ class  Parcels(object):
             chunksize="auto",
             allow_time_extrapolation=True,
             )
-        
+
     def _particleset_(self):
         return parcels.ParticleSet(
             fieldset=self._fieldset_(),
             pclass=MyParticle,#parcels.JITParticle,
             **self.ptc_coords_start,
             )
-    
+
     def _particlefile_(self, pset):
         outputdt = pd.to_timedelta(self.outputdt)
         outputdt = outputdt.to_pytimedelta()
@@ -71,7 +71,7 @@ class  Parcels(object):
             name=TMP_OFILE,
             outputdt=pd.to_timedelta(outputdt)
             )
-    
+
     def _post_(self):
         ds_parcels = xr.open_dataset(TMP_OFILE)
         if "z" in ds_parcels.data_vars:
@@ -91,12 +91,12 @@ class  Parcels(object):
             dims=["time"]
             )
         u_parcels = grid2loc(
-            ds_field.u,
+            ds_field["u"],
             da
             )
         u_parcels = u_parcels.to_dataset(name="u_drifter")
         v_parcels = grid2loc(
-            ds_field.v,
+            ds_field["v"],
             da
             )
         del da
@@ -122,7 +122,7 @@ class  Parcels(object):
             "trajectory": "obj_trajectory"
             })
         ds = xr.merge([ds_parcels, ds_field, ds_drifter])
-        ds = ds.assign_attrs({**ds_field.attrs}) 
+        ds = ds.assign_attrs({**ds_field.attrs})
         os.remove(self.ncin)
         ds.to_netcdf(self.ncin)
         ds.close()
@@ -130,8 +130,8 @@ class  Parcels(object):
         ds_drifter.close()
         del ds_drifter
         del ds_parcels
-        shutil.rmtree(TMP_OFILE)   
-    
+        shutil.rmtree(TMP_OFILE)
+
     def execute(self):
         pset = self._particleset_()
         # runtime = pd.to_timedelta(self.runtime) / pd.to_timedelta(1, "s")
@@ -150,4 +150,4 @@ class  Parcels(object):
             output_file=self._particlefile_(pset),
             )
         self._post_()
-    
+

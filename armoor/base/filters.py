@@ -8,21 +8,21 @@ import re
 import sys
 
 import datetime
-from scipy.signal.windows import gaussian
 import dask.array as da
 from typing import Union, Tuple
 import dask
 import numpy as np
 import pandas as pd
 import xarray as xr
-import xoa.filter as xfilter
-import xoa.geo as xgeo
-from matplotlib import path
-from scipy.ndimage import binary_dilation
+
+# Heavy optional imports — deferred to first use to avoid the multi-second NFS
+# stat overhead on HPC cluster filesystems when `import armoor` is called.
+# xoa.filter, xoa.geo, matplotlib.path, scipy.signal, scipy.ndimage
+# are imported lazily inside the functions that need them.
 
 from armoor.base.interp import grid2loc, regrid
-import armoor.base.oceanvars
-from armoor.data.open_decode import open_decode
+# open_decode imported lazily (see bathy filter) to avoid pulling in xoa/pyproj
+# at `import armoor` time.
 
 
 R_terre = 6371
@@ -70,6 +70,7 @@ def generate_kernel_from_freq(freq: str, time_index: pd.DatetimeIndex,
     if kernel_type == "boxcar":
         kernel = np.ones(kernel_size) / kernel_size
     elif kernel_type == "gaussian":
+        from scipy.signal.windows import gaussian
         std = kernel_size / 6
         kernel = gaussian(kernel_size, std)
         kernel /= kernel.sum()
@@ -78,8 +79,6 @@ def generate_kernel_from_freq(freq: str, time_index: pd.DatetimeIndex,
 
     return kernel, kernel_size
 
-@xr.register_dataarray_accessor("armoorfilters")
-@xr.register_dataset_accessor("armoorfilters")
 class ArmoorFilters:
     """
     Select a subset of the original object filtering elements with conditions across certain dimensions.
@@ -111,6 +110,7 @@ class ArmoorFilters:
         https://matplotlib.org/stable/api/path_api.html
         """
         logger.info("getting mask for horizontal_selection_polygon")
+        from matplotlib import path
         # Create the polygon where to subset
         polygon = path.Path(coords)
         
@@ -162,6 +162,7 @@ class ArmoorFilters:
         mask_poly = mask_result.copy()
 
         if (("x" in self.ds.lon.dims) and ("y" in self.ds.lon.dims)) and dilate:
+            from scipy.ndimage import binary_dilation
             structure = np.ones((3, 3), dtype=bool)
             dilated_values = binary_dilation(
                 mask_poly.values,
@@ -205,6 +206,7 @@ class ArmoorFilters:
         xr.DataArray
             Filtered dataset where bathymetry is within specified range.
         """
+        from armoor.data.open_decode import open_decode
         logger.info("bathy filter")
         ds_bathy = open_decode(path, fmt=fmt)[["bathy"]]
         if "time" in ds.lon.dims:
@@ -262,6 +264,7 @@ class ArmoorFilters:
         The method handles exceptions internally and logs warnings rather than raising
         errors, ensuring robustness when processing multiple variables.
         """
+        import xoa.filter as xfilter
         logger.info(f"Apply tidal filter: {filter_name}")
         for vname in ds.data_vars:
             dai = ds[vname]
@@ -317,6 +320,7 @@ class ArmoorFilters:
             kernel_type="gaussian"
             )
 
+        import xoa.filter as xfilter  # noqa: F811
         kernel = xr.DataArray(
             data=kernel,
             dims="time"
@@ -325,7 +329,7 @@ class ArmoorFilters:
         for var in ds.data_vars:
             if (var != "time") and ("time" in ds[var].dims):
                 da = xr.map_blocks(
-                    xfilter.smooth, 
+                    xfilter.smooth,
                     ds[var], 
                     kwargs={'kernel': kernel, "na_thres": 1}
                 )
@@ -615,6 +619,7 @@ class ArmoorFilters:
         xarray.Dataset
             Dataset with elements around (lat, lon).
         """
+        import xoa.geo as xgeo
         logger.info("Applying filter - sel_closest")
         if "time" in self.ds.lon.dims:
             dss = []

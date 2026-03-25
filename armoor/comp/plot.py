@@ -18,7 +18,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts
 
 from armoor.__init__ import ArmoorError
-from armoor.base import FILTERS, LINE_COLORS, CMAP_VARS
+from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.plot import create_subplots, diagdisp, save_figure
 from armoor.comp import METRIC_LABELS, TITLE_PLOTS
 
@@ -40,6 +40,7 @@ class PlotComp:
         self.ax_minimap = [0.7, 0.91, 0.19]
         self.plot_title = TITLE_PLOTS[func_comp]
         self.dt = xr.open_datatree(nc)
+        self.saved_files = []
         self.__post_init__()
 
     def register_method(self, func):
@@ -441,7 +442,7 @@ class PlotComp:
                 dsprod.isel(time=[itime]).squeeze() for dsprod in dssprod
                 ]
             dssprod_closest = [
-                ds.armoorfilters.sel_closest(
+                ds.filters.sel_closest(
                     dsref_itime
                     ) for ds in dssprod_itime
                 ]
@@ -451,8 +452,8 @@ class PlotComp:
             if (~mask).all():
                 continue
             depth = dsref_itime.depth.where(mask, drop=True)
-            zmin = -depth.max()
-            zmax = -depth.min()
+            zmin = -float(depth.max())
+            zmax = -float(depth.min())
             xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
             xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
             if vrange:
@@ -686,7 +687,7 @@ class PlotComp:
                 if "member" in ds.depth.dims:
                     ds = ds.reset_coords("depth")
                 dssprod_itime.append(ds)
-            dssprod_closest = [ds.armoorfilters.sel_closest(dsref_itime) for ds in dssprod_itime]
+            dssprod_closest = [ds.filters.sel_closest(dsref_itime) for ds in dssprod_itime]
             def _safe_reduce(ds, method):
                 agg_vars = [v for v in ds.data_vars if "member" in ds[v].dims and ds[v].ndim > 1]
                 other_vars = [v for v in ds.data_vars if v not in agg_vars]
@@ -702,8 +703,8 @@ class PlotComp:
             if (~mask).all():
                 continue
             depth = dsref_itime.depth.where(mask, drop=True)
-            zmin = -depth.max()
-            zmax = -depth.min()
+            zmin = -float(depth.max())
+            zmax = -float(depth.min())
             xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
             xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
             if vrange:
@@ -1554,6 +1555,7 @@ class PlotComp:
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, filename)
+        self.saved_files.append(str(filename.resolve()))
         logger.info(f"{filename} saved")
         plt.close(fig)
         del fig
@@ -1563,11 +1565,19 @@ def _plot_task(nc, func_comp, metazone, output):
     plotcomp = PlotComp(nc, func_comp, metazone)
     plotcomp.call(output)
     plotcomp.clean()
+    saved = plotcomp.saved_files
     del plotcomp
+    return saved
 
 
 def main_plot(ncins, metazones, func_comp, kw_dask=None):
-    """Process plot tasks in parallel using a multiprocessing pool."""
+    """Process plot tasks in parallel using a multiprocessing pool.
+
+    Returns
+    -------
+    list of str
+        Absolute paths of all PNG files generated.
+    """
     import multiprocessing
 
     logger.info("Start plot")
@@ -1579,14 +1589,23 @@ def main_plot(ncins, metazones, func_comp, kw_dask=None):
                     task_args.append((nc, func_comp, metazone, output))
 
     if not task_args:
-        return
+        return []
 
     # Use the same n_workers as the CLI dask config (e.g. --dask-nworkers 4).
     num_workers = kw_dask[0] if kw_dask else 4
     num_workers = min(num_workers, len(task_args))
     logger.info(f"Plotting {len(task_args)} tasks with {num_workers} workers")
+    # Pre-warm cartopy's naturalearth cache in the main process so that
+    # concurrent workers don't race to download the same shapefiles.
+    import cartopy.feature as cfeature
+    list(cfeature.LAND.geometries())
+
     # Use 'spawn' to create clean child processes: avoids both the
     # "fork() after OpenMP" crash and inherited memory bloat.
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(num_workers) as pool:
-        pool.starmap(_plot_task, task_args)
+        results = pool.starmap(_plot_task, task_args)
+
+    png_paths = [p for task_result in results for p in (task_result or [])]
+    logger.info(f"Generated {len(png_paths)} PNG file(s)")
+    return png_paths

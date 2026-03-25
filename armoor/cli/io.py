@@ -49,6 +49,49 @@ def add_comp_parser_arguments(parser, default_level="info"):
         action='store_true',
         help="Use for exiting after colocation processes.",
         )
+    parser.add_argument(
+        '--no-plot',
+        action='store_true',
+        help="Run filter+colocation+output but skip the plot stage.",
+        )
+    parser.add_argument(
+        '--plot-only',
+        type=str,
+        default=None,
+        metavar='OTYPE',
+        help="Run only plots for this output type (requires --input-json).",
+        )
+    parser.add_argument(
+        '--input-json',
+        type=Path,
+        default=None,
+        help="JSON file listing pre-computed output zarr paths (used with --plot-only).",
+        )
+    parser.add_argument(
+        '--hosts-cfg',
+        type=Path,
+        default=None,
+        metavar='PATH',
+        help="Path to a woom hosts.cfg file for HPC scheduler detection. "
+             "If absent, armoor runs in background mode.",
+    )
+    parser.add_argument(
+        '--load-only',
+        type=str,
+        default=None,
+        metavar='DATASET_KEY',
+        help="Load-only mode: load a single dataset key for all metazones "
+             "and write zarr paths to --jsonfile as {mz: [paths]}. "
+             "Used internally by HPC Wave 0 jobs.",
+    )
+    parser.add_argument(
+        '--input-zarrs',
+        type=comma_separated,
+        default=None,
+        metavar='JSON,...',
+        help="Comma-separated list of zarr-paths JSON files produced by Wave 0 load jobs. "
+             "When provided, load_datasets() is skipped.",
+    )
 
 def add_tbound_parser_arguments(parser):
     """Add tbound argument to argument parser.

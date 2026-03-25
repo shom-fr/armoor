@@ -19,8 +19,7 @@ from armoor.base.io import (
     )
 from armoor.comp import COMP_VARS, OUTPUTS_PARAMS
 from armoor.comp.stats import StatsComp
-import armoor.base.oceanvars  # noqa: F401 — registers .oceanvars accessor
-from armoor.data.interp import process_time_interpolation
+import armoor  # noqa: F401 — registers all xarray accessors
 from armoor.diags.parcels import Parcels
 
 logger = logging.getLogger(__name__)
@@ -95,11 +94,10 @@ def _prepare_prod_for_parcels(zprod):
 def _interpolate_ref_and_run_parcels(zref, odt, timeprod, ncprod, runtime):
     """Interpolate reference dataset and execute Parcels simulation."""
     with xr.open_dataset(zref) as dsref:
-        dsref_update = process_time_interpolation(
-            dsref.reset_coords(["lon", "lat"]).drop("depth"),
-            ("tfreq", odt),
-            [dsref.time.min().values, dsref.time.max().values]
-            )
+        dsref_update = (
+            dsref.reset_coords(["lon", "lat"]).drop("depth")
+            .interp.tfreq(odt)
+        )
     zref = str(zref)
     dsref_update = dsref_update.compute()
     write_dataset_to_zarr(
@@ -612,7 +610,7 @@ class OutputProcessor:
             time_slices = []
             for ds in datasets:
                 time_slices.extend([
-                    ds.isel(time=time_idx)
+                    ds.isel(time=[time_idx])
                     for time_idx in range(ds.sizes["time"])
                 ])
             datasets = time_slices

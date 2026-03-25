@@ -1,6 +1,7 @@
 """Input/output."""
 import re, os
 import logging
+import time
 from typing import Dict, List, Tuple
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
@@ -8,7 +9,9 @@ import zarr
 import dask
 import numpy as np
 import xarray as xr
-from dask.distributed import Client
+from dask.diagnostics import ProgressBar
+# dask.distributed is imported lazily in setup_dask_client to avoid the
+# heavy import cost at module load time on NFS HPC filesystems.
 from numcodecs import Blosc
 
 logger = logging.getLogger(__name__)
@@ -120,10 +123,11 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                 first_chunk = dim_chunks[0]
                 last_chunk = dim_chunks[-1]
 
-                if last_chunk > first_chunk:
+                non_uniform = not all(c == first_chunk for c in dim_chunks[:-1])
+                if last_chunk > first_chunk or non_uniform:
                     # PROBLÈME DÉTECTÉ
                     needs_rechunk = True
-                    optimal_size = find_valid_chunk_size(dim_size, first_chunk)
+                    optimal_size = find_valid_chunk_size(dim_size, max(dim_chunks[:-1]))
                     new_chunks[dim_name] = optimal_size
 
                     if verbose:
@@ -146,6 +150,23 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                     if verbose:
                         logger.debug(f"  {dim_name}: Chunks OK ({n_chunks} chunks: {first_chunk}...{last_chunk})")
 
+            # Cap chunks to stay under the Blosc 2 GB per-buffer limit
+            _BLOSC_MAX_CHUNK_BYTES = 2_000_000_000
+            if new_chunks:
+                chunk_bytes = int(np.prod(list(new_chunks.values()))) * var.dtype.itemsize
+                if chunk_bytes > _BLOSC_MAX_CHUNK_BYTES:
+                    while chunk_bytes > _BLOSC_MAX_CHUNK_BYTES:
+                        spatial = {d: new_chunks[d] for d in new_chunks if d != 'time'}
+                        dim_to_reduce = max(
+                            spatial if spatial else new_chunks,
+                            key=(spatial if spatial else new_chunks).__getitem__
+                        )
+                        new_chunks[dim_to_reduce] = max(1, new_chunks[dim_to_reduce] // 2)
+                        chunk_bytes = int(np.prod(list(new_chunks.values()))) * var.dtype.itemsize
+                    needs_rechunk = True
+                    if verbose:
+                        logger.debug(f"  → Capped chunks for Blosc 2 GB limit: {new_chunks}")
+
             # Rechunker si nécessaire
             if needs_rechunk:
                 if verbose:
@@ -167,7 +188,7 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                 da_fixed.attrs[key] = float(val)
             elif isinstance(val, str):
                 da_fixed.attrs[key] = str(val)
-        if np.issubdtype(da_fixed.dtype, np.number):
+        if np.issubdtype(da_fixed.dtype, np.number) and da_fixed.size > 0 and da_fixed.chunks is not None:
             lazy_minmax.append(da_fixed.min())
             lazy_minmax.append(da_fixed.max())
             minmax_vars.append(var_name)
@@ -202,8 +223,16 @@ def _apply_minmax_to_zarr(path, minmax_vars, computed_minmax, ds):
 
     store = zarr.open(str(path), mode='r+')
     for idx, var_name in enumerate(minmax_vars):
-        vmin = computed_minmax[2 * idx].values
-        vmax = computed_minmax[2 * idx + 1].values
+        result_vmin = computed_minmax[2 * idx]
+        result_vmax = computed_minmax[2 * idx + 1]
+        if result_vmin is None or result_vmax is None:
+            logger.warning(
+                f"_apply_minmax_to_zarr: min/max for '{var_name}' is None "
+                f"— skipping valid_min/valid_max attrs for this variable"
+            )
+            continue
+        vmin = result_vmin.values
+        vmax = result_vmax.values
         if var_name == "time":
             da_t = ds[var_name]
             if "units" in da_t.encoding:
@@ -262,23 +291,67 @@ class _BundledZarrWrite:
 def compute_bundled_zarr_writes(write_jobs):
     """Compute multiple _BundledZarrWrite objects in a single dask pass.
 
-    Dask merges all task graphs into one and the scheduler reuses shared
-    upstream nodes — in practice each source chunk (e.g. a NetCDF4/HDF5
-    tile) is read exactly once even when it feeds several output zarr files.
-    This is the key optimisation for per-metazone staging: N metazones that
-    share the same source data pay for one read pass, not N.
+    All write jobs are submitted together so the dask thread scheduler can
+    run them in parallel — in practice N zarr writes proceed concurrently
+    without waiting for each other.
+
+    Note: optimize_graph=False is intentional.  Dask's graph optimizer can
+    reorder or fuse zarr write tasks in ways that corrupt the store, so we
+    disable it.  As a result there is no read deduplication across jobs; the
+    parallelism benefit is write concurrency only.
+
+    The scheduler used can be overridden via the ARMOOR_DASK_SCHEDULER env
+    var ('threads', 'synchronous', 'processes') for benchmarking purposes.
 
     Parameters
     ----------
     write_jobs : list of _BundledZarrWrite
         Write jobs returned by ``write_dataset_to_zarr(..., compute=False)``.
     """
+    import os
+    scheduler = os.environ.get("ARMOOR_DASK_SCHEDULER", "threads")
+
     all_delayed = []
     for job in write_jobs:
-        all_delayed.append(job._write_delayed)
+        if job._write_delayed is not None:
+            all_delayed.append(job._write_delayed)
         all_delayed.extend(job._lazy_minmax)
 
-    results = dask.compute(*all_delayed)
+    def _task_count(d):
+        """Return dask task count for d; 0 for non-dask or empty graphs."""
+        try:
+            g = d.__dask_graph__()
+            return len(g) if g is not None else 0
+        except (AttributeError, TypeError):
+            return 0
+
+    n_jobs = len(write_jobs)
+    total_tasks = sum(_task_count(d) for d in all_delayed)
+    logger.info(
+        f"compute_bundled_zarr_writes: {total_tasks} tasks, {n_jobs} zarr(s), "
+        f"scheduler={scheduler!r}"
+    )
+
+    t0 = time.time()
+    kw = dict(optimize_graph=False)
+    if scheduler == "threads":
+        # Use at least os.cpu_count() threads so a single-zarr staging write
+        # (n_jobs=1 → formula gives 4) still saturates all available CPUs.
+        # n_cpus = os.cpu_count() or 8
+        #kw["num_workers"] = min(, max(n_jobs * 4, n_cpus))
+        ncpus = os.cpu_count()
+        if ncpus >= n_jobs * 4:
+            num_workers = ncpus
+        elif ncpus <= 2:
+            num_workers = 1
+        else:
+            num_workers = ncpus - 2
+        kw["num_workers"] = min(num_workers, max(n_jobs * 4, ncpus // 4))
+
+    with ProgressBar(dt=30.0):
+        results = dask.compute(*all_delayed, scheduler=scheduler, **kw)
+
+    logger.info(f"compute_bundled_zarr_writes: done in {time.time() - t0:.1f}s")
 
     offset = 0
     for job in write_jobs:
@@ -286,6 +359,11 @@ def compute_bundled_zarr_writes(write_jobs):
         if job._lazy_minmax:
             _apply_minmax_to_zarr(
                 job._path, job._minmax_vars, results[offset + 1: offset + 1 + n], job._ds)
+        else:
+            # No min/max to compute, but still consolidate metadata so that
+            # subsequent xr.open_zarr() calls read a single .zmetadata file
+            # instead of stat-ing every chunk directory on (potentially slow) NFS.
+            zarr.consolidate_metadata(str(job._path))
         offset += 1 + n
 
 
@@ -347,6 +425,8 @@ def write_dataset_to_zarr(
     mode: str = 'w',
     consolidated: bool = True,
     compute: bool = True,
+    minmax: bool = True,
+    compressor=None,
     **kwargs
     ):
     """
@@ -367,10 +447,21 @@ def write_dataset_to_zarr(
         Consolider les métadonnées (recommandé)
     compute : bool
         Calculer immédiatement (True) ou retourner delayed (False)
+    compressor : numcodecs compressor or None
+        Override the zarr compressor for all variables.  Pass a fast
+        compressor (e.g. ``Blosc(cname='lz4', clevel=1)``) for temporary
+        staging writes, or ``None`` to keep the default.
     **kwargs : arguments supplémentaires pour to_zarr()
     """
     # Correction automatique
     ds, encoding, (lazy_minmax, minmax_vars) = auto_fix_zarr_encoding(ds)
+    if not minmax:
+        lazy_minmax = []
+        minmax_vars = []
+
+    if compressor is not None:
+        for var_name in encoding:
+            encoding[var_name]['compressor'] = compressor
 
     logger.info(f"\n Write: {path}")
     logger.debug(f"   Mode: {mode}")
@@ -385,6 +476,12 @@ def write_dataset_to_zarr(
         encoding=encoding,
         **kwargs
     )
+
+    if write_delayed is None:
+        # Older xarray (< 2022.06) writes synchronously for non-dask datasets
+        # and returns None instead of a Delayed.  Wrap in a no-op so that
+        # compute_bundled_zarr_writes can handle this job uniformly.
+        write_delayed = dask.delayed(lambda: None)()
 
     if compute:
         # Compute write + min/max in a single dask pass
@@ -504,8 +601,9 @@ def zarrs2netcdfs(fins):
         fouts = []
     return fouts
 
-def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, localdirectory):
+def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, localdirectory):  # noqa: E501
     """Configure le client Dask de manière robuste."""
+    from dask.distributed import Client  # noqa: F401 — lazy import, heavy on NFS HPC
     # Configuration optimale
     dask.config.set({
         "distributed.worker.profile.enabled": False,
