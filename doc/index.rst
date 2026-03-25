@@ -13,6 +13,7 @@
    :maxdepth: 1
    :hidden:
 
+   accessors
    cli
    examples/index
 
@@ -26,6 +27,13 @@
    roadmap
    appendix
    Gitlab repository <https://gitlab.com/GitShom/STM/armoor>
+
+.. toctree::
+   :caption: Contributing
+   :maxdepth: 1
+   :hidden:
+
+   contributing
 
 Indices and tables
 ------------------

@@ -1,3 +1,4 @@
+import copy
 import logging.config
 
 DEFAULT_LOGGING_CONFIG = {
@@ -20,12 +21,10 @@ DEFAULT_LOGGING_CONFIG = {
             "level": "INFO",
         },
         "file": {
-            "class": "logging.handlers.RotatingFileHandler",
+            "class": "logging.FileHandler",
             "formatter": "precise",
             "filename": "armoor.log",
-            "maxBytes": 1024 * 1000,
-            "backupCount": 3,
-            "level": "DEBUG",
+            "level": "INFO",
         },
     },
     "root": {"handlers": ["console", "file"], "level": "DEBUG"},
@@ -38,12 +37,18 @@ def setup_logging(
 ):
     """Setup the logging"""
 
-    #    for handler in logging.root.handlers:
-    #        logging.root.handlers.remove(handler)
-    #    del logging.root.handlers[:]
+    # Deep copy so dictConfig cannot mutate DEFAULT_LOGGING_CONFIG in place.
+    # (dictConfig replaces each config-dict entry with the actual handler object,
+    # which would permanently corrupt the global default on subsequent calls.)
+    logging_config = copy.deepcopy(DEFAULT_LOGGING_CONFIG)
+
+    # Explicitly clear root handlers before reconfiguring to prevent stale
+    # handlers accumulating when setup_logging is called more than once.
+    for h in logging.root.handlers[:]:
+        logging.root.removeHandler(h)
+        h.close()
 
     # Alter the config
-    logging_config = DEFAULT_LOGGING_CONFIG.copy()
     if console_level is not None:
         logging_config["handlers"]["console"]["level"] = console_level.upper()
     if to_file is False:
@@ -81,9 +86,14 @@ def add_log_level_parser_arguments(parser, default_level="info"):
     )
 
 def main_setup_logging(args):
+    import os
+    # When running inside a batch job, the scheduler already captures
+    # stdout/stderr to a file.  Enabling FileHandler on top would write
+    # every line twice to the same file (StreamHandler→stderr + FileHandler).
+    in_batch_job = bool(os.environ.get("SLURM_JOB_ID") or os.environ.get("PBS_JOBID"))
     setup_logging(
         console_level=args.log_level,
-        to_file=args.log_file,
+        to_file=False if in_batch_job else args.log_file,
     )
 
 

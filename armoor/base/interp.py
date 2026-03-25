@@ -1,11 +1,12 @@
 """Interpolation functions."""
+# pyproj and xoa.regrid are imported lazily (inside the functions that need
+# them) to avoid the significant NFS stat overhead on HPC cluster filesystems
+# when the whole armoor package is imported at startup.
 import logging
 from contextlib import contextmanager
 import re
-from pyproj import Geod
 import pandas as pd
 import xarray as xr
-import xoa.regrid as xregrid
 
 from armoor.base.misc import geo_vars
 
@@ -183,7 +184,7 @@ def interp_time(
 
     return dso
 
-def grid2loc(ds, coords: [(float, float)]): 
+def grid2loc(ds, coords: [(float, float)]):
     """Interpolate a dataset at specific coordinates.
 
     Parameters
@@ -198,6 +199,7 @@ def grid2loc(ds, coords: [(float, float)]):
     xarray.Dataset, xarray.Dataset
         Dataset with elements located at specific coordinates.
     """
+    import xoa.regrid as xregrid
     lat, lon = zip(*coords)
     loc = xr.Dataset(
         coords={
@@ -267,6 +269,8 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     xarray.Dataset, xarray.Dataset
         Dataset interpolated over a section.
     """    
+    from pyproj import Geod
+    import xoa.regrid as xregrid  # noqa: F811
     dx = dx * 1e3  # Convert to meters
     geod = Geod(ellps='WGS84')
     
@@ -336,7 +340,7 @@ def regrid(dsi, dso) -> xr.Dataset:
     
     return dsio
 
-def vinterp(ds, vname, vlevels, method="linear"):
+def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
     """Interpolate an xarray Dataset over specified vertical levels.
     
     Parameters
@@ -365,6 +369,7 @@ def vinterp(ds, vname, vlevels, method="linear"):
             ds = ds.reset_coords("depth")
         if "dens" not in ds.coords:
             ds = ds.set_coords("dens")
+    import xoa.regrid as xregrid  # noqa: F811
     das = []
     for var in ds.data_vars:
         if "z" in ds[var].dims:
@@ -373,6 +378,7 @@ def vinterp(ds, vname, vlevels, method="linear"):
                 vlevels,
                 method=method,
                 extrap="both",
+                dim="z",
                 )
         else:
             da = ds[var]

@@ -20,11 +20,7 @@ from armoor.cli.io import (
     check_insitu_platform
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.comp.coloc import (
-    process_time_colocation,
-    process_horizontal_colocation,
-    process_vertical_colocation
-    )
+import armoor  # noqa: F401 — registers ds.coloc accessor
 from armoor.data.open_decode import open_decode, register_cf
 
 
@@ -137,9 +133,8 @@ def main_coloc_time():
             dsprod = open_decode(args.fins, args.ifmt, platform=args.platform)
             tbound = (dsref.time.min(), dsref.time.max())
             param = ("trange_seq", (None, "reference"))
-            _, dsout = process_time_colocation(dsref, dsprod, param, tbound)
-            del dsref
-            del dsprod
+            _, dsout = dsprod.coloc.with_ref(dsref).time(param, tbound=tbound)
+            del dsref, dsprod
             save_output(dsout, args.fout, args.ofmt)
 
 def main_coloc_horizontal():
@@ -226,9 +221,8 @@ def main_coloc_horizontal():
                 raise ArmoorError(
                     "No horizontal colocation detected."
                     )
-            _, dsout = process_horizontal_colocation(dsref, dsprod, param)
-            del dsref
-            del dsprod
+            _, dsout = dsprod.coloc.with_ref(dsref).horizontal(param)
+            del dsref, dsprod
             save_output(dsout, args.fout, args.ofmt)
             
 def main_coloc_vertical():
@@ -337,7 +331,6 @@ def main_coloc_vertical():
             else:
                 raise ArmoorError(f"Vertical coordinate {vname} varying in time, y, x")
             dsref["depth"] = vcoord
-            _, dsout = process_vertical_colocation(dsref, dsprod, param)
-            del dsref
-            del dsprod
+            _, dsout = dsprod.coloc.with_ref(dsref).vertical(param)
+            del dsref, dsprod
             save_output(dsout, args.fout, args.ofmt)

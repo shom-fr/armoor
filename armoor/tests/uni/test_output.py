@@ -18,7 +18,12 @@ import pytest
 # ---------------------------------------------------------------------------
 def _ensure_mock(name):
     """Insert a MagicMock into sys.modules if the real module is absent."""
-    if name not in sys.modules:
+    if name in sys.modules:
+        return
+    import importlib
+    try:
+        importlib.import_module(name)
+    except ImportError:
         sys.modules[name] = mock.MagicMock()
 
 

@@ -6,6 +6,14 @@ Package API
     :toctree: _api
 
     armoor
+    armoor.accessors
+    armoor.accessors.filters
+    armoor.accessors.oceanvars
+    armoor.accessors.coloc
+    armoor.accessors.stats
+    armoor.accessors.interp
+    armoor.accessors.range
+    armoor.accessors.plot
     armoor.base
     armoor.base.filters
     armoor.base.interp

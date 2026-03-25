@@ -10,7 +10,7 @@ from dask.distributed import Client, LocalCluster
 import dask.config
 import xarray as xr
 
-from armoor.base.filters import ArmoorFilters  # registers armoorfilters accessor
+import armoor  # noqa: F401 — registers ds.filters accessor
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
 from armoor.base.misc import parse_date, parse_hours, is_dict_empty, parse_coords
 from armoor.cli.io import (
@@ -87,7 +87,7 @@ def process_filters(fins, ifmt, platform, fout, ofmt, filters_config, kw_dask):
             save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
             del ds
             ds = xr.open_dataset("tmp.zarr")
-            ds = ds.armoorfilters.apply_combined_filters(filters_config)
+            ds = ds.filters.combined(filters_config)
             save_output(ds, fout, ofmt=ofmt, scheduler="threads")
             shutil.rmtree("tmp.zarr")
 

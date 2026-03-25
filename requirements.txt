@@ -27,5 +27,4 @@ setuptools
 sqlite=3.47.0
 xarray=2025.1.1
 xesmf=0.8.8
-xoa
 zarr=2.18.7

@@ -19,11 +19,7 @@ from armoor.cli.io import (
     check_insitu_platform
 )        
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.data.interp import (
-    process_time_interpolation,
-    process_horizontal_interpolation,
-    process_vertical_interpolation
-    )
+import armoor  # noqa: F401 — registers ds.interp accessor
 from armoor.data.open_decode import open_decode, register_cf
 
 
@@ -141,11 +137,7 @@ def main_interp_time():
                 ds = xr.open_dataset("tmp.zarr")
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
-            ds = process_time_interpolation(
-                ds,
-                ("tfreq", args.tfreq),
-                [ds.time.min().values, ds.time.max().values]
-                )
+            ds = ds.interp.tfreq(args.tfreq)
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
             if args.ifmt != 'armoor':
                 shutil.rmtree("tmp.zarr")
@@ -309,28 +301,12 @@ def main_interp_horizontal():
     elif check == 0:
         raise InterpError("No horizontal interpolation to be performed.")
         
-    if cloud:
-        params = ("cloud", cloud)
-    elif section:
-        it = iter(section[:-1])
-        coords_pairs = list(zip(it, it))
-        dx = section[-1]
-        params = ("section", coords_pairs, dx)
-    elif lon_grid:
-        params = (
-            "regrid_from_latlon", lon_grid, lat_grid
-            )
-    elif ncgrid:
-        params = (
-            "regrid_from_nc", ncgrid
-            )
-    
     register_cf()
-    
+
     check_insitu_platform(args.ifmt, args.platform)
-    
+
     kw_dask = get_dask_args(args)
-    
+
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt, platform=args.platform)
@@ -340,7 +316,16 @@ def main_interp_horizontal():
                 ds = xr.open_dataset("tmp.zarr")
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
-            ds = process_horizontal_interpolation(ds, params)
+            if cloud:
+                ds = ds.interp.grid2loc(cloud)
+            elif section:
+                it = iter(section[:-1])
+                coords_pairs = list(zip(it, it))
+                ds = ds.interp.grid2section(coords_pairs, dx=section[-1])
+            elif lon_grid:
+                ds = ds.interp.regrid_from_latlon(lon_grid, lat_grid)
+            elif ncgrid:
+                ds = ds.interp.regrid_from_nc(ncgrid)
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
             if args.ifmt != 'armoor':
                 shutil.rmtree("tmp.zarr")
@@ -468,11 +453,6 @@ def main_interp_vertical():
     elif check == 0:
         raise InterpError("No vertical interpolation to be performed.")
 
-    if vlevel:
-        params = ("vlevel", (vname, vlevel))
-    elif vfreq:
-        params = ("vfreq", (vname, vfreq))
-    
     kw_dask = get_dask_args(args)
     
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
@@ -484,7 +464,11 @@ def main_interp_vertical():
                 ds = xr.open_dataset("tmp.zarr")
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
-            ds = process_vertical_interpolation(ds.chunk(dict(z=-1)), params)
+            ds_chunked = ds.chunk(dict(z=-1))
+            if vlevel:
+                ds = ds_chunked.interp.vertical(vname, vlevel)
+            elif vfreq:
+                ds = ds_chunked.interp.vfreq(vname, vfreq)
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
             if args.ifmt != 'armoor':
                 shutil.rmtree("tmp.zarr")

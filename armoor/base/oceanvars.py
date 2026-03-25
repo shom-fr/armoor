@@ -15,8 +15,6 @@ def _gsw_ufunc(func, *args):
         output_dtypes=[np.float32],
     )
 
-@xr.register_dataarray_accessor("oceanvars")
-@xr.register_dataset_accessor("oceanvars")
 class OceanVars:
     """
     Sel or compute ocean variable from a dataset in a user-friendly format.

@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 from dask.distributed import Client, LocalCluster
 import xarray as xr
 
-from armoor.base.stats import diff, mean, std, bias, rms, crms
+import armoor  # noqa: F401 — registers ds.stats accessor
 from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
 from armoor.cli.io import (
     add_comp_io_parser_arguments,
@@ -113,11 +113,11 @@ def process_diff(dsref, dsprod):
     """
     if "time_range" in dsref:
         dsref, dsprod = drop_time_range(dsref, dsprod)
-    ds = diff(dsprod, dsref)
-    ds = rename_stat_var(ds, "diff")
-    dsref = rename_stat_var(dsref, "ref")
-    dsprod = rename_stat_var(dsprod, "prod")
-    return xr.merge([dsref, dsprod, ds])
+    return xr.merge([
+        rename_stat_var(dsref, "ref"),
+        rename_stat_var(dsprod, "prod"),
+        rename_stat_var(dsprod.stats.bias(dsref), "diff"),
+    ])
 
 
 def process_stat(dsref, dsprod, dim):
@@ -155,17 +155,15 @@ def process_stat(dsref, dsprod, dim):
     """
     if "time_range" in dsref:
         dsref, dsprod = drop_time_range(dsref, dsprod)
-    ds = xr.Dataset()
-    for func in [mean, std]:
-        fname = func.__name__
-        for dsname, ds0 in zip(("ref", "prod"), (dsref, dsprod)):
-            ds1 = func(ds0, dim)
-            ds1 = rename_stat_var(ds1, f"{dsname}_{fname}")
-            ds = xr.merge([ds, ds1])
-    for func in [bias, rms, crms]:
-        ds1 = func(dsprod, dsref, dim)
-        ds1 = rename_stat_var(ds1, func.__name__)
-        ds = xr.merge([ds, ds1])
+    ds = xr.merge([
+        rename_stat_var(dsref.stats.mean(dim), "ref_mean"),
+        rename_stat_var(dsref.stats.std(dim), "ref_std"),
+        rename_stat_var(dsprod.stats.mean(dim), "prod_mean"),
+        rename_stat_var(dsprod.stats.std(dim), "prod_std"),
+        rename_stat_var(dsprod.stats.bias(dsref, dim), "bias"),
+        rename_stat_var(dsprod.stats.rmse(dsref, dim), "rms"),
+        rename_stat_var(dsprod.stats.rmsec(dsref, dim), "crms"),
+    ])
     if "trange" in ds.sizes:
         ds = ds.swap_dims({"trange": "time"})
     if "time_range" in ds:

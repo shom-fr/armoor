@@ -8,10 +8,12 @@ import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dask
-from dask.diagnostics import ProgressBar
+import dask.array as da
+from collections import Counter
 import numpy as np
 import xarray as xr
 
+import armoor  # noqa: F401 — registers all xarray accessors (ds.filters, …)
 from armoor.base.io import (setup_dask_client, create_fast_encoding,
                             write_dataset_to_zarr, compute_bundled_zarr_writes)
 from armoor.base.misc import optimize_for_low_swap
@@ -166,14 +168,10 @@ def process_single_combination(ds, mz_name, mz_param):
     # Apply combined filters if any filters are configured
     if filters_config:
         logger.info(f"Applying combined filters for {combination_id}")
-        all_nan = bool(ds[list(ds.data_vars)].to_array().isnull().all().values)
-        logger.info(all_nan)
-        dsout = ds.armoorfilters.apply_combined_filters(filters_config)
+        dsout = ds.filters.combined(filters_config)
         if dsout is None:
             logger.info(f"No data left after filtering for {combination_id}")
-            sys.exit()
-        all_nan = bool(ds[list(ds.data_vars)].to_array().isnull().all().values)
-        logger.info(all_nan)
+            return None
     else:
         logger.info(f"No filters to apply for {combination_id}")
         dsout = ds.copy()
@@ -231,10 +229,10 @@ def save_result(dsout, mz_name, func_comp):
         nc,
         mode="w",
         consolidated=True,
-        compute=False
+        compute=False,
+        compressor=_OUTPUT_COMPRESSOR,
         )
-    with ProgressBar():
-        write_job.compute()
+    compute_bundled_zarr_writes([write_job])
     dsout.close()
     del dsout
     logger.info(f"Saved: {nc}")
@@ -252,8 +250,9 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     if dsout:
         # dsout = optimize_for_low_swap(dsout)
         try:
-            dsout = dsout.chunk('auto')
-        except:
+            tc = _compute_output_time_chunk(dsout)
+            dsout = dsout.chunk({'time': tc}) if tc else dsout.chunk('auto')
+        except Exception:
             logger.info("No chunks")
         ncout = save_result(dsout, mz_name, dirout)
         del dsout
@@ -266,8 +265,35 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
 
 def _process_single_task_from_zarr(zfile, mz_name, mz_param, dirout):
     """Open zarr, process one combination, close. Thread-safe for parallel use."""
-    ds = xr.open_dataset(str(zfile), chunks="auto")
+    # Open with native zarr chunks (chunks={}) so xarray never materialises a
+    # single array larger than one stored chunk.  The staging phase ensures
+    # time is chunked to _STAGING_TIME_CHUNK and spatial dims to
+    # _STAGING_SPATIAL_CHUNK, so each chunk stays well below 1 GB.
+    ds = xr.open_dataset(str(zfile), chunks={})
     task = (ds, mz_name, mz_param, dirout)
+    ncout = process_single_task(task)
+    ds.close()
+    return ncout
+
+
+def _process_metazone_from_union_zarr(zfile, mz_name, mz_param, dirout):
+    """Apply per-metazone spatial prefilter on the union staging zarr, then process.
+
+    Used when Phase 1 staged ONE union zarr (covering all metazones) rather
+    than one zarr per metazone.  Re-reading the zarr multiple times in parallel
+    is free when it lives in /dev/shm (~20 GB/s RAM bandwidth).
+    """
+    ds = xr.open_dataset(str(zfile), chunks={})
+    mz_bounds = _extract_prefilter_bounds({mz_name: mz_param})
+    if mz_bounds is not None:
+        ds_mz = _apply_prefilter(ds, mz_bounds)
+        if any(s == 0 for s in ds_mz.sizes.values()):
+            logger.warning(f"Skipping {mz_name}: empty after per-metazone prefilter")
+            ds.close()
+            return None
+    else:
+        ds_mz = ds
+    task = (ds_mz, mz_name, mz_param, dirout)
     ncout = process_single_task(task)
     ds.close()
     return ncout
@@ -322,6 +348,40 @@ def process_all_combinations(inputs, metazones, dirout, max_workers=1):
 _ZARR_SIZE_THRESHOLD_DEFAULT = 2 * 1024**3  # 2 GB fallback
 _ZARR_SIZE_THRESHOLD_MAX = 4 * 1024**3     # 4 GB cap (avoids Dask graph serialization overhead)
 _ZARR_RAM_FRACTION = 0.6
+_TARGET_CHUNK_BYTES = 2 * 1024**3          # target uncompressed size per output zarr chunk
+_BLOSC_MAX_CHUNK_BYTES = 2_000_000_000     # Blosc per-variable per-chunk limit
+
+
+def _compute_output_time_chunk(dsout):
+    """Return the optimal time chunk size for a zarr output dataset.
+
+    The previous formula divided _TARGET_CHUNK_BYTES by *total* dataset
+    bytes/tstep.  Because zarr stores each variable in its own array, the
+    Blosc 2 GB limit applies *per variable*, not across the whole dataset.
+    Dividing by the total deflated chunk sizes by N_vars (typically 3–7×),
+    producing unnecessarily small time chunks and proportionally more NFS
+    chunk files — each costing ~1–2 s of metadata latency on HPC NFS.
+
+    This function uses the largest per-variable bytes/tstep so every variable
+    chunk stays just under the Blosc 2 GB limit, minimising NFS file count.
+    """
+    if 'time' not in dsout.dims or dsout.sizes.get('time', 1) <= 1:
+        return None
+    n_time = dsout.sizes['time']
+    timed_vars = [v for v in dsout.data_vars if 'time' in dsout[v].dims]
+    if not timed_vars:
+        return None
+    max_bytes_per_var_per_tstep = max(
+        dsout[v].nbytes / n_time for v in timed_vars
+    )
+    if max_bytes_per_var_per_tstep <= 0:
+        return None
+    tc = max(1, int(_BLOSC_MAX_CHUNK_BYTES / max_bytes_per_var_per_tstep))
+    logger.debug(
+        f"_compute_output_time_chunk: {len(timed_vars)} timed vars, "
+        f"max {max_bytes_per_var_per_tstep/1e6:.1f} MB/var/tstep → time_chunk={tc}"
+    )
+    return tc
 
 
 def _get_available_ram():
@@ -339,7 +399,37 @@ def _get_available_ram():
 
 _SHM_DIR = Path("/dev/shm")
 _SHM_MIN_FREE = 2 * 1024**3   # require at least 2 GB free in /dev/shm
-_RAM_LOAD_FRACTION = 0.40      # load into RAM if filtered data < 40 % of available RAM
+_RAM_LOAD_FRACTION = 0.50      # load into RAM if filtered data < 50 % of available RAM
+_STAGING_SPATIAL_CHUNK = 64  # rechunk non-time dims to this size before staging
+_STAGING_TIME_CHUNK = 10       # rechunk time to this size to reduce task count
+
+def _make_staging_compressor():
+    """Fast lz4 compressor for temporary staging zarrs."""
+    try:
+        from numcodecs import Blosc
+        return Blosc(cname='lz4', clevel=1, shuffle=Blosc.BITSHUFFLE)
+    except ImportError:
+        return None
+
+def _make_output_compressor():
+    """zstd+BITSHUFFLE compressor for final output zarrs.
+
+    clevel=1 gives lz4-like compression speed while still achieving ~4-5×
+    ratio (vs lz4 ~3×), keeping Phase 2 CPU-bound time similar to lz4 but
+    reducing NFS copy volume by ~30-40%.
+    """
+    try:
+        from numcodecs import Blosc
+        return Blosc(cname='zstd', clevel=1, shuffle=Blosc.BITSHUFFLE)
+    except ImportError:
+        return None
+
+_STAGING_COMPRESSOR = _make_staging_compressor()
+_OUTPUT_COMPRESSOR  = _make_output_compressor()
+
+_STAGING_COMPRESS_RATIO = 4.0  # lz4 cl1 on ocean data: typically 3-5×
+_OUTPUT_COMPRESS_RATIO  = 6.0  # zstd+BITSHUFFLE on ocean data: typically 5-8×
+_OUTPUT_SHM_MARGIN      = 1.2  # require 20 % safety margin when staging output to /dev/shm
 
 
 def _get_zarr_tmp_dir(needed_bytes=0):
@@ -347,24 +437,44 @@ def _get_zarr_tmp_dir(needed_bytes=0):
 
     Preference order:
     1. /dev/shm (tmpfs RAM disk) — eliminates all temporary disk I/O.
-    2. Current working directory (local disk, existing behaviour).
+    2. $TMPDIR — per-job local SSD on HPC nodes (much faster than NFS).
+    3. Current working directory (fallback).
 
     Parameters
     ----------
     needed_bytes : int
-        Estimated bytes required; used to verify /dev/shm has enough room.
+        Estimated UNCOMPRESSED bytes; the actual disk usage is divided by
+        _STAGING_COMPRESS_RATIO before checking free space.
     """
-    if _SHM_DIR.exists():
-        try:
-            free = shutil.disk_usage(_SHM_DIR).free
-            if free > max(_SHM_MIN_FREE, needed_bytes * 1.1):
-                logger.info(
-                    f"/dev/shm available ({free / 1e9:.1f} GB free) "
-                    f"-- using RAM disk for zarr staging"
-                )
-                return _SHM_DIR
-        except OSError:
-            pass
+    # Use compressed size estimate: lz4 reduces ocean data by ~4×.
+    # Using raw ds.nbytes (uncompressed) would over-estimate disk usage and
+    # incorrectly reject fast /dev/shm in favour of slower $TMPDIR.
+    disk_bytes = max(int(needed_bytes / _STAGING_COMPRESS_RATIO), 1)
+
+    candidates = [_SHM_DIR]
+    tmpdir_env = os.environ.get("TMPDIR")
+    if tmpdir_env:
+        candidates.append(Path(tmpdir_env))
+
+    for candidate in candidates:
+        if candidate.exists():
+            try:
+                free = shutil.disk_usage(candidate).free
+                if free > max(_SHM_MIN_FREE, disk_bytes * 1.1):
+                    logger.info(
+                        f"{candidate} available ({free / 1e9:.1f} GB free, "
+                        f"estimated need {disk_bytes / 1e9:.1f} GB compressed) "
+                        f"-- using it for zarr staging"
+                    )
+                    return candidate
+            except OSError:
+                pass
+
+    logger.warning(
+        "No fast local storage available for zarr staging "
+        "(neither /dev/shm nor $TMPDIR have enough free space) "
+        "-- falling back to current directory (may be slow NFS)"
+    )
     return Path(".")
 
 
@@ -419,6 +529,11 @@ def _apply_prefilter(ds, bounds):
     This dramatically reduces the data volume for gridded products that cover
     a much larger domain than the metazones of interest, cutting zarr staging
     time proportionally.  Works with 1-D or 2-D lat(y,x)/lon(y,x) coordinates.
+
+    For both 1-D and 2-D lat/lon coordinates an ``isel`` with integer slices
+    is applied first so that only the bounding-box region is read from disk
+    via HDF5/NetCDF4 hyperslab selection.  For 2-D coordinates a fine
+    ``where(mask, drop=True)`` is then applied on the much smaller sub-region.
     """
     if not bounds:
         return ds
@@ -438,138 +553,169 @@ def _apply_prefilter(ds, bounds):
 
     lat = ds['lat']
     lon = ds['lon']
-    lat_cond = (lat >= lat_min) & (lat <= lat_max)
-    lon_cond = (lon >= lon_min) & (lon <= lon_max)
 
-    # Handle 0-360 vs -180-180 longitude convention
-    # if float(lon.min()) >= 0 and lon_min < 0:
-    #     lon_min_360 = lon_min % 360
-    #     lon_max_360 = lon_max % 360
-    #     if lon_min_360 > lon_max_360:
-    #         # Wraps across 0°: e.g. lon ∈ [346°, 360°] ∪ [0°, 5°]
-    #         lon_cond = (lon >= lon_min_360) | (lon <= lon_max_360)
-    #     else:
-    #         lon_cond = (lon >= lon_min_360) & (lon <= lon_max_360)
-    # else:
-    #     lon_cond = (lon >= lon_min) & (lon <= lon_max)
-    mask = lat_cond & lon_cond
-    mask = mask.compute()
-    return ds.where(mask, drop=True)
+    if lat.ndim == 1 and lon.ndim == 1:
+        # Structured grid: use integer-slice isel → HDF5 hyperslab → actual IO reduction.
+        lat_vals = lat.compute().values
+        lon_vals = lon.compute().values
+
+        lat_mask = (lat_vals >= lat_min) & (lat_vals <= lat_max)
+        if not lat_mask.any():
+            logger.warning("_apply_prefilter: no lat points inside bbox — returning full lat range")
+            return ds
+        lat_idx = np.where(lat_mask)[0]
+        lat_slice = slice(int(lat_idx[0]), int(lat_idx[-1]) + 1)
+
+        # Handle 0-360 vs -180-180 longitude convention
+        if lon_vals.min() >= 0 and lon_min < 0:
+            lon_min_360 = lon_min % 360
+            lon_max_360 = lon_max % 360
+            if lon_min_360 > lon_max_360:
+                # Wraps across 0°: e.g. lon ∈ [346°, 360°] ∪ [0°, 5°]
+                lon_mask = (lon_vals >= lon_min_360) | (lon_vals <= lon_max_360)
+            else:
+                lon_mask = (lon_vals >= lon_min_360) & (lon_vals <= lon_max_360)
+        else:
+            lon_mask = (lon_vals >= lon_min) & (lon_vals <= lon_max)
+
+        if not lon_mask.any():
+            logger.warning("_apply_prefilter: no lon points inside bbox — returning full lon range")
+            return ds
+        lon_idx = np.where(lon_mask)[0]
+        lon_slice = slice(int(lon_idx[0]), int(lon_idx[-1]) + 1)
+
+        dim_lat = lat.dims[0]
+        dim_lon = lon.dims[0]
+        logger.info(
+            f"_apply_prefilter: 1-D isel [{dim_lat}={lat_slice}, {dim_lon}={lon_slice}] "
+            f"({lat_slice.stop - lat_slice.start} × {lon_slice.stop - lon_slice.start} pts) "
+            f"— HDF5 hyperslab: only bbox read from disk"
+        )
+        return ds.isel({dim_lat: lat_slice, dim_lon: lon_slice})
+
+    # --- 2-D lat/lon (curvilinear or pseudo-curvilinear grids) ---
+    # lat_vals = lat.compute().values  # shape (y, x) or (lat, lon)
+    # lon_vals = lon.compute().values
+    # mask_sub = ((lat_vals >= lat_min) & (lat_vals <= lat_max)) & ((lon_vals >= lon_min) & (lon_vals <= lon_max))
+    # return ds.where(mask_sub)
+    
+    mask_2d = ((lat >= lat_min) & (lat <= lat_max) & (lon >= lon_min) & (lon <= lon_max)).compute()
+    arg_where = np.argwhere(mask_2d.values)
+    if arg_where.size == 0:
+        logger.warning("_apply_prefilter: no points inside bbox for 2-D grid")
+        return ds
+
+    # Use lat.dims to get the actual dimension names (never assume 'y'/'x')
+    dim_y, dim_x = lat.dims[0], lat.dims[1]
+    # arg_where columns follow lat.dims order: col 0 = dim_y index, col 1 = dim_x index
+    y_min_idx, x_min_idx = arg_where.min(axis=0)
+    y_max_idx, x_max_idx = arg_where.max(axis=0)
+    y_slice = slice(int(y_min_idx), int(y_max_idx) + 1)
+    x_slice = slice(int(x_min_idx), int(x_max_idx) + 1)
+    logger.info(
+        f"_apply_prefilter: 2-D isel [{dim_y}={y_slice}, {dim_x}={x_slice}] "
+        f"({y_slice.stop - y_slice.start} × {x_slice.stop - x_slice.start} pts)"
+    )
+    ds = ds.isel({dim_y: y_slice, dim_x: x_slice})
+    return ds.where(mask_2d.isel({dim_y: y_slice, dim_x: x_slice}))
 
 
 def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
-    """Process large datasets with the best available staging strategy.
+    """Stage union-prefiltered datasets to one temporary zarr per source, then process.
 
-    Strategy selection (in order of preference):
+    The union prefilter has already been applied by load_datasets(), so dss
+    covers only the bounding box of all metazones combined.
 
-    1. **RAM-first** — if the union-filtered data fits in 40 % of available RAM,
-       load it into memory once and run ``process_all_combinations`` directly.
-       No zarr staging, no disk I/O; all per-metazone work is pure numpy.
-
-    2. **/dev/shm (RAM-disk)** — write one per-metazone temporary zarr to
-       ``/dev/shm`` (tmpfs).  Eliminates all rotational/SSD I/O for staging;
-       Stage-2 reads are at RAM speed.  All metazone writes for a given source
-       dataset are fused into a single ``dask.compute`` call so shared source
-       chunks are read from the network exactly once.
-
-    3. **Local-disk fallback** — same per-metazone approach but zarr files land
-       on the local filesystem (original behaviour).
+    Phase 1: rechunk (on already-reduced data) → stage ONE zarr per source.
+    Phase 2: for each (staging zarr × metazone), apply the per-metazone fine
+             prefilter, process, and write the final zarr.  All phase-2 writes
+             are fused into a single dask.compute() call.
     """
-    union_bounds = _extract_prefilter_bounds(metazones)
+    logger.info(f"_process_large_dataset_pipelined: data_key={data_key!r} "
+                f"n_datasets={len(dss)} n_metazones={len(metazones)}")
 
-    # ── Apply union pre-filter to all source datasets (lazy) ──────────────────
-    dss_filtered = []
+    # Rechunk AFTER the union prefilter (on reduced data).
+    # HDF5 sources often have small internal chunks (e.g. 100×100) that produce
+    # tens of thousands of dask tasks; merging non-time dims to
+    # _STAGING_SPATIAL_CHUNK reduces task count by ~100×.
+    #
+    # Use the output time_chunk (Blosc 2 GB per-variable limit) rather than
+    # _STAGING_TIME_CHUNK=10.  This means Phase 2 inherits the right chunk size
+    # directly from the staging zarr and never needs to rechunk, eliminating
+    # the main source of excess tasks in Phase 2 (~4× task reduction).
+    dss_rechunked = []
     for ds in dss:
-        if union_bounds is not None:
-            original_nbytes = ds.nbytes
-            ds_f = _apply_prefilter(ds, union_bounds)
-            filtered_nbytes = ds_f.nbytes
-            if original_nbytes > 0:
-                reduction = (1 - filtered_nbytes / original_nbytes) * 100
-                logger.info(
-                    f"Union pre-filter: {original_nbytes / 1e9:.1f} GB "
-                    f"-> {filtered_nbytes / 1e9:.1f} GB "
-                    f"({reduction:.0f}% reduction)"
-                )
-        else:
-            ds_f = ds
-        dss_filtered.append(ds_f)
+        non_time_dims = [d for d in ds.dims if d != 'time']
+        rechunk_spec = {d: _STAGING_SPATIAL_CHUNK for d in non_time_dims}
+        if 'time' in ds.dims:
+            # _compute_output_time_chunk on the full union-prefiltered domain gives
+            # a conservative lower bound: every per-metazone subset has a smaller
+            # or equal bytes/tstep → its optimal tc is >= this value → no rechunk needed.
+            staging_tc = _compute_output_time_chunk(ds) or _STAGING_TIME_CHUNK
+            rechunk_spec['time'] = staging_tc
+            logger.info(f"Staging time_chunk={staging_tc} (output-aligned, avoids Phase 2 rechunk)")
+        if rechunk_spec and any(isinstance(v.data, da.Array) for v in ds.variables.values()):
+            ds = ds.chunk(rechunk_spec)
+        dss_rechunked.append(ds)
+    del dss
 
-    total_filtered = sum(ds.nbytes for ds in dss_filtered)
+    # ONE staging zarr per source dataset (not one per metazone).
+    total_nbytes = sum(ds.nbytes for ds in dss_rechunked)
+    zarr_dir = _get_zarr_tmp_dir(needed_bytes=total_nbytes)
 
-    # ── Strategy 1: RAM-first ──────────────────────────────────────────────────
-    available_ram = _get_available_ram()
-    if available_ram and total_filtered < available_ram * _RAM_LOAD_FRACTION:
-        logger.info(
-            f"RAM-first: loading {total_filtered / 1e9:.1f} GB into RAM "
-            f"({total_filtered / available_ram * 100:.0f}% of "
-            f"{available_ram / 1e9:.1f} GB available) -- no zarr staging"
-        )
-        dss_loaded = [ds.load() for ds in dss_filtered]
-        for ds in dss:
-            ds.close()
-        del dss, dss_filtered
-        ncs = process_all_combinations(dss_loaded, metazones, dirout)
-        for ds in dss_loaded:
-            ds.close()
-        return ncs
-
-    # ── Strategies 2 & 3: per-metazone zarr staging ───────────────────────────
-    # Pick staging directory: /dev/shm (RAM disk) when possible.
-    zarr_dir = _get_zarr_tmp_dir(needed_bytes=total_filtered)
-
-    # zfiles: list of (path, mz_name, mz_param)
     zfiles = []
     ncs = []
     try:
-        for ids, ds in enumerate(dss_filtered):
-            original_nbytes = ds.nbytes
-            write_jobs = []
-            for mz_name, mz_param in metazones.items():
-                # Tight per-metazone filter: only read what this metazone needs.
-                mz_bounds = _extract_prefilter_bounds({mz_name: mz_param})
-                if mz_bounds is not None:
-                    ds_mz = _apply_prefilter(ds, mz_bounds)
-                    filtered_nbytes = ds_mz.nbytes
-                    if original_nbytes > 0:
-                        reduction = (1 - filtered_nbytes / original_nbytes) * 100
-                        logger.info(
-                            f"Pre-filter {mz_name}: {original_nbytes / 1e9:.1f} GB "
-                            f"-> {filtered_nbytes / 1e9:.1f} GB "
-                            f"({reduction:.0f}% reduction)"
-                        )
-                else:
-                    ds_mz = ds
-                zfile = zarr_dir / f"tmp_{data_key}_{ids}_{mz_name}.zarr"
-                logger.info(f"Staging {mz_name} ({ids + 1}/{len(dss_filtered)}) -> {zfile}")
-                write_job = write_dataset_to_zarr(
-                    ds_mz,
-                    str(zfile),
-                    mode="w",
-                    consolidated=True,
-                    compute=False,
-                )
-                write_jobs.append(write_job)
-                zfiles.append((zfile, mz_name, mz_param))
-            # Single dask pass: all metazone writes share the same upstream
-            # task graph so each source chunk is read from the network once.
-            compute_bundled_zarr_writes(write_jobs)
-            ds.close()
-        del dss, dss_filtered
-        logger.info("All datasets staged to zarr")
+        # --- Phase 1: rechunk + stage to temporary zarr ---
+        write_jobs = []
+        for ids, ds in enumerate(dss_rechunked):
+            if any(isinstance(v.data, da.Array) for v in ds.variables.values()):
+                ds = ds.unify_chunks()
+            if 'time' in ds.dims and 'time' in ds.chunks:
+                t_chunks = ds.chunks['time']
+                interior = t_chunks[:-1] if len(t_chunks) > 1 else t_chunks
+                if len(set(interior)) > 1:
+                    uniform_t = max(set(interior), key=interior.count)
+                    ds = ds.chunk({'time': uniform_t})
+            zfile = zarr_dir / f"tmp_{data_key}_{ids}.zarr"
+            logger.info(f"Staging {data_key} ({ids + 1}/{len(dss_rechunked)}) -> {zfile}")
+            write_jobs.append(write_dataset_to_zarr(
+                ds, str(zfile), mode="w", consolidated=True,
+                compute=False, minmax=False,
+                compressor=_STAGING_COMPRESSOR,
+            ))
+            zfiles.append(zfile)
 
-        # Stage 2: process per-metazone zarrs in parallel.
-        delayed_tasks = [
-            dask.delayed(_process_single_task_from_zarr)(
-                str(zfile), mz_name, mz_param, dirout
-            )
-            for zfile, mz_name, mz_param in zfiles
-        ]
+        t0 = time.time()
+        compute_bundled_zarr_writes(write_jobs)
+        logger.info(f"Staging done ({len(write_jobs)} zarr(s)) in {time.time() - t0:.1f}s")
+        del write_jobs, dss_rechunked
+        gc.collect()
+
+        # --- Phase 2: one output zarr per (source × metazone), all in parallel ---
+        #
+        # Each metazone runs as an independent dask.delayed task.  Re-reading the
+        # union staging zarr N times is free when it lives in /dev/shm (~20 GB/s).
+        # Each task applies its own per-metazone spatial prefilter before processing.
+        delayed_tasks = []
+        for zfile in zfiles:
+            for mz_name, mz_param in metazones.items():
+                delayed_tasks.append(
+                    dask.delayed(_process_metazone_from_union_zarr)(
+                        str(zfile), mz_name, mz_param, dirout
+                    )
+                )
+
+        nc_paths_p2 = []
         if delayed_tasks:
-            ncs = list(dask.compute(*delayed_tasks))
+            nc_paths_p2 = list(dask.compute(*delayed_tasks, scheduler="threads"))
+        for nc in nc_paths_p2:
+            if nc:
+                logger.info(f"Saved: {nc}")
+        ncs = nc_paths_p2
 
     finally:
-        for zfile, _, _ in zfiles:
+        for zfile in zfiles:
             if zfile.exists():
                 shutil.rmtree(zfile)
 
@@ -579,28 +725,38 @@ def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
 def load_datasets(data_cfg, metazones, dirout):
     """Load datasets and process all metazone combinations.
 
-    Small datasets (< 2 GB) are passed directly to processing,
-    skipping the intermediate zarr round-trip.  Large datasets
-    fall back to a temporary zarr to avoid memory pressure.
+    The union bounding-box prefilter is applied immediately after opening,
+    before the small/large decision, so the threshold is compared against
+    the data volume that will actually be processed (not the full global domain).
+
+    Small datasets (< threshold after prefilter) are passed directly to
+    processing.  Large datasets use the two-phase pipelined zarr path.
     """
     register_cf()
     ncouts = []
+
+    # Compute union bounds once — shared by all datasets
+    union_bounds = _extract_prefilter_bounds(metazones)
+
     for data_key, cfg_data in data_cfg.items():
         dataset_name = cfg_data["name"]
         logger.info(f"Load {dataset_name}...")
-
         start_time = time.time()
 
-        dss = open_decode(
-            cfg_data["path"],
-            fmt=cfg_data["fmt"],
-            platform=cfg_data.get("platform")
+        try:
+            dss = open_decode(
+                cfg_data["path"],
+                fmt=cfg_data["fmt"],
+                platform=cfg_data.get("platform")
             )
+        except armoor.ArmoorError as e:
+            logger.warning(f"{dataset_name}: {e} — skipping")
+            continue
         if not isinstance(dss, list):
             dss = [dss]
         logger.debug(dss)
 
-        # Add metadata
+        # Attach metadata before any filtering
         for ids, ds in enumerate(dss):
             if len(dss) == 1:
                 ds.attrs["data_name"] = cfg_data["name"]
@@ -608,15 +764,37 @@ def load_datasets(data_cfg, metazones, dirout):
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
             ds.attrs["data_ref"] = str(cfg_data.get("ref"))
 
-        # Choose direct or zarr-backed processing based on dataset size
+        # Apply union prefilter FIRST so the size decision is made on
+        # the actual data volume, not the full global domain.
+        if union_bounds is not None:
+            original_nbytes = sum(ds.nbytes for ds in dss)
+            dss_filtered = []
+            for ds in dss:
+                ds_f = _apply_prefilter(ds, union_bounds)
+                if any(s == 0 for s in ds_f.sizes.values()):
+                    logger.warning(
+                        f"{dataset_name}: empty after union prefilter, skipping this sub-dataset"
+                    )
+                    continue
+                dss_filtered.append(ds_f)
+            if not dss_filtered:
+                logger.warning(f"{dataset_name}: all sub-datasets empty after union prefilter — skipping")
+                continue
+            filtered_nbytes = sum(ds.nbytes for ds in dss_filtered)
+            logger.info(
+                f"Union prefilter: {original_nbytes / 1e9:.1f} GB "
+                f"-> {filtered_nbytes / 1e9:.1f} GB "
+                f"({(1 - filtered_nbytes / max(1, original_nbytes)) * 100:.0f}% reduction)"
+            )
+            dss = dss_filtered
+
+        # Size decision on filtered data
         total_nbytes = sum(ds.nbytes for ds in dss)
         zarr_threshold = _get_zarr_size_threshold()
         if total_nbytes > zarr_threshold:
-            # Large datasets: pipelined write + processing
             logger.info("Large dataset -- using pipelined zarr processing")
             ncs = _process_large_dataset_pipelined(dss, data_key, metazones, dirout)
         else:
-            # Small datasets: pass directly, skip zarr round-trip
             logger.info("Small dataset -- processing directly in memory")
             ncs = process_all_combinations(dss, metazones, dirout)
             for ds in dss:
@@ -625,7 +803,6 @@ def load_datasets(data_cfg, metazones, dirout):
 
         elapsed = time.time() - start_time
         logger.info(f"{dataset_name} load in {elapsed:.1f}s")
-
         ncouts += ncs
 
     return ncouts

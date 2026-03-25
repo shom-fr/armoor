@@ -17,12 +17,9 @@ from armoor.cli.io import (
     get_dask_args,
     save_output,
     check_insitu_platform
-)        
+)
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.data.range import (
-    process_time_range,
-    process_vertical_range
-    )
+import armoor  # noqa: F401 — registers ds.range accessor
 from armoor.data.open_decode import open_decode, register_cf
 
 
@@ -128,7 +125,7 @@ def main_range_time():
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-            ds = process_time_range(ds, args.tfreq)
+            ds = ds.range.tfreq(args.tfreq)
             save_output(ds, args.fout, args.ofmt)
             
 def get_parser_range_vertical():
@@ -207,5 +204,5 @@ def main_range_vertical():
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
             ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-            ds = process_vertical_range(ds, args.vname, [args.vmin, args.vmax])
+            ds = ds.range.vertical(args.vname, [args.vmin, args.vmax])
             save_output(ds, args.fout, args.ofmt)

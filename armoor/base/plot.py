@@ -1,10 +1,15 @@
 """Plot functions."""
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
+# matplotlib, scipy and gridspec are imported lazily (inside each function)
+# to avoid the several-second NFS penalty on HPC clusters where hundreds of
+# .py/.so files are stat'd during a standard matplotlib/__init__.py traversal.
 import numpy as np
-from scipy.stats import linregress
 
-plt.style.use('seaborn-v0_8-whitegrid')
+def _get_plt():
+    """Return matplotlib.pyplot, applying the armoor style on first import."""
+    import matplotlib.pyplot as _plt
+    _plt.style.use('seaborn-v0_8-whitegrid')
+    return _plt
+
 
 def create_figure(width, height):
     """
@@ -22,10 +27,11 @@ def create_figure(width, height):
     matplotlib.figure.Figure
         Matplotlib Figure object.
     """
+    plt = _get_plt()
     fig = plt.figure(figsize=(width, height))
     return fig
 
-def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x_label='X-axis', y_label='Y-axis', title='Subplots', sharex=False, sharey=False, projection=None):
+def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x_label='X-axis', y_label='Y-axis', title='Subplots', sharex=False, sharey=False, projection=None):  # noqa: E501
     """Create and return a figure with a specified number of subplots arranged in a grid.
 
     Parameters
@@ -91,10 +97,12 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
     
     # Create a figure
     # projection=ccrs.PlateCarree()
+    import matplotlib.gridspec as gridspec
+    plt = _get_plt()
     subplot_kw = {}
     if projection is not None:
         subplot_kw['projection'] = projection
-    
+
     fig = plt.figure(figsize=figsize)
     axes = []   
  
@@ -187,12 +195,15 @@ def save_figure(fig, filename, dpi=300):
     dpi: int, optional
         The resolution in dots per inch. Default is 300.
     """
+    plt = _get_plt()
     # Save the figure with the specified filename and DPI
     fig.savefig(filename, dpi=dpi, bbox_inches='tight')
     plt.close(fig)
     
 def diagdisp(x_data, y_data, ax, x_label, y_label):
-    
+    from scipy.stats import linregress
+    plt = _get_plt()
+
     x = x_data.values.ravel()
     y = y_data.values.ravel()
 

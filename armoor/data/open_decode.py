@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
+import time
 import dask
 import gsw
 import numpy as np
@@ -347,21 +348,19 @@ def open_decode_cmems_model(path_files):
     # Open
     cfspecs = xcf.get_cf_specs("cmems_model")
     sorted_paths = sorted(map(str, path_files))
-    # ds = xr.open_mfdataset(
-    #     sorted_paths,
-    #     combine="by_coords",
-    #     engine="netcdf4",
-    #     chunks={"time": 1, "lat": 100, "lon": 100},
-    #     parallel=True,
-    #     cache=False,
-    #     # lock=False,
-    #     )
+    n_files = len(sorted_paths)
     ds = xr.open_mfdataset(
         sorted_paths,
         combine="by_coords",
         engine="netcdf4",
-        chunks={"time": 1, "latitude": 100, "longitude": 100},
-        parallel=False,
+        # Large explicit chunks to minimise dask task count (same reasoning as
+        # open_decode_hycom).  Both original (lat/lon/depth) and post-preprocess
+        # (y/x/z) dim names are listed; xarray ignores unknown names silently.
+        chunks={"time": 30,
+                "depth": 100, "z": 100,
+                "lat": 1024, "lon": 1024,
+                "y": 1024, "x": 1024},
+        parallel=n_files > 1,
         cache=False,
         decode_times=True,
         decode_coords=True,
@@ -370,7 +369,6 @@ def open_decode_cmems_model(path_files):
         data_vars='minimal',
         coords='minimal',
         preprocess=preprocess_cmems_model,
-        autoclose=True
         )
     if "depth" in ds:
         ds = ds.set_coords("depth")
@@ -422,32 +420,93 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
 
     logger.info(f"Using {len(sorted_paths)} files.")
     logger.debug(f"sorted_paths : {sorted_paths}")
-    
-    ds = xr.open_mfdataset(
-        sorted_paths,
-        combine="by_coords",
-        engine="netcdf4",         # works with classic and netcdf4
-        chunks={"time": 1, "lat": 200, "lon": 200},
-        preprocess=preprocess_hycom,
-        # parallel=True,        # Avoid threading issues with netCDF4
-        cache=False,       # Cache can be disabled for huge datasets
-        # lock=False,
-        decode_times=True,     # Decode times properly
-        decode_coords=True,    # Decode coordinates
-        # Optimize I/O
+
+    n_files = len(sorted_paths)
+    _t = time.perf_counter()
+
+    # Group files by their exact time range (n_steps, first, last) so that
+    # per-variable files covering the same period are MERGED (not concat'd),
+    # while sequential time files are concatenated.
+    # Example: [h_202509, h_202510, temp_202509, temp_202510] → two groups
+    # {202509: [h, temp], 202510: [h, temp]}, merge within each, concat across.
+    def _time_key(path):
+        """Return (n, t0, t1) identifying the time axis of a NetCDF file."""
+        try:
+            import netCDF4 as _nc4
+            with _nc4.Dataset(path) as _d:
+                for dimname in list(_d.dimensions):
+                    if "time" in dimname.lower():
+                        n = len(_d.dimensions[dimname])
+                        tvar = _d.variables.get(dimname)
+                        if tvar is not None and n > 0:
+                            return (n, float(tvar[0]), float(tvar[-1]))
+                        return (n, None, None)
+        except Exception:
+            pass
+        return None
+
+    _open_kw = dict(
+        engine="netcdf4",
+        chunks={"time": 30, "Y": 1024, "X": 1024, "lev": 100},
+        cache=False,
+        decode_times=True,
+        decode_coords=True,
         decode_cf=True,
         mask_and_scale=True,
-        # CRITICAL: Limit data variables to prevent reading everything at once
-        data_vars='minimal',   # Only load data variables, not coordinates as data
-        coords='minimal',      # Minimize coordinate loading
-        autoclose=True
     )
+
+    # Build groups: {time_key: [path, ...]}
+    from collections import OrderedDict
+    _groups: dict = OrderedDict()
+    for p in sorted_paths:
+        k = _time_key(p)
+        _groups.setdefault(k, []).append(p)
+
+    _needs_merge = any(len(v) > 1 for v in _groups.values())
+
+    if not _needs_merge:
+        # All files have distinct time ranges: plain nested concat (fast path)
+        logger.info("open_decode_hycom: sequential files — nested concat")
+        ds = xr.open_mfdataset(
+            sorted_paths,
+            combine="nested",
+            concat_dim="time",
+            preprocess=preprocess_hycom,
+            parallel=n_files > 1,
+            data_vars='minimal',
+            coords='minimal',
+            **_open_kw,
+        )
+    else:
+        # Some time ranges are shared across files (per-variable organisation):
+        # merge within each group, then concat groups along time.
+        logger.info(f"open_decode_hycom: {len(_groups)} time group(s), merging per-variable files")
+        _group_ds = []
+        for _key, _paths in _groups.items():
+            if len(_paths) == 1:
+                _ds = xr.open_dataset(_paths[0], **_open_kw)
+                _ds = preprocess_hycom(_ds)
+            else:
+                _parts = []
+                for p in _paths:
+                    _ds0 = xr.open_dataset(p, **_open_kw)
+                    _ds0 = preprocess_hycom(_ds0)
+                    _parts.append(_ds0)
+                _ds = xr.merge(_parts, join="inner", combine_attrs="override")
+            _group_ds.append(_ds)
+        if len(_group_ds) == 1:
+            ds = _group_ds[0]
+        else:
+            ds = xr.concat(_group_ds, dim="time")
+    logger.info(f"  [timing] open_mfdataset: {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
     cfspecs = xcf.get_cf_specs("hycom")
     with xcf.set_cf_specs(cfspecs):
         ds = ds.xoa.decode()
+    logger.info(f"  [timing] xoa.decode:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
     ds = ds.unify_chunks()
+    logger.info(f"  [timing] unify_chunks:   {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
     if "bathy" in ds:
         bathy = ds["bathy"]
@@ -459,22 +518,36 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
         ds["u"] = ds.map_blocks(shift_u_block, template=ds["u"])
     if "v" in ds:
         ds["v"] = ds.map_blocks(shift_v_block, template=ds["v"])
+    logger.info(f"  [timing] map_blocks u/v: {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
     if bathy is not None:
         ds = xr.merge([ds, bathy.to_dataset(name="bathy")])
     if "dz" in ds:
         depth = dz2depth(ds.dz, centered=True)
         ds = ds.assign_coords(depth=depth).drop_vars(["dz", "z"])
+    logger.info(f"  [timing] dz2depth:       {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
     ds = ds.sel(time=~ds.get_index("time").duplicated())
+    logger.info(f"  [timing] dedup time:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+
+    good_var = None
     for var in ["depth", "ssh", "ptemp"]:
         if var in ds:
             good_var = ds[var]
             break
     chunk_dict = {}
-    for dim, chunks in zip(good_var.dims, good_var.chunks):
-        chunk_dict[dim] = chunks[0]
+    if good_var is None:
+        good_var = next(iter(ds.data_vars.values()))
+    for dim, dim_chunks in zip(good_var.dims, good_var.chunks):
+        dim_size = good_var.sizes[dim]
+        if dim == 'time':
+            chunk_dict[dim] = dim_chunks[0]  # keep 1 time step per chunk
+        else:
+            # Keep the large chunks set at open time; fall back to native if
+            # they are somehow still small (unknown dim name was ignored).
+            chunk_dict[dim] = min(dim_size, max(dim_chunks[0], 1024))
     ds = ds.chunk(chunk_dict)
+    logger.info(f"  [timing] final rechunk:  {time.perf_counter()-_t:.1f}s")
     return ds
 
 def open_decode_woa18(path_files):
@@ -694,7 +767,7 @@ def open_decode_cmems_insitu(path_files, platform):
             dss_by_platform[platform_code].append(ds)
         dss = []
         for platform_code, dss0 in dss_by_platform.items():
-            ds = xr.merge(dss0)
+            ds = xr.merge(dss0, compat='override')
             ds = ds.sortby("time")
             ds.attrs["name"] = f"{ds.attrs['platform_code']}"
             dss.append(ds)
