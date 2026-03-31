@@ -21,8 +21,7 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "woom @ git+https://github.com/shom-fr/woom.git@fix/slurm-scheduler",
-    "xoa @ git+https://github.com/shom-fr/xoa.git@0424d03fc81ccfe6f4d0b83ada400ee6b5f8b789",
+    "woom @ git+https://github.com/shom-fr/woom.git",
 ]
 
 [project.optional-dependencies]

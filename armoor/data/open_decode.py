@@ -23,18 +23,19 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import xoa
-import xoa.cf as xcf
+import xoa.meta as xmeta
+from xoa.meta.general import MetaSpecs
 import xoa.geo as xgeo
 from pyproj import Geod
 from xoa.grid import dz2depth, shift, to_rect
 
-from armoor.__init__ import ROOTDIR, ArmoorError
+from armoor import ROOTDIR, ArmoorError
 from armoor.base.interp import regrid
 from armoor.base.misc import optimize_for_low_swap
 
 logger = logging.getLogger(__name__)
 
-xoa.register_accessors(xcf=True, decode_sigma=True)
+xoa.register_accessors(meta=True, decode_sigma=True)
 xr.set_options(keep_attrs=True)
 
 
@@ -180,8 +181,8 @@ def register_cf():
     )
     for cfg_file in cfg_files:
         logger.info(f"register {cfg_file}")
-        mycfspecs = xcf.CFSpecs(cfg_file, default=False, user=False)
-        xcf.register_cf_specs(mycfspecs)
+        mycfspecs = MetaSpecs(cfg_file, default=False, user=False)
+        xmeta.register_meta_specs(mycfspecs)
     
 def open_decode(
     path_files, fmt, platform=None, func=None, type=None
@@ -245,7 +246,7 @@ def open_decode(
 def open_decode_arpege_insta(path_files):
     logger.info("atmfrc - insta")
     insta_gribs = path_files
-    cfspecs = xcf.get_cf_specs("meteofrance")
+    cfspecs = xmeta.get_meta_specs("meteofrance")
     dss = []
     for grib in insta_gribs:
         ds = []
@@ -271,8 +272,7 @@ def open_decode_arpege_insta(path_files):
         {"longitude": "lon", "latitude": "lat", "valid_time": "time"}
     )
     ds_insta = ds_insta.swap_dims({"lon": "x", "lat": "y"})
-    with xcf.set_cf_specs(cfspecs):
-        ds_insta = ds_insta.sortby("time").xcf.decode()
+    ds_insta = cfspecs.decode(ds_insta.sortby("time"))
     logger.info(ds_insta)
     return ds_insta
 
@@ -292,9 +292,8 @@ def open_decode_sst_satellite(path_files, fmt):
     """
     # Open
     # path = os.path.join(ROOTDIR, "config", f"{fmt}.cfg")
-    cfspecs = xcf.get_cf_specs(f"{fmt}")
-    with xcf.set_cf_specs(cfspecs):
-        ds = xr.open_mfdataset(path_files).chunk(chunks={}).xcf.decode()
+    cfspecs = xmeta.get_meta_specs(f"{fmt}")
+    ds = cfspecs.decode(xr.open_mfdataset(path_files).chunk(chunks={}))
     for var in ds.coords:
         if "or_" in var:
             ds = ds.drop_vars(var)
@@ -327,8 +326,7 @@ def open_decode_cmems_model(path_files):
         CMEMS dataset.
     """
     def preprocess_cmems_model(ds):
-        with xcf.set_cf_specs(cfspecs):
-            ds = ds.xoa.decode()
+        ds = cfspecs.decode(ds)
         if "bathy" in ds.data_vars:
             ds = ds[["bathy"]]
         ds = ds.swap_dims({"lon": "x", "lat": "y"})
@@ -346,7 +344,7 @@ def open_decode_cmems_model(path_files):
             ds = ds.reset_coords("depth")
         return ds
     # Open
-    cfspecs = xcf.get_cf_specs("cmems_model")
+    cfspecs = xmeta.get_meta_specs("cmems_model")
     sorted_paths = sorted(map(str, path_files))
     n_files = len(sorted_paths)
     ds = xr.open_mfdataset(
@@ -500,9 +498,8 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
             ds = xr.concat(_group_ds, dim="time")
     logger.info(f"  [timing] open_mfdataset: {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
-    cfspecs = xcf.get_cf_specs("hycom")
-    with xcf.set_cf_specs(cfspecs):
-        ds = ds.xoa.decode()
+    cfspecs = xmeta.get_meta_specs("hycom")
+    ds = cfspecs.decode(ds)
     logger.info(f"  [timing] xoa.decode:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
     ds = ds.unify_chunks()
@@ -623,11 +620,10 @@ def open_decode_cora_insitu(path_files, platform):
     """
     # Open
     cmems_coords = ["time", "lon", "lat", "depth"]
-    cfspecs = xcf.get_cf_specs(f"cora_{platform}")
+    cfspecs = xmeta.get_meta_specs(f"cora_{platform}")
     dss = []
     for path in path_files:
-        with xcf.set_cf_specs(cfspecs):
-            ds = xr.open_dataset(path).xcf.decode()
+        ds = cfspecs.decode(xr.open_dataset(path))
         ds = ds.swap_dims({"N_PROF": "time", "level": "z"})
         for coord in ds.coords:
             if coord not in cmems_coords:
@@ -661,11 +657,10 @@ def open_decode_cmems_insitu(path_files, platform):
     """
     # Open
     cmems_coords = ["time", "lon", "lat", "depth"]
-    cfspecs = xcf.get_cf_specs(f"cmems_{platform}")
+    cfspecs = xmeta.get_meta_specs(f"cmems_{platform}")
     dss = []
     for path in path_files:
-        with xcf.set_cf_specs(cfspecs):
-            ds = xr.open_dataset(path, chunks={}).xcf.decode()
+        ds = cfspecs.decode(xr.open_dataset(path, chunks={}))
         object_vars = [var for var in ds.data_vars if ds[var].dtype == 'object']
         ds = ds.drop_vars(object_vars)
         vars2drop = []
@@ -786,12 +781,12 @@ def open_decode_croco(path_file, fmt="croco"):
     croco : xarray.Dataset
          Model dataset decoded.
     """
-    cfspecs = xcf.get_cf_specs("croco")
+    cfspecs = xmeta.get_meta_specs("croco")
     ds = xr.open_mfdataset(path_file)
     if 'scrum_time' in ds:   
         ds = ds.drop_vars('scrum_time') 
-    with xcf.set_cf_specs(cfspecs):
-        ds = ds.xcf.decode()
+    ds = cfspecs.decode(ds)
+    with xmeta.set_meta_specs(cfspecs):
         for sig in ("sig_rho", "sig_w"):
             if sig in ds:
                 # if "formula_terms" not in ds[sig].attrs:

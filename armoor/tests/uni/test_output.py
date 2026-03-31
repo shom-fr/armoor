@@ -29,7 +29,7 @@ def _ensure_mock(name):
 
 # xoa and its sub-packages
 for _mod in (
-    "xoa", "xoa.geo", "xoa.grid", "xoa.regrid", "xoa.cf",
+    "xoa", "xoa.geo", "xoa.grid", "xoa.regrid", "xoa.meta",
     "parcels",
 ):
     _ensure_mock(_mod)

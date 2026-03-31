@@ -30,10 +30,18 @@ from armoor.data.open_decode import (
     register_cf
 )
 
-register_cf()
-
 # Test data directory
 TEST_DATA_DIR = Path(ROOTDIR) / "_samples"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def register_and_reset_cf():
+    """Register armoor CF specs for the module and reset xoa.meta registry on teardown."""
+    import xoa.meta as xmeta
+    register_cf()
+    yield
+    xmeta.reset_cache(memory=True)
+
 
 @pytest.fixture(scope="module")
 def setup_test_data():
