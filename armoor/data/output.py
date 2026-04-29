@@ -1,5 +1,6 @@
 import gc
 import logging
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -50,8 +51,7 @@ def set_time_range(ds, time):
     ds = ds.set_coords("time")
     return ds
 
-def get_datatrees(dsins, dim, mparams):
-    
+def get_datatrees(dsins, dim, mparams):    
     dts = []
     for ds in dsins:
         for coord in ["lon", "lat", "depth"]:
@@ -76,15 +76,15 @@ def get_datatrees(dsins, dim, mparams):
         for k, v in xdim.items():
             for data_name, dt0 in dt.items():
                 ds0 = dt0.to_dataset()
-                if data_name != "data":
+                ds0 = ds0.assign_attrs({"trange_seq":mparams['trange_seq'][0]})
+                if dim:
                     if ("time" in dim) and (k == "time"):
                         ds0 = set_time_range(ds0, v)
-                    dt.update(xr.DataTree.from_dict({
-                        data_name: ds0
-                        }))
+                dt.update(xr.DataTree.from_dict({
+                    data_name: ds0
+                    }))
         dts.append(dt)
-        del dt
-        del ds
+        del dt,ds
     return dts
 
 def validate_interpolation(metazones):
@@ -210,7 +210,9 @@ def save_datasets(dsprod, dirout, prod_name):
     if "time" in attrs:
         ncname += f"_{attrs['time']}"
     elif "trange" in attrs:
-        ncname += f"_{attrs['trange']}"
+        trange = attrs['trange']
+        trange = re.sub('[\[\]]', '', trange)
+        ncname += f"_{trange}"
     else:
         pass
     
@@ -518,9 +520,14 @@ class OutputProcessor:
         if "tfreq" in mparams:
             dss = ranges.tfreq(ds)
         elif "trange_seq" in mparams:
-            dss = ranges.trange_seq(
-                ds, *mparams.get("tbound"), mparams["trange_seq"][0]
-            )
+            logger.info('Applying trange_seq...')
+            try:
+                dss = ranges.trange_seq(
+                    ds, *mparams.get("tbound"), mparams["trange_seq"][0]
+                    )
+            except:
+                logger.info('Error for trange_seq. Maybe tbound was not defined in metazones.')
+                sys.exit(1)
         else:
             dss = [ds]
         
@@ -801,7 +808,7 @@ class OutputProcessor:
             
             ds = xr.concat(dss0, "time")
             
-            # Handle vrange attributes specially
+            # Handle vrange attributes specifically
             if dss0[0].attrs.get("vrange"):
                 vrange_attrs = [ds0.attrs.get("vrange") for ds0 in dss0]
                 ds.attrs["vrange"] = vrange_attrs

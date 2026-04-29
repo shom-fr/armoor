@@ -12,8 +12,11 @@ def timegroups_to_list(grouped, label="trange"):
     dss = []
     for name, ds in grouped:
         dso = ds.copy()
-        tlabel = pd.to_datetime(name)
-        dso.attrs[label] = f"{tlabel:%Y-%m-%dT%H:%M:%S}"
+        if label == "time":
+            tlabel = pd.to_datetime(name)
+            dso.attrs[label] = f"{tlabel:%Y-%m-%dT%H:%M:%S}"
+        else:
+            dso.attrs[label] = f"[{name.left:%Y-%m-%dT%H:%M:%S}_{name.right:%Y-%m-%dT%H:%M:%S}["
         dss.append(dso)
     return dss
    
@@ -28,12 +31,8 @@ def trange_seq(ds, tstart, tend, tbin):
             "Use trange=1MS, 2MS... to specify a  monthly sequential range."
             )
     time_bins = pd.date_range(start=tstart, end=tend, freq=tbin)
-    labels = [
-        time_bins[it] + 0.5 * (time_bins[it + 1] - time_bins[it])
-        for it in range(len(time_bins) - 1)
-        ]
     grouped = ds.groupby_bins(
-        "time", time_bins, labels=labels, right=False
+        "time", time_bins, right=False
         )
     return timegroups_to_list(grouped, label="trange")
     
