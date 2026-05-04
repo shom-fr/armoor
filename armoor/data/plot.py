@@ -90,7 +90,7 @@ class PlotData:
         method = self.methods.get(method_name)
         if method:
             return method(self, *args, **kwargs)
-        raise ArmoorError(f"Comparison plot '{method_name}' not found")
+        raise ArmoorError(f"Data plot '{method_name}' not found")
 
     def __init_subclass__(cls):
         """Initialize the subclass by adding the __post_init__ method to the class.
@@ -778,6 +778,7 @@ class PlotData:
     def save_figure(self, fig, filename):
         """Save figure."""
         filename = Path(filename)
+        logger.info(f'plot save: {filename}')
         filename.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, filename)
         del fig
@@ -786,7 +787,6 @@ def main_plot(ncins, metazones):
     """Process using dask.bag for functional mapping"""
 
     def process_task(nc, metazone, output):
-        print(nc)
         plotcomp = PlotData(nc, metazone)
         plotcomp.call(output)
         plotcomp.clean()
