@@ -120,6 +120,34 @@ class TimeColocation(AbstractColocation):
         self.dsprod = interp_time(self.dsprod, time)
         return self.dsref, self.dsprod
     
+    def tmonth(self) -> Tuple[xr.Dataset, xr.Dataset]:
+        """Monthly climatological colocation.
+
+        Groups model data by calendar month, computes monthly means,
+        then aligns with the reference climatology on a shared month index (1–12).
+        """
+        ds_prod_monthly = (
+            self.dsprod
+            .sel(time=slice(self.start, self.end))
+            .groupby("time.month")
+            .mean("time")
+            .rename({"month": "time"})
+        )
+        common_months = np.intersect1d(
+            ds_prod_monthly.time.values,
+            self.dsref.time.values,
+        )
+        ds_prod_monthly = ds_prod_monthly.sel(time=common_months)
+        ds_ref_monthly = self.dsref.sel(time=common_months)
+        # Align time dtype and strip CF encoding attrs: WOA18 stores month
+        # indices as floats with 'units'/'calendar' in attrs, while the
+        # product has plain int months from groupby. Make both consistent
+        # (int, no CF attrs) so zarr encoding doesn't conflict.
+        ds_ref_monthly = ds_ref_monthly.assign_coords(
+            time=("time", common_months.astype(int), {})
+        )
+        return ds_ref_monthly, ds_prod_monthly
+
     def trange_seq(self, args: [str, str]) -> xr.Dataset:
         """
         Colocate reference and product on the same time axis before ranging.
@@ -521,6 +549,47 @@ def process_vertical_colocation(dsref, dsprod, param):
     dsref, dsprod = coloc.call(*param)
     return dsref, dsprod
 
+def _drop_time_cf_attrs_if_not_datetime(ds):
+    """Remove CF time encoding attrs from the time coordinate before zarr write.
+
+    When a dataset is opened with ``decode_times=False`` (e.g. climatologies
+    with 'months since ...' units), the time coordinate carries CF attrs
+    (``units``, ``calendar``) and possibly encoding inherited from the zarr
+    store.  Newer xarray versions try to re-encode such variables as CF time,
+    which fails with ``ValueError: failed to prevent overwriting existing key
+    units in attrs``.
+
+    For non-datetime time, rebuild the coordinate from scratch (forcing values
+    to a plain numpy array) so that all CF baggage — attrs, encoding, and any
+    lazy zarr references — is stripped away.
+
+    For datetime64 time that has CF units already in ``.attrs`` (which can
+    happen when xarray's ``merge`` decodes float CF time internally without
+    going through the normal decode→encode cycle), strip ``units`` and
+    ``calendar`` from attrs so the CF encoder can re-encode correctly.
+    """
+    if "time" not in ds.coords:
+        return ds
+    time_var = ds["time"]
+    if np.issubdtype(time_var.dtype, np.datetime64):
+        # CF encoder will add "units" to attrs; if they're already there the
+        # write fails.  Strip them so the encoder can set them properly.
+        if any(k in time_var.attrs for k in ("units", "calendar")):
+            clean_attrs = {k: v for k, v in time_var.attrs.items()
+                           if k not in ("units", "calendar")}
+            clean_time = xr.Variable(
+                "time",
+                time_var.values,
+                attrs=clean_attrs,
+                encoding=dict(time_var.encoding),
+            )
+            return ds.assign_coords(time=clean_time)
+        return ds
+    # Rebuild from scratch: force to numpy, empty attrs, empty encoding.
+    clean_time = xr.Variable("time", np.asarray(time_var.values), attrs={})
+    return ds.assign_coords(time=clean_time)
+
+
 def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     """Save datasets to NetCDF files.
 
@@ -560,14 +629,30 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     logger.info(f"Save {ncout_ref} and {ncout_prod}")
     if "mask" in dsref.data_vars:
         dsref = dsref.drop_vars("mask")
+    dsref = _drop_time_cf_attrs_if_not_datetime(dsref)
     dsref = dsref.chunk("auto")
     encoding_ref = get_zarr_encoding(dsref)
+    # For non-datetime time (e.g. WOA18 month indices), provide explicit zarr
+    # encoding so xarray's CF time encoder does not attempt to re-encode it.
+    if "time" in dsref.coords and not np.issubdtype(dsref["time"].dtype, np.datetime64):
+        encoding_ref["time"] = {"dtype": str(dsref["time"].dtype)}
+    if "time" in dsref.coords:
+        logger.debug(
+            "dsref time before zarr write — dtype=%s attrs=%s encoding=%s enc_ref=%s",
+            dsref["time"].dtype,
+            dict(dsref["time"].attrs),
+            dict(dsref["time"].encoding),
+            encoding_ref.get("time"),
+        )
     job_ref = dsref.to_zarr(store=ncout_ref, mode="w", encoding=encoding_ref, compute=False)
 
     if "mask" in dsprod.data_vars:
         dsprod = dsprod.drop_vars("mask")
+    dsprod = _drop_time_cf_attrs_if_not_datetime(dsprod)
     dsprod = dsprod.chunk("auto")
     encoding_prod = get_zarr_encoding(dsprod)
+    if "time" in dsprod.coords and not np.issubdtype(dsprod["time"].dtype, np.datetime64):
+        encoding_prod["time"] = {"dtype": str(dsprod["time"].dtype)}
     job_prod = dsprod.to_zarr(store=ncout_prod, mode="w", encoding=encoding_prod, compute=False)
 
     dask.compute(job_ref, job_prod)
@@ -601,6 +686,8 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
     """
     if "depth" in ds.data_vars:
         ds = ds.set_coords("depth")
+    if "pres" in ds.data_vars:
+        ds = ds.set_coords("pres")
 
     # Keep only raw variables already present that are needed (directly or
     # as inputs for derived variables computed later in output).
@@ -633,6 +720,8 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
 
     if "depth" in ds.coords and "time" in ds.depth.dims:
         ds = ds.reset_coords("depth")
+    if "pres" in ds.data_vars and "time" not in ds.pres.dims:
+        ds = ds.set_coords("pres")
 
     ds = ds.load()
     # Ensure time coordinate is in nanosecond precision to avoid xarray warnings
@@ -862,12 +951,13 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
     # Apply colocations
     dsref, dsprod = _apply_colocations(dsref, dsprod, params, tbound)
 
-    # Set depth as coordinate if needed
-    if "depth" in dsref.data_vars:
-        dsref = dsref.set_coords("depth")
-    if "depth" in dsprod.data_vars:
-        dsprod = dsprod.set_coords("depth")
-
+    # Set depth/pres as coordinate if needed
+    for vcoord in ["depth", "pres"]:
+        if vcoord in dsref.data_vars:
+            dsref = dsref.set_coords(vcoord)
+        if vcoord in dsprod.data_vars:
+            dsprod = dsprod.set_coords(vcoord)
+    
     dsref = dsref.assign_attrs(gattrs_ref)
     dsprod = dsprod.assign_attrs(gattrs_prod)
 
@@ -911,7 +1001,12 @@ def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts
     """
     logger.info(f"Use reference {ncref}")
 
-    dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={})
+    _climato_names = {"woa18", "bobyclim"}
+    _ds_meta = xr.open_dataset(ncref, engine="zarr", chunks={}, decode_times=False)
+    _is_climato = any(n in _ds_meta.attrs.get("data_name", "") for n in _climato_names)
+    _ds_meta.close()
+    dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={},
+                               decode_times=not _is_climato)
     dsrefin = _prepare_dataset(dsrefin, comp_func, is_reference=True)
 
     results = []

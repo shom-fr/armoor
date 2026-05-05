@@ -56,6 +56,14 @@ METAZONE_PARAMS = {
         "vlevel",
         "oceanvars",
         "bathy"
+        ],
+    "comp_clim": [
+        "tbound",
+        "polygon",
+        "href",
+        "vlevel",
+        "oceanvars",
+        "bathy",
         ]
     }
 
@@ -78,6 +86,11 @@ COLOCATION_PARAMS_USER = {
         "time": ("trange_seq", "tfreq"),
         "horizontal": ("href", "cloud"),
         "vertical": ("vrange", "vlevel"),
+        },
+    "comp_clim": {
+        "time":       ("tmonth",),
+        "horizontal": ("href",),
+        "vertical":   ("vlevel",),
         },
     }
 
@@ -232,7 +245,19 @@ OUTPUTS_PARAMS = {
                 "horizontal": ["cloud"]
                 },
             },
-        
+
+        },
+    "comp_clim": {
+        "maps": {
+            "sort": ["time", "z"],
+            "stat": ["time"],
+            },
+        "timeseries": {
+            "sort": ["z"],
+            "concat": ["time"],
+            "stat": ["y", "x"],
+            "output": "merge",
+            },
         },
     }
 
@@ -241,7 +266,8 @@ COMP_VARS = {
     "comp_argo": ["ptemp", "sal", "pdens", "temp", "sndspeed"],
     "comp_mooring": ["ptemp", "sal", "pdens", "temp", "sndspeed", "cdir", "cspeed"],
     "comp_drifter": ["ptemp", "sal", "u", "v"],
-    "comp_models": ["ptemp", "sal", "pdens", "sndspeed"]
+    "comp_models": ["ptemp", "sal", "pdens", "sndspeed"],
+    "comp_clim": ["ptemp", "sal"],
     }
 
 TITLE_PLOTS = {
@@ -249,7 +275,8 @@ TITLE_PLOTS = {
     "comp_argo": "Hydrological profiles",
     "comp_mooring": "Hydrological mooring",
     "comp_models": "",
-    "comp_drifter": "Drifters"
+    "comp_drifter": "Drifters",
+    "comp_clim": "Hydrological climatology",
     }
 
 METRIC_LABELS = {

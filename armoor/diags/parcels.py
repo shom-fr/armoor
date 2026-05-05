@@ -85,10 +85,10 @@ class  Parcels(object):
             np.zeros(n),
             coords={
                 coord: (
-                    "time", self.ptc_coords_start[coord]
+                    "npt", self.ptc_coords_start[coord]
                     ) for coord in ["time", "lon", "lat"]
                 },
-            dims=["time"]
+            dims=["npt"]
             )
         u_parcels = grid2loc(
             ds_field["u"],
@@ -104,9 +104,7 @@ class  Parcels(object):
         ds_drifter = xr.merge([u_parcels, v_parcels])
         del u_parcels
         del v_parcels
-        ds_drifter = ds_drifter.swap_dims({
-            "time": "time_drifter"
-            }).rename({
+        ds_drifter = ds_drifter.rename({
             "time": "time_drifter",
             "lon": "lon_drifter",
             "lat": "lat_drifter",

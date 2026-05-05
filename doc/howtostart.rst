@@ -38,6 +38,7 @@ More details about Armoor command-lines can be found in the dedicated sections :
    
       * armoor-bull
       * armoor-comp-argo
+      * armoor-comp-clim
       * armoor-comp-drifter
       * armoor-comp-models
       * armoor-comp-mooring

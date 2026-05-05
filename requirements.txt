@@ -26,6 +26,5 @@ seaborn
 setuptools
 sqlite=3.47.0
 xarray=2025.1.1
-xoa
 xesmf=0.8.8
 zarr=2.18.7

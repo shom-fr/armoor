@@ -7,6 +7,13 @@ Develop
 New features
 ------------
 
+- Added ``armoor-comp-clim``: new comparison tool for 3D model outputs against
+  an observed hydrological climatology (WOA18 or Bobyclim) for ``ptemp`` and
+  ``sal``.  Colocation uses a new monthly grouping method
+  (``TimeColocation.tmonth``) that averages model outputs by calendar month
+  before comparing them to the climatology month by month.  Outputs: ``maps``
+  and ``timeseries``.
+
 Breaking changes
 ----------------
 

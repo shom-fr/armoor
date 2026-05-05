@@ -158,9 +158,18 @@ class StatsComp:
         tuple
             (product_tree, reference_tree, comparison_tree)
         """
+        # Filter dims to only those that are actual dimensions in both datasets.
+        # Scalar coordinates (e.g. z=10.0 when data is already at a fixed depth)
+        # have ndim=0 and cannot be reduced — they must be excluded.
+        available_dims = set(self.dsref.dims) & set(self.dsprod.dims)
+        dims = [d for d in dims if d in available_dims]
+        if not dims:
+            logger.debug("No reducible dimensions after filtering. Returning direct diff.")
+            return self.get_diff()
+        logger.debug("Effective reduction dims after filtering: %s", dims)
+
         # Build shared lazy computations
         diff = self.dsprod - self.dsref
-
         ref_mean = self.dsref.mean(dim=dims)
         ref_std = self.dsref.std(dim=dims)
         prod_mean = self.dsprod.mean(dim=dims)
@@ -245,10 +254,46 @@ class StatsComp:
         """
         Compute direct difference (no reduction).
 
+        When the reference is a single-time climatology (e.g. WOA18) and the
+        product has multiple time steps, their time coordinates will not align
+        and a naive subtraction returns an empty dataset.  In that case we
+        reduce the product over time first (temporal mean) so the comparison
+        becomes spatial-only and remains meaningful.
+
         Returns
         -------
         tuple
             (product_tree, reference_tree, comparison_tree)
         """
-        self._update_tree(self.dtcomps, "diff", stats.diff(self.dsprod, self.dsref))
+        dsprod = self.dsprod
+        dsref = self.dsref
+
+        if "time" in dsprod.dims and "time" in dsref.dims:
+            common_times = np.intersect1d(dsprod.time.values, dsref.time.values)
+            if len(common_times) == 0:
+                # No overlapping time steps — reduce both over time to obtain a
+                # meaningful spatial comparison (e.g. model mean vs WOA18 month).
+                logger.debug(
+                    "get_diff: no common time steps between prod (%d) and ref (%d) — "
+                    "reducing both over time before diff",
+                    dsprod.sizes["time"], dsref.sizes["time"],
+                )
+                dsprod_mean = dsprod.mean("time")
+                dsref_mean = dsref.mean("time")
+                # Store climatology month in attrs so plot.py can label axes.
+                # WOA18 time is encoded as a float month index (e.g. 4.0) stored
+                # without CF units, which xarray decodes as N nanoseconds — so
+                # the int64 value equals the month number directly.
+                if "time" in dsref.dims and dsref.sizes["time"] >= 1:
+                    t_ns = int(np.int64(dsref.time.values[0]))
+                    if 1 <= t_ns <= 12:
+                        dsref_mean.attrs["clim_month"] = t_ns
+                diff_ds = stats.diff(dsprod_mean, dsref_mean)
+                self.dtprod.update(xr.DataTree.from_dict({"data": dsprod_mean}))
+                self.dtref.update(xr.DataTree.from_dict({"data": dsref_mean}))
+                self._update_tree(self.dtcomps, "diff", diff_ds)
+                return self.dtprod, self.dtref, self.dtcomps
+
+        diff_ds = stats.diff(dsprod, dsref)
+        self._update_tree(self.dtcomps, "diff", diff_ds)
         return self.dtprod, self.dtref, self.dtcomps
