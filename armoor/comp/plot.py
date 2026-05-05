@@ -766,7 +766,7 @@ class PlotComp:
                     gridlines_xlabel_style={'size': 6},
                     gridlines_ylabel_style={'size': 6},
                     )
-                ax_minimap = plot_minimap(daref, fig=fig, ax=self.ax_minimap, **kw)
+                ax_minimap = plot_minimap((daref.lon, daref.lat), fig=fig, ax=self.ax_minimap, **kw)
                 
                 figname = (
                     f"{self.func_comp}/plot/{self.metazone}/{refname}/"
@@ -829,7 +829,13 @@ class PlotComp:
         dss_comp_rmse = [dt_comp["rmse"].to_dataset() for dt_comp in dts_comp]
         dss_comp_rmsec = [dt_comp["rmsec"].to_dataset() for dt_comp in dts_comp]
 
-        for var in ds_ref_data.data_vars:
+        # Only process variables present in both reference and all product datasets
+        prod_vars = set(dss_prod_mean[0].data_vars) if dss_prod_mean else set()
+        for dsp in dss_prod_mean[1:]:
+            prod_vars &= set(dsp.data_vars)
+        vars_to_plot = [v for v in ds_ref_data.data_vars if v in prod_vars]
+
+        for var in vars_to_plot:
             for inpt in range(npts):
                 fig, axes = create_subplots(
                     nrows=5, figsize=(10, 8),
@@ -878,8 +884,9 @@ class PlotComp:
                             plot_coords = "filledbox"
                         else:
                             plot_coords = "points"
+                        _da_map = da_ref if npts == 1 else da_ref.isel(npts=inpt)
                         plot_minimap(
-                            da_ref if npts == 1 else da_ref.isel(npts=inpt),
+                            (_da_map.lon, _da_map.lat),
                             ax=self.ax_minimap,
                             fig=fig,
                             plot_coords=plot_coords,
@@ -1037,9 +1044,8 @@ class PlotComp:
                             plot_coords = "filledbox"
                         else:
                             plot_coords = "points"
-                    
                         plot_minimap(
-                            da_ref,
+                            (da_ref.lon, da_ref.lat),
                             ax=self.ax_minimap,
                             fig=fig,
                             plot_coords=plot_coords,
@@ -1188,10 +1194,11 @@ class PlotComp:
                 
             dlat = dsref.lat.max() - dsref.lat.min()
             dlon = dsref.lon.max() - dsref.lon.min()
-            aspect_ratio = dlat / dlon
+            mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
+            aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
             fig, axes = create_subplots(
                 layout_type="one",
-                figsize=(10 * aspect_ratio, 10),
+                figsize=(10, 10 * aspect_ratio),
                 x_label=None, y_label=None,
                 sharex=True, projection=ccrs.PlateCarree()
                 )
@@ -1259,10 +1266,13 @@ class PlotComp:
         """Plot maps per product."""
         for prod, node_prod in self.dt.children.items():
             dsprod = node_prod["prod/data"].to_dataset()
+            dsprod = dsprod.isel(time_drifter=[0])
+
             dsref = node_prod["ref/data"].to_dataset()
+
             prod_name = dsprod.attrs.get("data_name")
             ref_name = dsref.attrs.get("data_name")
-                                        
+
             figtitle = (
                 f"{self.plot_title} \n"
                 f"{self.metazone}"
@@ -1270,10 +1280,12 @@ class PlotComp:
                 
             dlat = dsref.lat.max() - dsref.lat.min()
             dlon = dsref.lon.max() - dsref.lon.min()
-            aspect_ratio = dlat / dlon
+            mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
+            aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
+            
             fig, axes = create_subplots(
                 layout_type="one",
-                figsize=(10 * aspect_ratio, 10),
+                figsize=(10, 10 * aspect_ratio),
                 x_label=None, y_label=None,
                 sharex=True, projection=ccrs.PlateCarree()
                 )
@@ -1296,7 +1308,7 @@ class PlotComp:
                 color="k",
                 label=ref_name
                 )
-            
+
             axes[0].quiver(
                 dsprod.lon_drifter,
                 dsprod.lat_drifter,
@@ -1368,6 +1380,13 @@ class PlotComp:
                     if "lon" not in dsref_all.coords:
                         dsref_all = dsref_all.set_coords(["lon", "lat"])
 
+                if any(s == 0 for s in dscomp_all.sizes.values()):
+                    logger.info(
+                        "maps: skipping %s — comp dataset is empty (sizes=%s)",
+                        comp, dict(dscomp_all.sizes)
+                    )
+                    continue
+
                 for var in dscomp_all.data_vars:
                     if var not in CMAP_VARS:
                         continue
@@ -1382,10 +1401,14 @@ class PlotComp:
                     if trange:
                         xtitle += f"{trange} "
                         ncname += f"_{trange}"
-                    elif dsref.sizes["time"] == 1:
+                    elif dsref.sizes.get("time") == 1:
                         time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
                         xtitle += f"{time}"
                         ncname += f"_{time}"
+                    elif "clim_month" in attrs:
+                        import calendar
+                        xtitle += calendar.month_name[attrs["clim_month"]]
+                        ncname += f"_m{attrs['clim_month']:02d}"
 
                     if "vlevel" in attrs:
                         vlevel = attrs.get("vlevel")
@@ -1602,10 +1625,12 @@ def main_plot(ncins, metazones, func_comp, kw_dask=None):
 
     # Use 'spawn' to create clean child processes: avoids both the
     # "fork() after OpenMP" crash and inherited memory bloat.
-    ctx = multiprocessing.get_context("spawn")
-    with ctx.Pool(num_workers) as pool:
-        results = pool.starmap(_plot_task, task_args)
-
+    # ctx = multiprocessing.get_context("spawn")
+    # with ctx.Pool(num_workers) as pool:
+    #     results = pool.starmap(_plot_task, task_args)
+    results = []
+    for arg in task_args:
+        results.append(_plot_task(*arg))
     png_paths = [p for task_result in results for p in (task_result or [])]
     logger.info(f"Generated {len(png_paths)} PNG file(s)")
     return png_paths

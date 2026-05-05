@@ -20,6 +20,7 @@ from armoor.comp.coloc import (
     process_horizontal_colocation,
     process_vertical_colocation,
     save_datasets,
+    _drop_time_cf_attrs_if_not_datetime,
     _prepare_dataset,
     _apply_colocations,
     _apply_time_ranges,
@@ -258,6 +259,99 @@ class TestTimeColocation:
         mock_interp.assert_called_once()
         call_kwargs = mock_interp.call_args
         assert call_kwargs[1]["method"] == "nearest"
+
+    # -------------------------------------------------------------------------
+    # tmonth
+    # -------------------------------------------------------------------------
+
+    def _make_clim_datasets(self, months=(1, 2, 3, 4)):
+        """Helper: reference climatology (monthly indices) + model (datetime)."""
+        dsref = xr.Dataset(
+            {"temp": (["time"], np.arange(1., len(months) + 1))},
+            coords={"time": np.array(months)},
+        )
+        # Two years of daily data covering the requested months
+        time_prod = pd.date_range("2022-01-01", "2023-12-31", freq="MS")
+        time_prod = time_prod[time_prod.month.isin(months)]
+        dsprod = xr.Dataset(
+            {"temp": (["time"], np.ones(len(time_prod)) * 10.0)},
+            coords={"time": time_prod},
+        )
+        tbound = (pd.Timestamp("2022-01-01"), pd.Timestamp("2023-12-31"))
+        return dsref, dsprod, tbound
+
+    def test_tmonth_output_has_monthly_index(self):
+        """tmonth must produce a time axis of integer month indices (1–12)."""
+        dsref, dsprod, tbound = self._make_clim_datasets(months=(1, 3, 6, 9))
+        coloc = TimeColocation(dsref, dsprod, tbound)
+        ref_out, prod_out = coloc.tmonth()
+
+        assert "time" in ref_out.dims
+        assert "time" in prod_out.dims
+        assert ref_out.sizes["time"] == prod_out.sizes["time"]
+        # Values must be integer month numbers
+        np.testing.assert_array_equal(
+            np.sort(prod_out.time.values),
+            np.sort(ref_out.time.values),
+        )
+
+    def test_tmonth_aligns_on_common_months(self):
+        """tmonth must restrict output to the intersection of ref and prod months."""
+        # Reference covers months 1–6, product only covers months 3–12
+        dsref = xr.Dataset(
+            {"temp": (["time"], np.ones(6))},
+            coords={"time": np.arange(1, 7)},
+        )
+        time_prod = pd.date_range("2022-03-01", "2022-12-01", freq="MS")
+        dsprod = xr.Dataset(
+            {"temp": (["time"], np.ones(len(time_prod)))},
+            coords={"time": time_prod},
+        )
+        tbound = (pd.Timestamp("2022-01-01"), pd.Timestamp("2022-12-31"))
+        coloc = TimeColocation(dsref, dsprod, tbound)
+        ref_out, prod_out = coloc.tmonth()
+
+        # Common months are 3, 4, 5, 6
+        assert ref_out.sizes["time"] == 4
+        assert prod_out.sizes["time"] == 4
+        np.testing.assert_array_equal(np.sort(ref_out.time.values), [3, 4, 5, 6])
+
+    def test_tmonth_multiyear_averaging(self):
+        """tmonth must average all same-month values across multiple years."""
+        dsref = xr.Dataset(
+            {"temp": (["time"], [20.0])},
+            coords={"time": np.array([1])},
+        )
+        # Two januaries: values 10 and 20 → mean should be 15
+        time_prod = pd.to_datetime(["2022-01-01", "2023-01-01"])
+        dsprod = xr.Dataset(
+            {"temp": (["time"], [10.0, 20.0])},
+            coords={"time": time_prod},
+        )
+        tbound = (pd.Timestamp("2022-01-01"), pd.Timestamp("2023-12-31"))
+        coloc = TimeColocation(dsref, dsprod, tbound)
+        _, prod_out = coloc.tmonth()
+
+        assert prod_out.sizes["time"] == 1
+        assert float(prod_out["temp"].values[0]) == pytest.approx(15.0)
+
+    def test_tmonth_respects_tbound(self):
+        """tmonth must exclude product data outside tbound."""
+        dsref = xr.Dataset(
+            {"temp": (["time"], [1.0, 2.0])},
+            coords={"time": np.array([1, 2])},
+        )
+        # Month 1 inside tbound, month 2 outside
+        time_prod = pd.to_datetime(["2023-01-01", "2023-02-01"])
+        dsprod = xr.Dataset(
+            {"temp": (["time"], [5.0, 99.0])},
+            coords={"time": time_prod},
+        )
+        tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-31"))
+        coloc = TimeColocation(dsref, dsprod, tbound)
+        _, prod_out = coloc.tmonth()
+
+        assert 2 not in prod_out.time.values
 
 
 # =============================================================================
@@ -746,6 +840,144 @@ class TestSaveDatasets:
 
         assert "0-100m" in str(ncout_ref)
 
+    def test_save_datasets_woa18_like_float_time_with_cf_attrs(self, tmp_path):
+        """Regression test: saving a WOA18-like dataset must not raise.
+
+        WOA18 is opened with decode_times=False, so the time coordinate is a
+        float array (month indices 1–12) with CF attrs ``units`` and
+        ``calendar`` in its attrs dict.  Older code failed with::
+
+            ValueError: failed to prevent overwriting existing key units in attrs
+
+        because xarray's CF encoder tried to write ``units`` again.
+        """
+        # Simulate WOA18 reference: float time with CF attrs in attrs dict
+        time_vals = np.arange(1, 4, dtype=np.float64)
+        time_coord = xr.Variable(
+            "time",
+            time_vals,
+            attrs={"units": "months since 1955-01-01", "calendar": "gregorian"},
+        )
+        dsref = xr.Dataset(
+            {"temp": (["time", "y", "x"], np.random.rand(3, 3, 4))},
+            coords={"time": time_coord},
+        )
+        dsref.attrs = {"time": "clim", "data_name": "woa18"}
+
+        dsprod = xr.Dataset(
+            {"temp": (["time", "y", "x"], np.random.rand(3, 3, 4))},
+            coords={"time": pd.date_range("2023-01-01", periods=3, freq="MS")},
+        )
+        dsprod.attrs = {"data_name": "glo12"}
+
+        # Must not raise
+        ncout_ref, ncout_prod = save_datasets(dsref, dsprod, tmp_path, "ref", "prod")
+
+        assert ncout_ref.exists()
+        assert ncout_prod.exists()
+
+        # Time written to zarr must be numeric (not decoded as datetime)
+        ds_read = xr.open_zarr(ncout_ref)
+        assert np.issubdtype(ds_read["time"].dtype, np.floating)
+        np.testing.assert_array_equal(ds_read["time"].values, time_vals)
+
+
+# =============================================================================
+# TestDropTimeCfAttrs
+# =============================================================================
+
+class TestDropTimeCfAttrs:
+    """Test suite for _drop_time_cf_attrs_if_not_datetime."""
+
+    def _make_float_time_ds(self, attrs=None):
+        """Dataset with float time (WOA18-like)."""
+        time_vals = np.arange(1, 4, dtype=np.float64)
+        time_coord = xr.Variable("time", time_vals, attrs=attrs or {})
+        return xr.Dataset(
+            {"temp": (["time"], np.random.rand(3))},
+            coords={"time": time_coord},
+        )
+
+    def _make_datetime_ds(self):
+        """Dataset with datetime64 time."""
+        return xr.Dataset(
+            {"temp": (["time"], np.random.rand(3))},
+            coords={"time": pd.date_range("2023-01-01", periods=3)},
+        )
+
+    def test_noop_when_no_time(self):
+        """Dataset without time coordinate is returned unchanged."""
+        ds = xr.Dataset({"temp": (["x"], np.zeros(3))})
+        result = _drop_time_cf_attrs_if_not_datetime(ds)
+        assert result is ds
+
+    def test_noop_for_datetime_time(self):
+        """datetime64 time with no CF attrs in attrs is left untouched."""
+        ds = self._make_datetime_ds()
+        result = _drop_time_cf_attrs_if_not_datetime(ds)
+        assert np.issubdtype(result["time"].dtype, np.datetime64)
+
+    def test_strips_units_from_datetime_attrs(self):
+        """datetime64 time that has 'units' in attrs (from xr.merge decode) gets them removed.
+
+        When xr.merge internally decodes float CF time to datetime64 without
+        going through the normal decode→encode path, 'units'/'calendar' stay
+        in .attrs instead of .encoding.  The CF encoder then fails because it
+        tries to write 'units' to attrs again.  The fix removes these keys from
+        attrs so the CF encoder can set them correctly.
+        """
+        ds = xr.Dataset(
+            {"temp": (["time"], np.random.rand(3))},
+            coords={
+                "time": xr.Variable(
+                    "time",
+                    pd.date_range("1955-04-01", periods=3),
+                    attrs={"units": "months since 1955-01-01", "calendar": "gregorian",
+                           "long_name": "time"},
+                )
+            },
+        )
+        result = _drop_time_cf_attrs_if_not_datetime(ds)
+        assert np.issubdtype(result["time"].dtype, np.datetime64)
+        assert "units" not in result["time"].attrs
+        assert "calendar" not in result["time"].attrs
+        assert "long_name" in result["time"].attrs  # non-CF attrs preserved
+
+    def test_removes_cf_attrs_from_float_time(self):
+        """CF attrs are stripped from a float time coordinate."""
+        ds = self._make_float_time_ds(
+            attrs={"units": "months since 1955-01-01", "calendar": "gregorian"}
+        )
+        result = _drop_time_cf_attrs_if_not_datetime(ds)
+        assert result["time"].attrs == {}
+
+    def test_preserves_float_values(self):
+        """Float values are preserved after attrs removal."""
+        ds = self._make_float_time_ds(
+            attrs={"units": "months since 1955-01-01"}
+        )
+        result = _drop_time_cf_attrs_if_not_datetime(ds)
+        np.testing.assert_array_equal(result["time"].values, ds["time"].values)
+
+    def test_encoding_is_empty_after_rebuild(self):
+        """Encoding dict on the rebuilt coordinate must be empty."""
+        ds = self._make_float_time_ds(
+            attrs={"units": "months since 1955-01-01", "calendar": "gregorian"}
+        )
+        # Simulate inherited encoding from a zarr store read
+        ds["time"].encoding["units"] = "months since 1955-01-01"
+        ds["time"].encoding["calendar"] = "gregorian"
+
+        result = _drop_time_cf_attrs_if_not_datetime(ds)
+        assert result["time"].encoding == {}
+
+    def test_float_time_noop_when_no_cf_attrs(self):
+        """Float time with no CF attrs passes through without error."""
+        ds = self._make_float_time_ds(attrs={})
+        result = _drop_time_cf_attrs_if_not_datetime(ds)
+        assert result["time"].attrs == {}
+        np.testing.assert_array_equal(result["time"].values, ds["time"].values)
+
 
 # =============================================================================
 # TestPrepareDataset
@@ -1131,7 +1363,9 @@ class TestProcessFunctions:
             params, tbound, "comp_argo", "zone1", ncouts
         )
 
-        mock_open.assert_called_once()
+        # open_dataset is called twice: once with decode_times=False to detect
+        # climatology datasets, then once more with the appropriate decode_times value.
+        assert mock_open.call_count == 2
         # Should process 2 products
         assert mock_single.call_count == 2
 

@@ -84,7 +84,19 @@ Hereafter are presented some examples of configuration files for metazone-based 
          :linenos:
 
         :download:`Download comp_models.cfg <configs/comp_models.cfg>`
-    
+
+    .. grid-item-card:: Climatology comparison
+
+        Configuration for comparing 3D model outputs with an observed
+        hydrological climatology (WOA18 or Bobyclim).
+
+        .. literalinclude:: configs/comp_clim.cfg
+         :language: ini
+         :caption: comp_clim.cfg
+         :linenos:
+
+        :download:`Download comp_clim.cfg <configs/comp_clim.cfg>`
+
     .. grid-item-card:: Bull
 
         Configuration for running a bull generation.

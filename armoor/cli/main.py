@@ -580,12 +580,29 @@ def get_parser_comp_models():
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
-    
+
     return parser
 
 def main_comp_models():
     """Compare a model reference with other products."""
     _dispatch_comp("comp_models", get_parser_comp_models(),
+                   lambda args: {"tbound": args.tbound})
+
+def get_parser_comp_clim():
+    """Get parser for climatology comparison."""
+    parser = ArgumentParser(
+        description="Compare 3D model outputs with an observed hydrological climatology.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+    )
+    add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
+    add_comp_parser_arguments(parser)
+    return parser
+
+
+def main_comp_clim():
+    """Compare model outputs with an observed climatology."""
+    _dispatch_comp("comp_clim", get_parser_comp_clim(),
                    lambda args: {"tbound": args.tbound})
 
 def get_parser_comp_sst():

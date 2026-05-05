@@ -3,6 +3,7 @@ Open files and decode data.
 """
 
 import concurrent.futures
+import warnings
 import datetime
 import gc
 import glob
@@ -184,6 +185,20 @@ def register_cf():
         mycfspecs = MetaSpecs(cfg_file, default=False, user=False)
         xmeta.register_meta_specs(mycfspecs)
     
+def _normalize_geo_coords(ds):
+    """Ensure lon/lat coordinates carry standard_name so xoa can locate them."""
+    if isinstance(ds, list):
+        return [_normalize_geo_coords(d) for d in ds]
+    for coord, std_name, axis in [
+        ("lon", "longitude", "X"),
+        ("lat", "latitude", "Y"),
+    ]:
+        if coord in ds.coords:
+            ds.coords[coord].attrs.setdefault("standard_name", std_name)
+            ds.coords[coord].attrs.setdefault("axis", axis)
+    return ds
+
+
 def open_decode(
     path_files, fmt, platform=None, func=None, type=None
 ) -> xr.Dataset:
@@ -211,36 +226,40 @@ def open_decode(
     # Open file
     if fmt == "cmems_insitu":
         logger.info("Opening/decoding insitu cmems files")
-        return open_decode_cmems_insitu(path_files, platform=platform)
+        result = open_decode_cmems_insitu(path_files, platform=platform)
     elif fmt == "cora_insitu":
         logger.info("Opening/decoding insitu cmems files")
-        return open_decode_cora_insitu(path_files, platform=platform)
+        result = open_decode_cora_insitu(path_files, platform=platform)
     elif fmt == "cmems_model":
         logger.info("Opening/decoding model cmems files")
-        return open_decode_cmems_model(path_files)
+        result = open_decode_cmems_model(path_files)
     elif fmt == "armoor":
         logger.info("Opening armoor files")
-        ds = xr.open_mfdataset(path_files)#, chunks="auto")
+        ds = xr.open_mfdataset(path_files)
         if "depth" in ds:
             ds = ds.reset_coords("depth")
-        return ds
+        result = ds
     elif "_sst_l" in fmt:
         logger.info("Opening/decoding sst satellite files")
-        return open_decode_sst_satellite(path_files, fmt)
+        result = open_decode_sst_satellite(path_files, fmt)
     elif (fmt == "hycom") or (fmt == "hycom3d"):
         logger.info("Opening/decoding hycom files")
-        return open_decode_hycom(path_files)
+        result = open_decode_hycom(path_files)
     elif (fmt == "croco") or (fmt == "croco_xios"):
         logger.info("Opening/decoding croco files")
-        return open_decode_croco(path_files, fmt)
+        result = open_decode_croco(path_files, fmt)
     elif fmt == "arpege_insta":
         logger.info("Opening/decoding instantaneous arpege files")
-        return open_decode_arpege_insta(path_files)
+        result = open_decode_arpege_insta(path_files)
     elif fmt == "woa18":
         logger.info("Opening/decoding woa18 climato")
-        return open_decode_woa18(path_files)
+        result = open_decode_woa18(path_files)
+    elif fmt == "bobyclim":
+        logger.info("Opening/decoding Bobyclim climato")
+        result = open_decode_bobyclim(path_files)
     else:
         raise logger.error("Unknow format")
+    return _normalize_geo_coords(result)
     
 
 def open_decode_arpege_insta(path_files):
@@ -338,37 +357,39 @@ def open_decode_cmems_model(path_files):
             ds["lon"] = lon
             ds["lat"] = lat
             ds = ds.set_coords(["lon", "lat"])
-        if "time" in ds.dims:
-            var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
-            ds["depth"] = ds["depth"].broadcast_like(ds[var])
-            ds = ds.reset_coords("depth")
+        if "depth" in ds.coords and len(ds.depth.dims) == 1:
+            ref_vars = [v for v in ds.data_vars if len(ds[v].dims) == 4]
+            if ref_vars:
+                ds = ds.assign_coords(depth=ds["depth"].broadcast_like(ds[ref_vars[0]]))
         return ds
     # Open
     cfspecs = xmeta.get_meta_specs("cmems_model")
     sorted_paths = sorted(map(str, path_files))
     n_files = len(sorted_paths)
-    ds = xr.open_mfdataset(
-        sorted_paths,
-        combine="by_coords",
+    open_kw = dict(
         engine="netcdf4",
-        # Large explicit chunks to minimise dask task count (same reasoning as
-        # open_decode_hycom).  Both original (lat/lon/depth) and post-preprocess
-        # (y/x/z) dim names are listed; xarray ignores unknown names silently.
         chunks={"time": 30,
                 "depth": 100, "z": 100,
                 "lat": 1024, "lon": 1024,
                 "y": 1024, "x": 1024},
-        parallel=n_files > 1,
         cache=False,
         decode_times=True,
         decode_coords=True,
         decode_cf=True,
         mask_and_scale=True,
-        data_vars='minimal',
-        coords='minimal',
-        preprocess=preprocess_cmems_model,
-        )
-    if "depth" in ds:
+    )
+    # Open each file individually and keep explicit references so that the
+    # underlying netCDF4 file handles are not garbage-collected before dask
+    # computes.  Using open_mfdataset with combine="nested"+concat_dim=None
+    # was causing "RuntimeError: NetCDF: Not a valid ID" on some xarray
+    # versions because the internal per-file datasets were GC'd too early.
+    _handles = [xr.open_dataset(p, **open_kw) for p in sorted_paths]
+    _processed = [preprocess_cmems_model(d) for d in _handles]
+    if n_files == 1:
+        ds = _processed[0]
+    else:
+        ds = xr.merge(_processed)
+    if "depth" in ds.data_vars:
         ds = ds.set_coords("depth")
     return ds
 
@@ -602,6 +623,67 @@ def open_decode_woa18(path_files):
     )
     woa18["time"] = woa18.time.where(woa18.time != 0., 12.)
     return woa18
+
+
+def open_decode_bobyclim(path_files):
+    """Open Bobyclim netcdf files and store into a ready-to-use dataset.
+
+    Parameters
+    ----------
+    path_files : str, list of str
+        Path to the netcdf files.
+
+    Returns
+    -------
+    xarray.Dataset
+        Bobyclim dataset with time axis normalised to monthly indices 1–12.
+    """
+    warnings.warn(
+        "open_decode_bobyclim() has not been tested against real Bobyclim files. "
+        "Variable names and axis encoding are assumed — this function may crash or "
+        "produce incorrect results. Please validate before use in production.",
+        UserWarning,
+        stacklevel=2,
+    )
+    ds = xr.open_mfdataset(path_files, combine_attrs="drop_conflicts")
+
+    # Rename variables to canonical names (adjust if source names differ)
+    rename_map = {}
+    for src, dst in [("temperature", "temp"), ("salinity", "sal"),
+                     ("TEMP", "temp"), ("SAL", "sal"),
+                     ("votemper", "temp"), ("vosaline", "sal")]:
+        if src in ds and dst not in ds:
+            rename_map[src] = dst
+    if rename_map:
+        ds = ds.rename(rename_map)
+
+    ds = convert_lons(ds)
+
+    # Build 2D (y, x) grid from 1D lon/lat if needed
+    if "lon" in ds.coords and ds["lon"].ndim == 1 and "lat" in ds.coords and ds["lat"].ndim == 1:
+        lon2d, lat2d = np.meshgrid(ds["lon"].values, ds["lat"].values)
+        ds = ds.swap_dims({"lon": "x", "lat": "y"})
+        ds = ds.drop_vars(["lon", "lat"])
+        ds["lon"] = xr.DataArray(lon2d, dims=["y", "x"])
+        ds["lat"] = xr.DataArray(lat2d, dims=["y", "x"])
+        ds = ds.set_coords(["lon", "lat"])
+
+    # Normalise time axis to monthly indices 1–12
+    if "time" in ds.coords:
+        time_vals = ds["time"].values
+        if np.issubdtype(time_vals.dtype, np.floating) or np.issubdtype(time_vals.dtype, np.integer):
+            # Already numeric — apply same formula as WOA18
+            ds["time"] = np.ceil(ds["time"]) - 12.0 * np.trunc(
+                np.ceil(ds["time"]) / 12.0
+            )
+            ds["time"] = ds["time"].where(ds["time"] != 0., 12.)
+        else:
+            # datetime-like: extract month number
+            ds["time"] = xr.DataArray(
+                ds["time"].dt.month.values, dims=["time"]
+            )
+
+    return ds
 
 
 def open_decode_cora_insitu(path_files, platform):

@@ -49,8 +49,20 @@ def test():
         print(e)
         assert False
     else:
+        skip_tasks = []
+        for stage_content in workflow.task_tree.values():
+            for parallel_groups in stage_content.values():
+                for group in parallel_groups:
+                    for task_name in group:
+                        artifacts = workflow.get_task_artifacts(task_name)
+                        if artifacts and isinstance(artifacts, dict):
+                            paths = [v for v in artifacts.values() if isinstance(v, str)]
+                            if paths and all(os.path.exists(p) for p in paths):
+                                skip_tasks.append(task_name)
+        if skip_tasks:
+            print(f"Skipping tasks with existing artifacts: {skip_tasks}")
         try:
-            workflow.run()
+            workflow.run(skip=skip_tasks or None)
         finally:  
             isend = False
             while isend == False:
@@ -60,7 +72,7 @@ def test():
                     isend = True
                     workflow.show_status()
             df = workflow.get_status()
-            res = df[~df.STATUS.str.contains("SUCCESS")].copy()
+            res = df[~df.STATUS.str.contains("SUCCESS|SKIPPED")].copy()
             
             if not res.empty:
                 for submission_dir in res["SUBMISSION DIR"]:

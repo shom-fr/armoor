@@ -60,7 +60,7 @@ def generate_kernel_from_freq(freq: str, time_index: pd.DatetimeIndex,
     offset_sample = pd.tseries.frequencies.to_offset(inferred)
 
     # Number of samples per user frequency
-    kernel_size = int(round(pd.to_timedelta(offset_user) / pd.to_timedelta(offset_sample)))
+    kernel_size = int(round(offset_user.nanos / offset_sample.nanos))
     if kernel_size < 1:
         kernel_size = 1
     if kernel_size % 2 == 0:
@@ -346,6 +346,10 @@ class ArmoorFilters:
         if not start:
             logger.error("Giving a begindate is mandatory.")
             sys.exit(1)
+        # Skip for climatologies: time indices are not calendar dates (e.g. WOA18
+        # opened with decode_times=False stores month indices as floats).
+        if 'time' not in self.ds or not np.issubdtype(self.ds.time.dtype, np.datetime64):
+            return None
         start = pd.to_datetime(start)
         if isinstance(end, int):
             end = pd.to_datetime(start) + pd.to_timedelta(end, "D")

@@ -203,8 +203,8 @@ def grid2loc(ds, coords: [(float, float)]):
     lat, lon = zip(*coords)
     loc = xr.Dataset(
         coords={
-            "lon": ("npts", list(lon)),
-            "lat": ("npts", list(lat)),
+            "lon": ("npts", list(lon), {"axis": "X", "standard_name": "longitude", "units": "degrees_east"}),
+            "lat": ("npts", list(lat), {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"}),
             }
         )
     dsi = ds.copy()
@@ -379,6 +379,7 @@ def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
                 method=method,
                 extrap="both",
                 dim="z",
+                coord_in_name=vname,
                 )
         else:
             da = ds[var]

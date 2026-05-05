@@ -88,6 +88,11 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
     lazy_minmax = []
     minmax_vars = []
 
+    _CF_GEO_ATTRS = {
+        "lon":   {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
+        "lat":   {"axis": "Y", "standard_name": "latitude",  "units": "degrees_north"},
+        "depth": {"axis": "Z", "standard_name": "depth",     "positive": "down"},
+    }
     # Traiter toutes les variables (data + coords)
     all_vars = list(ds_fixed.data_vars) + list(ds_fixed.coords)
     for var_name in all_vars:
@@ -192,11 +197,10 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
             lazy_minmax.append(da_fixed.min())
             lazy_minmax.append(da_fixed.max())
             minmax_vars.append(var_name)
-        if var_name in ("lon", "lat", "depth"):
-            if "axis" in da_fixed.attrs:
-                da_fixed.attrs.pop("axis")
-            if "step" in da_fixed.attrs:
-                da_fixed.attrs.pop("step")
+        if "step" in da_fixed.attrs:
+            da_fixed.attrs.pop("step")
+        if var_name in _CF_GEO_ATTRS:
+            da_fixed.attrs.update(_CF_GEO_ATTRS[var_name])
         da_fixed.attrs["coordinates"] = ','.join(list(da_fixed.dims))
         ds_fixed[var_name] = da_fixed
         if verbose:

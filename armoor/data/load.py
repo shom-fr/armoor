@@ -539,7 +539,10 @@ def _apply_prefilter(ds, bounds):
         return ds
 
     # --- Temporal pre-filter ---
-    if 'time_min' in bounds and 'time' in ds.dims:
+    # Skip for climatologies: time is not decoded as datetime64 (e.g. WOA18
+    # opened with decode_times=False stores month indices as floats).
+    if ('time_min' in bounds and 'time' in ds.dims
+            and np.issubdtype(ds['time'].dtype, np.datetime64)):
         ds = ds.sel(time=slice(bounds['time_min'], bounds['time_max']))
 
     # --- Spatial pre-filter ---

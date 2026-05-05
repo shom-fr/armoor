@@ -534,6 +534,12 @@ class OutputProcessor:
             for file_idx in range(num_files):
                 ds_prod = prod_datasets[file_idx]
                 ds_ref = ref_datasets[file_idx]
+                # Set depth/pres as coordinate if needed
+                for vcoord in ["depth", "pres"]:
+                    if vcoord in ds_ref.data_vars:
+                        ds_ref = ds_ref.set_coords(vcoord)
+                    if vcoord in ds_prod.data_vars:
+                        ds_prod = ds_prod.set_coords(vcoord)
                 # Prepare statistics configuration
                 stats = output_params.get("stat").copy() if output_params.get("stat") else None
                 # Compute statistics and comparisons

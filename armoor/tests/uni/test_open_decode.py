@@ -23,6 +23,7 @@ from armoor.data.open_decode import (
     open_decode_cmems_model,
     open_decode_hycom,
     open_decode_woa18,
+    open_decode_bobyclim,
     open_decode_cora_insitu,
     open_decode_cmems_insitu,
     open_decode_croco,
@@ -712,6 +713,133 @@ class TestOpenDecode:
         result = open_decode(str(filepath), fmt=fmt, platform=platform)
         
         assert result is not None
+
+
+# ============================================================================
+# Test open_decode_bobyclim
+# ============================================================================
+
+def _write_bobyclim_nc(path, time_values, time_dtype="datetime"):
+    """Write a minimal synthetic Bobyclim-like netCDF file."""
+    lon = np.linspace(-10., 0., 5)
+    lat = np.linspace(40., 50., 4)
+    depth = np.array([10., 50., 100.])
+    nz, ny, nx = len(depth), len(lat), len(lon)
+    nt = len(time_values)
+
+    with nc4.Dataset(path, "w") as ds:
+        ds.createDimension("time", nt)
+        ds.createDimension("depth", nz)
+        ds.createDimension("lat", ny)
+        ds.createDimension("lon", nx)
+
+        t_var = ds.createVariable("time", "f4", ("time",))
+        if time_dtype == "datetime":
+            t_var.units = "days since 2000-01-01"
+            t_var.calendar = "standard"
+            t_var[:] = time_values
+        else:
+            t_var[:] = time_values
+
+        lon_var = ds.createVariable("lon", "f4", ("lon",))
+        lon_var[:] = lon
+        lat_var = ds.createVariable("lat", "f4", ("lat",))
+        lat_var[:] = lat
+        d_var = ds.createVariable("depth", "f4", ("depth",))
+        d_var[:] = depth
+
+        t_data = ds.createVariable("votemper", "f4", ("time", "depth", "lat", "lon"))
+        t_data[:] = np.random.rand(nt, nz, ny, nx) * 20 + 5
+        s_data = ds.createVariable("vosaline", "f4", ("time", "depth", "lat", "lon"))
+        s_data[:] = np.random.rand(nt, nz, ny, nx) * 5 + 33
+
+
+class TestOpenDecodeBobyclim:
+    """Tests for open_decode_bobyclim.
+
+    NOTE: these tests use synthetic netCDF files — open_decode_bobyclim has
+    NOT been validated against real Bobyclim files.
+    """
+
+    def test_emits_user_warning(self, tmp_path):
+        """open_decode_bobyclim must emit a UserWarning on every call."""
+        nc_file = tmp_path / "bobyclim.nc"
+        _write_bobyclim_nc(nc_file, time_values=[0., 31., 59.])
+
+        with pytest.warns(UserWarning, match="not been tested"):
+            open_decode_bobyclim([str(nc_file)])
+
+    def test_output_is_dataset(self, tmp_path):
+        """open_decode_bobyclim must return an xarray.Dataset."""
+        nc_file = tmp_path / "bobyclim.nc"
+        _write_bobyclim_nc(nc_file, time_values=[0., 31., 59.])
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            result = open_decode_bobyclim([str(nc_file)])
+
+        assert isinstance(result, xr.Dataset)
+
+    def test_variable_renaming(self, tmp_path):
+        """votemper/vosaline must be renamed to temp/sal."""
+        nc_file = tmp_path / "bobyclim.nc"
+        _write_bobyclim_nc(nc_file, time_values=[0., 31., 59.])
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            result = open_decode_bobyclim([str(nc_file)])
+
+        assert "temp" in result
+        assert "sal" in result
+        assert "votemper" not in result
+        assert "vosaline" not in result
+
+    def test_2d_grid_construction(self, tmp_path):
+        """1D lon/lat must be promoted to 2D (y, x) grid."""
+        nc_file = tmp_path / "bobyclim.nc"
+        _write_bobyclim_nc(nc_file, time_values=[0., 31., 59.])
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            result = open_decode_bobyclim([str(nc_file)])
+
+        assert "lon" in result.coords
+        assert "lat" in result.coords
+        assert result["lon"].ndim == 2
+        assert result["lat"].ndim == 2
+        assert set(("y", "x")).issubset(result["lon"].dims)
+
+    def test_time_normalised_to_monthly_indices(self, tmp_path):
+        """Time axis must be normalised to integer monthly indices 1–12."""
+        nc_file = tmp_path / "bobyclim.nc"
+        # datetime-encoded: Jan, Apr, Jul → months 1, 4, 7
+        time_values = [0., 90., 181.]  # approx days-since-2000 for Jan/Apr/Jul
+        _write_bobyclim_nc(nc_file, time_values=time_values)
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            result = open_decode_bobyclim([str(nc_file)])
+
+        t = result["time"].values
+        assert t.dtype in (np.int32, np.int64, np.float32, np.float64)
+        assert np.all(t >= 1)
+        assert np.all(t <= 12)
+
+    def test_dispatcher_routes_to_bobyclim(self, tmp_path):
+        """open_decode with fmt='bobyclim' must call open_decode_bobyclim."""
+        nc_file = tmp_path / "bobyclim.nc"
+        _write_bobyclim_nc(nc_file, time_values=[0., 31., 59.])
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            result = open_decode(str(nc_file), fmt="bobyclim")
+
+        assert isinstance(result, xr.Dataset)
 
 
 # ============================================================================
