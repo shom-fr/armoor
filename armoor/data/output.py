@@ -40,23 +40,22 @@ def get_dim_stats(dsin, dim, mparams):
         return None
     
 def set_time_range(ds, time):
-    if "time" in ds.dims:
-        ds = ds.drop_dims("time")
-    if "time" in ds.coords:
-        ds = ds.drop_vars("time")
-    ds = ds.expand_dims(dim="time")
-    
-    t1 = pd.to_datetime(time[1:20])
-    t2 = pd.to_datetime(time[21:40])
-    med_time = t1+0.5*(t2-t1)
-    
-    ds["time"] = xr.DataArray(
-        data=[med_time],
-        dims="time"
-        )    
-    del t1,t2,med_time
-    
-    ds = ds.set_coords("time")
+    if "time" not in ds.dims: # mean/std groups
+        if "time" in ds.coords:
+            ds = ds.drop_vars("time")
+        ds = ds.expand_dims(dim="time")
+        
+        t1 = pd.to_datetime(time[1:20])
+        t2 = pd.to_datetime(time[21:40])
+        med_time = t1+0.5*(t2-t1)
+        
+        ds["time"] = xr.DataArray(
+            data=[med_time],
+            dims="time"
+            )    
+        del t1,t2,med_time
+        
+        ds = ds.set_coords("time")
     return ds
 
 def get_datatrees(dsins, dim, mparams):

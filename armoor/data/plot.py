@@ -17,6 +17,7 @@ import xarray as xr
 from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
 from cartopy.mpl.ticker import (LatitudeFormatter, LatitudeLocator,
                                 LongitudeFormatter, LongitudeLocator)
+from datetime import datetime
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts
@@ -543,7 +544,7 @@ class PlotData:
                 "data/plot/{self.metazone}/"
                 "timeseries_{data_name}_{var}{ncname}.png"
                 )
-        vars2plot = [var for var in ds_data.data_vars if var != "depth"]
+        vars2plot = [var for var in ds_mean.data_vars if var != "depth"]
         for var in vars2plot:
             for inpt in range(npts):
                 xtitle = ""
@@ -561,10 +562,8 @@ class PlotData:
                             vrange = vrange[0]
                         ncname += f"_{vrange}"
                         xtitle += f" {vrange}"
-                    else:
-                        pass
-                else:
-                    pass
+                if "trange_seq" in attrs:
+                    xtitle += f" time range {attrs.get('trange_seq')}"
                 fig, axes = create_subplots(
                     nrows=2, figsize=(10, 6),
                     x_label='Date', y_label=None,
@@ -643,7 +642,7 @@ class PlotData:
                 ds_mean_all = ds_mean_all.set_coords(["lon", "lat"])
                 ds_std_all = ds_std_all.set_coords(["lon", "lat"])
                 
-        vars2plot = [var for var in ds_data_all.data_vars if var != "depth"]
+        vars2plot = [var for var in ds_mean_all.data_vars if var != "depth"]
         for var in vars2plot:
             ds_data = ds_data_all[[var]]
             ds_mean = ds_mean_all[[var]]
@@ -654,8 +653,12 @@ class PlotData:
             xtitle = ""
             trange = attrs.get("trange")
             if trange:
-                xtitle += f"{trange} "
-                ncname += f"_{trange}"
+                t1 = datetime.strftime(pd.to_datetime(trange[1:20]),'%Y%m%d')
+                t2 = datetime.strftime(pd.to_datetime(trange[21:40]),'%Y%m%d')
+                add_time = f"[{t1}-{t2}["
+                add_time2 = re.sub('-', '_', re.sub('[\[\]]', '', add_time))
+                xtitle += add_time
+                ncname += f"_{add_time2}"
             if "z" in ds_data[var].dims:
                 if "vlevel" in attrs:
                     vlevel = attrs.get("vlevel")
