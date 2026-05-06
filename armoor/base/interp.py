@@ -340,6 +340,59 @@ def regrid(dsi, dso) -> xr.Dataset:
     
     return dsio
 
+def coarsen(dsi: xr.Dataset, factor: int, boundary: str = "trim", method: str = "mean") -> xr.Dataset:
+    """Coarsen a gridded dataset by aggregating over spatial blocks.
+
+    Each ``(factor × factor)`` block of cells is reduced to a single cell
+    using the chosen aggregation method.  Spatial coordinates (``lon``,
+    ``lat``) that share the ``x``/``y`` dimensions are coarsened in the
+    same way.  Non-spatial dimensions (``time``, ``z``, …) are left intact.
+
+    .. note::
+        This function relies on :meth:`xarray.Dataset.coarsen`, which only
+        supports **structured regular grids** (i.e. datasets with explicit
+        ``x`` and ``y`` index dimensions).  Curvilinear or unstructured grids
+        are not supported; use :func:`regrid` with an explicit target grid
+        for those cases.
+
+    Parameters
+    ----------
+    dsi : xr.Dataset
+        Gridded dataset with ``x`` and ``y`` dimensions.
+    factor : int
+        Coarsening factor applied to both ``x`` and ``y``.  A factor of 4
+        reduces a 1/12° grid to roughly 1/3°.
+    boundary : str
+        How to handle dimension sizes that are not divisible by *factor*:
+
+        * ``"trim"`` (default) — drop the remainder.
+        * ``"pad"`` — zero-pad to the next multiple.
+    method : str
+        Block aggregation method: ``"mean"`` (default), ``"median"``,
+        ``"min"``, or ``"max"``.
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset with ``x`` and ``y`` sizes divided by *factor* (rounded
+        according to *boundary*).
+
+    Raises
+    ------
+    ValueError
+        If *dsi* has neither an ``x`` nor a ``y`` dimension.
+
+    See Also
+    --------
+    regrid : bilinear regridding via xesmf (handles curvilinear grids).
+    """
+    spatial_dims = {dim: factor for dim in ("x", "y") if dim in dsi.dims}
+    if not spatial_dims:
+        raise ValueError("Dataset has no 'x' or 'y' dimensions to coarsen.")
+    coarsener = dsi.coarsen(**spatial_dims, boundary=boundary)
+    return getattr(coarsener, method)()
+
+
 def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
     """Interpolate an xarray Dataset over specified vertical levels.
     

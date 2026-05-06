@@ -233,3 +233,47 @@ class TestInterpVertical:
     def test_variable_preserved(self, ds_vertical):
         result = ds_vertical.interp.vertical("depth", [0.0, 50.0])
         assert "temp" in result
+
+
+# ---------------------------------------------------------------------------
+# .coarsen — horizontal block aggregation
+# ---------------------------------------------------------------------------
+
+class TestInterpCoarsen:
+    def test_returns_dataset(self, ds_gridded):
+        result = ds_gridded.interp.coarsen(2)
+        assert isinstance(result, xr.Dataset)
+
+    def test_spatial_dims_reduced_by_factor(self, ds_gridded):
+        # ds_gridded is (time=3, y=10, x=12)
+        result = ds_gridded.interp.coarsen(2)
+        assert result.sizes["x"] == 6
+        assert result.sizes["y"] == 5
+
+    def test_time_dim_unchanged(self, ds_gridded):
+        result = ds_gridded.interp.coarsen(2)
+        assert result.sizes["time"] == ds_gridded.sizes["time"]
+
+    def test_coordinates_coarsened(self, ds_gridded):
+        result = ds_gridded.interp.coarsen(2)
+        assert result["lon"].sizes == {"y": 5, "x": 6}
+        assert result["lat"].sizes == {"y": 5, "x": 6}
+
+    def test_method_median(self, ds_gridded):
+        result = ds_gridded.interp.coarsen(2, method="median")
+        assert isinstance(result, xr.Dataset)
+        assert "temp" in result
+
+    def test_boundary_trim_vs_pad(self, ds_gridded):
+        """trim and pad give different sizes when dims not divisible by factor."""
+        # y=10, x=12, factor=3 → trim: floor(10/3)=3, floor(12/3)=4
+        #                       → pad: ceil(10/3)=4, ceil(12/3)=4
+        r_trim = ds_gridded.interp.coarsen(3, boundary="trim")
+        r_pad  = ds_gridded.interp.coarsen(3, boundary="pad")
+        assert r_trim.sizes["y"] == 3   # floor(10/3)
+        assert r_pad.sizes["y"]  == 4   # ceil(10/3)
+        assert r_trim.sizes["x"] == r_pad.sizes["x"]  # 12 divisible by 3
+
+    def test_variable_preserved(self, ds_gridded):
+        result = ds_gridded.interp.coarsen(2)
+        assert "temp" in result

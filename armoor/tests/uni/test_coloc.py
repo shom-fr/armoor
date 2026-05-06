@@ -498,6 +498,62 @@ class TestHorizontalColocation:
         coloc = HorizontalColocation(self.dsref, self.dsprod)
         assert hasattr(coloc, "_handle_time_dependent")
 
+    @patch("armoor.comp.coloc._coarsen")
+    def test_coarsen_on_product_calls_coarsen(self, mock_coarsen):
+        """coarsen(on='product') must call _coarsen on dsprod only."""
+        mock_coarsen.return_value = self.dsprod
+        coloc = HorizontalColocation(self.dsref, self.dsprod)
+        coloc.coarsen(2, on="product")
+        mock_coarsen.assert_called_once_with(
+            self.dsprod, factor=2, boundary="trim", method="mean"
+        )
+
+    @patch("armoor.comp.coloc._coarsen")
+    def test_coarsen_on_reference_calls_coarsen(self, mock_coarsen):
+        """coarsen(on='reference') must call _coarsen on dsref only."""
+        mock_coarsen.return_value = self.dsref
+        coloc = HorizontalColocation(self.dsref, self.dsprod)
+        coloc.coarsen(4, on="reference")
+        mock_coarsen.assert_called_once_with(
+            self.dsref, factor=4, boundary="trim", method="mean"
+        )
+
+    @patch("armoor.comp.coloc._coarsen")
+    def test_coarsen_on_both_calls_coarsen_twice(self, mock_coarsen):
+        """coarsen(on='both') must call _coarsen once per dataset."""
+        mock_coarsen.side_effect = [self.dsref, self.dsprod]
+        coloc = HorizontalColocation(self.dsref, self.dsprod)
+        coloc.coarsen(2, on="both")
+        assert mock_coarsen.call_count == 2
+
+    @patch("armoor.comp.coloc._coarsen")
+    def test_coarsen_returns_tuple_of_two_datasets(self, mock_coarsen):
+        mock_coarsen.return_value = self.dsprod
+        coloc = HorizontalColocation(self.dsref, self.dsprod)
+        result = coloc.coarsen(2)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+
+    @patch("armoor.comp.coloc._coarsen")
+    def test_coarsen_default_on_is_product(self, mock_coarsen):
+        """Default on='product' → dsref returned unchanged."""
+        mock_coarsen.return_value = self.dsprod
+        coloc = HorizontalColocation(self.dsref, self.dsprod)
+        dsref_out, _ = coloc.coarsen(2)
+        assert dsref_out is self.dsref
+
+    def test_coarsen_integration(self):
+        """End-to-end: coarsen actually reduces spatial dims."""
+        lon2d, lat2d = np.meshgrid(np.linspace(0.0, 7.0, 8), np.linspace(40.0, 45.0, 6))
+        ds = xr.Dataset(
+            {"temp": (["y", "x"], np.ones((6, 8)))},
+            coords={"lon": (["y", "x"], lon2d), "lat": (["y", "x"], lat2d)},
+        )
+        coloc = HorizontalColocation(ds, ds.copy())
+        _, dsprod_out = coloc.coarsen(2, on="product")
+        assert dsprod_out.sizes["x"] == 4
+        assert dsprod_out.sizes["y"] == 3
+
 
 # =============================================================================
 # TestVerticalColocation
