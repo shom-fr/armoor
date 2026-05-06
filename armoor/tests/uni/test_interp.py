@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from armoor.base.interp import grid2loc, interp_time, regrid, vinterp, grid2section
+from armoor.base.interp import coarsen, grid2loc, interp_time, regrid, vinterp, grid2section
 
 
 class TestInterpTime:
@@ -531,6 +531,98 @@ class TestVinterp:
         
         assert 'surface_var' in result.data_vars
         assert 'z' not in result.surface_var.dims
+
+
+class TestCoarsen:
+    """Test suite for the coarsen() function."""
+
+    def setup_method(self):
+        """Uniform-value (y=6, x=8) gridded dataset for easy mean verification."""
+        lon2d, lat2d = np.meshgrid(np.linspace(0.0, 7.0, 8), np.linspace(40.0, 45.0, 6))
+        time = pd.date_range("2023-01-01", periods=2, freq="D")
+        self.ds = xr.Dataset(
+            {"temp": (["time", "y", "x"], np.ones((2, 6, 8)))},
+            coords={
+                "time": time,
+                "lon": (["y", "x"], lon2d),
+                "lat": (["y", "x"], lat2d),
+            },
+        )
+
+    def test_spatial_dims_reduced(self):
+        result = coarsen(self.ds, factor=2)
+        assert result.sizes["x"] == 4
+        assert result.sizes["y"] == 3
+
+    def test_time_dim_unchanged(self):
+        result = coarsen(self.ds, factor=2)
+        assert result.sizes["time"] == self.ds.sizes["time"]
+
+    def test_mean_aggregation(self):
+        """Uniform field → block mean must equal original value."""
+        result = coarsen(self.ds, factor=2)
+        np.testing.assert_allclose(result["temp"].values, 1.0)
+
+    def test_median_aggregation(self):
+        result = coarsen(self.ds, factor=2, method="median")
+        np.testing.assert_allclose(result["temp"].values, 1.0)
+
+    def test_boundary_trim(self):
+        """factor=3 on x=8 → floor(8/3)=2 output x-cells with trim."""
+        ds = xr.Dataset(
+            {"temp": (["y", "x"], np.ones((6, 8)))},
+            coords={
+                "lon": (["y", "x"], np.zeros((6, 8))),
+                "lat": (["y", "x"], np.zeros((6, 8))),
+            },
+        )
+        result = coarsen(ds, factor=3, boundary="trim")
+        assert result.sizes["x"] == 2
+
+    def test_boundary_pad(self):
+        """factor=3 on x=8 → ceil(8/3)=3 output x-cells with pad."""
+        ds = xr.Dataset(
+            {"temp": (["y", "x"], np.ones((6, 8)))},
+            coords={
+                "lon": (["y", "x"], np.zeros((6, 8))),
+                "lat": (["y", "x"], np.zeros((6, 8))),
+            },
+        )
+        result = coarsen(ds, factor=3, boundary="pad")
+        assert result.sizes["x"] == 3
+
+    def test_coordinates_coarsened(self):
+        """lon/lat coordinates must share the coarsened (y, x) shape."""
+        result = coarsen(self.ds, factor=2)
+        assert result["lon"].sizes == {"y": 3, "x": 4}
+        assert result["lat"].sizes == {"y": 3, "x": 4}
+
+    def test_no_spatial_dims_raises(self):
+        ds = xr.Dataset(
+            {"temp": ("time", [1.0, 2.0])},
+            coords={"time": pd.date_range("2023", periods=2)},
+        )
+        with pytest.raises(ValueError, match="no 'x' or 'y'"):
+            coarsen(ds, factor=2)
+
+    def test_multiple_variables(self):
+        self.ds["sal"] = (["time", "y", "x"], np.full((2, 6, 8), 35.0))
+        result = coarsen(self.ds, factor=2)
+        assert "temp" in result
+        assert "sal" in result
+
+    def test_factor_one_is_identity(self):
+        result = coarsen(self.ds, factor=1)
+        assert result.sizes["x"] == self.ds.sizes["x"]
+        assert result.sizes["y"] == self.ds.sizes["y"]
+        np.testing.assert_allclose(result["temp"].values, self.ds["temp"].values)
+
+    def test_z_dim_preserved(self):
+        """Vertical dimension must be left untouched."""
+        self.ds["temp"] = (["time", "z", "y", "x"], np.ones((2, 3, 6, 8)))
+        self.ds = self.ds.assign_coords(z=np.arange(3))
+        result = coarsen(self.ds, factor=2)
+        assert result.sizes["z"] == 3
 
 
 class TestIntegration:

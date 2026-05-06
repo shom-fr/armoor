@@ -13,7 +13,7 @@ import xoa.geo as xgeo
 
 import armoor.base.ranges as ranges
 from armoor.__init__ import ArmoorError
-from armoor.base.interp import grid2loc, interp_time, regrid, vinterp
+from armoor.base.interp import coarsen as _coarsen, grid2loc, interp_time, regrid, vinterp
 from armoor.base.io import (create_fast_encoding, get_zarr_encoding,
                             setup_dask_client)
 from armoor.comp import (COLOCATION_PARAMS_DEFAULT, COLOCATION_PARAMS_USER,
@@ -243,7 +243,36 @@ class HorizontalColocation(AbstractColocation):
         if "mask" in self.dsref:
             self.dsref= self.dsref.drop_vars("mask")
         return self.dsref, self.dsprod
-    
+
+    def coarsen(self, factor: int, on: str = "product", boundary: str = "trim", method: str = "mean") -> Tuple[xr.Dataset, xr.Dataset]:
+        """Coarsen one or both datasets by aggregating spatial blocks.
+
+        Useful for degrading model resolution before computing comparison
+        scores, e.g. to study score sensitivity to grid resolution.
+
+        Parameters
+        ----------
+        factor : int
+            Coarsening factor applied to both ``x`` and ``y`` dimensions.
+        on : str
+            Which dataset to coarsen: ``"product"`` (default), ``"reference"``,
+            or ``"both"``.
+        boundary : str
+            How to handle non-divisible sizes: ``"trim"`` (default) or ``"pad"``.
+        method : str
+            Aggregation method: ``"mean"`` (default), ``"median"``, ``"min"``, ``"max"``.
+
+        Returns
+        -------
+        tuple[xr.Dataset, xr.Dataset]
+            Reference and product datasets (the coarsened one(s) replaced).
+        """
+        if on in ("product", "both"):
+            self.dsprod = _coarsen(self.dsprod, factor=factor, boundary=boundary, method=method)
+        if on in ("reference", "both"):
+            self.dsref = _coarsen(self.dsref, factor=factor, boundary=boundary, method=method)
+        return self.dsref, self.dsprod
+
     def _clean_coordinates(self, dataset: xr.Dataset) -> xr.Dataset:
         """Remove temporary coordinates and rename primary ones."""
         coords_to_drop = ["lon", "lat", "lon_1", "lat_1"]

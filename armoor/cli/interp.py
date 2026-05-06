@@ -160,11 +160,12 @@ def get_parser_interp_horizontal():
     Notes
     -----
     Horizontal interpolation methods (mutually exclusive):
-    
+
     - **Cloud points**: Irregular scattered points defined by lat/lon coordinates
     - **Section**: Linear transect between two geographic points with specified spacing
-    - **Regular grid**: Rectangular lat/lon grid with uniform spacing  
+    - **Regular grid**: Rectangular lat/lon grid with uniform spacing
     - **NetCDF grid**: Grid coordinates read from existing NetCDF file
+    - **Coarsen**: Block aggregation onto a coarser structured grid (no xesmf required)
     """
     parser = ArgumentParser(
         description="Apply horizontal interpolation over a list of input files.",
@@ -201,7 +202,25 @@ def get_parser_interp_horizontal():
         type=str,
         help="NetCDF file in armoor format containing target grid lat/lon coordinates."
         )
-    
+    parser.add_argument(
+        '--coarsen-factor',
+        type=int,
+        metavar='FACTOR',
+        help="Coarsening factor applied to both x and y dimensions (e.g. 4 degrades a 1/12° grid to ~1/3°)."
+        )
+    parser.add_argument(
+        '--coarsen-boundary',
+        choices=["trim", "pad"],
+        default="trim",
+        help="How to handle sizes not divisible by the coarsening factor (default: trim)."
+        )
+    parser.add_argument(
+        '--coarsen-method',
+        choices=["mean", "median", "min", "max"],
+        default="mean",
+        help="Block aggregation method (default: mean)."
+        )
+
     return parser
 
 
@@ -225,44 +244,58 @@ def main_interp_horizontal():
         Required when --lon-grid is specified.
     --ncgrid : str
         Path to NetCDF file containing target grid coordinates.
-    
+    --coarsen-factor : int
+        Coarsening factor applied to both x and y dimensions.
+    --coarsen-boundary : {"trim", "pad"}
+        How to handle sizes not divisible by the factor (default: trim).
+    --coarsen-method : {"mean", "median", "min", "max"}
+        Block aggregation method (default: mean).
+
     Raises
     ------
     InterpError
         If latitude grid is missing when longitude grid is specified, if longitude
         grid is missing when latitude grid is specified, if multiple incompatible
         interpolation methods are specified, or if no interpolation method is provided.
-    
+
     Examples
     --------
     Command line usage:
-    
+
     .. code-block:: bash
-    
+
         # Interpolate to scattered cloud points
         armoor-interp-horizontal input.nc output.zarr \\
                                 --cloud '(45.0,2.0),(46.0,3.0),(44.0,4.0)'
-        
+
         # Create linear section with 5km spacing
         armoor-interp-horizontal input.nc output.zarr \\
                                 --section 45.0 2.0 46.0 4.0 5.0
-                                           
-        
+
         # Regular grid interpolation
         armoor-interp-horizontal input.nc output.zarr \\
                             --lon-grid -5.0 10.0 0.1 \\
                             --lat-grid 40.0 50.0 0.1
-        
+
         # Use existing grid from NetCDF file
         armoor-interp-horizontal input.nc output.zarr \\
                                 --ncgrid target_grid.nc
-    
+
+        # Coarsen by a factor of 4 (mean aggregation)
+        armoor-interp-horizontal input.nc output.zarr \\
+                                --coarsen-factor 4
+
+        # Coarsen by a factor of 8 using median, pad incomplete blocks
+        armoor-interp-horizontal input.nc output.zarr \\
+                                --coarsen-factor 8 --coarsen-boundary pad --coarsen-method median
+
     Notes
     -----
     - Only one interpolation method can be specified per execution
     - Regular grid interpolation requires both longitude and latitude specifications
     - Section interpolation creates points along a great circle path
     - Cloud point interpolation supports irregular scattered point distributions
+    - Coarsening works on structured grids only (x and y dimensions required)
     """
     # Get parser
     parser = get_parser_interp_horizontal()
@@ -278,7 +311,8 @@ def main_interp_horizontal():
     lon_grid = args.lon_grid
     lat_grid = args.lat_grid
     ncgrid = args.ncgrid
-    
+    coarsen_factor = args.coarsen_factor
+
     if lon_grid and not lat_grid:
         raise InterpError(
             "--lat-grid is mandatory since --lon-grid is specified."
@@ -288,15 +322,15 @@ def main_interp_horizontal():
             "--lon-grid is mandatory since --lat-grid is specified."
             )
     if section:
-        if len(section) %2 == 0:
+        if len(section) % 2 == 0:
             raise InterpError(
                 "--section expects a odd length of arguments"
                 )
-            
-    check = sum(1 for x in (cloud, section, lon_grid, ncgrid) if x is not None)
+
+    check = sum(1 for x in (cloud, section, lon_grid, ncgrid, coarsen_factor) if x is not None)
     if check > 1:
         raise InterpError(
-            "--cloud, --section, --lon-grid and --ncgrid are not compatible."
+            "--cloud, --section, --lon-grid, --ncgrid and --coarsen-factor are not compatible."
             )
     elif check == 0:
         raise InterpError("No horizontal interpolation to be performed.")
@@ -326,6 +360,12 @@ def main_interp_horizontal():
                 ds = ds.interp.regrid_from_latlon(lon_grid, lat_grid)
             elif ncgrid:
                 ds = ds.interp.regrid_from_nc(ncgrid)
+            elif coarsen_factor:
+                ds = ds.interp.coarsen(
+                    coarsen_factor,
+                    boundary=args.coarsen_boundary,
+                    method=args.coarsen_method,
+                )
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
             if args.ifmt != 'armoor':
                 shutil.rmtree("tmp.zarr")

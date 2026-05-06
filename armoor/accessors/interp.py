@@ -10,6 +10,7 @@ shadows that method on ``xr.Dataset``, so we restore it via ``__call__``:
     ds.interp.grid2section(coords, dx)      # → data.interp.process_horizontal_interpolation
     ds.interp.regrid_from_latlon(lon, lat)  # → data.interp.process_horizontal_interpolation
     ds.interp.regrid_from_nc(ncin)          # → data.interp.process_horizontal_interpolation
+    ds.interp.coarsen(factor)               # → data.interp.process_horizontal_interpolation
     ds.interp.vertical(vname, vlevels)      # → data.interp.process_vertical_interpolation
     ds.interp.vfreq(vname, step)            # → data.interp.process_vertical_interpolation
     ds.interp.regrid(ds_target)             # → base.interp.regrid (needs xesmf)
@@ -229,6 +230,38 @@ class InterpAccessor:
         xr.Dataset
         """
         return regrid(self._obj, ds_target)
+
+    def coarsen(self, factor, boundary="trim", method="mean"):
+        """Horizontal coarsening by spatial block aggregation.
+
+        Delegates to :func:`armoor.data.interp.process_horizontal_interpolation`
+        with strategy ``"coarsen"``.  Works on structured grids with ``x`` and
+        ``y`` dimensions; does **not** require xesmf.
+
+        Parameters
+        ----------
+        factor : int
+            Coarsening factor applied to both ``x`` and ``y`` dimensions.
+            A factor of 4 reduces a 1/12° grid to ~1/3°.
+        boundary : str
+            How to handle sizes not divisible by *factor*:
+            ``"trim"`` (default, drops the remainder) or ``"pad"`` (zero-pads).
+        method : str
+            Aggregation method: ``"mean"`` (default), ``"median"``,
+            ``"min"``, or ``"max"``.
+
+        Returns
+        -------
+        xr.Dataset
+
+        Examples
+        --------
+        >>> ds_coarse = ds_model.interp.coarsen(4)            # ×4 degradation, mean
+        >>> ds_coarse = ds_model.interp.coarsen(8, method="median")
+        """
+        return process_horizontal_interpolation(
+            self._obj, ("coarsen", factor, boundary, method)
+        )
 
     # ------------------------------------------------------------------
     # Vertical

@@ -6,7 +6,7 @@ import xarray as xr
 from xoa.geo import m2deg
 
 from armoor.__init__ import ArmoorError
-from armoor.base.interp import grid2loc, interp_time, vinterp, regrid, grid2section
+from armoor.base.interp import grid2loc, interp_time, vinterp, regrid, grid2section, coarsen as _coarsen
 
 logger = logging.getLogger(__name__)
 
@@ -109,12 +109,23 @@ class TimeInterpolation(AbstractInterpolation):
 
 
 class HorizontalInterpolation(AbstractInterpolation):
-    """Interpolate horizontaly a dataset.
+    """Horizontal resampling of a gridded dataset.
+
+    Available strategies (passed as the first element of *param* in
+    :func:`process_horizontal_interpolation`):
+
+    * ``"cloud"`` — bilinear interpolation at scattered (lat, lon) points.
+    * ``"section"`` — interpolation along a geodesic section.
+    * ``"regrid_from_latlon"`` — bilinear regrid onto a regular lon/lat grid.
+    * ``"regrid_from_nc"`` — bilinear regrid onto a grid defined in a NetCDF
+      file.
+    * ``"coarsen"`` — block aggregation onto a coarser structured grid
+      (no xesmf required).
 
     Parameters
     ----------
-    xarray_obj : xarray.Dataset
-        Product dataset to subset.
+    ds : xarray.Dataset
+        Dataset to resample.
     """
     
     def __init__(self, ds):
@@ -224,11 +235,30 @@ class HorizontalInterpolation(AbstractInterpolation):
             self.ds = self.ds.drop_vars("mask")
         return self.ds
     
+    def coarsen(self, factor: int, boundary: str = "trim", method: str = "mean") -> xr.Dataset:
+        """Coarsen the dataset by aggregating over spatial blocks.
+
+        Parameters
+        ----------
+        factor : int
+            Coarsening factor applied to both ``x`` and ``y`` dimensions.
+        boundary : str
+            How to handle non-divisible sizes: ``"trim"`` (default) or ``"pad"``.
+        method : str
+            Aggregation method: ``"mean"`` (default), ``"median"``, ``"min"``, ``"max"``.
+
+        Returns
+        -------
+        xr.Dataset
+        """
+        self.ds = _coarsen(self.ds, factor=factor, boundary=boundary, method=method)
+        return self.ds
+
     def _clean_coordinates(self, dataset: xr.Dataset) -> xr.Dataset:
         """Remove temporary coordinates and rename primary ones."""
         coords_to_drop = ["lon", "lat", "lon_1", "lat_1"]
         existing_coords = [coord for coord in coords_to_drop if coord in dataset.coords]
-        
+
         cleaned_ds = dataset.drop_vars(existing_coords)
         return cleaned_ds.rename({"lon_0": "lon", "lat_0": "lat"})
 
