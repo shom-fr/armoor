@@ -45,7 +45,7 @@ def set_time_range(ds, time):
             ds = ds.drop_vars("time")
         ds = ds.expand_dims(dim="time")
         
-        t1, t2 = [pd.to_datetime(t).strftime('%Y%m%d') for t in time.strip('[').split('_')]
+        t1, t2 = [pd.to_datetime(t) for t in time.strip('[').split('_')]
         med_time = t1+0.5*(t2-t1)
         
         ds["time"] = xr.DataArray(

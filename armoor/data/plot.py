@@ -652,7 +652,7 @@ class PlotData:
             xtitle = ""
             trange = attrs.get("trange")
             if trange:
-                t1, t2 = [pd.to_datetime(t).strftime('%Y%m%d') for t in trange.strip('[').split('_')]
+                t1, t2 = [pd.to_datetime(t).strftime('%Y-%m-%dT%H:%M') for t in trange.strip('[').split('_')]
                 add_time = f"[{t1}-{t2}["
                 add_time2 = re.sub('-', '_', re.sub('[\[\]]', '', add_time))
                 xtitle += add_time
