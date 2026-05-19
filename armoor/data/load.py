@@ -159,6 +159,7 @@ def process_single_combination(ds, mz_name, mz_param):
         return None
     
     data_name = ds.attrs["data_name"]
+    data_ref = ds.attrs["data_ref"]
 
     # Build filters configuration
     filters_config = build_filters_config(mz_param, data_name)
@@ -191,6 +192,7 @@ def process_single_combination(ds, mz_name, mz_param):
     if dsout is not None:
         dsout.attrs = {
             "data_name": data_name,
+            "data_ref": data_ref,
         }
 
     elapsed = time.time() - start_time
@@ -201,9 +203,10 @@ def process_single_combination(ds, mz_name, mz_param):
 def save_result(dsout, mz_name, func_comp):
     """Sauvegarde optimisée (< 30s)."""
     # Préparer les chemins
+    refprod = "ref" if dsout.attrs["data_ref"] == "True" else "prod"
     data_name = dsout.attrs["data_name"]
     parent_dir = f"{func_comp}/metazones" if func_comp else "metazones"
-    ncpat = "{mz_name}/{data_name}/{data_name}.zarr"
+    ncpat = "{mz_name}/{data_name}/{refprod}_{data_name}.zarr"
     nc = Path(parent_dir) / ncpat.format(**locals())
 
     nc.parent.mkdir(parents=True, exist_ok=True)
@@ -761,6 +764,7 @@ def load_datasets(data_cfg, metazones, dirout):
                 ds.attrs["data_name"] = cfg_data["name"]
             else:
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
+            ds.attrs["data_ref"] = str(cfg_data.get("ref"))
 
         # Apply union prefilter FIRST so the size decision is made on
         # the actual data volume, not the full global domain.

@@ -45,8 +45,7 @@ def set_time_range(ds, time):
             ds = ds.drop_vars("time")
         ds = ds.expand_dims(dim="time")
         
-        t1 = pd.to_datetime(time[1:20])
-        t2 = pd.to_datetime(time[21:40])
+        t1, t2 = [pd.to_datetime(t).strftime('%Y%m%d') for t in time.strip('[').split('_')]
         med_time = t1+0.5*(t2-t1)
         
         ds["time"] = xr.DataArray(
@@ -83,7 +82,7 @@ def get_datatrees(dsins, dim, mparams):
         for k, v in xdim.items():
             for data_name, dt0 in dt.items():
                 ds0 = dt0.to_dataset()
-                ds0 = ds0.assign_attrs({"trange_seq":mparams['trange_seq'][0]})
+                ds0 = ds0.assign_attrs({"trange_seq": mparams['trange_seq'][0]})
                 if dim:
                     if ("time" in dim) and (k == "time"):
                         ds0 = set_time_range(ds0, v)
