@@ -864,14 +864,106 @@ def open_decode_croco(path_file, fmt="croco"):
          Model dataset decoded.
     """
     cfspecs = xmeta.get_meta_specs("croco")
-    ds = xr.open_mfdataset(path_file)
-    if 'scrum_time' in ds:   
-        ds = ds.drop_vars('scrum_time') 
+
+    def _find_grid_file(files):
+        """Return the first file with grid vars and no time dim (separate grid file)."""
+        import netCDF4 as _nc4
+        required_vars = {"lon_rho", "mask_rho", "h"}
+        for f in files:
+            try:
+                with _nc4.Dataset(f) as _d:
+                    if required_vars.issubset(_d.variables.keys()):
+                        if "time" not in _d.dimensions:
+                            return f
+            except Exception:
+                pass
+        return None
+
+    def _find_grid_source(files):
+        """Return the first file containing grid vars (may also have time)."""
+        import netCDF4 as _nc4
+        required_vars = {"lon_rho", "mask_rho", "h"}
+        for f in files:
+            try:
+                with _nc4.Dataset(f) as _d:
+                    if required_vars.issubset(_d.variables.keys()):
+                        return f
+            except Exception:
+                pass
+        return None
+
+    grid_file = _find_grid_file(path_file)
+    has_separate_grid = grid_file is not None
+    if not has_separate_grid:
+        # No separate grid file: grid vars are embedded in data files (standard CROCO output)
+        grid_file = _find_grid_source(path_file)
+        if grid_file is None:
+            raise ValueError("No croco grid variables found in input files.")
+        logger.info(f"Grid variables found in data file: {grid_file}")
+    else:
+        logger.info(f"Separate grid file detected: {grid_file}")
+
+    _t = time.perf_counter()
+
+    ds_grid = xr.open_dataset(grid_file)
+    # Separate grid file is excluded from data files; embedded grid files are kept
+    data_files = [f for f in path_file if f != grid_file] if has_separate_grid else list(path_file)
+    n_files = len(data_files)
+
+    # Use native file dim names (pre-decode: eta_rho/xi_rho, not y_rho/x_rho)
+    # and large chunks to minimise dask task count.
+    nx = ds_grid.sizes["xi_rho"]
+    ny = ds_grid.sizes["eta_rho"]
+    chunk_x = min(nx, 1024)
+    chunk_y = min(ny, 1024)
+    chunks = {
+        "time": 1,
+        "eta_rho": chunk_y,
+        "xi_rho": chunk_x,
+        "eta_v": chunk_y,
+        "xi_u": chunk_x,
+    }
+
+    ds = xr.open_mfdataset(
+        data_files,
+        combine="nested",
+        concat_dim="time",
+        chunks=chunks,
+        parallel=n_files > 1,
+        data_vars="minimal",
+        coords="minimal",
+        compat="override",
+        engine="netcdf4",
+        cache=False,
+        decode_times=True,
+        decode_coords=True,
+        decode_cf=True,
+        mask_and_scale=True,
+    )
+    logger.info(f"  [timing] open_mfdataset:   {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+
+    if "auxil" in ds.dims:
+        ds = ds.drop_dims("auxil")
+
+    # Override grid coordinates (handles MPINOLAND and ensures consistent grid)
+    for var in ["xi_rho", "eta_rho", "xi_u", "eta_v", "lon_rho", "lat_rho", "lon_u", "lat_v", "mask_rho"]:
+        if var in ds_grid:
+            ds[var] = ds_grid[var]
+    ds_grid.close()
+
+    # Deduplicate time via pandas index (avoids np.unique which forces eager compute)
+    ds = ds.sel(time=~ds.get_index("time").duplicated())
+    logger.info(f"  [timing] dedup time:       {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+
+    if 'scrum_time' in ds:
+        ds = ds.drop_vars('scrum_time')
+
     ds = cfspecs.decode(ds)
+    logger.info(f"  [timing] xoa.decode:       {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+
     with xmeta.set_meta_specs(cfspecs):
         for sig in ("sig_rho", "sig_w"):
             if sig in ds:
-                # if "formula_terms" not in ds[sig].attrs:
                 logger.warning(f"No formula_terms attributes in {sig}")
                 if "hc" not in ds.data_vars:
                     ds["hc"] = float(ds.attrs.get("hc"))
@@ -892,7 +984,11 @@ def open_decode_croco(path_file, fmt="croco"):
                     elif sig == "sig_w":
                         ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
         ds = ds.decode_sigma()
-    
+    logger.info(f"  [timing] decode_sigma:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+
+    ds = ds.unify_chunks()
+    logger.info(f"  [timing] unify_chunks:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+
     for v in [
         "sig_rho",
         "sig_w",
@@ -926,32 +1022,49 @@ def open_decode_croco(path_file, fmt="croco"):
         "depth_w",
         "s_w",
         "cs_rho",
+        "sst_skin",
+        "hbl",
         ]:
         if v in ds:
             ds = ds.drop_vars(v)
-    for coord in ds.coords:
+
+    for coord in list(ds.coords):
         if "nav_" in coord:
             coord_name = coord.replace("nav_", "")
             if coord_name in ds:
-                ds = ds.drop(coord)
-            ds = ds.rename({coord: coord_name})
+                ds = ds.drop_vars(coord)
+            else:
+                ds = ds.rename({coord: coord_name})
+
     if "time_counter" in ds.dims:
         ds = ds.swap_dims({"time_counter": "time"})
-    ds = ds.swap_dims({"sig_rho": "z"})
-    # ds = ds.swap_dims({"sig_w": "z_w"})
-    ds = ds.isel(x_rho=slice(1, -1), y_rho=slice(1,-1))
-    for varname in ds.data_vars:
-        if varname == "u":
-            dau = shift(ds["u"], {"x_u": "right"}).isel(x_u=slice(None, -1)).xoa.reloc(u="rho")
-            ds["u"] = dau.assign_coords(**ds.ptemp.coords)
-        if varname == "v":
-            dav = shift(ds["v"], {"y_v": "top"}).isel(y_v=slice(None, -1)).xoa.reloc(v="rho")
-            ds["v"] = dav.assign_coords(**ds.ptemp.coords)
-    ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat", "depth_rho": "depth"})
+    if "sig_rho" in ds.dims:
+        ds = ds.swap_dims({"sig_rho": "z"})
+
+    ds = ds.isel(x_rho=slice(1, -1), y_rho=slice(1, -1))
+
+    if "u" in ds.data_vars:
+        dau = shift(ds["u"], {"x_u": "right"}).isel(x_u=slice(None, -1)).xoa.reloc(u="rho")
+        ds["u"] = dau.assign_coords(**ds.ptemp.coords)
+    if "v" in ds.data_vars:
+        dav = shift(ds["v"], {"y_v": "top"}).isel(y_v=slice(None, -1)).xoa.reloc(v="rho")
+        ds["v"] = dav.assign_coords(**ds.ptemp.coords)
+    logger.info(f"  [timing] u/v shift:        {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+
+    if "z" in ds.dims:
+        ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat", "depth_rho": "depth"})
+    else:
+        ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat"})
+
     for dim in ("x_u", "y_v"):
         if dim in ds.dims:
             ds = ds.drop_dims(dim)
+
     ds = ds.swap_dims({"x_rho": "x", "y_rho": "y"})
+    for coord in ("x_rho", "y_rho"):
+        if coord in ds.coords:
+            ds = ds.drop_vars(coord)
+
     if "angle" in ds and (set(("u", "v")).issubset(ds.data_vars)):
         angle = ds["angle"]
         da_u = ds["u"] * np.cos(angle) - ds["v"] * np.sin(angle)
@@ -959,10 +1072,36 @@ def open_decode_croco(path_file, fmt="croco"):
         ds = ds.drop_vars(["u", "v", "angle"])
         ds["u"] = da_u
         ds["v"] = da_v
-    if "mask" in ds:
-        ds = ds.where(ds["mask"] > 0, drop=False)
-    ds = ds.isel(z=slice(None, None, -1))
-    ds = ds.assign_coords(depth=-ds.depth)
+
+    logger.info(f"Dataset: {ds}")
+
+    if "mask_rho" in ds:
+        ds = ds.where(ds["mask_rho"] > 0, drop=False)
+        ds = ds.rename({"mask_rho": "mask"})
+
+    if "z" in ds.dims:
+        ds = ds.isel(z=slice(None, None, -1))
+        ds = ds.assign_coords(depth=-ds.depth)
+
+    # Final rechunk: large spatial chunks now that sigma coords are decoded
+    good_var = None
+    for var in ["depth", "ptemp", "sal"]:
+        if var in ds:
+            good_var = ds[var]
+            break
+    if good_var is None and ds.data_vars:
+        good_var = next(iter(ds.data_vars.values()))
+    if good_var is not None and good_var.chunks:
+        chunk_dict = {}
+        for dim, dim_chunks in zip(good_var.dims, good_var.chunks):
+            dim_size = good_var.sizes[dim]
+            if dim == "time":
+                chunk_dict[dim] = dim_chunks[0]
+            else:
+                chunk_dict[dim] = min(dim_size, max(dim_chunks[0], 512))
+        ds = ds.chunk(chunk_dict)
+    logger.info(f"  [timing] final rechunk:    {time.perf_counter()-_t:.1f}s")
+
     return ds
 
 def open_decode_cora(path_files):
