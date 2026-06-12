@@ -595,9 +595,7 @@ class OutputProcessor:
                 logger.info(
                         "Concatenation request: %s datasets: %s",
                         len(datasets),
-                        [d.name for d in datasets]
-                    )
-                logger.info("datasets=%s", datasets.keys())
+                        datasets)
                 raise ArmoorError("Multi-dataset concatenation not implemented")
             
             concatenated_data[ds_name] = concatenated_dataset
