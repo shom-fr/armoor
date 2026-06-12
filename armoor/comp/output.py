@@ -592,6 +592,12 @@ class OutputProcessor:
             elif len(datasets) == 1:
                 concatenated_dataset = datasets[0]
             else:
+                logger.info(
+                        "Concatenation request: %s datasets: %s",
+                        len(datasets),
+                        [d.name for d in datasets]
+                    )
+                logger.info("datasets=%s", datasets.keys())
                 raise ArmoorError("Multi-dataset concatenation not implemented")
             
             concatenated_data[ds_name] = concatenated_dataset
