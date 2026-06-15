@@ -281,6 +281,7 @@ class OutputProcessor:
         """
         # Remove 'fmt' from outputs as it's not needed
         outputs.pop("fmt", None)
+        outputs.pop("vminmax", None)
         
         # Validate and prepare interpolation parameters
         interp_params = self._prepare_interpolation_params(metazones)
