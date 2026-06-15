@@ -291,7 +291,7 @@ def main_data():
 
         if "png" in ofmt:
             from armoor.data.plot import main_plot as plot_data
-            plot_data(zarr_outputs, metazones)
+            plot_data(zarr_outputs, metazones, cfg["outputs"])
 
         zarr_outputs = dict_to_list(zarr_outputs)
 

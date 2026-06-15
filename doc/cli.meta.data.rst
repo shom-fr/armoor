@@ -17,9 +17,12 @@ data
         
         - ``name``: name of the dataset.
         - ``path``: path of the input data files. Use of wild card is possible in order to process multiple files.
-        - ``fmt``: user has to configure an armoor format-like.
+        - ``fmt``: user has to configure an armoor format-like.   
+        - ``vminmax``: (optional) set colorbar/axis limits for each variable and plot type. 
+          Format is a dictionnary such as `vminmax = {'ptemp': (15,25), 'sal': (33,36)}`
+          Variables names are those of the Armoor pivot format (see :ref:`Armoor conventions <varconventions>`).
         
-ouputs
+outputs
 ======
     
         Multiple outputs can be configured. The available outputs depend on the metazone parameters.

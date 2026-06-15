@@ -34,7 +34,9 @@ The list of configuration files used can be found at ``armoor/data/`` :
     - cf_cora_argo.cfg
     - cf_hycom.cfg
     
-Decoding data consists in following armoor conventions:
+.. _varconventions:
+    
+Decoding data consists in following armoor conventions :
 
     - time dimension --> ``time``
     - vertical dimension --> ``z``

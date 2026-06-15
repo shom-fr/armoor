@@ -39,12 +39,13 @@ plt.rcParams.update({'font.size': 8})
 class PlotData:
     """Class for plot data."""
     
-    def __init__(self, nc, metazone):
+    def __init__(self, nc, metazone, vminmax):
         """Initialize the AbstractPlotData instance with an empty dictionary to store methods."""
         self.methods = {}
         self.metazone = metazone
         self.ax_minimap = [0.7, 0.91, 0.19]
         self.dt = xr.open_datatree(nc)
+        self.vminmax = vminmax
         self.__post_init__()
 
     def register_method(self, func):
@@ -114,12 +115,21 @@ class PlotData:
             title=figtitle.format(**locals())
             )
         ax0 = axes[0]
-        vmax = - dsprod.depth.min()
-        vmin = - dsprod.depth.max()
-        tmin = dsprod.ptemp.min()
-        tmax = dsprod.ptemp.max()
-        smin = dsprod.sal.min()
-        smax = dsprod.sal.max()
+        if 'depth' in self.vminmax:
+            vmin, vmax = self.vminmax['depth']
+        else:
+            vmin = -dsprod.depth.max()
+            vmax = -dsprod.depth.min()
+        if 'ptemp' in self.vminmax:
+            tmin,tmax = self.vminmax['ptemp']
+        else:
+            tmin = dsprod.ptemp.min()
+            tmax = dsprod.ptemp.max()
+        if 'ptemp' in self.vminmax:
+            smin,smax = self.vminmax['sal']
+        else:
+            smin = dsprod.sal.min()
+            smax = dsprod.sal.max()
         tsprod = plot_ts(
             dsprod.ptemp, dsprod.sal,
             dens=True, potential=True, absolute=False,
@@ -239,8 +249,11 @@ class PlotData:
                 if (~mask).all():
                     continue
                 depth = ds.depth.where(mask, drop=True)
-                zmin = -depth.max()
-                zmax = -depth.min()
+                if 'depth' in self.vminmax:
+                    zmin, zmax = self.vminmax['depth']
+                else:
+                    zmin = -depth.max()
+                    zmax = -depth.min()
                 xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
                 xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
                 if vrange:
@@ -330,8 +343,11 @@ class PlotData:
             dsprod = dsprod.stack(member=['x', 'y'])
         mask = ~dsprod.ptemp.isnull()
         depth = dsprod.depth.where(mask, drop=True)
-        zmin = -depth.max()
-        zmax = -depth.min()
+        if 'depth' in self.vminmax:
+            zmin, zmax = self.vminmax['depth']
+        else:
+            zmin = -depth.max()
+            zmax = -depth.min()
         if "member" in dsprod.dims:
             dsprod = dsprod.transpose("z", "time", "member")
         elif "npts" in dsprod.dims:
@@ -353,8 +369,11 @@ class PlotData:
                 dsprod["depth"] = dsprod["depth"].broadcast_like(dsprod[var])
             daprod = dsprod[var]
             
-            vmin = daprod.min()
-            vmax = daprod.max()
+            if var in self.vminmax:
+                vmin, vmax = self.vminmax[var]
+            else:
+                vmin = daprod.min()
+                vmax = daprod.max()
             
             prod_data = daprod.values
             prod_depth = -dsprod["depth"].values
@@ -479,12 +498,18 @@ class PlotData:
                     )
                 ax = ax[0]
                         
-                vmin = daprod.min()
-                vmax = daprod.max()
+                if var in self.vminmax:
+                    vmin, vmax = self.vminmax[var]
+                else:
+                    vmin = daprod.min()
+                    vmax = daprod.max()
                 prod_data = daprod.values
                 
-                zmin = -depth.max()
-                zmax = -depth.min()
+                if 'depth' in self.vminmax:
+                    zmin, zmax = self.vminmax['depth']
+                else:
+                    zmin = -depth.max()
+                    zmax = -depth.min()
                 depth_data = depth.values
 
                 n_depths, n_times = daprod.shape
@@ -687,7 +712,10 @@ class PlotData:
             
             cmean = ds_mean.mean()
             cstd =  1.75 * ds_mean.std()
-            cmin, cmax = cmean - cstd, cmean + cstd
+            if var in self.vminmax:
+                cmin, cmax = self.vminmax[var]
+            else:
+                cmin, cmax = cmean - cstd, cmean + cstd
             vmean = ds_std.mean()
             vstd = vmean + 1.75 * ds_std.std()
             vmin, vmax =  - vstd, vstd
@@ -777,17 +805,17 @@ class PlotData:
     
     def save_figure(self, fig, filename):
         """Save figure."""
+        logger.info(f'save plot {filename}')
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, filename)
         del fig
 
-def main_plot(ncins, metazones):
+def main_plot(ncins, metazones, cfg_outputs):
     """Process using dask.bag for functional mapping"""
 
-    def process_task(nc, metazone, output):
-        print(nc)
-        plotcomp = PlotData(nc, metazone)
+    def process_task(nc, metazone, output, vminmax):
+        plotcomp = PlotData(nc, metazone, vminmax)
         plotcomp.call(output)
         plotcomp.clean()
         del plotcomp
@@ -795,10 +823,11 @@ def main_plot(ncins, metazones):
     # Flatten the nested structure into a list of tasks
     tasks = []
     for output, metas in ncins.items():
+        vminmax = [cfg_outputs[output].get("vminmax") if "vminmax" in cfg_outputs[output] else None][0]
         for metazone, ncs in metas.items():
             if metazone in metazones:
                 for nc in ncs:
-                    tasks.append(dask.delayed(process_task)(nc, metazone, output))
+                    tasks.append(dask.delayed(process_task)(nc, metazone, output, vminmax))
 
     # Execute in parallel
     # with setup_dask_client():
