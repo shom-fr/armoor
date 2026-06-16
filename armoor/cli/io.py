@@ -202,12 +202,14 @@ def add_input_fmt_parser_arguments(parser):
     parser.add_argument(
         "--ifmt",
         type=str,
+        default="sloop",
         choices=(
-            "hycom", "cmems_model", "croco", "armoor", 
+            "hycom", "cmems_model", "croco", "armoor",
             "cmems_insitu", "cora_insitu",
-            "cmems_sst_l3", "cersat_sst_l3", "cmems_sst_l4"
+            "cmems_sst_l3", "cersat_sst_l3", "cmems_sst_l4",
+            "sloop",
             ),
-        help="Format of the input files",
+        help="Format of the input files (default: sloop)",
     )
     parser.add_argument(
         "--platform",

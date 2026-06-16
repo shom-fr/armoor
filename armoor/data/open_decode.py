@@ -239,7 +239,7 @@ def open_decode(
         if "depth" in ds:
             ds = ds.reset_coords("depth")
         result = ds
-    elif "_sst_l" in fmt:
+    elif fmt is not None and "_sst_l" in fmt:
         logger.info("Opening/decoding sst satellite files")
         result = open_decode_sst_satellite(path_files, fmt)
     elif (fmt == "hycom") or (fmt == "hycom3d"):
@@ -248,6 +248,9 @@ def open_decode(
     elif (fmt == "croco") or (fmt == "croco_xios"):
         logger.info("Opening/decoding croco files")
         result = open_decode_croco(path_files, fmt)
+    elif fmt == "sloop":
+        logger.info("Opening/decoding sloop files")
+        result = open_decode_sloop(path_files)
     elif fmt == "arpege_insta":
         logger.info("Opening/decoding instantaneous arpege files")
         result = open_decode_arpege_insta(path_files)
@@ -567,6 +570,50 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
     ds = ds.chunk(chunk_dict)
     logger.info(f"  [timing] final rechunk:  {time.perf_counter()-_t:.1f}s")
     return ds
+
+def open_decode_sloop(path_files):
+    """Open and decode Sloop output files.
+
+    Parameters
+    ----------
+    path_files : list of str
+        Paths to NetCDF files.
+
+    Returns
+    -------
+    xarray.Dataset
+        Decoded Sloop dataset with armoor-standard variable names and
+        dimensions (z, y, x, time).
+    """
+    cfspecs = xmeta.get_meta_specs("sloop")
+    sorted_paths = sorted(map(str, path_files))
+    n_files = len(sorted_paths)
+    open_kw = dict(
+        engine="netcdf4",
+        decode_times=True,
+        decode_coords=True,
+        decode_cf=True,
+        mask_and_scale=True,
+    )
+    _handles = [xr.open_dataset(p, **open_kw) for p in sorted_paths]
+    _processed = []
+    for ds in _handles:
+        ds = cfspecs.decode(ds)
+        if "Y" in ds.dims:
+            ds = ds.swap_dims({"Y": "y"})
+        if "X" in ds.dims:
+            ds = ds.swap_dims({"X": "x"})
+        if "depth" in ds.dims:
+            ds = ds.swap_dims({"depth": "z"})
+        if "depth" in ds.coords and len(ds.depth.dims) == 1:
+            ref_vars = [v for v in ds.data_vars if len(ds[v].dims) == 4]
+            if ref_vars:
+                ds = ds.assign_coords(depth=ds["depth"].broadcast_like(ds[ref_vars[0]]))
+        _processed.append(ds)
+    if n_files == 1:
+        return _processed[0]
+    return xr.merge(_processed)
+
 
 def open_decode_woa18(path_files):
     """
