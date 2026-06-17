@@ -39,7 +39,7 @@ plt.rcParams.update({'font.size': 8})
 class PlotData:
     """Class for plot data."""
     
-    def __init__(self, nc, metazone, vminmax):
+    def __init__(self, nc, metazone, vminmax=None):
         """Initialize the AbstractPlotData instance with an empty dictionary to store methods."""
         self.methods = {}
         self.metazone = metazone
