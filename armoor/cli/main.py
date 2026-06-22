@@ -285,24 +285,31 @@ def main_data():
 
     else:
 
-        zarr_outputs = output_data(zarrs, metazones, cfg.get("outputs").copy())
+        outputs_cfg = cfg.get("outputs", {})
+        zarr_outputs = output_data(zarrs, metazones, outputs_cfg.copy())
 
-        ofmt = cfg["outputs"].get("fmt")
+        ofmt = outputs_cfg.get("fmt", [])
 
-        if "png" in ofmt:
-            from armoor.data.plot import main_plot as plot_data
-            plot_data(zarr_outputs, metazones, cfg["outputs"])
+        if not zarr_outputs:
+            logger.info(
+                "No output sub-section defined. "
+                "Interpolated data is available in data/interp/"
+            )
+        else:
+            if "png" in ofmt:
+                from armoor.data.plot import main_plot as plot_data
+                plot_data(zarr_outputs, metazones, outputs_cfg)
 
-        zarr_outputs = dict_to_list(zarr_outputs)
+            zarr_outputs = dict_to_list(zarr_outputs)
 
-        if "zarr" in ofmt:
-            with open(args.jsonfile, 'w') as f:
-                json.dump(zarr_outputs, f, indent=4)
+            if "zarr" in ofmt:
+                with open(args.jsonfile, 'w') as f:
+                    json.dump(zarr_outputs, f, indent=4)
 
-        if "netcdf" in ofmt:
-            ncs_outputs = zarrs2netcdfs(zarr_outputs)
-            with open(args.jsonfile, 'w') as f:
-                json.dump(ncs_outputs, f, indent=4)
+            if "netcdf" in ofmt:
+                ncs_outputs = zarrs2netcdfs(zarr_outputs)
+                with open(args.jsonfile, 'w') as f:
+                    json.dump(ncs_outputs, f, indent=4)
 
 def _write_json(path, data):
     """Serialize data to JSON, converting Path objects to strings."""
