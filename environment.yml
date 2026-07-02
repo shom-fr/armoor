@@ -3,6 +3,9 @@ channels:
   - conda-forge
 dependencies:
   - appdirs
+  - flask>=3.0
+  - flask-cors>=4.0
+  - pillow>=10.0
   - bottleneck
   - cartopy
   - cfgrib

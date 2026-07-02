@@ -79,22 +79,35 @@ armoor-interp-horizontal = "armoor.cli.interp:main_interp_horizontal"
 armoor-interp-vertical = "armoor.cli.interp:main_interp_vertical"
 armoor-range-time = "armoor.cli.range:main_range_time"
 armoor-range-vertical = "armoor.cli.range:main_range_vertical"
+armoor-viewer = "armoor.viewer.app:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["armoor", "armoor.accessors", "armoor.algo", "armoor.base", "armoor.cli", "armoor.comp", "armoor.data", "armoor.diags"]
+packages = [
+    "armoor", "armoor.accessors", "armoor.algo", "armoor.base",
+    "armoor.cli", "armoor.comp", "armoor.data", "armoor.diags",
+    "armoor.viewer", "armoor.viewer.api", "armoor.viewer.rendering", "armoor.viewer.bridge",
+]
 include-package-data = true
 
 [tool.setuptools.package-data]
+"armoor.viewer" = ["static/**/*", "static/*", "data/*"]
 "*" = ["*.ini", "*.cfg"]
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
 write_to = "armoor/_version.py"
 tag_regex= "^(?P<prefix>v)?(?P<version>[^\\+]+)(?P<suffix>.*)?$"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # xarray converts non-nanosecond datetime64 values to ns internally.
+    # The conversion is correct; the warning is noise in test output.
+    "ignore:Converting non-nanosecond precision datetime values:UserWarning",
+]
 
 [tool.flake8]
 max-line-length = 100

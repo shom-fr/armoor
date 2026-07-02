@@ -15,6 +15,7 @@
 
    accessors
    cli
+   viewer
    examples/index
 
 .. toctree::
