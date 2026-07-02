@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>armoor viewer</title>
+
+  <!-- armoor viewer styles -->
+  <link rel="stylesheet" href="/css/viewer.css" />
+
+  <!-- Import map: resolve bare "three" specifier to the local vendor bundle.
+       Must appear before any <script type="module">. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/js/vendor/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Globe ─────────────────────────────────────────────────── -->
+  <div id="globe-container">
+    <div id="globe-viewer"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Chart overlay panel (time series or section) -->
+    <div id="chart-panel">
+      <div id="chart-panel-header">
+        <span id="chart-title">—</span>
+        <button id="chart-close" title="Close">✕</button>
+      </div>
+      <canvas id="chart-canvas"></canvas>
+    </div>
+
+    <!-- Point inspection tooltip -->
+    <div id="probe-box" hidden>
+      <div id="probe-box-close" title="Close">✕</div>
+      <table id="probe-table"></table>
+    </div>
+
+    <div id="status-bar">armoor viewer</div>
+  </div>
+
+  <!-- ── Sidebar ───────────────────────────────────────────────── -->
+  <aside id="sidebar">
+
+    <div id="sidebar-header">
+      <div>
+        <h1>armoor viewer</h1>
+      </div>
+      <div id="render-mode-toggle" title="Render mode">
+        <button class="mode-btn" data-mode="2d">2D</button>
+        <button class="mode-btn" data-mode="3d">3D</button>
+      </div>
+    </div>
+
+    <!-- Dataset panel -->
+    <div class="panel" id="panel-dataset">
+      <div class="panel-header" data-panel="dataset">
+        Dataset <span class="chevron">▾</span>
+      </div>
+      <div class="panel-body">
+        <div class="field">
+          <label>Path</label>
+          <input type="text" id="ds-path" placeholder="/path/to/store.zarr" />
+        </div>
+        <div class="field">
+          <label>Format</label>
+          <select id="ds-fmt">
+            <option value="zarr">zarr</option>
+            <option value="armoor">armoor</option>
+            <option value="cmems_model">cmems_model</option>
+            <option value="hycom">hycom</option>
+            <option value="croco">croco</option>
+            <option value="woa18">woa18</option>
+          </select>
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" id="btn-load">Load</button>
+          <button class="btn-secondary" id="btn-unload">Unload</button>
+        </div>
+        <div id="ds-info" style="font-size:11px; color:var(--text-muted); word-break:break-all;"></div>
+      </div>
+    </div>
+
+    <!-- Variable panel -->
+    <div class="panel collapsed" id="panel-variable">
+      <div class="panel-header" data-panel="variable">
+        Variable <span class="chevron">▾</span>
+      </div>
+      <div class="panel-body">
+        <div class="field">
+          <label>Variable</label>
+          <select id="var-select"></select>
+        </div>
+        <div class="field">
+          <label>Colormap</label>
+          <select id="var-cmap">
+            <option value="cmo.thermal">cmo.thermal</option>
+            <option value="cmo.haline">cmo.haline</option>
+            <option value="cmo.speed">cmo.speed</option>
+            <option value="cmo.delta">cmo.delta</option>
+            <option value="cmo.dense">cmo.dense</option>
+            <option value="cmo.deep">cmo.deep</option>
+            <option value="viridis">viridis</option>
+            <option value="plasma">plasma</option>
+            <option value="RdBu_r">RdBu_r</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Vmin</label>
+          <input type="number" id="var-vmin" placeholder="auto" step="any" />
+        </div>
+        <div class="field">
+          <label>Vmax</label>
+          <input type="number" id="var-vmax" placeholder="auto" step="any" />
+        </div>
+        <div class="field">
+          <label>Opacity <span id="opacity-val">0.85</span></label>
+          <input type="range" id="var-opacity" min="0" max="1" step="0.05" value="0.85" />
+        </div>
+        <button class="btn-accent" id="btn-render">Render</button>
+
+        <!-- Colormap legend -->
+        <div id="legend-container">
+          <canvas id="legend-canvas" height="24"></canvas>
+          <div class="legend-labels">
+            <span id="legend-vmin"></span>
+            <span id="legend-vmax"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Time & Depth panel -->
+    <div class="panel collapsed" id="panel-timedepth">
+      <div class="panel-header" data-panel="timedepth">
+        Time &amp; Depth <span class="chevron">▾</span>
+      </div>
+      <div class="panel-body">
+        <div class="field">
+          <label>Time step: <span id="time-label">0</span></label>
+          <div class="slider-nav">
+            <button class="nav-btn" id="btn-time-prev">‹</button>
+            <input type="range" id="time-slider" min="0" max="0" value="0" />
+            <button class="nav-btn" id="btn-time-next">›</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Z level: <span id="depth-label">0</span></label>
+          <div class="slider-nav">
+            <button class="nav-btn" id="btn-depth-prev">‹</button>
+            <input type="range" id="depth-slider" min="0" max="0" value="0" />
+            <button class="nav-btn" id="btn-depth-next">›</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-secondary" id="btn-play">▶ Play</button>
+          <button class="btn-secondary" id="btn-stop">■ Stop</button>
+        </div>
+        <div class="field">
+          <label>FPS <span id="fps-val">2</span></label>
+          <input type="range" id="fps-slider" min="1" max="10" step="1" value="2" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnostics panel -->
+    <div class="panel collapsed" id="panel-diagnostics">
+      <div class="panel-header" data-panel="diagnostics">
+        Diagnostics <span class="chevron">▾</span>
+      </div>
+      <div class="panel-body">
+        <div class="diag-mode-row">
+          <button class="btn-secondary diag-btn" id="btn-mode-ts"
+                  title="Click on the map to get a time series at that point">
+            ⏱ Time series
+          </button>
+          <button class="btn-secondary diag-btn" id="btn-mode-sec"
+                  title="Click two points to draw a vertical section">
+            ↔ Section
+          </button>
+          <button class="btn-secondary diag-btn" id="btn-mode-off"
+                  title="Exit diagnostic mode">
+            ✕
+          </button>
+        </div>
+        <div id="diag-hint" style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+          Select a mode, then click on the globe.
+        </div>
+      </div>
+    </div>
+
+    <!-- Currents / Particles panel -->
+    <div class="panel collapsed" id="panel-currents">
+      <div class="panel-header" data-panel="currents">
+        Currents <span class="chevron">▾</span>
+      </div>
+      <div class="panel-body">
+        <div class="toggle-row">
+          <span>Enable particle animation</span>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-particles" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="field">
+          <label>U variable</label>
+          <select id="wind-u-var"></select>
+        </div>
+        <div class="field">
+          <label>V variable</label>
+          <select id="wind-v-var"></select>
+        </div>
+        <div class="field">
+          <label>Nb. particles <span id="nb-particles-val">3000</span></label>
+          <input type="range" id="nb-particles" min="500" max="10000" step="500" value="3000" />
+        </div>
+        <div class="field">
+          <label>Speed scale <span id="speed-scale-val">5</span></label>
+          <input type="range" id="speed-scale" min="0.5" max="50" step="0.5" value="5" />
+        </div>
+        <div class="field">
+          <label>Trail opacity <span id="trail-opacity-val">0.92</span></label>
+          <input type="range" id="trail-opacity" min="0.7" max="0.99" step="0.01" value="0.92" />
+        </div>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<!-- viewer application (ES modules) -->
+<script type="module" src="/js/viewer.js"></script>
+</body>
+</html>
