@@ -48,6 +48,15 @@ export class PlanarMap {
     this._meshRAF     = null;
     this._meshCanvas  = this._createMeshCanvas(containerId);
     this._meshCtx     = this._meshCanvas.getContext('2d');
+    // Off-screen buffer the mesh is first painted onto at full opacity, so
+    // overlapping triangle edges (the seam-hiding overdraw, see
+    // _drawTexturedTriangle) simply overwrite each other instead of
+    // compounding through alpha blending — visible as a hatched grid pattern
+    // at low opacity otherwise, since two 0.2-alpha draws stacked on the
+    // same pixel composite to ~0.36, not 0.2. The desired opacity is then
+    // applied once, in a single blit of the flattened result.
+    this._meshOffscreen = document.createElement('canvas');
+    this._meshOffCtx    = this._meshOffscreen.getContext('2d');
 
     // ── Markers ───────────────────────────────────────────────────────────
     this._markerLayer = L.layerGroup().addTo(this._map);
@@ -178,6 +187,8 @@ export class PlanarMap {
     if (canvas.width !== size.x || canvas.height !== size.y) {
       canvas.width  = size.x;
       canvas.height = size.y;
+      this._meshOffscreen.width  = size.x;
+      this._meshOffscreen.height = size.y;
     }
     const ctx = this._meshCtx;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -200,7 +211,10 @@ export class PlanarMap {
       pts[j] = row;
     }
 
-    ctx.globalAlpha = this._meshOpacity;
+    // Paint the whole mesh at full opacity onto the off-screen buffer first
+    // (see constructor comment on why), then composite it once below.
+    const offCtx = this._meshOffCtx;
+    offCtx.clearRect(0, 0, canvas.width, canvas.height);
 
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
@@ -213,15 +227,17 @@ export class PlanarMap {
         const u0 = (i / nx) * iw,       u1 = ((i + 1) / nx) * iw;
         const v0 = (1 - j / ny) * ih,   v1 = (1 - (j + 1) / ny) * ih;
 
-        _drawTexturedTriangle(ctx, img,
+        _drawTexturedTriangle(offCtx, img,
           u0, v0, u1, v0, u0, v1,
           p00.x, p00.y, p10.x, p10.y, p01.x, p01.y);
-        _drawTexturedTriangle(ctx, img,
+        _drawTexturedTriangle(offCtx, img,
           u1, v0, u1, v1, u0, v1,
           p10.x, p10.y, p11.x, p11.y, p01.x, p01.y);
       }
     }
 
+    ctx.globalAlpha = this._meshOpacity;
+    ctx.drawImage(this._meshOffscreen, 0, 0);
     ctx.globalAlpha = 1;
   }
 
