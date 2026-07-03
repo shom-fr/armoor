@@ -380,14 +380,35 @@ function _drawTexturedTriangle(
   const e = (dx0 * (sx1 * sy2 - sx2 * sy1) + dx1 * (sx2 * sy0 - sx0 * sy2) + dx2 * (sx0 * sy1 - sx1 * sy0)) / denom;
   const f = (dy0 * (sx1 * sy2 - sx2 * sy1) + dy1 * (sx2 * sy0 - sx0 * sy2) + dy2 * (sx0 * sy1 - sx1 * sy0)) / denom;
 
+  // Clip on a slightly inflated triangle (pushed out from the centroid by a
+  // fraction of a pixel) instead of the exact one. The affine transform above
+  // still uses the true vertices, so this only extrapolates the texture a
+  // hair past each edge — but it makes neighbouring triangles overlap
+  // slightly instead of abutting exactly, which hides the hairline seams
+  // that canvas's edge anti-aliasing would otherwise leave along every
+  // triangle boundary (most visible along the shared diagonal of each quad).
+  const cx = (dx0 + dx1 + dx2) / 3;
+  const cy = (dy0 + dy1 + dy2) / 3;
+  const [ex0, ey0] = _pushOut(dx0, dy0, cx, cy);
+  const [ex1, ey1] = _pushOut(dx1, dy1, cx, cy);
+  const [ex2, ey2] = _pushOut(dx2, dy2, cx, cy);
+
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(dx0, dy0);
-  ctx.lineTo(dx1, dy1);
-  ctx.lineTo(dx2, dy2);
+  ctx.moveTo(ex0, ey0);
+  ctx.lineTo(ex1, ey1);
+  ctx.lineTo(ex2, ey2);
   ctx.closePath();
   ctx.clip();
   ctx.transform(a, b, c, d, e, f);
   ctx.drawImage(img, 0, 0);
   ctx.restore();
+}
+
+const _SEAM_OVERDRAW_PX = 1.0;
+
+function _pushOut(x, y, cx, cy) {
+  const dx = x - cx, dy = y - cy;
+  const len = Math.hypot(dx, dy) || 1;
+  return [x + (dx / len) * _SEAM_OVERDRAW_PX, y + (dy / len) * _SEAM_OVERDRAW_PX];
 }
