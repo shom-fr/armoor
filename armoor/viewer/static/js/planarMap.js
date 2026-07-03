@@ -30,7 +30,24 @@ export class PlanarMap {
     L.tileLayer(BASEMAP_URL, { maxZoom: 8 }).addTo(this._map);
 
     // ── Scalar data overlay ───────────────────────────────────────────────
+    // Two mutually-exclusive rendering paths:
+    //  - `_overlay` (plain L.imageOverlay): used only when no vertex grid is
+    //    available for the dataset (no lon/lat coordinates at all).
+    //  - mesh canvas: used whenever a vertex grid is available — the normal
+    //    case. Native ocean-model grids (HYCOM, NEMO, …) are curvilinear or
+    //    non-uniformly spaced, so stretching the tile image linearly across
+    //    a straight bbox misplaces every pixel except at the four corners.
+    //    This mirrors globe.js's `_buildOverlayMesh` (which tessellates a
+    //    WebGL mesh from the same /api/.../grid vertices) using canvas
+    //    triangle texture-mapping instead, since Leaflet has no built-in
+    //    way to warp an image overlay onto an arbitrary quad mesh.
     this._overlay = null;
+    this._meshGrid    = null;
+    this._meshImg     = null;
+    this._meshOpacity = 0.85;
+    this._meshRAF     = null;
+    this._meshCanvas  = this._createMeshCanvas(containerId);
+    this._meshCtx     = this._meshCanvas.getContext('2d');
 
     // ── Markers ───────────────────────────────────────────────────────────
     this._markerLayer = L.layerGroup().addTo(this._map);
@@ -56,6 +73,9 @@ export class PlanarMap {
     this._map.on('move',    () => this._emit('move'));
     this._map.on('moveend', () => this._emit('moveend'));
 
+    const scheduleMeshRedraw = () => this._scheduleMeshRedraw();
+    this._map.on('move zoom resize', scheduleMeshRedraw);
+
     // Shim providing MapLibre-compatible API for probe.js / particles.js
     this.map = this._shim();
   }
@@ -66,12 +86,32 @@ export class PlanarMap {
    * @param {string}  imageUrl
    * @param {Object}  bbox          – { west, east, south, north } in degrees
    * @param {number}  [opacity]
-   * @param {Object|null} [_vertexGrid]  – ignored in 2D: the server already
-   *   resamples curvilinear grids onto a regular lat/lon raster (see
-   *   rendering/raster.py::slice_to_png), so a plain image overlay is
-   *   always correctly aligned — no tessellation needed as in the 3D globe.
+   * @param {Object|null} [vertexGrid]  – { lons, lats, nx, ny } from
+   *   /api/.../grid. When available, the tile is warped onto the true
+   *   per-vertex geographic grid (see class-level comment); otherwise it
+   *   falls back to a plain rectangular L.imageOverlay.
    */
-  setScalarLayer(imageUrl, bbox, opacity = 0.85, _vertexGrid = null) {
+  setScalarLayer(imageUrl, bbox, opacity = 0.85, vertexGrid = null) {
+    this._meshOpacity = opacity;
+
+    if (vertexGrid && Array.isArray(vertexGrid.lons) && vertexGrid.lons.length > 1) {
+      if (this._overlay) {
+        this._map.removeLayer(this._overlay);
+        this._overlay = null;
+      }
+      this._meshGrid = vertexGrid;
+      const img = new Image();
+      img.onload = () => {
+        if (this._meshImg !== img) return; // superseded by a newer load
+        this._scheduleMeshRedraw();
+      };
+      this._meshImg = img;
+      img.src = imageUrl;
+      return;
+    }
+
+    // Fallback: dataset has no lon/lat coordinates to build a grid from.
+    this._clearMesh();
     const bounds = L.latLngBounds([bbox.south, bbox.west], [bbox.north, bbox.east]);
     if (!this._overlay) {
       this._overlay = L.imageOverlay(imageUrl, bounds, { opacity }).addTo(this._map);
@@ -83,13 +123,106 @@ export class PlanarMap {
   }
 
   removeScalarLayer() {
-    if (!this._overlay) return;
-    this._map.removeLayer(this._overlay);
-    this._overlay = null;
+    if (this._overlay) {
+      this._map.removeLayer(this._overlay);
+      this._overlay = null;
+    }
+    this._clearMesh();
   }
 
   setScalarOpacity(o) {
+    this._meshOpacity = o;
     this._overlay?.setOpacity(o);
+    if (this._meshGrid) this._scheduleMeshRedraw();
+  }
+
+  // ── Mesh canvas (curvilinear-grid-aware scalar overlay) ───────────────────
+
+  _createMeshCanvas(containerId) {
+    const host = document.getElementById(containerId);
+    const canvas = document.createElement('canvas');
+    Object.assign(canvas.style, {
+      position:      'absolute',
+      top:           '0',
+      left:          '0',
+      width:         '100%',
+      height:        '100%',
+      pointerEvents: 'none',
+      zIndex:        '450',
+    });
+    host.parentNode.insertBefore(canvas, host.nextSibling);
+    return canvas;
+  }
+
+  _clearMesh() {
+    this._meshGrid = null;
+    this._meshImg  = null;
+    if (this._meshRAF) {
+      cancelAnimationFrame(this._meshRAF);
+      this._meshRAF = null;
+    }
+    this._meshCtx.clearRect(0, 0, this._meshCanvas.width, this._meshCanvas.height);
+  }
+
+  _scheduleMeshRedraw() {
+    if (this._meshRAF) return;
+    this._meshRAF = requestAnimationFrame(() => {
+      this._meshRAF = null;
+      this._redrawMesh();
+    });
+  }
+
+  _redrawMesh() {
+    const canvas = this._meshCanvas;
+    const size = this._map.getSize();
+    if (canvas.width !== size.x || canvas.height !== size.y) {
+      canvas.width  = size.x;
+      canvas.height = size.y;
+    }
+    const ctx = this._meshCtx;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const grid = this._meshGrid;
+    const img  = this._meshImg;
+    if (!grid || !img || !img.complete || !img.naturalWidth) return;
+
+    const { lons, lats, nx, ny } = grid;
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+
+    // Screen-space position of every grid vertex, computed once per redraw.
+    const pts = new Array(ny + 1);
+    for (let j = 0; j <= ny; j++) {
+      const row = new Array(nx + 1);
+      for (let i = 0; i <= nx; i++) {
+        row[i] = this._map.latLngToContainerPoint([lats[j][i], lons[j][i]]);
+      }
+      pts[j] = row;
+    }
+
+    ctx.globalAlpha = this._meshOpacity;
+
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const p00 = pts[j][i],     p10 = pts[j][i + 1];
+        const p01 = pts[j + 1][i], p11 = pts[j + 1][i + 1];
+
+        // Source pixel coords: the tile image is south-up flipped server
+        // side (row 0 = north), so v grows southward — see
+        // rendering/raster.py::slice_to_png's np.flipud.
+        const u0 = (i / nx) * iw,       u1 = ((i + 1) / nx) * iw;
+        const v0 = (1 - j / ny) * ih,   v1 = (1 - (j + 1) / ny) * ih;
+
+        _drawTexturedTriangle(ctx, img,
+          u0, v0, u1, v0, u0, v1,
+          p00.x, p00.y, p10.x, p10.y, p01.x, p01.y);
+        _drawTexturedTriangle(ctx, img,
+          u1, v0, u1, v1, u0, v1,
+          p10.x, p10.y, p11.x, p11.y, p01.x, p01.y);
+      }
+    }
+
+    ctx.globalAlpha = 1;
   }
 
   // ── Camera / navigation ───────────────────────────────────────────────────
@@ -222,4 +355,39 @@ export class PlanarMap {
       },
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Draw the portion of `img` inside source triangle (sx0,sy0)-(sx1,sy1)-
+ * (sx2,sy2) warped onto destination triangle (dx0,dy0)-(dx1,dy1)-(dx2,dy2),
+ * via the unique affine transform mapping one triangle onto the other
+ * (closed-form solution of the 3-point-correspondence linear system).
+ */
+function _drawTexturedTriangle(
+  ctx, img,
+  sx0, sy0, sx1, sy1, sx2, sy2,
+  dx0, dy0, dx1, dy1, dx2, dy2,
+) {
+  const denom = sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1);
+  if (Math.abs(denom) < 1e-9) return;
+
+  const a = (dx0 * (sy1 - sy2) + dx1 * (sy2 - sy0) + dx2 * (sy0 - sy1)) / denom;
+  const b = (dy0 * (sy1 - sy2) + dy1 * (sy2 - sy0) + dy2 * (sy0 - sy1)) / denom;
+  const c = (dx0 * (sx2 - sx1) + dx1 * (sx0 - sx2) + dx2 * (sx1 - sx0)) / denom;
+  const d = (dy0 * (sx2 - sx1) + dy1 * (sx0 - sx2) + dy2 * (sx1 - sx0)) / denom;
+  const e = (dx0 * (sx1 * sy2 - sx2 * sy1) + dx1 * (sx2 * sy0 - sx0 * sy2) + dx2 * (sx0 * sy1 - sx1 * sy0)) / denom;
+  const f = (dy0 * (sx1 * sy2 - sx2 * sy1) + dy1 * (sx2 * sy0 - sx0 * sy2) + dy2 * (sx0 * sy1 - sx1 * sy0)) / denom;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(dx0, dy0);
+  ctx.lineTo(dx1, dy1);
+  ctx.lineTo(dx2, dy2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.transform(a, b, c, d, e, f);
+  ctx.drawImage(img, 0, 0);
+  ctx.restore();
 }
