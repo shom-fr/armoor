@@ -310,7 +310,7 @@ class VerticalInterpolation(AbstractInterpolation):
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
         vname = args[0]
-        vfreq = args[1]
+        vfreq = float(args[1])
         vlevels = np.arange(
             self.ds[vname].min(),
             self.ds[vname].max(),

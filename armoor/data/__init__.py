@@ -1,7 +1,7 @@
 INTERP_PARAMS_USER = {
     "time": ("tfreq",),
     "horizontal": ("cloud",),
-    "vertical": ("vlevel",),
+    "vertical": ("vlevel","vfreq"),
     }
 
 OUTPUTS_PARAMS = {
