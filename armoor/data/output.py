@@ -12,7 +12,7 @@ from armoor.base.io import (
     get_zarr_encoding,
     sort_ncs_by_suffix
     )
-from armoor.base.misc import optimize_for_low_swap
+from armoor.base.misc import optimize_for_low_swap, validate_metazone_params
 import armoor.base.ranges as ranges
 from armoor.data import INTERP_PARAMS_USER, OUTPUTS_PARAMS
 from armoor.data.interp import (
@@ -100,31 +100,12 @@ def validate_interpolation(metazones):
         The first parameter to check.
     param2: str
         The second parameter to check.
-        
+
     Raises
     ------
     ArmoorError: If both parameters are defined or neither is defined.
     """
-    for mz_name, mz_param in metazones.items():
-        for k, v in INTERP_PARAMS_USER.items():
-            if len(v) == 2:
-                param1, param2 = v[0], v[1]
-                val1 = mz_param.get(param1)
-                val2 = mz_param.get(param2)
-                if val1 is not None and val2 is not None:
-                    raise ArmoorError(
-                        f"Both '{param1}' and '{param2}' are defined for {mz_name}. "
-                        f"Please choose either '{param1}' or '{param2}' colocation."
-                    )
-                    
-                if val1 is None and val2 is None:
-                    logger.info(
-                        f"Neither '{param1}' nor '{param2}' is defined for {mz_name}. "
-                        f"Please choose either '{param1}' or '{param2}' colocation."
-                    )
-                    metazones[mz_name] = None
-                    continue
-    return metazones
+    return validate_metazone_params(metazones, INTERP_PARAMS_USER, label="interpolation")
 
 def get_interpolation_params(metazones):
     """

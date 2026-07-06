@@ -5,74 +5,16 @@ import pandas as pd
 import xarray as xr
 from xoa.geo import m2deg
 
-from armoor.__init__ import ArmoorError
+from armoor.base.dispatch import SubclassingMethodRegistry
 from armoor.base.interp import grid2loc, interp_time, vinterp, regrid, grid2section, coarsen as _coarsen
 
 logger = logging.getLogger(__name__)
 
-    
-class AbstractInterpolation:
+
+class AbstractInterpolation(SubclassingMethodRegistry):
     """Abstract class for interpolation."""
-    
-    def __init__(self):
-        """Initialize the AbstractInterpolation instance with an empty dictionary to store methods."""
-        self.methods = {}
 
-    def register_method(self, func):
-        """Register a method in the methods dictionary.
-
-        Parameters
-        ----------
-        func
-            The method to be registered.
-
-        Returns
-        -------
-        The registered method.
-        """
-        self.methods[func.__name__] = func
-        return func
-
-    def __post_init__(self):
-        """Register all callable methods of the class after initialization.
-        
-        This method is called after the instance is initialized.
-        """
-        for name, method in vars(self.__class__).items():
-            if callable(method) and not name.startswith("__"):
-                self.register_method(method)
-
-    def call(self, method_name, *args, **kwargs):
-        """Call a method by its name.
-
-        Parameters
-        ----------
-        method_name: str
-            The name of the method to call.
-
-        Returns
-        -------
-        The result of the called method.
-
-        Raises
-        ------
-        AttributeError: If the method is not found.
-        """
-        method = self.methods.get(method_name)
-        if method:
-            return method(self, *args, **kwargs)
-        raise ArmoorError(f"Interpolation '{method_name}' not found")
-
-    def __init_subclass__(cls):
-        """Initialize the subclass by adding the __post_init__ method to the class.
-        
-        This method is called after the class is defined.
-        """
-        def __post_init__(self):
-            for name, method in vars(cls).items():
-                if callable(method) and not name.startswith("__"):
-                    self.register_method(method)
-        cls.__post_init__ = __post_init__
+    _dispatch_label = "Interpolation"
 
 
 class TimeInterpolation(AbstractInterpolation):

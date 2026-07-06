@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 from datetime import datetime
 from argparse import ArgumentTypeError
-from armoor import ArmoorError
+from armoor.__init__ import ArmoorError
 
 logger = logging.getLogger(__name__)
 
@@ -278,8 +278,54 @@ def validate_mixed_param_types(parsed_list: List,
     
     if expected_list_count is not None and list_count != expected_list_count:
         raise TypeError(f"Expected {expected_list_count} lists, got {list_count}")
-    
+
     return True
+
+def validate_metazone_params(metazones, params, label="colocation"):
+    """Validate that only one of each pair of parameters is defined for each metazone.
+
+    This function checks, for each metazone and each two-element candidate
+    pair in `params`, that either param1 or param2 is defined, but not both.
+    Shared between armoor.comp (colocation) and armoor.data (interpolation),
+    which pick different candidate-parameter dicts but apply the identical
+    validation rule.
+
+    Parameters
+    ----------
+    metazones : dict
+        A dictionary of metazones with their parameters.
+    params : dict
+        A dictionary where keys are parameter categories and values are lists
+        of parameter pairs to validate.
+    label : str
+        Word used in log/error messages to name the kind of choice being
+        validated (e.g. "colocation", "interpolation").
+
+    Raises
+    ------
+    ArmoorError
+        If both parameters are defined or neither is defined.
+    """
+    for mz_name, mz_param in metazones.items():
+        for k, v in params.items():
+            if len(v) == 2:
+                param1, param2 = v[0], v[1]
+                val1 = mz_param.get(param1)
+                val2 = mz_param.get(param2)
+                if val1 is not None and val2 is not None:
+                    raise ArmoorError(
+                        f"Both '{param1}' and '{param2}' are defined for {mz_name}. "
+                        f"Please choose either '{param1}' or '{param2}' {label}."
+                    )
+
+                if val1 is None and val2 is None:
+                    logger.info(
+                        f"Neither '{param1}' nor '{param2}' is defined for {mz_name}. "
+                        f"Please choose either '{param1}' or '{param2}' {label}."
+                    )
+                    metazones[mz_name] = None
+                    continue
+    return metazones
 
 def parse_coords(s):
     """
