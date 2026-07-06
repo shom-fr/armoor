@@ -16,8 +16,8 @@ from armoor.__init__ import ArmoorError
 from armoor.base.interp import coarsen as _coarsen, grid2loc, interp_time, regrid, vinterp
 from armoor.base.io import (create_fast_encoding, get_zarr_encoding,
                             setup_dask_client)
-from armoor.comp import (COLOCATION_PARAMS_DEFAULT, COLOCATION_PARAMS_USER,
-                         COMP_VARS)
+from armoor.comp import COMP_VARS
+from armoor.comp.comparison import get_comparison
 from armoor.comp.misc import get_colocation_params, validate_colocation
 
 logger = logging.getLogger(__name__)
@@ -498,11 +498,12 @@ def validate_and_get_params(metazones, comp_func):
     dict
         Colocation parameters.
     """
-    metazones = validate_colocation(metazones, COLOCATION_PARAMS_USER[comp_func])
+    comparison = get_comparison(comp_func)
+    metazones = validate_colocation(metazones, comparison.colocation_params_user)
     coloc_params = get_colocation_params(
         metazones,
-        COLOCATION_PARAMS_USER[comp_func],
-        COLOCATION_PARAMS_DEFAULT.get(comp_func)
+        comparison.colocation_params_user,
+        comparison.colocation_params_default
         )
     return coloc_params
 
@@ -857,32 +858,10 @@ def _apply_vertical_ranges(dsref_list, dsprod_list, params, comp_func):
     tuple
         Lists of (dsref_list, dsprod_list) after vertical ranging.
     """
-    vertical_coloc = params.get("vertical")
-
-    if vertical_coloc is None:
+    if params.get("vertical") is None:
         return dsref_list, dsprod_list
 
-    if "vlevel" in vertical_coloc[0] or comp_func in ("comp_mooring", "comp_drifter"):
-        if comp_func in ("comp_mooring", "comp_drifter"):
-            vname = "depth"
-        else:
-            vname = vertical_coloc[1][0]
-
-        if comp_func != "comp_sst":
-            return (
-                ranges.vlevels(dsref_list, vname),
-                ranges.vlevels(dsprod_list, vname)
-            )
-
-    elif "vrange" in vertical_coloc[0]:
-        vname = vertical_coloc[1][1]
-        vbins = vertical_coloc[1][2]
-        return (
-            ranges.vrange(dsref_list, vname, vbins),
-            ranges.vrange(dsprod_list, vname, vbins)
-        )
-
-    return dsref_list, dsprod_list
+    return get_comparison(comp_func).apply_vertical_ranges(dsref_list, dsprod_list, params)
 
 
 def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, prod_name):

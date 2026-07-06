@@ -201,6 +201,23 @@ def process_single_combination(ds, mz_name, mz_param):
         
     return dsout
 
+class StagedDataset(str):
+    """A zarr output path that also carries the metazone it was written for.
+
+    Behaves identically to a plain str/path everywhere (isinstance str is
+    True, json.dumps serializes it as a plain string, Path(x) works, string
+    matching in main_coloc's file-index scan works) -- this is purely
+    additive metadata riding along on the same object, not a new on-disk
+    shape. Lets callers recover the metazone without parsing it back out of
+    the path.
+    """
+
+    def __new__(cls, path, metazone):
+        obj = super().__new__(cls, path)
+        obj.metazone = metazone
+        return obj
+
+
 def save_result(dsout, mz_name, func_comp):
     """Sauvegarde optimisée (< 30s)."""
     # Préparer les chemins
@@ -236,7 +253,7 @@ def save_result(dsout, mz_name, func_comp):
     dsout.close()
     del dsout
     logger.info(f"Saved: {nc}")
-    return str(nc)
+    return StagedDataset(str(nc), metazone=mz_name)
 
 def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     """Process a single dataset×metazone combination."""

@@ -408,7 +408,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs
     from armoor.base.misc import dict_to_list
-    from armoor.comp import METAZONE_PARAMS
+    from armoor.comp.comparison import get_comparison
     from armoor.comp.coloc import main_coloc
     from armoor.data.load import load_datasets
 
@@ -441,7 +441,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
             return
         from armoor.comp.plot import main_plot as plot_comp
         metas = ConfigManager(METAZONES_INI).load(str(metafile))
-        metazones = check_metazones_in(metazones, metas, func_param=METAZONE_PARAMS[func_comp])
+        metazones = check_metazones_in(metazones, metas, func_param=get_comparison(func_comp).metazone_params)
         with open(input_json) as f:
             zarr_outputs = json.load(f)
         if plot_only not in zarr_outputs:
@@ -460,7 +460,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
     metazones = check_metazones_in(
         metazones,
         metas,
-        func_param=METAZONE_PARAMS[func_comp],
+        func_param=get_comparison(func_comp).metazone_params,
         **comp_args
         )
 
@@ -473,7 +473,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
         for nc in (ncouts or []):
             if nc is None:
                 continue
-            mz_name = Path(nc).parts[2]
+            mz_name = getattr(nc, "metazone", None) or Path(nc).parts[2]
             mz_paths.setdefault(mz_name, []).append(str(Path(nc).resolve()))
         _write_json(jsonfile, mz_paths)
         return

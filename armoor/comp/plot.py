@@ -20,7 +20,8 @@ from xoa.plot import plot_minimap, plot_ts
 from armoor.__init__ import ArmoorError
 from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.plot import create_subplots, diagdisp, save_figure
-from armoor.comp import METRIC_LABELS, TITLE_PLOTS
+from armoor.comp import METRIC_LABELS
+from armoor.comp.comparison import get_comparison
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class PlotComp:
         self.func_comp = func_comp
         self.metazone = metazone
         self.ax_minimap = [0.7, 0.91, 0.19]
-        self.plot_title = TITLE_PLOTS[func_comp]
+        self.plot_title = get_comparison(func_comp).title
         self.dt = xr.open_datatree(nc)
         self.saved_files = []
         self.__post_init__()
