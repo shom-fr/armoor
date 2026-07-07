@@ -26,6 +26,7 @@ from armoor.comp.coloc import (
     _apply_time_ranges,
     _apply_vertical_ranges,
     _save_colocation_results,
+    _split_by_dims,
     _process_single_product,
     _process_reference,
     _process_metazone,
@@ -1329,6 +1330,251 @@ class TestApplyVerticalRanges:
 
         assert dsref_out is self.dsref_list
         assert dsprod_out is self.dsprod_list
+
+
+# =============================================================================
+# TestSplitByDims
+# =============================================================================
+
+
+class TestSplitByDims:
+    """Test suite for _split_by_dims."""
+
+    def test_single_group(self):
+        """All variables share the same dims → one group."""
+        ds = xr.Dataset(
+            {
+                "temp": (["time", "z"], np.zeros((3, 2))),
+                "sal":  (["time", "z"], np.zeros((3, 2))),
+            }
+        )
+        groups = _split_by_dims(ds)
+        assert len(groups) == 1
+        key = next(iter(groups))
+        assert key == frozenset({"time", "z"})
+        sub = groups[key]
+        assert set(sub.data_vars) == {"temp", "sal"}
+
+    def test_two_groups(self):
+        """Variables with different dims → two groups."""
+        ds = xr.Dataset(
+            {
+                "temp": (["time", "z"], np.zeros((3, 2))),
+                "sst":  (["time"],      np.zeros((3,))),
+            }
+        )
+        groups = _split_by_dims(ds)
+        assert len(groups) == 2
+        sigs = set(groups.keys())
+        assert frozenset({"time", "z"}) in sigs
+        assert frozenset({"time"}) in sigs
+        assert "temp" in groups[frozenset({"time", "z"})].data_vars
+        assert "sst"  in groups[frozenset({"time"})].data_vars
+
+    def test_empty_dataset(self):
+        """Empty dataset → empty dict."""
+        ds = xr.Dataset()
+        groups = _split_by_dims(ds)
+        assert groups == {}
+
+    def test_scalar_variable(self):
+        """Scalar variable (no dims) forms its own group."""
+        ds = xr.Dataset(
+            {
+                "temp":  (["time"], np.zeros((3,))),
+                "scalar": ([], 42.0),
+            }
+        )
+        groups = _split_by_dims(ds)
+        assert frozenset() in groups
+        assert "scalar" in groups[frozenset()].data_vars
+
+    def test_sub_dataset_inherits_attrs(self):
+        """Sub-datasets inherit global attrs."""
+        ds = xr.Dataset(
+            {"temp": (["time", "z"], np.zeros((3, 2)))},
+            attrs={"data_name": "myref"},
+        )
+        groups = _split_by_dims(ds)
+        sub = groups[frozenset({"time", "z"})]
+        assert sub.attrs["data_name"] == "myref"
+
+    def test_sub_dataset_drops_irrelevant_coords(self):
+        """Sub-dataset with only 'time' dim should not keep a 'z'-only coord."""
+        ds = xr.Dataset(
+            {
+                "temp": (["time", "z"], np.zeros((3, 2))),
+                "sst":  (["time"],      np.zeros((3,))),
+            },
+            coords={
+                "time":  pd.date_range("2023-01-01", periods=3),
+                "z":     [0, 1],
+                "depth": ("z", [0.0, 10.0]),
+            },
+        )
+        groups = _split_by_dims(ds)
+        sst_sub = groups[frozenset({"time"})]
+        # 'z' is not a dim of sst → depth coord (which depends on z) should be absent
+        assert "depth" not in sst_sub.coords
+
+
+# =============================================================================
+# TestProcessSingleProductSplitBehavior
+# =============================================================================
+
+
+class TestProcessSingleProductSplitBehavior:
+    """Tests for the split-then-range logic in _process_single_product."""
+
+    def _make_ds(self, dims_vars, attrs=None):
+        """Build a minimal dataset with the given {var: dims} mapping."""
+        time = pd.date_range("2023-01-01", periods=3, freq="D")
+        z = [0, 1]
+        data_vars = {}
+        coords = {"time": time, "z": z}
+        for var, dims in dims_vars.items():
+            shape = tuple(
+                3 if d == "time" else (2 if d == "z" else 4) for d in dims
+            )
+            data_vars[var] = (list(dims), np.zeros(shape))
+        ds = xr.Dataset(data_vars, coords={k: v for k, v in coords.items() if k in
+                        {d for dims in dims_vars.values() for d in dims}})
+        ds.attrs = attrs or {"data_name": "test"}
+        return ds
+
+    @patch("armoor.comp.coloc._apply_time_ranges")
+    @patch("armoor.comp.coloc._apply_vertical_ranges")
+    @patch("armoor.comp.coloc._apply_colocations")
+    @patch("armoor.comp.coloc._compute_oceanvars")
+    @patch("armoor.comp.coloc._save_colocation_results")
+    @patch("armoor.comp.coloc._prepare_dataset")
+    @patch("armoor.comp.coloc.xr.open_dataset")
+    def test_time_ranges_skipped_when_no_time_dim(
+        self, mock_open, mock_prep, mock_save, mock_ocean,
+        mock_coloc, mock_vrange, mock_trange
+    ):
+        """Variables without 'time' dim must not trigger _apply_time_ranges."""
+        dsref = self._make_ds({"temp": ("z",)}, {"data_name": "ref"})
+        dsprod = self._make_ds({"temp": ("z",)}, {"data_name": "prod"})
+        mock_open.return_value = dsprod
+        mock_prep.return_value = dsprod
+        mock_ocean.side_effect = lambda ds, _: ds
+        mock_coloc.return_value = (dsref, dsprod)
+        mock_vrange.return_value = ([dsref], [dsprod])
+        mock_save.return_value = []
+
+        params = {"time": ("tfreq", "D")}
+        tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+
+        mock_trange.assert_not_called()
+
+    @patch("armoor.comp.coloc._apply_time_ranges")
+    @patch("armoor.comp.coloc._apply_vertical_ranges")
+    @patch("armoor.comp.coloc._apply_colocations")
+    @patch("armoor.comp.coloc._compute_oceanvars")
+    @patch("armoor.comp.coloc._save_colocation_results")
+    @patch("armoor.comp.coloc._prepare_dataset")
+    @patch("armoor.comp.coloc.xr.open_dataset")
+    def test_vertical_ranges_skipped_when_no_z_dim(
+        self, mock_open, mock_prep, mock_save, mock_ocean,
+        mock_coloc, mock_vrange, mock_trange
+    ):
+        """Variables without 'z' dim must not trigger _apply_vertical_ranges."""
+        dsref = self._make_ds({"sst": ("time",)}, {"data_name": "ref"})
+        dsprod = self._make_ds({"sst": ("time",)}, {"data_name": "prod"})
+        mock_open.return_value = dsprod
+        mock_prep.return_value = dsprod
+        mock_ocean.side_effect = lambda ds, _: ds
+        mock_coloc.return_value = (dsref, dsprod)
+        mock_trange.return_value = ([dsref], [dsprod])
+        mock_save.return_value = []
+
+        params = {"vertical": ("vlevel", ("depth", [0.0, 10.0]))}
+        tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+
+        mock_vrange.assert_not_called()
+
+    @patch("armoor.comp.coloc._apply_time_ranges")
+    @patch("armoor.comp.coloc._apply_vertical_ranges")
+    @patch("armoor.comp.coloc._apply_colocations")
+    @patch("armoor.comp.coloc._compute_oceanvars")
+    @patch("armoor.comp.coloc._save_colocation_results")
+    @patch("armoor.comp.coloc._prepare_dataset")
+    @patch("armoor.comp.coloc.xr.open_dataset")
+    def test_both_ranges_applied_when_time_and_z(
+        self, mock_open, mock_prep, mock_save, mock_ocean,
+        mock_coloc, mock_vrange, mock_trange
+    ):
+        """Both ranges called when ref sub-dataset has time and z dims."""
+        dsref = self._make_ds({"temp": ("time", "z")}, {"data_name": "ref"})
+        dsprod = self._make_ds({"temp": ("time", "z")}, {"data_name": "prod"})
+        mock_open.return_value = dsprod
+        mock_prep.return_value = dsprod
+        mock_ocean.side_effect = lambda ds, _: ds
+        mock_coloc.return_value = (dsref, dsprod)
+        mock_trange.return_value = ([dsref], [dsprod])
+        mock_vrange.return_value = ([dsref], [dsprod])
+        mock_save.return_value = []
+
+        params = {
+            "time": ("tfreq", "D"),
+            "vertical": ("vlevel", ("depth", [0.0, 10.0])),
+        }
+        tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+
+        mock_trange.assert_called_once()
+        mock_vrange.assert_called_once()
+
+    @patch("armoor.comp.coloc._apply_time_ranges")
+    @patch("armoor.comp.coloc._apply_vertical_ranges")
+    @patch("armoor.comp.coloc._apply_colocations")
+    @patch("armoor.comp.coloc._compute_oceanvars")
+    @patch("armoor.comp.coloc._save_colocation_results")
+    @patch("armoor.comp.coloc._prepare_dataset")
+    @patch("armoor.comp.coloc.xr.open_dataset")
+    def test_mixed_dims_split_into_groups(
+        self, mock_open, mock_prep, mock_save, mock_ocean,
+        mock_coloc, mock_vrange, mock_trange
+    ):
+        """Dataset with mixed dims is split: time ranges called once (3-D group only)."""
+        dsref = xr.Dataset(
+            {
+                "temp": (["time", "z"], np.zeros((3, 2))),
+                "sst":  (["time"],      np.zeros((3,))),
+            },
+            coords={"time": pd.date_range("2023-01-01", periods=3), "z": [0, 1]},
+            attrs={"data_name": "ref"},
+        )
+        dsprod = xr.Dataset(
+            {
+                "temp": (["time", "z"], np.zeros((3, 2))),
+                "sst":  (["time"],      np.zeros((3,))),
+            },
+            coords={"time": pd.date_range("2023-01-01", periods=3), "z": [0, 1]},
+            attrs={"data_name": "prod"},
+        )
+        mock_open.return_value = dsprod
+        mock_prep.return_value = dsprod
+        mock_ocean.side_effect = lambda ds, _: ds
+        mock_coloc.return_value = (dsref, dsprod)
+        mock_trange.return_value = ([dsref], [dsprod])
+        mock_vrange.return_value = ([dsref], [dsprod])
+        mock_save.return_value = []
+
+        params = {
+            "time": ("tfreq", "D"),
+            "vertical": ("vlevel", ("depth", [0.0, 10.0])),
+        }
+        tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+
+        # Two dim groups: {time,z} and {time}
+        # time ranges called for both (both have 'time'), vertical ranges only for {time,z}
+        assert mock_trange.call_count == 2
+        assert mock_vrange.call_count == 1
 
 
 # =============================================================================

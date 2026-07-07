@@ -97,6 +97,19 @@ class TestOceanVars:
         result = ds_no_temp.oceanvars.sel_sndspeed()
         assert result is None
 
+    def test_sel_mld(self):
+        """Test calculation of mld"""
+        result = self.ds.oceanvars.sel_mld()
+        assert result is not None
+        assert 'mld' in self.ds
+        assert self.ds['mld'].attrs['units'] == 'm'
+
+    def test_sel_mld_missing_sal(self):
+        """Test mld  without salinity"""
+        ds_no_sal = self.ds.drop_vars('sal')
+        result = ds_no_sal.oceanvars.sel_mld()
+        assert result is None
+
     def test_sel_method_routing(self):
         """Test routing of the sel method"""
         # Test with temperature

@@ -1,3 +1,8 @@
+GROUP_SUFFIX = "__armoor_grp"
+"""Suffix appended by `concat_then_merge` to dim/coord names of a minor
+signature-group (e.g. mld) to avoid colliding with the dominant group's
+names of the same size mismatch."""
+
 METAZONE_PARAMS = {
     "comp_sst": [
         "tbound",
@@ -176,15 +181,21 @@ OUTPUTS_PARAMS = {
                 }
             },
         "uvprofiles": {
-            "concat": ["time"],
+            "sort": ["time"],
             "output": "merge",
+            "mparams_pro": {
+                "time": ["trange_seq"],
+                },
             "mparams_con": {
                 "vertical": ["vlevel"]
                 }
             },
         "udiagts": {
-            "concat": ["time"],
-            "output": "merge"
+            "sort": ["time"],
+            "output": "merge",
+            "mparams_pro": {
+                "time": ["trange_seq"],
+                },
             },
         },
     "comp_drifter": {
@@ -263,7 +274,7 @@ OUTPUTS_PARAMS = {
 
 COMP_VARS = {
     "comp_sst": ["ptemp"],
-    "comp_argo": ["ptemp", "sal", "pdens", "temp", "sndspeed"],
+    "comp_argo": ["ptemp", "sal", "pdens", "temp", "sndspeed", "mld"],
     "comp_mooring": ["ptemp", "sal", "pdens", "temp", "sndspeed", "cdir", "cspeed"],
     "comp_drifter": ["ptemp", "sal", "u", "v"],
     "comp_models": ["ptemp", "sal", "pdens", "sndspeed"],
