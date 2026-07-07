@@ -199,71 +199,162 @@ def _normalize_geo_coords(ds):
     return ds
 
 
-def open_decode(
-    path_files, fmt, platform=None, func=None, type=None
-) -> xr.Dataset:
+_DECODER_REGISTRY = {}  # fmt string -> Decoder instance
+
+
+class Decoder:
+    """One armoor-data input format.
+
+    Subclasses register themselves under every fmt string listed in
+    ``fmts`` (several fmt values can share one decoder, e.g. hycom/hycom3d).
+    """
+
+    name = None
+    fmts = ()
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if cls.name is not None:
+            instance = cls()
+            for fmt in cls.fmts:
+                _DECODER_REGISTRY[fmt] = instance
+
+    def decode(self, path_files, fmt, platform=None):
+        raise NotImplementedError
+
+
+class CmemsInsituDecoder(Decoder):
+    name = "cmems_insitu"
+    fmts = ("cmems_insitu",)
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding insitu cmems files")
+        return open_decode_cmems_insitu(path_files, platform=platform)
+
+
+class CoraInsituDecoder(Decoder):
+    name = "cora_insitu"
+    fmts = ("cora_insitu",)
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding insitu cmems files")
+        return open_decode_cora_insitu(path_files, platform=platform)
+
+
+class CmemsModelDecoder(Decoder):
+    name = "cmems_model"
+    fmts = ("cmems_model",)
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding model cmems files")
+        return open_decode_cmems_model(path_files)
+
+
+class ArmoorDecoder(Decoder):
+    name = "armoor"
+    fmts = ("armoor",)
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening armoor files")
+        ds = xr.open_mfdataset(path_files)
+        if "depth" in ds:
+            ds = ds.reset_coords("depth")
+        return ds
+
+
+class SstSatelliteDecoder(Decoder):
+    name = "sst_satellite"
+    fmts = ("cmems_sst_l4", "cmems_sst_l3", "cersat_sst_l3")
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding sst satellite files")
+        return open_decode_sst_satellite(path_files, fmt)
+
+
+class HycomDecoder(Decoder):
+    name = "hycom"
+    fmts = ("hycom", "hycom3d")
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding hycom files")
+        return open_decode_hycom(path_files)
+
+
+class CrocoDecoder(Decoder):
+    name = "croco"
+    fmts = ("croco", "croco_xios")
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding croco files")
+        return open_decode_croco(path_files, fmt)
+
+
+class SloopDecoder(Decoder):
+    name = "sloop"
+    fmts = ("sloop",)
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding sloop files")
+        return open_decode_sloop(path_files)
+
+
+class ArpegeInstaDecoder(Decoder):
+    name = "arpege_insta"
+    fmts = ("arpege_insta",)
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding instantaneous arpege files")
+        return open_decode_arpege_insta(path_files)
+
+
+class Woa18Decoder(Decoder):
+    name = "woa18"
+    fmts = ("woa18",)
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding woa18 climato")
+        return open_decode_woa18(path_files)
+
+
+class BobyclimDecoder(Decoder):
+    name = "bobyclim"
+    fmts = ("bobyclim",)
+
+    def decode(self, path_files, fmt, platform=None):
+        logger.info("Opening/decoding Bobyclim climato")
+        return open_decode_bobyclim(path_files)
+
+
+def get_decoder(fmt) -> Decoder:
+    """Look up the Decoder for a data.ini/comp.ini `fmt` value."""
+    if fmt not in _DECODER_REGISTRY:
+        raise ArmoorError(f"Unknown format: {fmt!r}")
+    return _DECODER_REGISTRY[fmt]
+
+
+def open_decode(path_files, fmt, platform=None) -> xr.Dataset:
     """
     Open a netcdf/txt file and store it into a dataset
+
     Parameters
     ----------
     path_files : str, list of str
         Path to the netcdf files.
-    func : str
-       Poste 1 : functionnality.
-    type : str
-       type of txt file or model.
-    steps : float
-       Horizontal and vertical steps.
+    fmt : str
+        Input format identifier (see Decoder subclasses in this module).
+    platform : str, optional
+        Type of in-situ platform (argo/glider/mooring/drifter), used by
+        the cmems_insitu/cora_insitu decoders.
 
     Returns
     -------
     xarray.Dataset
         Model or observation dataset.
     """
-    # Xoa initialisation
-    # register_cf()
     path_files = get_paths(path_files)
-    # Open file
-    if fmt == "cmems_insitu":
-        logger.info("Opening/decoding insitu cmems files")
-        result = open_decode_cmems_insitu(path_files, platform=platform)
-    elif fmt == "cora_insitu":
-        logger.info("Opening/decoding insitu cmems files")
-        result = open_decode_cora_insitu(path_files, platform=platform)
-    elif fmt == "cmems_model":
-        logger.info("Opening/decoding model cmems files")
-        result = open_decode_cmems_model(path_files)
-    elif fmt == "armoor":
-        logger.info("Opening armoor files")
-        ds = xr.open_mfdataset(path_files)
-        if "depth" in ds:
-            ds = ds.reset_coords("depth")
-        result = ds
-    elif fmt is not None and "_sst_l" in fmt:
-        logger.info("Opening/decoding sst satellite files")
-        result = open_decode_sst_satellite(path_files, fmt)
-    elif (fmt == "hycom") or (fmt == "hycom3d"):
-        logger.info("Opening/decoding hycom files")
-        result = open_decode_hycom(path_files)
-    elif (fmt == "croco") or (fmt == "croco_xios"):
-        logger.info("Opening/decoding croco files")
-        result = open_decode_croco(path_files, fmt)
-    elif fmt == "sloop":
-        logger.info("Opening/decoding sloop files")
-        result = open_decode_sloop(path_files)
-    elif fmt == "arpege_insta":
-        logger.info("Opening/decoding instantaneous arpege files")
-        result = open_decode_arpege_insta(path_files)
-    elif fmt == "woa18":
-        logger.info("Opening/decoding woa18 climato")
-        result = open_decode_woa18(path_files)
-    elif fmt == "bobyclim":
-        logger.info("Opening/decoding Bobyclim climato")
-        result = open_decode_bobyclim(path_files)
-    else:
-        raise logger.error("Unknow format")
+    result = get_decoder(fmt).decode(path_files, fmt, platform=platform)
     return _normalize_geo_coords(result)
-    
+
 
 def open_decode_arpege_insta(path_files):
     logger.info("atmfrc - insta")

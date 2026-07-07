@@ -28,7 +28,19 @@ from armoor.data.open_decode import (
     open_decode_cmems_insitu,
     open_decode_croco,
     get_paths,
-    register_cf
+    register_cf,
+    get_decoder,
+    ArmoorDecoder,
+    ArpegeInstaDecoder,
+    BobyclimDecoder,
+    CmemsInsituDecoder,
+    CmemsModelDecoder,
+    CoraInsituDecoder,
+    CrocoDecoder,
+    HycomDecoder,
+    SloopDecoder,
+    SstSatelliteDecoder,
+    Woa18Decoder,
 )
 
 # Test data directory
@@ -681,7 +693,36 @@ class TestOpenDecode:
         filepath = setup_test_data['croco']
         with pytest.raises(Exception):
             open_decode(str(filepath), fmt='unknown_format')
-    
+
+    def test_get_decoder_raises_armoor_error_for_unknown_fmt(self):
+        """get_decoder itself must raise a clear ArmoorError, not the old
+        broken `raise logger.error(...)` (which actually raised a TypeError
+        with no useful message)."""
+        with pytest.raises(ArmoorError, match="unknown_format"):
+            get_decoder("unknown_format")
+
+    @pytest.mark.parametrize("fmt,decoder_cls", [
+        ("cmems_insitu", CmemsInsituDecoder),
+        ("cora_insitu", CoraInsituDecoder),
+        ("cmems_model", CmemsModelDecoder),
+        ("armoor", ArmoorDecoder),
+        ("cmems_sst_l4", SstSatelliteDecoder),
+        ("cmems_sst_l3", SstSatelliteDecoder),
+        ("cersat_sst_l3", SstSatelliteDecoder),
+        ("hycom", HycomDecoder),
+        ("hycom3d", HycomDecoder),
+        ("croco", CrocoDecoder),
+        ("croco_xios", CrocoDecoder),
+        ("sloop", SloopDecoder),
+        ("arpege_insta", ArpegeInstaDecoder),
+        ("woa18", Woa18Decoder),
+        ("bobyclim", BobyclimDecoder),
+    ])
+    def test_get_decoder_registry_completeness(self, fmt, decoder_cls):
+        """Every reachable fmt (including hycom/hycom3d and croco/croco_xios
+        aliases) must resolve to its expected Decoder class."""
+        assert isinstance(get_decoder(fmt), decoder_cls)
+
     @pytest.mark.parametrize("fmt,platform", [
         ('cmems_insitu', 'argo'),
         ('cmems_insitu', 'glider'),
