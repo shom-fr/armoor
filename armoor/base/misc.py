@@ -301,11 +301,23 @@ def validate_metazone_params(metazones, params, label="colocation"):
         Word used in log/error messages to name the kind of choice being
         validated (e.g. "colocation", "interpolation").
 
+    Returns
+    -------
+    dict
+        A new dict (metazones is not mutated) mapping each metazone to its
+        original params, or to None where neither candidate of a pair is
+        defined. Returning a copy matters: callers of this function (e.g.
+        armoor.data.output.OutputProcessor) go on to look up the *original*
+        metazone config again later for unrelated processing (time/vertical
+        ranges, filters) -- mutating the caller's own dict in place would
+        silently replace that config with None.
+
     Raises
     ------
     ArmoorError
         If both parameters are defined or neither is defined.
     """
+    result = dict(metazones)
     for mz_name, mz_param in metazones.items():
         for k, v in params.items():
             if len(v) == 2:
@@ -323,9 +335,9 @@ def validate_metazone_params(metazones, params, label="colocation"):
                         f"Neither '{param1}' nor '{param2}' is defined for {mz_name}. "
                         f"Please choose either '{param1}' or '{param2}' {label}."
                     )
-                    metazones[mz_name] = None
+                    result[mz_name] = None
                     continue
-    return metazones
+    return result
 
 def parse_coords(s):
     """

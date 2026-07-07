@@ -101,6 +101,20 @@ class TestValidateInterpolationVfreq:
         result = validate_interpolation(metazones)
         assert result["zone1"] is None
 
+    def test_does_not_mutate_the_caller_s_metazones_dict(self):
+        # Regression test: validate_interpolation (via validate_metazone_params)
+        # used to overwrite metazones[mz_name] with None in place when neither
+        # vlevel nor vfreq was set. OutputProcessor re-reads the *original*
+        # metazones dict later for unrelated per-metazone processing (time/
+        # vertical ranges) -- silently replacing it with None there crashed
+        # with "TypeError: argument of type 'NoneType' is not iterable".
+        original_mz_param = {"tbound": ["2020-01-01", "2020-01-02"]}
+        metazones = {"zone1": original_mz_param}
+        result = validate_interpolation(metazones)
+        assert result["zone1"] is None
+        assert metazones["zone1"] is original_mz_param
+        assert metazones["zone1"] == {"tbound": ["2020-01-01", "2020-01-02"]}
+
 
 class TestGetInterpolationParamsVfreq:
     """Test suite for get_interpolation_params with vfreq."""
