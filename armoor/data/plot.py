@@ -39,7 +39,7 @@ plt.rcParams.update({'font.size': 8})
 class PlotData(MethodRegistry):
     """Class for plot data."""
 
-    _dispatch_label = "Comparison plot"
+    _dispatch_label = "Data plot"
 
     def __init__(self, nc, metazone, vminmax=None):
         """Initialize the AbstractPlotData instance with an empty dictionary to store methods."""
