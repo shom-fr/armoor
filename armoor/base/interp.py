@@ -322,7 +322,11 @@ def create_regridder(dsi, dso, method="bilinear"):
     import xesmf as xe
     regridder = None
     try:
-        regridder = xe.Regridder(dsi, dso, method, parallel=False)
+        regridder = xe.Regridder(
+            dsi, dso, method, parallel=False,
+            ignore_degenerate=True,
+            unmapped_to_nan=True,
+        )
         yield regridder
     finally:
         if regridder is not None:
