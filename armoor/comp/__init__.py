@@ -1,3 +1,7 @@
+"""Per-func_comp dicts, derived from the Comparison registry.
+
+See `armoor.comp.comparison` for the source of truth.
+"""
 from armoor.comp.comparison import _REGISTRY
 
 # Derived from the Comparison registry (armoor.comp.comparison) rather than

@@ -15,49 +15,72 @@ class MethodRegistry:
 
     Use when the class is never subclassed and calls ``self.__post_init__()``
     itself at the end of its own ``__init__`` (e.g. PlotComp, PlotData).
+
+    Attributes
+    ----------
+    methods : dict
+        Mapping of method name to callable, populated by `__post_init__`.
     """
 
     _dispatch_label = "Method"
 
     def __init__(self):
+        """Initialize an empty method registry.
+
+        Concrete subclasses must call ``self.__post_init__()`` at the end of
+        their own ``__init__`` to populate `methods`.
+        """
         self.methods = {}
 
     def register_method(self, func):
-        """Register a method in the methods dictionary.
+        """Register a callable under its own name.
 
         Parameters
         ----------
-        func
-            The method to be registered.
+        func : callable
+            The method to register.
 
         Returns
         -------
-        The registered method.
+        callable
+            The same `func`, unchanged (allows use as a decorator).
         """
         self.methods[func.__name__] = func
         return func
 
     def __post_init__(self):
-        """Register all callable methods of the class after initialization."""
+        """Populate `methods` with every callable, non-dunder attribute of
+        the instance's own class.
+
+        Returns
+        -------
+        None
+        """
         for name, method in vars(type(self)).items():
             if callable(method) and not name.startswith("__"):
                 self.register_method(method)
 
     def call(self, method_name, *args, **kwargs):
-        """Call a method by its name.
+        """Call a registered method by name.
 
         Parameters
         ----------
-        method_name: str
-            The name of the method to call.
+        method_name : str
+            Name of the method to call.
+        *args
+            Positional arguments forwarded to the method.
+        **kwargs
+            Keyword arguments forwarded to the method.
 
         Returns
         -------
-        The result of the called method.
+        object
+            The return value of the called method.
 
         Raises
         ------
-        ArmoorError: If the method is not found.
+        ArmoorError
+            If no method named `method_name` is registered.
         """
         method = self.methods.get(method_name)
         if method:
@@ -75,7 +98,20 @@ class SubclassingMethodRegistry(MethodRegistry):
     """
 
     def __init_subclass__(cls, **kwargs):
-        """Initialize the subclass by adding the __post_init__ method to the class."""
+        """Attach a `__post_init__` to `cls` that registers `cls`'s own
+        callable, non-dunder attributes.
+
+        Parameters
+        ----------
+        cls : type
+            The subclass being created.
+        **kwargs
+            Forwarded to `super().__init_subclass__`.
+
+        Returns
+        -------
+        None
+        """
         super().__init_subclass__(**kwargs)
 
         def __post_init__(self):

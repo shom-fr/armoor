@@ -29,6 +29,19 @@ class DataType:
     outputs_params = {}
 
     def __init_subclass__(cls, **kwargs):
+        """Register `cls` in the module-level registries.
+
+        Parameters
+        ----------
+        cls : type
+            The subclass being created.
+        **kwargs
+            Forwarded to `super().__init_subclass__`.
+
+        Returns
+        -------
+        None
+        """
         super().__init_subclass__(**kwargs)
         if cls.name is not None:
             instance = cls()
@@ -37,8 +50,26 @@ class DataType:
                 _REGISTRY[fmt] = instance
 
     def validate_load_params(self, fmt, metazones):
-        """Raise ArmoorError if a metazone config is incompatible with this
-        data type. No-op when the type has no forbidden params.
+        """Check that metazone configs are compatible with this data type.
+
+        No-op when the type has no `forbidden_params`.
+
+        Parameters
+        ----------
+        fmt : str
+            The data.ini `fmt` value being loaded, used only in the error
+            message.
+        metazones : dict
+            Mapping of metazone name to its parameters.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ArmoorError
+            If any metazone configures one of `forbidden_params`.
         """
         if not self.forbidden_params:
             return
@@ -122,6 +153,17 @@ def get_data_type(fmt: str) -> DataType:
 
     Any fmt not explicitly registered is treated as ocean_model, matching
     today's implicit, universal behavior.
+
+    Parameters
+    ----------
+    fmt : str
+        The data.ini `fmt` value (e.g. ``"hycom"``, ``"eddy_pet"``).
+
+    Returns
+    -------
+    DataType
+        The registered instance for `fmt`, or the `DataOceanModel`
+        instance if `fmt` is not registered.
     """
     return _REGISTRY.get(fmt, _REGISTRY["hycom"])
 
@@ -131,5 +173,16 @@ def get_data_type_by_name(name) -> DataType:
 
     Falls back to ocean_model for None/unrecognized names -- covers older
     outputs written before this attr existed.
+
+    Parameters
+    ----------
+    name : str or None
+        Canonical `DataType.name` (e.g. ``"ocean_model"``, ``"eddies"``).
+
+    Returns
+    -------
+    DataType
+        The registered instance for `name`, or the `DataOceanModel`
+        instance if `name` is None/unrecognized.
     """
     return _BY_NAME.get(name, _BY_NAME["ocean_model"])

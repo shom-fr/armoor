@@ -20,6 +20,12 @@ def validate_colocation(metazones, params):
         A dictionary where keys are colocation types and values are lists
         of parameter pairs to validate.
 
+    Returns
+    -------
+    dict
+        A new dict mapping each metazone to its original params, or to
+        None where neither candidate of a pair is defined.
+
     Raises
     ------
     ArmoorError

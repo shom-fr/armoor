@@ -35,13 +35,45 @@ def _compute_oceanvars(ds, func_comp):
     Derived variables (pdens, sndspeed, temp-from-ptemp, …) are computed
     here rather than during colocation so that the expensive gsw calls
     run on the small colocated data, not the full product grid.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Colocated dataset to augment in place.
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_sst"``).
+
+    Returns
+    -------
+    xarray.Dataset
+        `ds`, with any missing comparison variables added where derivable.
     """
     return get_comparison(func_comp).compute_oceanvars(ds)
 
 
 def check_output(func_name, outputs):
+    """Validate that every requested output type is implemented.
+
+    Parameters
+    ----------
+    func_name : str
+        Comparison type identifier (e.g. ``"comp_sst"``).
+    outputs : dict
+        Mapping of output name to output configuration.
+
+    Returns
+    -------
+    dict
+        `outputs`, unchanged (or with ``"otype"`` remapped for comp_drifter).
+
+    Raises
+    ------
+    ArmoorError
+        If an output's ``"otype"`` is not implemented for `func_name`.
+    """
     return get_comparison(func_name).check_output(outputs)
-        
+
+
 def _convert_time_to_epoch_seconds(ds, epoch=EPOCH):
     """Convert dataset time coordinates to seconds since epoch."""
     return [
@@ -147,6 +179,22 @@ def preproc_comp_drifter(zins, odt, runtime=None):
     return zins
 
 def preproc_comp(func_comp, ncs, **kwargs):
+    """Preprocess loaded inputs before output computation.
+
+    Parameters
+    ----------
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_drifter"``).
+    ncs : list of str
+        Paths to the loaded/colocated input files.
+    **kwargs
+        Comparison-specific extra arguments (e.g. ``freq_drift``).
+
+    Returns
+    -------
+    None or object
+        See `armoor.comp.comparison.Comparison.preproc`.
+    """
     return get_comparison(func_comp).preproc(ncs, **kwargs)
 
 class OutputProcessor:
@@ -156,7 +204,14 @@ class OutputProcessor:
     """
 
     def __init__(self, func_comp=None):
-        """Initialize the OutputProcessor."""
+        """Initialize the OutputProcessor.
+
+        Parameters
+        ----------
+        func_comp : str, optional
+            Comparison type identifier (e.g. ``"comp_sst"``), used to look
+            up the `Comparison` instance driving output/compatibility rules.
+        """
         self.func_comp = func_comp
         self.comparison = get_comparison(func_comp)
     
@@ -372,7 +427,11 @@ class OutputProcessor:
             Metazone parameters
         output_params
             Output parameters
-            
+        output
+            Output type name (``otype``), forwarded to
+            `Comparison.compute_comparison` for comparison types that
+            override the generic statistics (e.g. comp_drifter).
+
         Returns
         -------
         Dictionary containing lists of computed statistics for each data type
@@ -642,7 +701,14 @@ class OutputPipelineManager:
     """
     
     def __init__(self, func_comp=None):
-        """Initialize the OutputPipelineManager."""
+        """Initialize the OutputPipelineManager.
+
+        Parameters
+        ----------
+        func_comp : str, optional
+            Comparison type identifier (e.g. ``"comp_sst"``), used to look
+            up the `Comparison` instance driving output/preproc rules.
+        """
         self.processor = OutputProcessor(func_comp=func_comp)
         self.func_comp = func_comp
         self.comparison = get_comparison(func_comp)

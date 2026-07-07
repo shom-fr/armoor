@@ -315,6 +315,17 @@ def _log_completed_jobs(jobs, wave_name):
     _write_script) and are replayed as two distinct sections, each wrapped
     in a clearly delimited header/footer block, so real tracebacks aren't
     buried in routine progress logging.
+
+    Parameters
+    ----------
+    jobs : list of woom ScheduledJob
+        Jobs whose output files to replay.
+    wave_name : str
+        Wave label used in the log section headers.
+
+    Returns
+    -------
+    None
     """
     for job in jobs:
         try:
@@ -349,6 +360,15 @@ def _redirect_log_file_to_devnull(argv):
     Sub-job stdout/stderr are captured by the scheduler (job.out/job.err)
     and later replayed by _log_completed_jobs().  Writing to the shared
     armoor.log from parallel sub-jobs produces interleaved, unreadable output.
+
+    Parameters
+    ----------
+    argv : list of str
+        Sub-job command-line arguments, modified in place.
+
+    Returns
+    -------
+    None
     """
     if "--log-file" in argv:
         i = argv.index("--log-file")
@@ -528,6 +548,20 @@ def _write_script(subdir, cmd, workdir=None):
 
     stdout and stderr are left separate — the scheduler routes them to
     log_out (job.out) and log_err (job.err) respectively (see _opts()).
+
+    Parameters
+    ----------
+    subdir : Path
+        Directory to write ``job.sh`` into.
+    cmd : list
+        Command and arguments to run, joined with spaces.
+    workdir : str or Path, optional
+        Directory to ``cd`` into before running `cmd`.
+
+    Returns
+    -------
+    Path
+        Path to the written, executable script.
     """
     script = subdir / "job.sh"
     cmd_str = " ".join(str(c) for c in cmd)

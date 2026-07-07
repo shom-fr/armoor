@@ -25,7 +25,11 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractColocation(SubclassingMethodRegistry):
-    """Abstract class for coloction."""
+    """Abstract base for colocation strategies (time/horizontal/vertical).
+
+    Subclasses register their own methods for dispatch via `call`; see
+    `armoor.base.dispatch.SubclassingMethodRegistry`.
+    """
 
     _dispatch_label = "Colocation"
 

@@ -31,12 +31,28 @@ plt.rcParams.update({'font.size': 8})
 
 
 class PlotComp(MethodRegistry):
-    """Class for plot comparison."""
+    """Generate comparison plots (dispersion diagrams, profiles, maps, time
+    series) from a colocated armoor-comp-* output datatree.
+
+    Plot methods are dispatched by name via `call` (see
+    `armoor.base.dispatch.MethodRegistry`).
+    """
 
     _dispatch_label = "Comparison plot"
 
     def __init__(self, nc, func_comp, metazone):
-        """Initialize the AbstractPlotComp instance with an empty dictionary to store methods."""
+        """Initialize the plotter and open the output datatree.
+
+        Parameters
+        ----------
+        nc : str
+            Path to the zarr datatree holding the comparison output.
+        func_comp : str
+            Comparison type identifier (e.g. ``"comp_sst"``), used to look
+            up the plot title via `armoor.comp.comparison.get_comparison`.
+        metazone : str
+            Metazone name, used in plot titles/filenames.
+        """
         self.methods = {}
         self.func_comp = func_comp
         self.metazone = metazone

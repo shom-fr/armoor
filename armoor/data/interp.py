@@ -12,7 +12,11 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractInterpolation(SubclassingMethodRegistry):
-    """Abstract class for interpolation."""
+    """Abstract base for interpolation strategies (time/horizontal/vertical).
+
+    Subclasses register their own methods for dispatch via `call`; see
+    `armoor.base.dispatch.SubclassingMethodRegistry`.
+    """
 
     _dispatch_label = "Interpolation"
 

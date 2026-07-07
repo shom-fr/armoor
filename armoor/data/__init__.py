@@ -1,3 +1,8 @@
+"""Interpolation candidate params and per-otype output params for armoor-data.
+
+See `armoor.data.datatype` for the per-data-type hierarchy that now backs
+`OUTPUTS_PARAMS`.
+"""
 INTERP_PARAMS_USER = {
     "time": ("tfreq",),
     "horizontal": ("cloud",),

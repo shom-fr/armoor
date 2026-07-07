@@ -46,6 +46,19 @@ class Comparison:
     otype_remap = {}
 
     def __init_subclass__(cls, **kwargs):
+        """Register `cls` in the module-level registry under its `name`.
+
+        Parameters
+        ----------
+        cls : type
+            The subclass being created.
+        **kwargs
+            Forwarded to `super().__init_subclass__`.
+
+        Returns
+        -------
+        None
+        """
         super().__init_subclass__(**kwargs)
         if cls.name is not None:
             _REGISTRY[cls.name] = cls()
@@ -53,10 +66,27 @@ class Comparison:
     # -- colocation -----------------------------------------------------
 
     def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
-        """Apply vertical ranging to dataset lists (generic case).
+        """Apply vertical ranging to reference/product dataset lists.
 
-        Caller (``comp.coloc._apply_vertical_ranges``) already guarantees
-        ``params["vertical"]`` is not None.
+        Generic implementation shared by comparison types that don't
+        override it. Caller (``comp.coloc._apply_vertical_ranges``) already
+        guarantees ``params["vertical"]`` is not None.
+
+        Parameters
+        ----------
+        dsref_list : list of xarray.Dataset
+            Reference datasets, one per product.
+        dsprod_list : list of xarray.Dataset
+            Product datasets, matching `dsref_list`.
+        params : dict
+            Colocation parameters for the metazone; ``params["vertical"]``
+            holds the ``(param_name, param_value)`` pair selecting either a
+            vertical level (``vlevel``) or a vertical range (``vrange``).
+
+        Returns
+        -------
+        tuple of (list of xarray.Dataset, list of xarray.Dataset)
+            The ranged `dsref_list` and `dsprod_list`.
         """
         vertical_coloc = params["vertical"]
         if "vlevel" in vertical_coloc[0]:
@@ -74,7 +104,21 @@ class Comparison:
     # -- output -----------------------------------------------------------
 
     def compute_oceanvars(self, ds):
-        """Compute derived oceanographic variables on a colocated dataset."""
+        """Compute derived oceanographic variables on a colocated dataset.
+
+        For every variable in `comp_vars` missing from `ds`, attempt to
+        select or derive it via the ``ds.oceanvars`` accessor.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Colocated dataset to augment in place.
+
+        Returns
+        -------
+        xarray.Dataset
+            `ds`, with any missing `comp_vars` added where derivable.
+        """
         for var in self.comp_vars:
             if var not in ds.data_vars:
                 da = ds.oceanvars.sel(var)
@@ -83,12 +127,52 @@ class Comparison:
         return ds
 
     def check_output(self, outputs):
+        """Validate that every requested output type is implemented.
+
+        Parameters
+        ----------
+        outputs : dict
+            Mapping of output name to output configuration (each holding at
+            least an ``"otype"`` key).
+
+        Returns
+        -------
+        dict
+            `outputs`, unchanged.
+
+        Raises
+        ------
+        ArmoorError
+            If an output's ``"otype"`` is not a key of `outputs_params`.
+        """
         for oname, output in outputs.items():
             if output.get("otype") not in self.outputs_params.keys():
                 raise ArmoorError(f"Not implemented output for {self.name}: {output}")
         return outputs
 
     def validate_output_compatibility(self, oparams, mparams, metazone, output):
+        """Check whether an output type is compatible with a metazone's params.
+
+        Parameters
+        ----------
+        oparams : dict
+            Output configuration for the metazone (unused by the generic
+            implementation; kept for a uniform hook signature with
+            subclasses that do use it, e.g. CompDrifter).
+        mparams : dict
+            Metazone parameters (e.g. ``tfreq``, ``vlevel``).
+        metazone : str
+            Metazone name, used only for logging.
+        output : str
+            Output type name (``otype``) to check against `outputs_params`.
+
+        Returns
+        -------
+        bool
+            True if `output` can be processed for this metazone, False
+            otherwise (required params missing, or conflicting params
+            present).
+        """
         try:
             output_config = self.outputs_params[output]
         except KeyError:
@@ -116,16 +200,54 @@ class Comparison:
         return True
 
     def preproc(self, ncs, **kwargs):
-        """Preprocess loaded inputs before output computation (no-op by default)."""
+        """Preprocess loaded inputs before output computation.
+
+        No-op by default; overridden by comparison types that need to
+        transform inputs before comparison (e.g. CompDrifter).
+
+        Parameters
+        ----------
+        ncs : list of str
+            Paths to the loaded/colocated input files.
+        **kwargs
+            Comparison-specific extra arguments (e.g. ``freq_drift``).
+
+        Returns
+        -------
+        None or object
+            None by default; subclasses may return preprocessed inputs.
+        """
         return None
 
     def compute_comparison(self, dt_comps, ds_ref, ds_prod, output):
-        """Override the generic StatsComp result if this comparison type needs
-        something else (pass-through by default)."""
+        """Compute the comparison result for one output.
+
+        Pass-through by default (the generic `StatsComp` result is used
+        as-is); overridden by comparison types that need a different
+        computation (e.g. CompDrifter).
+
+        Parameters
+        ----------
+        dt_comps : xarray.DataTree
+            The generic comparison result (statistics per sort group).
+        ds_ref : xarray.Dataset
+            Reference dataset for this output.
+        ds_prod : xarray.Dataset
+            Product dataset for this output.
+        output : str
+            Output type name (``otype``).
+
+        Returns
+        -------
+        xarray.DataTree
+            `dt_comps`, unchanged by default.
+        """
         return dt_comps
 
 
 class CompSst(Comparison):
+    """Comparison of satellite sea surface temperature against products."""
+
     name = "comp_sst"
     title = "Sea surface temperature"
     metazone_params = [
@@ -148,10 +270,30 @@ class CompSst(Comparison):
     comp_vars = ["ptemp"]
 
     def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
+        """Return the dataset lists unchanged.
+
+        SST is a surface-only product, so no vertical ranging applies.
+
+        Parameters
+        ----------
+        dsref_list : list of xarray.Dataset
+            Reference datasets, one per product.
+        dsprod_list : list of xarray.Dataset
+            Product datasets, matching `dsref_list`.
+        params : dict
+            Colocation parameters for the metazone (unused).
+
+        Returns
+        -------
+        tuple of (list of xarray.Dataset, list of xarray.Dataset)
+            `dsref_list` and `dsprod_list`, unchanged.
+        """
         return dsref_list, dsprod_list
 
 
 class CompArgo(Comparison):
+    """Comparison of Argo hydrological profiles against products."""
+
     name = "comp_argo"
     title = "Hydrological profiles"
     metazone_params = [
@@ -212,10 +354,30 @@ class _ForcedDepthVLevelMixin:
     'vlevel' or 'vrange' — reproduces today's quirk exactly, do not "fix"."""
 
     def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
+        """Range reference/product datasets on the 'depth' variable.
+
+        Parameters
+        ----------
+        dsref_list : list of xarray.Dataset
+            Reference datasets, one per product.
+        dsprod_list : list of xarray.Dataset
+            Product datasets, matching `dsref_list`.
+        params : dict
+            Colocation parameters for the metazone (unused: 'depth' is
+            always used regardless of whether 'vlevel' or 'vrange' is
+            configured).
+
+        Returns
+        -------
+        tuple of (list of xarray.Dataset, list of xarray.Dataset)
+            The ranged `dsref_list` and `dsprod_list`.
+        """
         return ranges.vlevels(dsref_list, "depth"), ranges.vlevels(dsprod_list, "depth")
 
 
 class CompMooring(_ForcedDepthVLevelMixin, Comparison):
+    """Comparison of hydrological mooring time series against products."""
+
     name = "comp_mooring"
     title = "Hydrological mooring"
     metazone_params = [
@@ -241,6 +403,8 @@ class CompMooring(_ForcedDepthVLevelMixin, Comparison):
 
 
 class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
+    """Comparison of drifter trajectories against oceanparcels simulations."""
+
     name = "comp_drifter"
     title = "Drifters"
     metazone_params = [
@@ -265,6 +429,26 @@ class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
     }
 
     def check_output(self, outputs):
+        """Remap generic otype names to drifter-specific ones, then validate.
+
+        Parameters
+        ----------
+        outputs : dict
+            Mapping of output name to output configuration; each
+            configuration's ``"otype"`` is remapped in place via
+            `otype_remap` before validation (e.g. ``"timeseries"`` becomes
+            ``"timeseries_drifter"``).
+
+        Returns
+        -------
+        dict
+            `outputs`, with `"otype"` values remapped.
+
+        Raises
+        ------
+        ArmoorError
+            If a (remapped) output's ``"otype"`` is not implemented.
+        """
         for oname, output in outputs.items():
             otype = output.get("otype")
             if otype in self.otype_remap:
@@ -272,27 +456,97 @@ class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
         return super().check_output(outputs)
 
     def validate_output_compatibility(self, oparams, mparams, metazone, output):
+        """Remap a generic otype name to its drifter-specific one, then check.
+
+        Parameters
+        ----------
+        oparams : dict
+            Output configuration for the metazone (unused, see base class).
+        mparams : dict
+            Metazone parameters.
+        metazone : str
+            Metazone name, used only for logging.
+        output : str
+            Output type name, remapped via `otype_remap` if applicable
+            before checking compatibility.
+
+        Returns
+        -------
+        bool
+            True if the (remapped) output can be processed, False otherwise.
+        """
         if output in self.otype_remap:
             output = self.otype_remap[output]
         return super().validate_output_compatibility(oparams, mparams, metazone, output)
 
     def preproc(self, ncs, **kwargs):
+        """Preprocess drifter/oceanparcels inputs before comparison.
+
+        Parameters
+        ----------
+        ncs : list of str
+            Paths to the loaded/colocated input files.
+        **kwargs
+            Must include ``freq_drift`` and ``period_drift``, forwarded to
+            `armoor.comp.output.preproc_comp_drifter`.
+
+        Returns
+        -------
+        object
+            The result of `preproc_comp_drifter`.
+        """
         from armoor.comp.output import preproc_comp_drifter
         return preproc_comp_drifter(
             ncs, kwargs.get("freq_drift"), runtime=kwargs.get("period_drift")
         )
 
     def compute_comparison(self, dt_comps, ds_ref, ds_prod, output):
+        """Compute drifter-specific comparison metrics.
+
+        Parameters
+        ----------
+        dt_comps : xarray.DataTree
+            The generic comparison result (unused; drifter comparisons are
+            computed from scratch by `_drifter`).
+        ds_ref : xarray.Dataset
+            Reference drifter dataset.
+        ds_prod : xarray.Dataset
+            Product (oceanparcels) dataset.
+        output : str
+            Output type name (``otype``).
+
+        Returns
+        -------
+        xarray.DataTree or None
+            See `_drifter`.
+        """
         return self._drifter(ds_ref, ds_prod, output)
 
     def _drifter(self, dsref, dsprod, output):
         """Compute drifter-specific comparison metrics.
 
-        For timeseries_drifter: haversine distance and bearing angle
+        For ``timeseries_drifter``: haversine distance and bearing angle
         differences between reference drifter trajectories and
         parcels-simulated trajectories, averaged across all particles per
-        time step. For maps_current_drifter / maps_trajectory_drifter: no
-        comparison is computed (returns None).
+        time step. For ``maps_current_drifter``/``maps_trajectory_drifter``:
+        no comparison is computed.
+
+        Parameters
+        ----------
+        dsref : xarray.Dataset
+            Reference drifter dataset with ``time``/``lon``/``lat``.
+        dsprod : xarray.Dataset
+            Product (oceanparcels) dataset with
+            ``time_parcels``/``lon_parcels``/``lat_parcels`` per particle.
+        output : str
+            Output type name (``otype``).
+
+        Returns
+        -------
+        xarray.DataTree or None
+            A one-node ``"diff"`` DataTree holding ``distance``/``direction``
+            data variables indexed by time, or None for
+            ``maps_current_drifter``/``maps_trajectory_drifter``.
         """
         if output in ("maps_current_drifter", "maps_trajectory_drifter"):
             return None
@@ -350,6 +604,8 @@ class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
 
 
 class CompModels(Comparison):
+    """Comparison of one reference model against other model products."""
+
     name = "comp_models"
     title = ""
     metazone_params = [
@@ -392,6 +648,8 @@ class CompModels(Comparison):
 
 
 class CompClim(Comparison):
+    """Comparison of model outputs against an observed hydrological climatology."""
+
     name = "comp_clim"
     title = "Hydrological climatology"
     metazone_params = ["tbound", "polygon", "href", "vlevel", "oceanvars", "bathy"]
@@ -413,7 +671,23 @@ class CompClim(Comparison):
 
 
 def get_comparison(func_comp: str) -> Comparison:
-    """Look up the Comparison instance registered for a func_comp string."""
+    """Look up the Comparison instance registered for a func_comp string.
+
+    Parameters
+    ----------
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_sst"``, ``"comp_argo"``).
+
+    Returns
+    -------
+    Comparison
+        The registered instance for `func_comp`.
+
+    Raises
+    ------
+    ArmoorError
+        If no `Comparison` subclass is registered under `func_comp`.
+    """
     try:
         return _REGISTRY[func_comp]
     except KeyError:

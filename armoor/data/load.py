@@ -216,14 +216,45 @@ class StagedDataset(str):
     """
 
     def __new__(cls, path, metazone):
+        """Create a str instance carrying an extra `.metazone` attribute.
+
+        Parameters
+        ----------
+        path : str
+            The zarr path (used as the string value itself).
+        metazone : str
+            Metazone name to attach.
+
+        Returns
+        -------
+        StagedDataset
+            A str equal to `path`, with `.metazone` set to `metazone`.
+        """
         obj = super().__new__(cls, path)
         obj.metazone = metazone
         return obj
 
 
 def save_result(dsout, mz_name, func_comp):
-    """Sauvegarde optimisée (< 30s)."""
-    # Préparer les chemins
+    """Save a processed dataset to zarr (optimized for < 30s writes).
+
+    Parameters
+    ----------
+    dsout : xarray.Dataset
+        Processed dataset to save; must carry ``data_name``/``data_ref``
+        attrs (and, if present, ``data_type``).
+    mz_name : str
+        Metazone name, used in the output path.
+    func_comp : str or None
+        Comparison type identifier (e.g. ``"comp_sst"``), used as a path
+        prefix; when None/empty, the path omits it.
+
+    Returns
+    -------
+    StagedDataset
+        The zarr path written, carrying `mz_name` as its `.metazone`
+        attribute.
+    """
     refprod = "ref" if dsout.attrs["data_ref"] == "True" else "prod"
     data_name = dsout.attrs["data_name"]
     parent_dir = f"{func_comp}/metazones" if func_comp else "metazones"
@@ -754,6 +785,30 @@ def load_datasets(data_cfg, metazones, dirout):
 
     Small datasets (< threshold after prefilter) are passed directly to
     processing.  Large datasets use the two-phase pipelined zarr path.
+
+    Before decoding, each dataset's `fmt` is resolved to a
+    `armoor.data.datatype.DataType` and validated against `metazones` via
+    `DataType.validate_load_params` (e.g. rejects interpolation params on
+    eddy-detection inputs); the resolved type's name is then attached to
+    every decoded sub-dataset as ``ds.attrs["data_type"]``.
+
+    Parameters
+    ----------
+    data_cfg : dict
+        Mapping of dataset key to its data.ini-schema configuration (must
+        include ``name``, ``path``, ``fmt``, and may include ``platform``,
+        ``ref``).
+    metazones : dict
+        Mapping of metazone name to its parameters.
+    dirout : str
+        Output directory identifier, forwarded to `save_result` as
+        `func_comp` (path prefix).
+
+    Returns
+    -------
+    list of StagedDataset
+        Paths of the saved zarr outputs, one per dataset×metazone
+        combination that produced data.
     """
     register_cf()
     ncouts = []

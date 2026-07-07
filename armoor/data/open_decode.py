@@ -220,41 +220,139 @@ class Decoder:
                 _DECODER_REGISTRY[fmt] = instance
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode `path_files` into a dataset. Must be overridden.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files (already resolved via
+            `get_paths`).
+        fmt : str
+            The exact fmt string that was requested (some decoders use it
+            internally, e.g. SstSatelliteDecoder).
+        platform : str, optional
+            Type of in-situ platform (argo/glider/mooring/drifter), used
+            only by the cmems_insitu/cora_insitu decoders.
+
+        Returns
+        -------
+        xarray.Dataset
+            Decoded dataset.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, in the base class.
+        """
         raise NotImplementedError
 
 
 class CmemsInsituDecoder(Decoder):
+    """CMEMS in-situ observations (argo/glider/mooring/drifter)."""
+
     name = "cmems_insitu"
     fmts = ("cmems_insitu",)
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode CMEMS in-situ files for a given platform.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Platform type: ``"argo"``, ``"glider"``, ``"mooring"`` or
+            ``"drifter"``.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_cmems_insitu`.
+        """
         logger.info("Opening/decoding insitu cmems files")
         return open_decode_cmems_insitu(path_files, platform=platform)
 
 
 class CoraInsituDecoder(Decoder):
+    """CORA in-situ observations."""
+
     name = "cora_insitu"
     fmts = ("cora_insitu",)
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode CORA in-situ files for a given platform.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Platform type.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_cora_insitu`.
+        """
         logger.info("Opening/decoding insitu cmems files")
         return open_decode_cora_insitu(path_files, platform=platform)
 
 
 class CmemsModelDecoder(Decoder):
+    """CMEMS gridded model output."""
+
     name = "cmems_model"
     fmts = ("cmems_model",)
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode CMEMS model files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_cmems_model`.
+        """
         logger.info("Opening/decoding model cmems files")
         return open_decode_cmems_model(path_files)
 
 
 class ArmoorDecoder(Decoder):
+    """Already-armoor-formatted netcdf files (pass-through decode)."""
+
     name = "armoor"
     fmts = ("armoor",)
 
     def decode(self, path_files, fmt, platform=None):
+        """Open already-armoor-formatted files with no format conversion.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            The multi-file dataset, with ``depth`` reset to a data
+            variable if it was a coordinate.
+        """
         logger.info("Opening armoor files")
         ds = xr.open_mfdataset(path_files)
         if "depth" in ds:
@@ -263,70 +361,216 @@ class ArmoorDecoder(Decoder):
 
 
 class SstSatelliteDecoder(Decoder):
+    """Satellite SST products (cmems_sst_l4, cmems_sst_l3, cersat_sst_l3)."""
+
     name = "sst_satellite"
     fmts = ("cmems_sst_l4", "cmems_sst_l3", "cersat_sst_l3")
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode satellite SST files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            The exact fmt requested (``"cmems_sst_l4"``, ``"cmems_sst_l3"``
+            or ``"cersat_sst_l3"``); used to look up the matching CF meta
+            specs.
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_sst_satellite`.
+        """
         logger.info("Opening/decoding sst satellite files")
         return open_decode_sst_satellite(path_files, fmt)
 
 
 class HycomDecoder(Decoder):
+    """HYCOM ocean-model output (hycom, hycom3d)."""
+
     name = "hycom"
     fmts = ("hycom", "hycom3d")
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode HYCOM files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (``"hycom"`` and ``"hycom3d"`` share this decoder and
+            need no internal branching).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_hycom`.
+        """
         logger.info("Opening/decoding hycom files")
         return open_decode_hycom(path_files)
 
 
 class CrocoDecoder(Decoder):
+    """CROCO ocean-model output (croco, croco_xios)."""
+
     name = "croco"
     fmts = ("croco", "croco_xios")
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode CROCO files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            The exact fmt requested (``"croco"`` or ``"croco_xios"``);
+            forwarded for routing but not consumed internally.
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_croco`.
+        """
         logger.info("Opening/decoding croco files")
         return open_decode_croco(path_files, fmt)
 
 
 class SloopDecoder(Decoder):
+    """Sloop output files."""
+
     name = "sloop"
     fmts = ("sloop",)
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode Sloop files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_sloop`.
+        """
         logger.info("Opening/decoding sloop files")
         return open_decode_sloop(path_files)
 
 
 class ArpegeInstaDecoder(Decoder):
+    """Instantaneous Arpege GRIB2 atmospheric forcing files."""
+
     name = "arpege_insta"
     fmts = ("arpege_insta",)
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode instantaneous Arpege files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_arpege_insta`.
+        """
         logger.info("Opening/decoding instantaneous arpege files")
         return open_decode_arpege_insta(path_files)
 
 
 class Woa18Decoder(Decoder):
+    """WOA18 climatology."""
+
     name = "woa18"
     fmts = ("woa18",)
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode WOA18 climatology files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_woa18`.
+        """
         logger.info("Opening/decoding woa18 climato")
         return open_decode_woa18(path_files)
 
 
 class BobyclimDecoder(Decoder):
+    """Bobyclim climatology."""
+
     name = "bobyclim"
     fmts = ("bobyclim",)
 
     def decode(self, path_files, fmt, platform=None):
+        """Decode Bobyclim climatology files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_bobyclim`.
+        """
         logger.info("Opening/decoding Bobyclim climato")
         return open_decode_bobyclim(path_files)
 
 
 def get_decoder(fmt) -> Decoder:
-    """Look up the Decoder for a data.ini/comp.ini `fmt` value."""
+    """Look up the Decoder for a data.ini/comp.ini `fmt` value.
+
+    Parameters
+    ----------
+    fmt : str
+        Input format identifier.
+
+    Returns
+    -------
+    Decoder
+        The registered instance for `fmt`.
+
+    Raises
+    ------
+    ArmoorError
+        If no `Decoder` subclass is registered under `fmt`.
+    """
     if fmt not in _DECODER_REGISTRY:
         raise ArmoorError(f"Unknown format: {fmt!r}")
     return _DECODER_REGISTRY[fmt]
@@ -350,6 +594,11 @@ def open_decode(path_files, fmt, platform=None) -> xr.Dataset:
     -------
     xarray.Dataset
         Model or observation dataset.
+
+    Raises
+    ------
+    ArmoorError
+        If `fmt` is not a registered format (see `get_decoder`).
     """
     path_files = get_paths(path_files)
     result = get_decoder(fmt).decode(path_files, fmt, platform=platform)
@@ -357,6 +606,21 @@ def open_decode(path_files, fmt, platform=None) -> xr.Dataset:
 
 
 def open_decode_arpege_insta(path_files):
+    """Open and decode instantaneous Arpege GRIB2 atmospheric forcing files.
+
+    Merges the 0/2/10 m levels for each file, concatenates over time, and
+    renames coordinates to the armoor convention (lon/lat/time).
+
+    Parameters
+    ----------
+    path_files : list of str
+        Paths to the GRIB2 files.
+
+    Returns
+    -------
+    xarray.Dataset
+        Decoded, time-sorted dataset.
+    """
     logger.info("atmfrc - insta")
     insta_gribs = path_files
     cfspecs = xmeta.get_meta_specs("meteofrance")

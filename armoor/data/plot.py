@@ -43,7 +43,18 @@ class _PlotDataBase(SubclassingMethodRegistry):
     _dispatch_label = "Data plot"
 
     def __init__(self, dt, metazone, vminmax=None):
-        """Initialize with an already-open datatree (see get_plotter)."""
+        """Initialize with an already-open datatree (see `get_plotter`).
+
+        Parameters
+        ----------
+        dt : xarray.DataTree
+            Already-open output datatree to plot from.
+        metazone : str
+            Metazone name, used in plot titles/filenames.
+        vminmax : dict, optional
+            Mapping of variable name to a ``(vmin, vmax)`` pair, overriding
+            the automatic color/axis scaling for that variable.
+        """
         self.methods = {}
         self.metazone = metazone
         self.ax_minimap = [0.7, 0.91, 0.19]
@@ -52,10 +63,28 @@ class _PlotDataBase(SubclassingMethodRegistry):
         self.__post_init__()
 
     def clean(self):
+        """Close the underlying datatree.
+
+        Returns
+        -------
+        None
+        """
         self.dt.close()
 
     def save_figure(self, fig, filename):
-        """Save figure."""
+        """Save a matplotlib figure to disk, creating parent directories.
+
+        Parameters
+        ----------
+        fig : matplotlib.figure.Figure
+            Figure to save.
+        filename : str or Path
+            Destination path.
+
+        Returns
+        -------
+        None
+        """
         logger.info(f'save plot {filename}')
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
@@ -68,6 +97,21 @@ class PlotOceanModel(_PlotDataBase):
     and maps) -- today's only real-world data type, moved verbatim."""
 
     def _mdiagts(self, dsprod, figtitle, figname):
+        """Render and save a multi-profile theta-salinity diagram.
+
+        Parameters
+        ----------
+        dsprod : xarray.Dataset
+            Stacked product profiles with ``ptemp``/``sal``/``depth``.
+        figtitle : str
+            Title template, formatted with the local namespace.
+        figname : str
+            Output path template, formatted with the local namespace.
+
+        Returns
+        -------
+        None
+        """
         fig, axes = create_subplots(
             ncols=1,
             figsize=(8, 8),
@@ -292,7 +336,22 @@ class PlotOceanModel(_PlotDataBase):
                     )    
         
     def _mvprofiles(self, dsprod, figtitle, figname):
-        
+        """Render and save multiple vertical profiles, one figure per variable.
+
+        Parameters
+        ----------
+        dsprod : xarray.Dataset
+            Product profiles with a ``z``/``depth`` vertical dimension.
+        figtitle : str
+            Title template, formatted per variable via the local namespace.
+        figname : str
+            Output path template, formatted per variable via the local
+            namespace.
+
+        Returns
+        -------
+        None
+        """
         ref_color = "k"
         prod_color = "slateblue"
 
@@ -785,6 +844,22 @@ def get_plotter(nc, metazone, vminmax=None):
     Falls back to PlotOceanModel for datatrees missing the data_type attr
     (older outputs written before this attr existed) or carrying an
     unrecognized one.
+
+    Parameters
+    ----------
+    nc : str
+        Path to the zarr datatree holding the output to plot.
+    metazone : str
+        Metazone name, used in plot titles/filenames.
+    vminmax : dict, optional
+        Mapping of variable name to a ``(vmin, vmax)`` pair, forwarded to
+        the plotter.
+
+    Returns
+    -------
+    _PlotDataBase
+        A `PlotOceanModel` or `PlotEddies` instance, with the datatree
+        already open.
     """
     dt = xr.open_datatree(nc)
     type_name = dt.children["data"].attrs.get("data_type")
@@ -793,7 +868,23 @@ def get_plotter(nc, metazone, vminmax=None):
 
 
 def main_plot(ncins, metazones, cfg_outputs):
-    """Process using dask.bag for functional mapping"""
+    """Generate all requested plots for a set of armoor-data outputs.
+
+    Parameters
+    ----------
+    ncins : dict
+        Mapping of output name to ``{metazone: [zarr_paths]}``.
+    metazones : list of str
+        Metazone names to plot (others in `ncins` are skipped).
+    cfg_outputs : dict
+        Mapping of output name to its output configuration (may hold a
+        ``vminmax`` entry).
+
+    Returns
+    -------
+    None
+        Figures are written to disk as a side effect.
+    """
 
     def process_task(nc, metazone, output, vminmax):
         plotcomp = get_plotter(nc, metazone, vminmax)

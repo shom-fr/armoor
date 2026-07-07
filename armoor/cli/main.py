@@ -404,6 +404,55 @@ def _detect_scheduler(hosts_cfg=None):
 def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
               ofilter, ocoloc, no_plot, plot_only, input_json,
               kw_dask, comp_args={}, load_only=None, input_zarrs=None):
+    """Run (a stage of) the armoor-comp-* pipeline: load, colocate, output, plot.
+
+    Also serves as the per-wave worker entry point for the HPC pipeline
+    (`armoor.cli.hpc.run_hpc`) via the `load_only`/`input_zarrs`/`no_plot`/
+    `plot_only` arguments, which each activate a single-stage mode instead
+    of running the full pipeline.
+
+    Parameters
+    ----------
+    cfgfile : Path
+        Path to the comp.ini-schema data/outputs configuration file.
+    metafile : Path
+        Path to the metazones.ini-schema metazone configuration file.
+    metazones : list of str
+        Metazone names to process.
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_sst"``).
+    jsonfile : Path
+        Output path for the final JSON listing generated files (may contain
+        a ``{func_comp}`` placeholder).
+    ofilter : bool
+        If True, stop after filtering/loading and write netcdf outputs.
+    ocoloc : bool
+        If True, stop after colocation and write netcdf outputs.
+    no_plot : bool
+        If True, skip plotting (HPC Wave-1 mode: compute outputs only).
+    plot_only : str or None
+        If set, skip load/coloc/output and only plot this otype from
+        `input_json` (HPC Wave-3 mode).
+    input_json : Path or None
+        Zarr-outputs JSON to read from when `plot_only` is set.
+    kw_dask : tuple
+        Dask configuration arguments (n_workers, ...).
+    comp_args : dict, optional
+        Extra comparison-specific arguments (e.g. ``qc``, ``tbound``,
+        ``radius``, ``freq_drift``, ``period_drift``).
+    load_only : str or None, optional
+        If set, only load this dataset key for all metazones and write its
+        zarr paths JSON (HPC Wave-0 mode).
+    input_zarrs : list of str or None, optional
+        Pre-loaded dataset JSONs to read from instead of calling
+        `load_datasets` (HPC Wave-1 mode).
+
+    Returns
+    -------
+    None
+        Results are written to `jsonfile` (and to zarr/netcdf/png files on
+        disk); nothing is returned.
+    """
     import dask
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs

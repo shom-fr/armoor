@@ -473,6 +473,33 @@ class ArmoorFilters:
     
     @staticmethod
     def oceanvars_filter(ds, vnames):
+        """Keep only the requested (or derived) ocean variables.
+
+        Each name in `vnames` is resolved via the ``ds.oceanvars`` accessor
+        (selecting it directly if present, or deriving it from related
+        variables, e.g. ptemp from temp+sal); depth/pdens/time/lon/lat are
+        re-attached as coordinates on the result.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Input dataset to filter.
+        vnames : list of str
+            Ocean variable names to keep (see `armoor.base.oceanvars.OceanVars.sel`
+            for the set of recognized names).
+
+        Returns
+        -------
+        xarray.Dataset
+            Dataset containing only `vnames` as data variables, with the
+            original depth/pdens/time/lon/lat coordinates preserved.
+
+        Raises
+        ------
+        ArmoorError
+            If a name in `vnames` is unrecognized, or cannot be derived
+            from what's available in `ds`.
+        """
         logger.info("oceanvars filter")
         coords = []
         for coord in ["depth", "pdens", "time", "lon", "lat"]:
