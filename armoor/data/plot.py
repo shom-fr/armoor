@@ -22,7 +22,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts
 
 from armoor.base import LINE_COLORS, CMAP_VARS
-from armoor.base.dispatch import MethodRegistry
+from armoor.base.dispatch import SubclassingMethodRegistry
 from armoor.base.filters import create_optimized_mask
 from armoor.base.interp import vinterp
 from armoor.base.io import setup_dask_client
@@ -36,24 +36,37 @@ plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({'font.size': 8})
 
 
-class PlotData(MethodRegistry):
-    """Class for plot data."""
+class _PlotDataBase(SubclassingMethodRegistry):
+    """Shared plumbing for all data-source plot types: open the datatree,
+    dispatch plot methods by name (see armoor.base.dispatch)."""
 
     _dispatch_label = "Data plot"
 
-    def __init__(self, nc, metazone, vminmax=None):
-        """Initialize the AbstractPlotData instance with an empty dictionary to store methods."""
+    def __init__(self, dt, metazone, vminmax=None):
+        """Initialize with an already-open datatree (see get_plotter)."""
         self.methods = {}
         self.metazone = metazone
         self.ax_minimap = [0.7, 0.91, 0.19]
-        self.dt = xr.open_datatree(nc)
+        self.dt = dt
         self.vminmax = vminmax
         self.__post_init__()
 
-
     def clean(self):
         self.dt.close()
-    
+
+    def save_figure(self, fig, filename):
+        """Save figure."""
+        logger.info(f'save plot {filename}')
+        filename = Path(filename)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        save_figure(fig, filename)
+        del fig
+
+
+class PlotOceanModel(_PlotDataBase):
+    """Plot methods for ocean-model gridded output (ptemp/sal/depth profiles
+    and maps) -- today's only real-world data type, moved verbatim."""
+
     def _mdiagts(self, dsprod, figtitle, figname):
         fig, axes = create_subplots(
             ncols=1,
@@ -743,25 +756,47 @@ class PlotData(MethodRegistry):
             # axes[0].set_position(pos0)
             
             fig.suptitle(figtitle)
-            
+
             self.save_figure(fig, figname)
-                        
-        
+
+
         return None
-    
-    def save_figure(self, fig, filename):
-        """Save figure."""
-        logger.info(f'save plot {filename}')
-        filename = Path(filename)
-        filename.parent.mkdir(parents=True, exist_ok=True)
-        save_figure(fig, filename)
-        del fig
+
+
+class PlotEddies(_PlotDataBase):
+    """Plot methods for eddy-detection tool output (contour_lat/contour_lon,
+    center_lat/center_lon, eddy_type, vmax_area -- no depth/ptemp/sal, so
+    none of PlotOceanModel's methods apply).
+
+    No methods yet -- calling any output method raises a clear ArmoorError
+    via the inherited call() dispatch until eddy plotting is designed.
+    """
+
+
+_PLOT_REGISTRY = {
+    "ocean_model": PlotOceanModel,
+    "eddies": PlotEddies,
+}
+
+
+def get_plotter(nc, metazone, vminmax=None):
+    """Open a zarr datatree and return the plotter for its data type.
+
+    Falls back to PlotOceanModel for datatrees missing the data_type attr
+    (older outputs written before this attr existed) or carrying an
+    unrecognized one.
+    """
+    dt = xr.open_datatree(nc)
+    type_name = dt.children["data"].attrs.get("data_type")
+    plot_cls = _PLOT_REGISTRY.get(type_name, PlotOceanModel)
+    return plot_cls(dt, metazone, vminmax)
+
 
 def main_plot(ncins, metazones, cfg_outputs):
     """Process using dask.bag for functional mapping"""
 
     def process_task(nc, metazone, output, vminmax):
-        plotcomp = PlotData(nc, metazone, vminmax)
+        plotcomp = get_plotter(nc, metazone, vminmax)
         plotcomp.call(output)
         plotcomp.clean()
         del plotcomp

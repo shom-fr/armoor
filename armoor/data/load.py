@@ -17,6 +17,7 @@ import armoor  # noqa: F401 — registers all xarray accessors (ds.filters, …)
 from armoor.base.io import (setup_dask_client, create_fast_encoding,
                             write_dataset_to_zarr, compute_bundled_zarr_writes)
 from armoor.base.misc import optimize_for_low_swap
+from armoor.data.datatype import get_data_type
 from armoor.data.open_decode import open_decode, register_cf
 
 
@@ -160,6 +161,7 @@ def process_single_combination(ds, mz_name, mz_param):
     
     data_name = ds.attrs["data_name"]
     data_ref = ds.attrs["data_ref"]
+    data_type = ds.attrs.get("data_type")
 
     # Build filters configuration
     filters_config = build_filters_config(mz_param, data_name)
@@ -194,6 +196,7 @@ def process_single_combination(ds, mz_name, mz_param):
         dsout.attrs = {
             "data_name": data_name,
             "data_ref": data_ref,
+            "data_type": data_type,
         }
 
     elapsed = time.time() - start_time
@@ -763,6 +766,9 @@ def load_datasets(data_cfg, metazones, dirout):
         logger.info(f"Load {dataset_name}...")
         start_time = time.time()
 
+        data_type = get_data_type(cfg_data["fmt"])
+        data_type.validate_load_params(cfg_data["fmt"], metazones)
+
         try:
             dss = open_decode(
                 cfg_data["path"],
@@ -783,6 +789,7 @@ def load_datasets(data_cfg, metazones, dirout):
             else:
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
             ds.attrs["data_ref"] = str(cfg_data.get("ref"))
+            ds.attrs["data_type"] = data_type.name
 
         # Apply union prefilter FIRST so the size decision is made on
         # the actual data volume, not the full global domain.
