@@ -46,6 +46,8 @@ class OceanVars:
             return self.ds.oceanvars.sel_current_direction()
         elif varname == "cspeed":
             return self.ds.oceanvars.sel_current_speed()
+        elif varname == "mld":
+            return self.ds.oceanvars.sel_mld()
     
     def sel_current_direction(self):
         if "cdir" in self.ds:
@@ -117,8 +119,13 @@ class OceanVars:
             return self.ds["temp"]
         if "ptemp" in self.ds:
             sal = self.sel_sal()
-            ptemp = self.sel_ptemp()
             pres = self.sel_pres()
+            if not isinstance(sal, xr.DataArray) or not isinstance(pres, xr.DataArray):
+                logger.warning(
+                    "No salinity or pressure found, in situ temperature cannot be computed."
+                )
+                return None
+            ptemp = self.sel_ptemp()
             cons_temp = _gsw_ufunc(gsw.CT_from_pt, sal, ptemp)
             temp = _gsw_ufunc(gsw.t_from_CT, sal, cons_temp, pres)
             temp.attrs["units"] = "degC"
@@ -146,6 +153,9 @@ class OceanVars:
             # spatial dimensions, which can create huge intermediate arrays
             # on gridded products. The lat dependence in p_from_z is only
             # a minor gravity correction (~0.5%).
+            if "lat" not in self.ds:
+                logger.warning("pressure cannot be computed")
+                return None
             lat = float(self.ds.lat.mean())
             pres = gsw.conversions.p_from_z(-self.ds.depth, lat)
             # Cache to avoid recomputing (sel_pdens calls sel_pres
@@ -244,4 +254,44 @@ class OceanVars:
         self.ds["sndspeed"] = snd_speed
         return self.ds["sndspeed"]
 
-        
+    def sel_mld(self):
+        """
+        Compute the mixed layer depth.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing the mixed layer depth.
+        """
+        from xoa.thermdyn import mixed_layer_depth
+
+        logger.info(
+                "COMPUTE MLD"
+        ) 
+        if "mld" not in self.ds:
+            ptemp = self.sel_ptemp()
+            if not isinstance(ptemp, xr.DataArray):
+                logger.warning("Potential temperature cannot be computed")
+                return None
+            if "depth" not in self.ds:
+                logger.warning(
+                    "No depth coordinate found, mixed layer depth cannot be computed"
+                )
+                return None
+            # armoor.data.open_decode.register_cf() registers per-format CF
+            # specs (cmems_argo, cmems_model, ...) into xoa's global meta
+            # specs registry. Without this, xoa.meta.get_meta_specs infers
+            # the "best matching" spec for ptemp from its coordinate names,
+            # which can select a per-format spec that doesn't declare
+            # "depth" as a coordinate (e.g. cmems_model only knows lon/lat),
+            # making xoa.thermdyn.mixed_layer_depth fail with
+            # "No depth coordinate found" even though ptemp does carry a
+            # valid CF depth coordinate. Force xoa's generic default specs
+            # so the depth coordinate is always recognized.
+            ptemp = ptemp.copy()
+            ptemp.encoding["meta_specs"] = "default"
+            mld = mixed_layer_depth(ptemp, method='deltatemp')
+            mld.attrs["units"] = "m"
+            self.ds["mld"] = mld
+
+        return self.ds["mld"]

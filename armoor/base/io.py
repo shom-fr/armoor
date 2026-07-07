@@ -13,6 +13,7 @@ from dask.diagnostics import ProgressBar
 # dask.distributed is imported lazily in setup_dask_client to avoid the
 # heavy import cost at module load time on NFS HPC filesystems.
 from numcodecs import Blosc
+from armoor.comp import COLOCATION_PARAMS_DEFAULT, COLOCATION_PARAMS_USER, COMP_VARS
 
 logger = logging.getLogger(__name__)
 
@@ -714,3 +715,18 @@ def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List
         ncouts[suff].append(nc)
 
     return ncouts
+
+
+def _compute_oceanvars(ds, func_comp):
+    """Compute derived oceanographic variables on a colocated dataset.
+
+    Derived variables (pdens, sndspeed, temp-from-ptemp, …) are computed
+    here rather than during colocation so that the expensive gsw calls
+    run on the small colocated data, not the full product grid.
+    """
+    for var in COMP_VARS[func_comp]:
+        if var not in ds.data_vars:
+            da = ds.oceanvars.sel(var)
+            if isinstance(da, xr.DataArray):
+                ds[var] = da
+    return ds
