@@ -7,9 +7,6 @@ this would have incorrectly treated e.g. otype="maps" as valid (ocean
 model's own entry), letting eddy data reach stats code that assumes
 ptemp/depth. Now it must be skipped (logged forbidden, no crash).
 """
-import numpy as np
-import xarray as xr
-
 from armoor.data.datatype import DataEddies, DataOceanModel
 from armoor.data.output import OutputProcessor
 
@@ -48,7 +45,7 @@ class TestGenerateOutputsPerType:
         assert ncouts == {}
 
 
-class TestProcessDatasetsMparamsNotCorrupted:
+class TestPrepareInterpolationParamsDoesNotCorruptMetazones:
     """Regression test for the mparams=None crash.
 
     _prepare_interpolation_params used to mutate the caller's metazones dict
@@ -59,26 +56,20 @@ class TestProcessDatasetsMparamsNotCorrupted:
     "TypeError: argument of type 'NoneType' is not iterable" the moment a
     metazone had no interpolation params configured at all -- an entirely
     ordinary case (see REFACTOR_PLAN_DATA_DATATYPE.md follow-up).
+
+    Exercised directly at this level (no real dataset/file I/O) since the
+    bug lives entirely in the metazones-dict handling, not in dataset
+    processing itself.
     """
 
-    def test_metazone_without_interpolation_params_does_not_crash(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        ds = xr.Dataset(
-            {"ptemp": (("time",), np.random.rand(3).astype("float32"))},
-            coords={"time": np.arange(3), "lon": 10.0, "lat": 40.0},
-        )
-        ds.attrs["data_name"] = "model1"
-        ds.attrs["data_ref"] = "False"
-        ds.attrs["data_type"] = "ocean_model"
-        nc = tmp_path / "model1.nc"
-        ds.to_netcdf(nc)
-
+    def test_metazone_without_interpolation_params_stays_intact(self):
         # No vlevel/vfreq at all -- exactly the case that used to null out
-        # this same metazone dict before _apply_range_processing read it.
+        # this same metazone dict before _process_metazone read it.
         metazones = {"mz1": {}}
         processor = OutputProcessor()
-        result = processor.process_datasets([str(nc)], metazones, {})
 
-        assert result == {}
+        interp_params = processor._prepare_interpolation_params(metazones)
+
+        assert interp_params == {"mz1": None}
         # The caller's own metazones dict must come out exactly as it went in.
         assert metazones == {"mz1": {}}
