@@ -528,7 +528,7 @@ def main_filters_oceanvars():
     
     .. code-block:: bash
     
-        armoor-filters-quality input.nc output.nc ptemp sal
+        armoor-filters-oceanvars input.nc output.nc ptemp sal
     
     Notes
     -----

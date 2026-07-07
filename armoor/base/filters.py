@@ -20,6 +20,7 @@ import xarray as xr
 # xoa.filter, xoa.geo, matplotlib.path, scipy.signal, scipy.ndimage
 # are imported lazily inside the functions that need them.
 
+from armoor import ArmoorError
 from armoor.base.interp import grid2loc, regrid
 # open_decode imported lazily (see bathy filter) to avoid pulling in xoa/pyproj
 # at `import armoor` time.
@@ -480,10 +481,14 @@ class ArmoorFilters:
         dss = []
         for vname in vnames:
             logger.info(vname)
-            # da = ds.oceanvars.sel(vname)
-            dss.append(
-                ds.oceanvars.sel(vname).to_dataset(name=vname)
+            selected = ds.oceanvars.sel(vname)
+            if selected is None:
+                raise ArmoorError(
+                    f"Cannot select or compute ocean variable '{vname}': "
+                    "unknown variable name, or missing dependencies in the "
+                    "input dataset."
                 )
+            dss.append(selected.to_dataset(name=vname))
         dso = xr.merge(dss)
         coords2set = []
         for coord in coords:
