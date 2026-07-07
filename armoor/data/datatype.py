@@ -8,14 +8,18 @@ which solves the same shape of problem for ``armoor-comp-*``.
 """
 from armoor import ArmoorError
 
-_REGISTRY = {}  # fmt string -> DataType instance
+_REGISTRY = {}     # fmt string -> DataType instance
+_BY_NAME = {}      # DataType.name -> DataType instance
 
 
 class DataType:
     """One kind of armoor-data input.
 
     Subclasses register themselves under every fmt string listed in
-    ``fmts`` (many fmt values can map to the same type).
+    ``fmts`` (many fmt values can map to the same type), and under their
+    own ``name`` (used to recover the type later from ``ds.attrs["data_type"]``,
+    since `fmt` itself doesn't survive past the initial load -- see
+    armoor.data.load).
     """
 
     name = None
@@ -28,6 +32,7 @@ class DataType:
         super().__init_subclass__(**kwargs)
         if cls.name is not None:
             instance = cls()
+            _BY_NAME[cls.name] = instance
             for fmt in cls.fmts:
                 _REGISTRY[fmt] = instance
 
@@ -119,3 +124,12 @@ def get_data_type(fmt: str) -> DataType:
     today's implicit, universal behavior.
     """
     return _REGISTRY.get(fmt, _REGISTRY["hycom"])
+
+
+def get_data_type_by_name(name) -> DataType:
+    """Look up the DataType by its canonical name (e.g. ds.attrs["data_type"]).
+
+    Falls back to ocean_model for None/unrecognized names -- covers older
+    outputs written before this attr existed.
+    """
+    return _BY_NAME.get(name, _BY_NAME["ocean_model"])

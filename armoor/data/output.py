@@ -14,7 +14,8 @@ from armoor.base.io import (
     )
 from armoor.base.misc import optimize_for_low_swap, validate_metazone_params
 import armoor.base.ranges as ranges
-from armoor.data import INTERP_PARAMS_USER, OUTPUTS_PARAMS
+from armoor.data import INTERP_PARAMS_USER
+from armoor.data.datatype import get_data_type_by_name
 from armoor.data.interp import (
     process_time_interpolation,
     process_horizontal_interpolation,
@@ -330,18 +331,19 @@ class OutputProcessor:
         dsin = self._load_and_prepare_dataset(nc_file)
         attrs_in = dsin.attrs
         prod_name = attrs_in.get("data_name")
-        
+        outputs_params = get_data_type_by_name(attrs_in.get("data_type")).outputs_params
+
         try:
             # Process each metazone
             for metazone, params in interp_params.items():
                 fouts = self._process_metazone(
                     dsin, metazone, metazones[metazone], params, attrs_in
                 )
-                
+
                 # Generate outputs for this metazone
                 ncouts = self._generate_outputs(
-                    fouts, metazone, metazones[metazone], outputs, 
-                    prod_name, ncouts
+                    fouts, metazone, metazones[metazone], outputs,
+                    prod_name, ncouts, outputs_params
                 )
                 
         finally:
@@ -553,11 +555,12 @@ class OutputProcessor:
     
     def _generate_outputs(self, fouts: List[Path], metazone: str,
                          mparams: Dict[str, Any], outputs: Dict[str, Any],
-                         prod_name: str, 
-                         ncouts: Dict[str, Dict[str, List[Path]]]) -> Dict[str, Dict[str, List[Path]]]:
+                         prod_name: str,
+                         ncouts: Dict[str, Dict[str, List[Path]]],
+                         outputs_params: Dict[str, Any]) -> Dict[str, Dict[str, List[Path]]]:
         """
         Generate output files for a metazone.
-        
+
         Parameters
         ----------
         fouts
@@ -572,21 +575,24 @@ class OutputProcessor:
             Product name
         ncouts
             Accumulator for output paths
-            
+        outputs_params
+            Per-otype processing params for this dataset's data type
+            (DataType.outputs_params -- see armoor.data.datatype)
+
         Returns
         -------
         Updated ncouts dictionary
         """
         for oname, output in outputs.items():
             logger.info(f"Processing output: {oname}")
-            
+
             # Check if output type is allowed and compatible
-            if not self._validate_output_compatibility(output, mparams, metazone):
+            if not self._validate_output_compatibility(output, mparams, metazone, outputs_params):
                 continue
-            
+
             # Process this output type
             output_files = self._process_output_type(
-                fouts, output, metazone, mparams, prod_name, oname
+                fouts, output, metazone, mparams, prod_name, oname, outputs_params
             )
             
             # Add to results
@@ -600,11 +606,12 @@ class OutputProcessor:
         return ncouts
     
     def _validate_output_compatibility(self, output: Dict[str, Any],
-                                     mparams: Dict[str, Any], 
-                                     metazone: str) -> bool:
+                                     mparams: Dict[str, Any],
+                                     metazone: str,
+                                     outputs_params: Dict[str, Any]) -> bool:
         """
         Validate if an output type is compatible with the metazone parameters.
-        
+
         Parameters
         ----------
         output
@@ -613,12 +620,14 @@ class OutputProcessor:
             Metazone parameters
         metazone
             Metazone name
-            
+        outputs_params
+            Per-otype processing params for this dataset's data type
+
         Returns
         -------
         True if compatible, False otherwise
         """
-        oparams = OUTPUTS_PARAMS.get(output.get("otype"))
+        oparams = outputs_params.get(output.get("otype"))
         if not oparams:
             logger.warning(f"Skip {output.get('otype')}: forbidden")
             return False
@@ -647,10 +656,11 @@ class OutputProcessor:
     
     def _process_output_type(self, fouts: List[Path], output: Dict[str, Any],
                            metazone: str, mparams: Dict[str, Any],
-                           prod_name: str, oname: str) -> List[Path]:
+                           prod_name: str, oname: str,
+                           outputs_params: Dict[str, Any]) -> List[Path]:
         """
         Process a specific output type.
-        
+
         Parameters
         ----------
         fouts
@@ -665,12 +675,14 @@ class OutputProcessor:
             Product name
         oname
             Output name
-            
+        outputs_params
+            Per-otype processing params for this dataset's data type
+
         Returns
         -------
         List of generated output files
         """
-        oparams = OUTPUTS_PARAMS.get(output.get("otype"))
+        oparams = outputs_params.get(output.get("otype"))
         logger.info(f"Output parameters: {oparams}")
         
         sort_dim = oparams.get("sort")
