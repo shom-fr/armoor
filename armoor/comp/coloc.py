@@ -668,6 +668,7 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
         "v":     {"cdir", "cspeed"},
         "cdir":  {"u", "v"},
         "cspeed": {"u", "v"},
+        "mld": {"ptemp", "temp", "sal", "pres"},
     }
     needed = set(COMP_VARS[comp_func])
     vars_to_keep = needed & set(ds.data_vars)
@@ -801,6 +802,35 @@ def _apply_vertical_ranges(dsref_list, dsprod_list, params, comp_func):
     return get_comparison(comp_func).apply_vertical_ranges(dsref_list, dsprod_list, params)
 
 
+def _split_by_dims(ds):
+    """Split a dataset into sub-datasets grouped by variable dimension signature."""
+    groups = {}
+    for var in ds.data_vars:
+        key = frozenset(ds[var].dims)
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(var)
+    return {key: ds[vars_list] for key, vars_list in groups.items()}
+
+def select_vars_by_dims(prod_groups, sig):
+    """ Extract all the variables from a dataset
+    depending at least on dimensions in sig.
+
+    Returns None, like a plain dict .get(), when no product group matches
+    -- callers already skip that ref group in that case (e.g. a comp_func
+    whose product simply has no counterpart for this signature).
+    """
+    sig = set(sig)
+
+    for group, ds in prod_groups.items():
+        group = set(group)
+
+        if sig == group.intersection(sig) and len(sig) == len(group) - ("member" in group):
+            return ds
+
+    return None
+
+
 def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, prod_name):
     """Save colocation results to files.
 
@@ -906,16 +936,39 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
     dsref = dsref.assign_attrs(gattrs_ref)
     dsprod = dsprod.assign_attrs(gattrs_prod)
 
-    # # Ensure results are numpy-backed (some colocation ops may create dask arrays).
-    # # Limit threads to avoid OOM from too many concurrent allocations.
-    # logger.info("Compute coloc ref and prod")
-    # with dask.config.set(num_workers=4):
-    #     dsref = dsref.load()
-    #     dsprod = dsprod.load()
+    comparison = get_comparison(comp_func)
+    dsref = comparison.compute_oceanvars(dsref)
+    dsprod = comparison.compute_oceanvars(dsprod)
 
-    # Apply ranges
-    dssref, dssprod = _apply_time_ranges(dsref, dsprod, params, tbound)
-    dssref, dssprod = _apply_vertical_ranges(dssref, dssprod, params, comp_func)
+    # Set depth/pres as coordinate if needed
+    for vcoord in ["depth", "pres"]:
+        if vcoord in dsref.data_vars:
+            dsref = dsref.set_coords(vcoord)
+        if vcoord in dsprod.data_vars:
+            dsprod = dsprod.set_coords(vcoord)
+
+    # Split by dimension signature, then apply ranges per group conditionally
+    ref_groups = _split_by_dims(dsref)
+    prod_groups = _split_by_dims(dsprod)
+
+    dssref = []
+    dssprod = []
+    for sig, sub_ref in ref_groups.items():
+        sub_prod = select_vars_by_dims(prod_groups, sig)
+
+        if sub_ref is None or sub_prod is None:
+            continue
+
+        if "time" in sub_ref.dims:
+            sub_ref_list, sub_prod_list = _apply_time_ranges(sub_ref, sub_prod, params, tbound)
+        else:
+            sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]
+
+        if "z" in sub_ref.dims:
+            sub_ref_list, sub_prod_list = _apply_vertical_ranges(sub_ref_list, sub_prod_list, params, comp_func)
+
+        dssref.extend(sub_ref_list)
+        dssprod.extend(sub_prod_list)
 
     # Save results and return paths
     paths = _save_colocation_results(

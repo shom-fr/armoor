@@ -8,6 +8,7 @@ from typing import Dict, List, Any, Tuple
 import dask
 import pandas as pd
 import xarray as xr
+from collections import defaultdict
 
 from armoor import ArmoorError
 from armoor.base.io import (
@@ -15,6 +16,7 @@ from armoor.base.io import (
     sort_ncs_by_suffix,
     write_dataset_to_zarr
     )
+from armoor.comp import GROUP_SUFFIX
 from armoor.comp.comparison import get_comparison
 from armoor.comp.stats import StatsComp
 import armoor  # noqa: F401 — registers all xarray accessors
@@ -196,6 +198,97 @@ def preproc_comp(func_comp, ncs, **kwargs):
         See `armoor.comp.comparison.Comparison.preproc`.
     """
     return get_comparison(func_comp).preproc(ncs, **kwargs)
+
+
+def concat_then_merge(datasets, dim="time"):
+    """
+    Merge and concatenate a list of heterogeneous xarray datasets.
+
+    This function is designed for datasets that may contain variables
+    with different dimension structures (e.g., (time, z, member) and
+    (time, member)). It ensures a safe combination by:
+
+    1. Grouping datasets by the dimensional structure of their variables
+    2. Concatenating datasets within each homogeneous group along a given dimension
+    3. Merging the resulting grouped datasets into a single Dataset
+
+    Parameters
+    ----------
+    datasets : list of xr.Dataset
+        List of xarray datasets to be combined. Each dataset may contain
+        variables with different dimensionalities.
+    dim : str, optional
+        Dimension along which to concatenate datasets (default is "time").
+
+    Returns
+    -------
+    xr.Dataset
+        A single merged dataset containing all variables concatenated
+        along the specified dimension where applicable.
+
+    Notes
+    -----
+    - Variables sharing the same dimensional structure are concatenated
+      together.
+    - Variables with different dimensions are handled in separate groups
+      and merged afterward. Groups whose length along `dim` doesn't match
+      the dominant group (e.g. mld vs. vertical-range-split ptemp/sal) get
+      their dim/coord names suffixed with `GROUP_SUFFIX` so they still
+      merge in without a bogus label alignment or being dropped.
+    - This is particularly useful for oceanographic or atmospheric datasets
+      with mixed 2D/3D variables.
+
+    """
+
+    groups = defaultdict(list)
+
+    for ds in datasets:
+        signature = tuple(
+            sorted(
+                frozenset(ds[var].dims)
+                for var in ds.data_vars
+            )
+        )
+        groups[signature].append(ds)
+
+    concat_groups = [
+        xr.concat(dss, dim=dim, combine_attrs="override")
+        for dss in groups.values()
+    ]
+
+    if len(concat_groups) > 1:
+        # Variables with a dims signature that doesn't include the vertical
+        # ranging axis (e.g. mld, which has no "z" dim) only get one
+        # sub-dataset per real time step, while variables split per
+        # vertical-range bin (e.g. ptemp, sal) get one per bin -- all
+        # sharing the same timestamp. Their concatenated groups then have
+        # mismatched lengths along `dim` with duplicate coordinate values,
+        # which xr.merge cannot align by label. Rather than dropping the
+        # minor group(s) (which would silently lose e.g. mld from every
+        # plot/output built on this otype), give them private dim/coord
+        # names so every variable survives the merge; diagdisp() and
+        # friends only care about raw values, not dim/coord names.
+        max_len = max(cg.sizes[dim] for cg in concat_groups)
+        dominant = [cg for cg in concat_groups if cg.sizes[dim] == max_len]
+        minor = [cg for cg in concat_groups if cg.sizes[dim] != max_len]
+        shared_names = set().union(
+            *(set(cg.dims) | set(cg.variables) for cg in dominant)
+        )
+        renamed_minor = []
+        for i, cg in enumerate(minor):
+            overlap = shared_names & (set(cg.dims) | set(cg.variables))
+            if overlap:
+                logger.debug(
+                    "concat_then_merge: renaming %s on group %s "
+                    "(vars=%s) to avoid a '%s' cardinality mismatch",
+                    sorted(overlap), i, list(cg.data_vars), dim,
+                )
+                cg = cg.rename({name: f"{name}{GROUP_SUFFIX}{i}" for name in overlap})
+            renamed_minor.append(cg)
+        concat_groups = dominant + renamed_minor
+
+    return xr.merge(concat_groups, combine_attrs="override")
+
 
 class OutputProcessor:
     """
@@ -405,7 +498,7 @@ class OutputProcessor:
                 # Concatenate datasets for each data type
                 for data_type in DATA_TYPES:
                     concatenated_data = self._concatenate_datasets(
-                        stats_data[data_type], concat_dim
+                        stats_data[data_type], concat_dim, output
                     )
                     dss[prod_name][data_type][sort_key] = concatenated_data
         
@@ -448,60 +541,124 @@ class OutputProcessor:
         ref_datasets = []
         try:
             prod_datasets = [
-                _compute_oceanvars(xr.open_dataset(f), self.func_comp)
+                xr.open_dataset(f)
                 for f in prod_files_list
             ]
             ref_datasets = [
-                _compute_oceanvars(xr.open_dataset(f), self.func_comp)
+                xr.open_dataset(f)
                 for f in ref_files_list
             ]
+
             # Process each file pair
             for file_idx in range(num_files):
                 ds_prod = prod_datasets[file_idx]
                 ds_ref = ref_datasets[file_idx]
-                # Set depth/pres as coordinate if needed
-                for vcoord in ["depth", "pres"]:
-                    if vcoord in ds_ref.data_vars:
-                        ds_ref = ds_ref.set_coords(vcoord)
-                    if vcoord in ds_prod.data_vars:
-                        ds_prod = ds_prod.set_coords(vcoord)
-                # Prepare statistics configuration
-                stats = output_params.get("stat").copy() if output_params.get("stat") else None
-                # Compute statistics and comparisons
-                dt_prod, dt_ref, dt_comps = StatsComp(
-                    mparams, ds_prod, ds_ref, stats
-                ).compute()
-                dt_comps = self.comparison.compute_comparison(dt_comps, ds_ref, ds_prod, output)
+                # Colocation runs once per metazone and is shared by every
+                # otype, so a sort_key bucket here can also hold the
+                # mld-only file (no "z", split apart upstream by dims
+                # signature) alongside the real vertical-profile file --
+                # uvprofiles/udiagts only plot the latter, and mixing the
+                # two would misalign the "data"/"closest" bin lists below.
+                if output in ("uvprofiles", "udiagts") and "z" not in ds_ref.dims:
+                    continue
 
-                # Store results
-                computed_data["prod"].append(dt_prod)
-                computed_data["ref"].append(dt_ref)
-                computed_data["comp"].append(dt_comps)
+                # uvprofiles/udiagts need one entry per real profile, but
+                # colocation runs once per metazone (shared by every
+                # otype) so it cannot itself guarantee that: a trange bin
+                # can bundle several distinct observation times into the
+                # same coloc file. Split those apart here, scoped to just
+                # these two otypes, instead of hardening the shared coloc
+                # stage for everyone.
+                if (output in ("uvprofiles", "udiagts")
+                        and ds_ref.sizes.get("time", 1) > 1):
+                    pairs = [
+                        (ds_prod.isel(time=[it]), ds_ref.isel(time=[it]))
+                        for it in range(ds_ref.sizes["time"])
+                        ]
+                else:
+                    pairs = [(ds_prod, ds_ref)]
+
+                for ds_prod_i, ds_ref_i in pairs:
+                    self._process_coloc_pair(
+                        ds_prod_i, ds_ref_i, mparams, output_params, output,
+                        computed_data,
+                        )
         finally:
             # Close all files at end
             for ds in prod_datasets + ref_datasets:
                 ds.close()
 
         return computed_data
+
+    def _process_coloc_pair(self, ds_prod, ds_ref, mparams, output_params,
+                          output, computed_data):
+        """Compute stats (and, for uvprofiles/udiagts, the closest-member
+        profile) for a single ref/prod pair, appending results in place to
+        `computed_data`.
+        """
+        # Set depth/pres as coordinate if needed
+        for vcoord in ["depth", "pres"]:
+            if vcoord in ds_ref.data_vars:
+                ds_ref = ds_ref.set_coords(vcoord)
+            if vcoord in ds_prod.data_vars:
+                ds_prod = ds_prod.set_coords(vcoord)
+
+        # Resolve the nearest model member to the reference location once,
+        # before StatsComp's own member-mean reduction -- only uvprofiles/
+        # udiagts read a single representative profile instead of the
+        # ensemble mean/std.
+        closest_ds = None
+        if (output in ("uvprofiles", "udiagts")
+                and "member" in ds_prod.dims
+                and "depth" in ds_prod.variables):
+            # Colocation runs once per metazone and is shared by every
+            # otype, so a sort_key bucket here can also hold the mld-only
+            # file (no "z"/"depth", split apart upstream by dims signature)
+            # alongside the real vertical-profile file -- skip it, same as
+            # plot.py later skips mld for lacking a "depth" coord.
+            ds_closest = ds_prod
+            if "member" in ds_closest.depth.dims:
+                ds_closest = ds_closest.reset_coords("depth")
+            closest_ds = ds_closest.filters.sel_closest(ds_ref)
+
+        # Prepare statistics configuration
+        stats = output_params.get("stat").copy() if output_params.get("stat") else None
+        # Compute statistics and comparisons
+        dt_prod, dt_ref, dt_comps = StatsComp(
+            mparams, ds_prod, ds_ref, stats
+        ).compute()
+        dt_comps = self.comparison.compute_comparison(dt_comps, ds_ref, ds_prod, output)
+        if closest_ds is not None:
+            dt_prod.update(xr.DataTree.from_dict({"closest": closest_ds}))
+
+        # Store results
+        computed_data["prod"].append(dt_prod)
+        computed_data["ref"].append(dt_ref)
+        computed_data["comp"].append(dt_comps)
     
-    def _concatenate_datasets(self, data_trees: List[Any], 
-                            concat_dim: List[str]) -> Dict[str, xr.Dataset]:
+    def _concatenate_datasets(self, data_trees: List[Any],
+                            concat_dim: List[str], output: str = None) -> Dict[str, xr.Dataset]:
         """
         Concatenate datasets from data trees along specified dimensions.
-        
+
         Parameters
         ----------
         data_trees
             List of data trees to concatenate
         concat_dim
             Dimensions to concatenate along
-            
+        output
+            Output type name (otype). Only "uvprofiles"/"udiagts" are
+            allowed to keep several unfused datasets per sort_key (see
+            below) -- for every other otype a cardinality mismatch here
+            is still a hard error.
+
         Returns
         -------
         Dictionary of concatenated datasets
         """
         concatenated_data = {}
-        
+
         # Filter out None entries (e.g. from _drifter for map outputs)
         data_trees = [dt for dt in data_trees if dt is not None]
         if not data_trees:
@@ -510,14 +667,21 @@ class OutputProcessor:
         # Process each dataset in the data trees
         for ds_name in data_trees[0].keys():
             datasets = [dt[ds_name].to_dataset() for dt in data_trees]
-            
+
             if concat_dim == ["time"]:
                 concatenated_dataset = self._concatenate_time_datasets(datasets)
             elif len(datasets) == 1:
                 concatenated_dataset = datasets[0]
+            elif output in ("uvprofiles", "udiagts"):
+                # No fusion requested: keep one dataset per vrange-bin file
+                # sharing this sort_key, instead of merging them into a
+                # single object along a fake "time" axis. `_save_combined_
+                # output` fans this list out into numbered children of
+                # `ds_name`.
+                concatenated_dataset = datasets
             else:
                 raise ArmoorError("Multi-dataset concatenation not implemented")
-            
+
             concatenated_data[ds_name] = concatenated_dataset
         
         return concatenated_data
@@ -546,13 +710,13 @@ class OutputProcessor:
             datasets = time_slices
 
         # Concatenate along time dimension
-        concatenated = xr.concat(datasets, "time")
+        concatenated = concat_then_merge(datasets)
 
         # Preserve vrange attributes if present in any dataset
         vrange_attrs = [ds.range.vrange_value for ds in datasets if ds.range.vrange_value]
         if vrange_attrs:
             concatenated.attrs["vrange"] = vrange_attrs
-        
+
         return concatenated
     
     def _save_outputs(self, processed_datasets: Dict[str, Dict], 
@@ -639,7 +803,18 @@ class OutputProcessor:
             # Add data for each type (prod, ref, comp)
             for data_type in DATA_TYPES:
                 datasets = processed_datasets[prod_name][data_type][sort_key]
-                data_tree = xr.DataTree.from_dict(datasets)
+                # A ds_name maps to a list, rather than a single dataset,
+                # when `_concatenate_datasets` left several vrange-bin
+                # datasets unfused (no "concat" configured for this
+                # otype) -- fan those out into numbered children instead.
+                tree_dict = {}
+                for ds_name, ds_or_list in datasets.items():
+                    if isinstance(ds_or_list, list):
+                        for i, ds in enumerate(ds_or_list):
+                            tree_dict[f"{ds_name}/{i}"] = ds
+                    else:
+                        tree_dict[ds_name] = ds_or_list
+                data_tree = xr.DataTree.from_dict(tree_dict)
                 dt[prod_name].update(xr.DataTree.from_dict({data_type: data_tree}))
 
         # Save combined file

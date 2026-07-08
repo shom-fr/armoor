@@ -339,13 +339,18 @@ class CompArgo(Comparison):
             "mparams_pro": {"time": ["trange_seq"]},
         },
         "uvprofiles": {
-            "concat": ["time"],
+            "sort": ["time"],
             "output": "merge",
+            "mparams_pro": {"time": ["trange_seq"]},
             "mparams_con": {"vertical": ["vlevel"]},
         },
-        "udiagts": {"concat": ["time"], "output": "merge"},
+        "udiagts": {
+            "sort": ["time"],
+            "output": "merge",
+            "mparams_pro": {"time": ["trange_seq"]},
+        },
     }
-    comp_vars = ["ptemp", "sal", "pdens", "temp", "sndspeed"]
+    comp_vars = ["ptemp", "sal", "pdens", "temp", "sndspeed", "mld"]
 
 
 class _ForcedDepthVLevelMixin:

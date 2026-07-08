@@ -2,6 +2,11 @@
 
 See `armoor.comp.comparison` for the source of truth.
 """
+GROUP_SUFFIX = "__armoor_grp"
+"""Suffix appended by `concat_then_merge` to dim/coord names of a minor
+signature-group (e.g. mld) to avoid colliding with the dominant group's
+names of the same size mismatch."""
+
 from armoor.comp.comparison import _REGISTRY
 
 # Derived from the Comparison registry (armoor.comp.comparison) rather than

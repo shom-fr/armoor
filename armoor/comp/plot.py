@@ -20,10 +20,42 @@ from xoa.plot import plot_minimap, plot_ts
 from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.dispatch import MethodRegistry
 from armoor.base.plot import create_subplots, diagdisp, save_figure
-from armoor.comp import METRIC_LABELS
+from armoor.comp import GROUP_SUFFIX, METRIC_LABELS
 from armoor.comp.comparison import get_comparison
 
 logger = logging.getLogger(__name__)
+
+_GROUP_SUFFIX_RE = re.compile(rf"{re.escape(GROUP_SUFFIX)}\d+$")
+
+
+def _drop_group_suffix(ds):
+    """Undo the per-group dim/coord renaming `concat_then_merge` applies to
+    minor signature-groups (e.g. mld) to avoid cardinality clashes.
+
+    Safe to call on a dataset narrowed to a single variable, since only one
+    suffixed variant of any given coord/dim can be present at that point.
+    """
+    renames = {
+        name: _GROUP_SUFFIX_RE.sub("", name)
+        for name in set(ds.dims) | set(ds.variables)
+        if _GROUP_SUFFIX_RE.search(name)
+        }
+    return ds.rename(renames) if renames else ds
+
+
+def _bin_datasets(node):
+    """Return the list of per-vrange-bin datasets held by a `data`/`closest`
+    node.
+
+    That node is a single dataset when its sort_key matched exactly one
+    coloc file, or holds numbered children ("0", "1", ...) -- one per
+    vrange-bin file -- when `_concatenate_datasets` (armoor.comp.output)
+    left them unfused for uvprofiles/udiagts instead of merging them.
+    """
+    children = list(node.children)
+    if children:
+        return [node[c].to_dataset() for c in sorted(children, key=int)]
+    return [node.to_dataset()]
 
 matplotlib.use('Agg')
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -117,24 +149,30 @@ class PlotComp(MethodRegistry):
             
             prod_name = dsprod_all.attrs["data_name"]
             ref_name = dsref_all.attrs["data_name"]
-            
-            if "member" in dsprod_all.dims:
-                dsprod_all = dsprod_all.mean(dim="member", keep_attrs=True)
-            if "member" in dsref_all.dims:
-                dsref_all = dsref_all.mean(dim="member", keep_attrs=True)
-            
+
             for var in dsprod_all.data_vars:
-                dsref = dsref_all[[var]]
-                dsprod = dsprod_all[[var]]
-                
+                # Reduce "member" after narrowing to a single variable and
+                # resolving the group-suffix rename, not before: a minor
+                # signature-group (e.g. mld) may carry its own "member"
+                # dim under a suffixed name (see `concat_then_merge`),
+                # which a dataset-wide "member" check/mean would miss
+                # entirely -- leaving it unreduced and causing dsref/dsprod
+                # sizes to diverge for that variable.
+                dsref = _drop_group_suffix(dsref_all[[var]])
+                dsprod = _drop_group_suffix(dsprod_all[[var]])
+                if "member" in dsprod.dims:
+                    dsprod = dsprod.mean(dim="member", keep_attrs=True)
+                if "member" in dsref.dims:
+                    dsref = dsref.mean(dim="member", keep_attrs=True)
+
                 units = dsref[var].attrs.get('units')
-                    
+
                 figtitle = (
                     f"{self.plot_title} \n"
                     f"{self.metazone} \n"
                     f"{var}, {units}"
                     )
-                
+
                 figname = (
                     f"{self.func_comp}/plot/{self.metazone}/{ref_name}/"
                     f"diagdisp_glob_{var}_{prod_name}.png"
@@ -161,16 +199,17 @@ class PlotComp(MethodRegistry):
             
             prod_name = dsprod_all.attrs["data_name"]
             ref_name = dsref_all.attrs["data_name"]
-            
-            if "member" in dsprod_all.dims:
-                dsprod_all = dsprod_all.mean(dim="member", keep_attrs=True)
-            if "member" in dsref_all.dims:
-                dsref_all = dsref_all.mean(dim="member", keep_attrs=True)
-            
+
             for var in dsprod_all.data_vars:
-                dsref = dsref_all[[var]]
-                dsprod = dsprod_all[[var]]
-                
+                # Reduce "member" after narrowing to a single variable and
+                # resolving the group-suffix rename -- see diagdisp_glob.
+                dsref = _drop_group_suffix(dsref_all[[var]])
+                dsprod = _drop_group_suffix(dsprod_all[[var]])
+                if "member" in dsprod.dims:
+                    dsprod = dsprod.mean(dim="member", keep_attrs=True)
+                if "member" in dsref.dims:
+                    dsref = dsref.mean(dim="member", keep_attrs=True)
+
                 attrs = dsref.attrs
                 ncname = ""
                 xtitle = ""
@@ -337,6 +376,10 @@ class PlotComp(MethodRegistry):
             if dsref is None or dsprod is None:
                 logger.warning(f"Missing ref or prod data for {prod}, skipping")
                 continue
+            if 'z' not in dsref.dims or 'z' not in dsprod.dims:
+                logger.warning(f"z not in ref or prod data for {prod}, skipping")
+                continue
+
             dsprod = dsprod.stack({"npt": list(dsprod.sizes.keys())})
             dsref = dsref.stack({"npt": list(dsref.sizes.keys())})
             dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
@@ -375,46 +418,45 @@ class PlotComp(MethodRegistry):
 
     def udiagts(self):
         """Plot uniquely profiles theta-saln."""
-        dssprod = []
-        dsref = None
+        dssprod_data = []
+        dssprod_closest = []
+        dsref_bins = None
         for prod, node_prod in self.dt.children.items():
             logger.info(f"{prod}, Path: {node_prod.path}")
             for data, dt_data in node_prod.items():
                 logger.info(f"{data}, Path: {dt_data.path}")
                 if "ref" in data:
-                    dsref = dt_data["data"].to_dataset()
+                    dsref_bins = _bin_datasets(dt_data["data"])
                 elif "prod" in data:
-                    dssprod.append(dt_data["data"].to_dataset())
-        if dsref is None:
+                    dssprod_data.append(_bin_datasets(dt_data["data"]))
+                    dssprod_closest.append(
+                        _bin_datasets(dt_data["closest"]) if "closest" in dt_data else None
+                        )
+        if dsref_bins is None:
             logger.warning("No reference data found, skipping udiagts")
             return
-        refname = dsref.attrs.get("data_name")
-        vranges = dsref.attrs.get('vrange')
-        vlevels = dsref.attrs.get('vlevel')
-        for itime in range(dsref.sizes["time"]):
-            if isinstance(vranges, list):
-                vrange = vranges[itime]
-            else:
-                vrange = vranges
-            if isinstance(vlevels, list):
-                vlevel = vlevels[itime]
-            else:
-                vlevel = vlevels
-            dsref_itime = dsref.isel(time=[itime])
-            dssprod_itime = [
-                dsprod.isel(time=[itime]).squeeze() for dsprod in dssprod
+        if 'z' not in dsref_bins[0].dims:
+            logger.warning(f"z not in ref, skipping")
+            return
+        refname = dsref_bins[0].attrs.get("data_name")
+
+        # Each bin is one vrange-split fragment of this single profile (the
+        # sort/output stage already guarantees one real profile per call to
+        # this method -- see `armoor.comp.output`); the nearest model member
+        # was already resolved once upstream, before any vrange split.
+        for ibin, dsref in enumerate(dsref_bins):
+            vrange = dsref.attrs.get('vrange')
+            vlevel = dsref.attrs.get('vlevel')
+            dssprod_closest_bin = [
+                (closest_bins[ibin].squeeze() if closest_bins is not None
+                 else dssprod_data[iprod][ibin].squeeze())
+                for iprod, closest_bins in enumerate(dssprod_closest)
                 ]
-            dssprod_closest = [
-                ds.filters.sel_closest(
-                    dsref_itime
-                    ) for ds in dssprod_itime
-                ]
-            del dssprod_itime
-            time = pd.to_datetime(dsref_itime.time.values[0])
-            mask = ~dsref_itime.ptemp.isnull()
+            time = pd.to_datetime(dsref.time.values[0])
+            mask = ~dsref.ptemp.isnull()
             if (~mask).all():
                 continue
-            depth = dsref_itime.depth.where(mask, drop=True)
+            depth = dsref.depth.where(mask, drop=True)
             zmin = -float(depth.max())
             zmax = -float(depth.min())
             xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
@@ -438,7 +480,7 @@ class PlotComp(MethodRegistry):
             ax = ax[0]
             kw_ref = {"label": dsref.attrs["data_name"]}
             tsref = plot_ts(
-                dsref_itime.ptemp, dsref_itime.sal,
+                dsref.ptemp, dsref.sal,
                 dens=True, potential=True, absolute=False,
                 clabel=True, contour_linewidths=0.2,
                 colorbar=False,
@@ -452,7 +494,7 @@ class PlotComp(MethodRegistry):
                     label=refname
                     )
                 )
-            for iprod, dsprod_closest in enumerate(dssprod_closest):
+            for iprod, dsprod_closest in enumerate(dssprod_closest_bin):
                 tsprod = plot_ts(
                     dsprod_closest.ptemp, dsprod_closest.sal,
                     dens=True, potential=True, absolute=False,
@@ -465,7 +507,7 @@ class PlotComp(MethodRegistry):
                         alpha=0.8,
                         linewidths=0.5,
                         s=50,
-                        label=dssprod[iprod].attrs["data_name"]
+                        label=dssprod_data[iprod][ibin].attrs["data_name"]
                         )
                     )
                 ax = tsprod["axes"]
@@ -483,7 +525,7 @@ class PlotComp(MethodRegistry):
                 gridlines_xlabel_style={'size': 6},
                 gridlines_ylabel_style={'size': 6},
                 )
-            plot_minimap(dsref_itime, fig=fig, ax=self.ax_minimap, **kw)
+            plot_minimap(dsref, fig=fig, ax=self.ax_minimap, **kw)
             figname = (
                 f"{self.func_comp}/plot/{self.metazone}/{refname}/"
                 f"udiagts{xfigname}.png"
@@ -587,6 +629,10 @@ class PlotComp(MethodRegistry):
             if dsref is None or dsprod is None:
                 logger.warning(f"Missing ref or prod data for {prod}, skipping")
                 continue
+            if 'z' not in dsref.dims or 'z' not in dsprod.dims:
+                logger.warning(f"z not in ref or prod data for {prod}, skipping")
+                continue
+
             dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
             dsref = dsref.where(~dsref.ptemp.isnull(), drop=True)
             trange = dsprod.attrs.get("trange")
@@ -623,49 +669,83 @@ class PlotComp(MethodRegistry):
 
     def uvprofiles(self):
         """Plot uniquely vertical profiles."""
-        dssprod = []
-        dsref = None
+        dssprod_data = []
+        dssprod_closest = []
+        dsref_bins = None
         for prod, node_prod in self.dt.children.items():
             logger.info(f"{prod}, Path: {node_prod.path}")
             for data, dt_data in node_prod.items():
                 logger.info(f"{data}, Path: {dt_data.path}")
                 if "ref" in data:
-                    dsref = dt_data["data"].to_dataset()
+                    dsref_bins = _bin_datasets(dt_data["data"])
                 elif "prod" in data:
-                    dssprod.append(dt_data["data"].to_dataset())
-        if dsref is None:
+                    dssprod_data.append(_bin_datasets(dt_data["data"]))
+                    dssprod_closest.append(
+                        _bin_datasets(dt_data["closest"]) if "closest" in dt_data else None
+                        )
+        if dsref_bins is None:
             logger.warning("No reference data found, skipping uvprofiles")
             return
-        refname = dsref.attrs.get("data_name")
-        vranges = dsref.attrs.get('vrange')
-        for itime in range(dsref.sizes["time"]):
-            if isinstance(vranges, list):
-                vrange = vranges[itime]
-            else:
-                vrange = vranges
-            dsref_itime = dsref.isel(time=[itime])
-            dssprod_itime = []
-            for dsprod in dssprod:
-                ds = dsprod.isel(time=[itime]).squeeze()
+        if 'z' not in dsref_bins[0].dims:
+            logger.warning(f"z not in ref, skipping")
+            return
+        refname = dsref_bins[0].attrs.get("data_name")
+
+        def _safe_reduce(ds, method):
+            # "depth" is a position axis, not a statistic: averaging it
+            # across "member" is meaningless and can leave it with a
+            # leftover "member" dim (whenever it doesn't also vary by "z"
+            # and so never qualifies as a proper agg_var) -- always take
+            # one representative member's depth instead, like the "closest"
+            # profile already effectively does.
+            agg_vars = [
+                v for v in ds.data_vars
+                if v != "depth" and "member" in ds[v].dims and ds[v].ndim > 1
+                ]
+            other_vars = [v for v in ds.data_vars if v not in agg_vars]
+            result = getattr(ds[agg_vars], method)(dim="member")
+            for v in other_vars:
+                result[v] = ds[v].isel(member=0, drop=True) if "member" in ds[v].dims else ds[v]
+            return result
+
+        def _force_1d(da, context):
+            # Defensive net for the member/std reduction above: whatever
+            # leftover dim slips through, collapse it and log the actual
+            # shape so the root cause can be diagnosed from the logs
+            # instead of crashing matplotlib deep in fill_betweenx/plot.
+            if da.ndim == 1:
+                return da
+            extra_dims = [d for d in da.dims if d != "z"]
+            logger.warning(
+                f"{context}: unexpected dims {da.dims} shape {da.shape}, "
+                f"collapsing {extra_dims}"
+                )
+            return da.isel({d: 0 for d in extra_dims}, drop=True)
+
+        # Each bin is one vrange-split fragment of this single profile (the
+        # sort/output stage already guarantees one real profile per call to
+        # this method -- see `armoor.comp.output`); the nearest model member
+        # was already resolved once upstream, before any vrange split.
+        for ibin, dsref in enumerate(dsref_bins):
+            vrange = dsref.attrs.get('vrange')
+            dssprod_bin = []
+            dssprod_closest_bin = []
+            for iprod, bins in enumerate(dssprod_data):
+                ds = bins[ibin].squeeze()
                 if "member" in ds.depth.dims:
                     ds = ds.reset_coords("depth")
-                dssprod_itime.append(ds)
-            dssprod_closest = [ds.filters.sel_closest(dsref_itime) for ds in dssprod_itime]
-            def _safe_reduce(ds, method):
-                agg_vars = [v for v in ds.data_vars if "member" in ds[v].dims and ds[v].ndim > 1]
-                other_vars = [v for v in ds.data_vars if v not in agg_vars]
-                result = getattr(ds[agg_vars], method)(dim="member")
-                for v in other_vars:
-                    result[v] = ds[v].isel(member=0, drop=True) if "member" in ds[v].dims else ds[v]
-                return result
-            dssprod_mean = [_safe_reduce(ds, "mean") for ds in dssprod_itime]
-            dssprod_std = [_safe_reduce(ds, "std") for ds in dssprod_itime]
-            del dssprod_itime
-            time = pd.to_datetime(dsref_itime.time.values[0])
-            mask = ~dsref_itime.ptemp.isnull()
+                dssprod_bin.append(ds)
+                closest_bins = dssprod_closest[iprod]
+                dssprod_closest_bin.append(
+                    closest_bins[ibin].squeeze() if closest_bins is not None else ds
+                    )
+            dssprod_mean = [_safe_reduce(ds, "mean") for ds in dssprod_bin]
+            dssprod_std = [_safe_reduce(ds, "std") for ds in dssprod_bin]
+            time = pd.to_datetime(dsref.time.values[0])
+            mask = ~dsref.ptemp.isnull()
             if (~mask).all():
                 continue
-            depth = dsref_itime.depth.where(mask, drop=True)
+            depth = dsref.depth.where(mask, drop=True)
             zmin = -float(depth.max())
             zmax = -float(depth.min())
             xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
@@ -675,8 +755,11 @@ class PlotComp(MethodRegistry):
                 xfigname  += f"_{vrange}"
             for varname in dsref.data_vars:
                 units = dsref[varname].attrs.get("units")
-                daref = dsref_itime[varname].squeeze()
-                dasprod_closest= [ds[[varname]].squeeze() for ds in dssprod_closest]
+                daref = dsref[varname].squeeze()
+                if 'depth' not in daref.coords:
+                    logger.warning(f"depth not in coords for {varname}, skipping")
+                    continue
+                dasprod_closest= [ds[[varname]].squeeze() for ds in dssprod_closest_bin]
                 fig, ax = create_subplots(
                     nrows=1,
                     figsize=(5, 8),
@@ -690,24 +773,31 @@ class PlotComp(MethodRegistry):
                 kw_ref = {"label": dsref.attrs["data_name"]}
                 ax.plot(
                     daref,
-                    -daref.depth, 
+                    -daref.depth,
                     color="k",
                     linewidth=2.0,
                     alpha=1.0,
                     **kw_ref
                     )
                 for iprod in range(len(dssprod_mean)):
-                    data_prod_mean = dssprod_mean[iprod][varname]
-                    data_prod_std = dssprod_std[iprod][varname]
                     prod_name = dssprod_mean[iprod].attrs['data_name']
+                    data_prod_mean = _force_1d(
+                        dssprod_mean[iprod][varname], f"{prod_name} {varname} mean"
+                        )
+                    data_prod_std = _force_1d(
+                        dssprod_std[iprod][varname], f"{prod_name} {varname} std"
+                        )
+                    mean_depth = _force_1d(
+                        data_prod_mean.depth, f"{prod_name} {varname} mean depth"
+                        )
                     ax.plot(
                         dasprod_closest[iprod][varname], -dasprod_closest[iprod].depth,
                         color=LINE_COLORS[iprod], linewidth=2.0,
                         label=f"{prod_name} closest"
                         )
-                    
+
                     ax.fill_betweenx(
-                        -data_prod_mean.depth,
+                        -mean_depth,
                         data_prod_mean - data_prod_std,
                         data_prod_mean + data_prod_std,
                         color=LINE_COLORS[iprod],
@@ -717,11 +807,11 @@ class PlotComp(MethodRegistry):
                 ax.legend(
                     fontsize=11, frameon=True, fancybox=True
                     )
-                
+
                 ax.set_xlabel(f"{varname}, {units}")
                 ax.set_ylabel("Depth, m")
                 ax.set_ylim([zmin, zmax])
-                
+
                 kw = dict(
                     plot_coords = "points",
                     coords_markersize=4,
@@ -730,12 +820,12 @@ class PlotComp(MethodRegistry):
                     gridlines_ylabel_style={'size': 6},
                     )
                 ax_minimap = plot_minimap((daref.lon, daref.lat), fig=fig, ax=self.ax_minimap, **kw)
-                
+
                 figname = (
                     f"{self.func_comp}/plot/{self.metazone}/{refname}/"
                     f"uvprofiles_{varname}{xfigname}.png"
                     )
-    
+
                 self.save_figure(
                     fig,
                     figname.format(**locals())
