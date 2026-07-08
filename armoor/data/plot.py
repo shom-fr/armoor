@@ -26,7 +26,7 @@ from armoor.base.dispatch import SubclassingMethodRegistry
 from armoor.base.filters import create_optimized_mask
 from armoor.base.interp import vinterp
 from armoor.base.io import setup_dask_client
-from armoor.base.plot import create_subplots, diagdisp, save_figure
+from armoor.base.plot import create_subplots, diagdisp, format_trange, save_figure
 from armoor.data.datatype import DataEddies, DataOceanModel, get_data_type_by_name
 # from armoor.comp.stats import StatsComp
 
@@ -206,8 +206,9 @@ class PlotOceanModel(_PlotDataBase):
         xtitle = ""
         xfigname = ""
         if trange:
-            xtitle += f"{trange} "
-            xfigname += f"_{trange}"
+            title_str, suffix_str = format_trange(trange)
+            xtitle += f"{title_str} "
+            xfigname += f"_{suffix_str}"
         elif tfreq:
             xtitle += f"{tfreq} "
             xfigname += f"_{tfreq}"
@@ -442,8 +443,9 @@ class PlotOceanModel(_PlotDataBase):
         xtitle = ""
         xfigname = ""
         if trange:
-            xtitle += f"{trange} "
-            xfigname += f"_{trange}"
+            title_str, suffix_str = format_trange(trange)
+            xtitle += f"{title_str} "
+            xfigname += f"_{suffix_str}"
         if vlevel:
             xtitle += f"\n {vlevel}"
             xfigname += f"_{vlevel}"
@@ -474,8 +476,9 @@ class PlotOceanModel(_PlotDataBase):
         xtitle = ""
         xfigname = ""
         if trange:
-            xtitle += f"{trange} "
-            xfigname += f"_{trange}"
+            title_str, suffix_str = format_trange(trange)
+            xtitle += f"{title_str} "
+            xfigname += f"_{suffix_str}"
         if vlevel:
             xtitle += f"\n {vlevel}"
             xfigname += f"_{vlevel}"
@@ -605,10 +608,8 @@ class PlotOceanModel(_PlotDataBase):
                             vrange = vrange[0]
                         ncname += f"_{vrange}"
                         xtitle += f" {vrange}"
-                    else:
-                        pass
-                else:
-                    pass
+                if "trange_seq" in attrs:
+                    xtitle += f" time range {attrs.get('trange_seq')}"
                 fig, axes = create_subplots(
                     nrows=2, figsize=(10, 6),
                     x_label='Date', y_label=None,
@@ -698,8 +699,9 @@ class PlotOceanModel(_PlotDataBase):
             xtitle = ""
             trange = attrs.get("trange")
             if trange:
-                xtitle += f"{trange} "
-                ncname += f"_{trange}"
+                title_str, suffix_str = format_trange(trange)
+                xtitle += title_str
+                ncname += f"_{suffix_str}"
             if "z" in ds_data[var].dims:
                 if "vlevel" in attrs:
                     vlevel = attrs.get("vlevel")

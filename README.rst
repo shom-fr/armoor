@@ -24,5 +24,5 @@ Armoor is a python library for helping analysis of regional modelised and observ
 
 - Contacts
 
-        * Mathieu Morvan <mathieu.morvan (at) shom.fr>
+        * Mathieu Morvan <mathieu.morvan@shom.fr>
 

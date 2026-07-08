@@ -19,7 +19,7 @@ from xoa.plot import plot_minimap, plot_ts
 
 from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.dispatch import MethodRegistry
-from armoor.base.plot import create_subplots, diagdisp, save_figure
+from armoor.base.plot import create_subplots, diagdisp, format_trange, save_figure
 from armoor.comp import GROUP_SUFFIX, METRIC_LABELS
 from armoor.comp.comparison import get_comparison
 
@@ -215,8 +215,9 @@ class PlotComp(MethodRegistry):
                 xtitle = ""
                 trange = attrs.get("trange")
                 if trange:
-                    xtitle += f"{trange} "
-                    ncname += f"_{trange}"
+                    title_str, suffix_str = format_trange(trange)
+                    xtitle += f"{title_str} "
+                    ncname += f"_{suffix_str}"
                 elif dsref.sizes["time"] == 1:
                     time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
                     xtitle += f"{time}"
@@ -390,8 +391,9 @@ class PlotComp(MethodRegistry):
             xtitle = ""
             xfigname = ""
             if trange:
-                xtitle += f"{trange} "
-                xfigname += f"_{trange}"
+                title_str, suffix_str = format_trange(trange)
+                xtitle += f"{title_str} "
+                xfigname += f"_{suffix_str}"
             if vlevel:
                 xtitle += f" {vlevel}"
                 xfigname += f"_{vlevel}"
@@ -641,8 +643,9 @@ class PlotComp(MethodRegistry):
             xtitle = ""
             xfigname = ""
             if trange:
-                xtitle += f"{trange} "
-                xfigname += f"_{trange}"
+                title_str, suffix_str = format_trange(trange)
+                xtitle += f"{title_str} "
+                xfigname += f"_{suffix_str}"
             if vlevel:
                 xtitle += f"\n {vlevel}"
                 xfigname += f"_{vlevel}"
@@ -1452,8 +1455,9 @@ class PlotComp(MethodRegistry):
                     xtitle = ""
                     trange = attrs.get("trange")
                     if trange:
-                        xtitle += f"{trange} "
-                        ncname += f"_{trange}"
+                        title_str, suffix_str = format_trange(trange)
+                        xtitle += f"{title_str} "
+                        ncname += f"_{suffix_str}"
                     elif dsref.sizes.get("time") == 1:
                         time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
                         xtitle += f"{time}"

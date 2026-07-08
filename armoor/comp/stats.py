@@ -245,7 +245,11 @@ class StatsComp:
             ds = ds.drop_vars("time")
 
         ds = ds.expand_dims("time")
-        ds = ds.assign_coords(time=[pd.to_datetime(timestamp).as_unit("ns")])
+        
+        t1, t2 = [pd.to_datetime(t) for t in timestamp.strip('[').split('_')]
+        med_time = t1+0.5*(t2-t1)
+        
+        ds = ds.assign_coords(time=[med_time.as_unit("ns")])
         return ds
 
     # -------------------------------------------------------------------------

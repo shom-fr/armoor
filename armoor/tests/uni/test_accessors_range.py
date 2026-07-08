@@ -195,7 +195,10 @@ class TestRangeReadProperties:
     def test_properties_reflect_attrs_set_by_trange_seq(self, ds_time):
         result = ds_time.range.trange_seq("2020-01-01", "2020-01-05", "2D")[0]
         assert result.range.trange == result.attrs["trange"]
-        assert result.range.suffix == f"_{result.attrs['trange']}"
+        # trange is a bracketed range (e.g. "[t1_t2["); the brackets aren't
+        # filename-safe, so the suffix strips them.
+        stripped = result.attrs["trange"].replace("[", "").replace("]", "")
+        assert result.range.suffix == f"_{stripped}"
 
     def test_properties_reflect_attrs_set_by_vlevels(self, ds_3d):
         result = ds_3d.range.vlevels("depth")[0]

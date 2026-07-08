@@ -680,6 +680,10 @@ class OutputProcessor:
                 # `ds_name`.
                 concatenated_dataset = datasets
             else:
+                logger.info(
+                        "Concatenation request: %s datasets: %s",
+                        len(datasets),
+                        datasets)
                 raise ArmoorError("Multi-dataset concatenation not implemented")
 
             concatenated_data[ds_name] = concatenated_dataset

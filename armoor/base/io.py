@@ -479,7 +479,7 @@ def write_dataset_to_zarr(
         compute=False,
         encoding=encoding,
         **kwargs
-    )
+        )
 
     if write_delayed is None:
         # Older xarray (< 2022.06) writes synchronously for non-dask datasets
@@ -647,6 +647,8 @@ def output_suffix(attrs):
     ``time``/``trange``/``vlevel``/``vrange`` attrs set by
     `armoor.base.ranges.tfreq`/`trange_seq`/`vlevels`/`vrange`; time-like
     attrs take priority over the range-like ones when both happen to be set.
+    `trange` is a bracketed range (e.g. ``"[2020-01-01T00:00:00_2020-01-31T00:00:00["``)
+    -- the brackets aren't filename-safe, so they're stripped here.
 
     Parameters
     ----------
@@ -662,7 +664,7 @@ def output_suffix(attrs):
     if "time" in attrs:
         parts.append(attrs["time"])
     elif "trange" in attrs:
-        parts.append(attrs["trange"])
+        parts.append(re.sub(r"[\[\]]", "", attrs["trange"]))
     if "vlevel" in attrs:
         parts.append(attrs["vlevel"])
     elif "vrange" in attrs:
@@ -686,27 +688,31 @@ def extract_suffix_from_filename(filename):
     """
     result = {'time': None, 'z': None}
     
+    sub_pattern_time = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+    pattern_time = rf'(_(?P<dates>{sub_pattern_time}(?:_{sub_pattern_time})?))'
+
+    pattern_z = r'_([0-9.-]+)'
+
     # Main pattern: ref_[time]_[z].nc
-    pattern_full = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})_([0-9.-]+)\.zarr'
+    pattern_full = rf'(?P<prefix>[^_]+){pattern_time}{pattern_z}\.zarr'
     match_full = re.search(pattern_full, filename)
     if match_full:
         result['time'] = match_full.group(2)
         result['z'] = match_full.group(3)
-        return result
-    
+
     # Partial pattern: ref_[time]_*.nc (time without z)
-    pattern_time_only = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.zarr'
+    pattern_time_only = rf'(?P<prefix>[^_]+){pattern_time}\.zarr'
     match_time = re.search(pattern_time_only, filename)
-    
+
     if match_time:
-        result['time'] = match_time.group(2)
-    
+        result['time'] = match_time.groups()[-1]
+
     # Partial pattern: ref_*_[z].nc (z without valid time)
-    pattern_z_only = r'([^/]+)_([0-9.-]+)\.zarr'
+    pattern_z_only = rf'(?P<prefix>[^_]+){pattern_z}\.zarr'
     match_z = re.search(pattern_z_only, filename)
-    
     if match_z and not result['time']:  # Only if time not already found
         result['z'] = match_z.group(2)
+        
     return result
 
 def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List[str]]:
@@ -717,6 +723,7 @@ def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List
         if not isinstance(nc, str):
             nc = str(nc)
         res = extract_suffix_from_filename(nc)
+        
         if sort_dim == ["time", "z"]:
             if res.get("time") and res.get("z"):
                 suff = f"{res['time']}_{res['z']}"
@@ -738,6 +745,7 @@ def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List
                 suff = "None"
         else:
             suff = "None"
+
         if not ncouts.get(suff):
             ncouts[suff] = []
         

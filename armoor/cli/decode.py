@@ -50,7 +50,7 @@ def get_parser_decode():
     >>> args = parser.parse_args()
     """
     parser = ArgumentParser(
-        description="Apply time filters over a list of input files.",
+        description="Apply decode over a list of input files.",
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
@@ -72,8 +72,8 @@ def main_decode():
     
     .. code-block:: bash
     
-        armoor-filters-time input.nc output.nc \\
-                            --ifmt hycom --ofmt netcdf
+        armoor-decode --ifmt eddy_sacso --ofmt netcdf \\
+                            "folder/files*.txt" output.nc
     
     Notes
     -----

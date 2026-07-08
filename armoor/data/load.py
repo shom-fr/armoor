@@ -184,13 +184,12 @@ def process_single_combination(ds, mz_name, mz_param):
         if any(dsout.sizes[dim] == 0 for dim in dsout.dims):
             logger.warning(f"Dataset empty after filtering for {combination_id}")
             return None
+        elif "time" not in dsout.dims:
+            logger.warning(f"No index found for coordinate 'time' for {combination_id}")
         elif dsout.sizes["time"] == 1:
             logger.warning(f"One time step in the filtered dataset for {combination_id}, this may cause troubleshooting.")
-        elif "time" not in dsout.dims:
-            logger.warning(f"no index found for coordinate 'time' for {combination_id}")
-            return None
-            
-    
+        #return None
+
     # Final metadata
     if dsout is not None:
         dsout.attrs = {

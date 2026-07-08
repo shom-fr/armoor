@@ -2,7 +2,32 @@
 # matplotlib, scipy and gridspec are imported lazily (inside each function)
 # to avoid the several-second NFS penalty on HPC clusters where hundreds of
 # .py/.so files are stat'd during a standard matplotlib/__init__.py traversal.
+import re
+
 import numpy as np
+import pandas as pd
+
+
+def format_trange(trange):
+    """Format a bracketed ``trange`` attr (e.g. ``"[t1_t2["``) for display/filenames.
+
+    Parameters
+    ----------
+    trange : str
+        A ``"[<start>_<end>["`` bracketed range, as set by
+        `armoor.base.ranges.trange_seq`.
+
+    Returns
+    -------
+    tuple of str
+        ``(title_str, filename_safe_str)`` -- e.g.
+        ``("[2020-01-01T00:00-2020-01-31T00:00[", "2020-01-01T00_00_2020-01-31T00_00")``.
+    """
+    t1, t2 = [pd.to_datetime(t).strftime('%Y-%m-%dT%H:%M') for t in trange.strip('[').split('_')]
+    title_str = f"[{t1}-{t2}["
+    suffix_str = re.sub('-', '_', re.sub(r'[\[\]]', '', title_str))
+    return title_str, suffix_str
+
 
 def _get_plt():
     """Return matplotlib.pyplot, applying the armoor style on first import."""
