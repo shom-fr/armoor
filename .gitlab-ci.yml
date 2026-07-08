@@ -30,7 +30,6 @@ tests:
     - source activate ./armoor_env
     - export PYTHONPATH=$PWD
     - pip install ".[test]"
-    - conda list | grep -Ei '^(xoa|numpy|xarray|dask|esmf|esmpy|xesmf|cftime|h5py|h5netcdf|netcdf4)\b'
     - pytest -v -s armoor/tests/uni
     - pytest -v -s armoor/tests/integration
   cache:

@@ -182,7 +182,7 @@ def register_cf():
     )
     for cfg_file in cfg_files:
         logger.info(f"register {cfg_file}")
-        mycfspecs = MetaSpecs(cfg_file, default=False, user=False)
+        mycfspecs = MetaSpecs(cfg_file, default=True, user=False)
         xmeta.register_meta_specs(mycfspecs)
     
 def _normalize_geo_coords(ds):
