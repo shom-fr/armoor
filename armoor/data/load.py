@@ -204,34 +204,89 @@ def process_single_combination(ds, mz_name, mz_param):
     return dsout
 
 class StagedDataset(str):
-    """A zarr output path that also carries the metazone it was written for.
+    """A pipeline output path that also carries the config metadata it was
+    produced with (metazone, comp_func, ...).
 
     Behaves identically to a plain str/path everywhere (isinstance str is
     True, json.dumps serializes it as a plain string, Path(x) works, string
     matching in main_coloc's file-index scan works) -- this is purely
     additive metadata riding along on the same object, not a new on-disk
-    shape. Lets callers recover the metazone without parsing it back out of
-    the path.
+    shape. Lets callers recover pipeline context without re-parsing it back
+    out of the path or re-threading it as separate loose parameters.
+
+    Any operation that returns a *new* plain str (slicing, str(x), a JSON
+    round-trip) drops these attributes -- they only survive as long as the
+    StagedDataset instance itself is passed along. Callers that cross a
+    JSON/process boundary (see armoor.cli.hpc/main.py's HPC waves) must
+    re-wrap the recovered path explicitly.
     """
 
-    def __new__(cls, path, metazone):
-        """Create a str instance carrying an extra `.metazone` attribute.
+    def __new__(cls, path, *, metazone=None, comp_func=None, stage=None,
+                fmt=None, platform=None):
+        """Create a str instance carrying extra pipeline-context attributes.
 
         Parameters
         ----------
         path : str
-            The zarr path (used as the string value itself).
-        metazone : str
+            The output path (used as the string value itself).
+        metazone : str, optional
             Metazone name to attach.
+        comp_func : str, optional
+            Comparison type identifier (e.g. ``"comp_sst"``).
+        stage : str, optional
+            Pipeline stage that produced this path (e.g. ``"load"``,
+            ``"coloc"``, ``"output"``).
+        fmt : str, optional
+            Original data.ini ``fmt`` value. Not yet populated by any
+            caller in this codebase; reserved for a future increment.
+        platform : str, optional
+            Original data.ini ``platform`` value. Not yet populated by any
+            caller in this codebase; reserved for a future increment.
 
         Returns
         -------
         StagedDataset
-            A str equal to `path`, with `.metazone` set to `metazone`.
+            A str equal to `path`, carrying the given attributes.
         """
         obj = super().__new__(cls, path)
         obj.metazone = metazone
+        obj.comp_func = comp_func
+        obj.stage = stage
+        obj.fmt = fmt
+        obj.platform = platform
         return obj
+
+    def output_dir(self, stage, ref_name=None, prod_name=None, output=None):
+        """Build the per-stage output directory from this object's context.
+
+        Single source of truth for the ``<comp_func>/<stage>/<metazone>/...``
+        convention independently re-implemented in comp/coloc.py,
+        comp/output.py and comp/plot.py before this method existed.
+
+        Parameters
+        ----------
+        stage : str
+            Pipeline stage name (e.g. ``"coloc"``, ``"output"``, ``"plot"``).
+        ref_name : str, optional
+            Reference dataset name, appended if given.
+        prod_name : str, optional
+            Product dataset name, appended if given.
+        output : str, optional
+            Output/otype name, appended if given.
+
+        Returns
+        -------
+        pathlib.Path
+            The directory path for this stage/context.
+        """
+        parts = [self.comp_func or "", stage, self.metazone]
+        if ref_name:
+            parts.append(ref_name)
+        if prod_name:
+            parts.append(prod_name)
+        if output:
+            parts.append(output)
+        return Path(*[p for p in parts if p])
 
 
 def save_result(dsout, mz_name, func_comp):
@@ -286,7 +341,7 @@ def save_result(dsout, mz_name, func_comp):
     dsout.close()
     del dsout
     logger.info(f"Saved: {nc}")
-    return StagedDataset(str(nc), metazone=mz_name)
+    return StagedDataset(str(nc), metazone=mz_name, comp_func=func_comp, stage="load")
 
 def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     """Process a single dataset×metazone combination."""

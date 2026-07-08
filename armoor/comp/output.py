@@ -19,6 +19,7 @@ from armoor.base.io import (
 from armoor.comp import GROUP_SUFFIX
 from armoor.comp.comparison import get_comparison
 from armoor.comp.stats import StatsComp
+from armoor.data.load import StagedDataset
 import armoor  # noqa: F401 — registers all xarray accessors
 from armoor.diags.parcels import Parcels
 
@@ -369,8 +370,9 @@ class OutputProcessor:
                 sorted_prods, mparams, output_params, output
                 )
             # Save outputs
+            staged = StagedDataset("", metazone=metazone, comp_func=self.func_comp, stage="output")
             output_files = self._save_outputs(
-                processed_datasets, sorted_prods, metazone, 
+                processed_datasets, sorted_prods, staged,
                 ref_name, output, output_params
                 )
             
@@ -723,36 +725,36 @@ class OutputProcessor:
 
         return concatenated
     
-    def _save_outputs(self, processed_datasets: Dict[str, Dict], 
+    def _save_outputs(self, processed_datasets: Dict[str, Dict],
                      sorted_prods: Dict[str, Dict],
-                     metazone: str, ref_name: str, output: str,
+                     staged: StagedDataset, ref_name: str, output: str,
                      output_params: Dict[str, Any]) -> List[str]:
         """
         Save processed datasets to output files.
-        
+
         Parameters
         ----------
         processed_datasets
             Processed datasets organized by product and type
         sorted_prods
             Sorted product information
-        metazone
-            Metazone name
+        staged
+            Pipeline context (comp_func/metazone) for this output run
         ref_name
             Reference dataset name
         output
             Output type name
         output_params
             Output configuration parameters
-            
+
         Returns
         -------
         List of saved output file paths
         """
         output_files = []
-        
+
         # Create base output directory
-        dirout = Path(f"{self.func_comp}/output/{metazone}/{ref_name}/{output}")
+        dirout = staged.output_dir("output", ref_name=ref_name, output=output)
         
         # Get all sorting keys
         sort_keys = list(sorted_prods[list(sorted_prods.keys())[0]]["prod"].keys())

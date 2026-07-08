@@ -4,13 +4,16 @@ Covers the two places flagged as sharp edges when threading `data_type`
 through the pipeline: process_single_combination's full attrs overwrite,
 and load_datasets' early validate_load_params gate.
 """
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
 
 from armoor import ArmoorError
-from armoor.data.load import load_datasets, process_single_combination
+from armoor.data.load import StagedDataset, load_datasets, process_single_combination
 
 
 @pytest.fixture
@@ -82,3 +85,77 @@ class TestLoadDatasetsValidateLoadParamsGate:
         # this must complete without raising and return no outputs.
         result = load_datasets(data_cfg, metazones, "data")
         assert result == []
+
+
+class TestStagedDataset:
+    """Unit tests for StagedDataset -- the lightweight pipeline-context
+    object that rides a zarr path across stages/processes without carrying
+    the actual xr.Dataset in memory (see REFACTOR_PLAN_STAGED_DATASET.md).
+    """
+
+    def test_behaves_like_a_plain_path(self):
+        sd = StagedDataset("p/q.zarr", metazone="med", comp_func="comp_sst")
+        assert isinstance(sd, str)
+        assert sd == "p/q.zarr"
+        assert json.dumps([sd]) == '["p/q.zarr"]'
+
+    def test_attributes_readable(self):
+        sd = StagedDataset("p/q.zarr", metazone="med", comp_func="comp_sst", stage="coloc")
+        assert sd.metazone == "med"
+        assert sd.comp_func == "comp_sst"
+        assert sd.stage == "coloc"
+
+    def test_defaults_are_none(self):
+        sd = StagedDataset("p/q.zarr")
+        assert sd.metazone is None
+        assert sd.comp_func is None
+        assert sd.stage is None
+        assert sd.fmt is None
+        assert sd.platform is None
+
+    def test_operations_returning_a_plain_str_drop_attributes(self):
+        """Documents the boundary the HPC JSON round-trip fix depends on:
+        any operation returning a *new* str loses the extra attributes.
+        """
+        sd = StagedDataset("p/q.zarr", metazone="med", comp_func="comp_sst")
+        reloaded = json.loads(json.dumps(sd))
+        assert not hasattr(reloaded, "metazone")
+        assert not hasattr(str(sd), "metazone")
+
+    def test_output_dir_matches_pre_refactor_conventions(self):
+        """Locks in byte-for-byte parity with the f-string conventions
+        previously duplicated in coloc.py/output.py/plot.py -- these are
+        on-disk path contracts and must not silently drift.
+        """
+        sd = StagedDataset("", metazone="med", comp_func="comp_sst")
+
+        assert sd.output_dir("coloc", ref_name="argo", prod_name="hycom") == \
+            Path("comp_sst/coloc/med/argo/hycom")
+        assert sd.output_dir("output", ref_name="argo", output="maps") == \
+            Path("comp_sst/output/med/argo/maps")
+        assert sd.output_dir("plot", ref_name="argo") == \
+            Path("comp_sst/plot/med/argo")
+
+    def test_output_dir_omits_missing_parts(self):
+        sd = StagedDataset("", metazone="med", comp_func=None)
+        assert sd.output_dir("coloc", ref_name="argo") == Path("coloc/med/argo")
+
+    def test_hpc_json_round_trip_rewrap(self):
+        """Simulates the Wave 0 -> Wave 1 HPC boundary: a {metazone: [paths]}
+        dict is dumped to JSON, reloaded (paths come back as plain strings),
+        then re-wrapped as StagedDataset -- the fix applied at
+        cli/main.py's input_zarrs handling.
+        """
+        mz_name = "med"
+        original = {mz_name: ["a/ref.zarr", "a/prod.zarr"]}
+        dumped = json.dumps(original)
+        paths = json.loads(dumped)
+
+        rewrapped = [
+            StagedDataset(p, metazone=mz_name, comp_func="comp_sst", stage="load")
+            for p in paths.get(mz_name, [])
+        ]
+
+        assert all(isinstance(p, StagedDataset) for p in rewrapped)
+        assert [str(p) for p in rewrapped] == original[mz_name]
+        assert all(p.metazone == mz_name and p.comp_func == "comp_sst" for p in rewrapped)

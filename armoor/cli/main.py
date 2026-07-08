@@ -459,7 +459,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
     from armoor.base.misc import dict_to_list
     from armoor.comp.comparison import get_comparison
     from armoor.comp.coloc import main_coloc
-    from armoor.data.load import load_datasets
+    from armoor.data.load import load_datasets, StagedDataset
 
     dask.config.set({
         'scheduler': 'threads',
@@ -537,7 +537,13 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
             try:
                 with open(zarr_json) as f:
                     paths = json.load(f)
-                zarr.extend(paths.get(mz_name, []))
+                # JSON round-trip strips any StagedDataset attributes -- these
+                # come back as plain strings, re-wrap them immediately so
+                # downstream code (main_coloc) has rich objects again.
+                zarr.extend(
+                    StagedDataset(p, metazone=mz_name, comp_func=func_comp, stage="load")
+                    for p in paths.get(mz_name, [])
+                    )
             except FileNotFoundError:
                 logger.warning(f"Input zarr JSON not found (skipping): {zarr_json}")
     else:

@@ -10,6 +10,7 @@ import pytest
 import xarray as xr
 
 from armoor.__init__ import ArmoorError
+from armoor.data.load import StagedDataset
 from armoor.comp.coloc import (
     AbstractColocation,
     TimeColocation,
@@ -843,7 +844,7 @@ class TestSaveDatasets:
         mock_encoding.return_value = {}
 
         ncout_ref, ncout_prod = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         assert ncout_ref.exists()
@@ -855,7 +856,7 @@ class TestSaveDatasets:
         mock_encoding.return_value = {}
 
         ncout_ref, ncout_prod = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         assert "2023-01" in str(ncout_ref)
@@ -867,7 +868,7 @@ class TestSaveDatasets:
         self.dsref.attrs = {"trange": "2023-01_to_2023-02", "data_name": "ref"}
 
         ncout_ref, ncout_prod = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         assert "2023-01_to_2023-02" in str(ncout_ref)
@@ -879,7 +880,7 @@ class TestSaveDatasets:
         self.dsref["mask"] = (["y", "x"], np.ones((3, 4), dtype=bool))
 
         ncout_ref, _ = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         # Verify the file was created
@@ -892,7 +893,7 @@ class TestSaveDatasets:
         self.dsref.attrs = {"vlevel": "0-100m", "data_name": "ref"}
 
         ncout_ref, _ = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         assert "0-100m" in str(ncout_ref)
@@ -928,7 +929,7 @@ class TestSaveDatasets:
         dsprod.attrs = {"data_name": "glo12"}
 
         # Must not raise
-        ncout_ref, ncout_prod = save_datasets(dsref, dsprod, tmp_path, "ref", "prod")
+        ncout_ref, ncout_prod = save_datasets(dsref, dsprod, tmp_path)
 
         assert ncout_ref.exists()
         assert ncout_prod.exists()
@@ -937,6 +938,30 @@ class TestSaveDatasets:
         ds_read = xr.open_zarr(ncout_ref)
         assert np.issubdtype(ds_read["time"].dtype, np.floating)
         np.testing.assert_array_equal(ds_read["time"].values, time_vals)
+
+    @patch("armoor.comp.coloc.get_zarr_encoding")
+    def test_save_datasets_without_staged_returns_plain_paths(self, mock_encoding, tmp_path):
+        """No `staged` arg -> plain Path, not StagedDataset."""
+        mock_encoding.return_value = {}
+
+        ncout_ref, ncout_prod = save_datasets(self.dsref, self.dsprod, tmp_path)
+
+        assert not isinstance(ncout_ref, StagedDataset)
+        assert not isinstance(ncout_prod, StagedDataset)
+
+    @patch("armoor.comp.coloc.get_zarr_encoding")
+    def test_save_datasets_with_staged_returns_staged_datasets(self, mock_encoding, tmp_path):
+        """A `staged` arg carries its metazone/comp_func onto both return paths."""
+        mock_encoding.return_value = {}
+        staged = StagedDataset("", metazone="med", comp_func="comp_sst")
+
+        ncout_ref, ncout_prod = save_datasets(self.dsref, self.dsprod, tmp_path, staged=staged)
+
+        for nc in (ncout_ref, ncout_prod):
+            assert isinstance(nc, StagedDataset)
+            assert nc.metazone == "med"
+            assert nc.comp_func == "comp_sst"
+            assert nc.stage == "coloc"
 
 
 # =============================================================================
@@ -1465,7 +1490,8 @@ class TestProcessSingleProductSplitBehavior:
 
         params = {"time": ("tfreq", "D")}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
-        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+        staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
 
         mock_trange.assert_not_called()
 
@@ -1492,7 +1518,8 @@ class TestProcessSingleProductSplitBehavior:
 
         params = {"vertical": ("vlevel", ("depth", [0.0, 10.0]))}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
-        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+        staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
 
         mock_vrange.assert_not_called()
 
@@ -1523,7 +1550,8 @@ class TestProcessSingleProductSplitBehavior:
             "vertical": ("vlevel", ("depth", [0.0, 10.0])),
         }
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
-        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+        staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
 
         mock_trange.assert_called_once()
         mock_vrange.assert_called_once()
@@ -1569,7 +1597,8 @@ class TestProcessSingleProductSplitBehavior:
             "vertical": ("vlevel", ("depth", [0.0, 10.0])),
         }
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
-        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+        staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
 
         # Two dim groups: {time,z} and {time}
         # time ranges called for both (both have 'time'), vertical ranges only for {time,z}
@@ -1608,10 +1637,8 @@ class TestProcessFunctions:
         self.dsprod.attrs["data_name"] = "product"
 
         with patch("pathlib.Path.mkdir") as mock_mkdir:
-            _save_colocation_results(
-                [self.dsref], [self.dsprod],
-                "comp_argo", "zone1", "reference", "product"
-            )
+            staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
+            _save_colocation_results([self.dsref], [self.dsprod], staged)
 
             mock_mkdir.assert_called()
 
@@ -1635,9 +1662,10 @@ class TestProcessFunctions:
         params = {}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
 
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
         _process_single_product(
             self.dsref, Path("/fake/path.nc"),
-            params, tbound, "comp_argo", "zone1"
+            params, tbound, staged
         )
 
         mock_open.assert_called_once()
@@ -1660,9 +1688,10 @@ class TestProcessFunctions:
         params = {}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
 
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
         _process_reference(
             Path("/data/zone1/ref.zarr"), ncins,
-            params, tbound, "comp_argo", "zone1", ncouts
+            params, tbound, staged, ncouts
         )
 
         # open_dataset is called twice: once with decode_times=False to detect
@@ -1683,10 +1712,11 @@ class TestProcessFunctions:
         mock_prep.return_value = self.dsref
         mock_single.return_value = ("reference", "product", [Path("/out/ref.zarr")])
 
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
         _process_reference(
             Path("/data/zone1/ref.zarr"), [Path("/data/zone1/prod1.nc")],
             {}, (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03")),
-            "comp_argo", "zone1", {"zone1": {}}
+            staged, {"zone1": {}}
         )
 
         assert mock_open.call_args_list[1].kwargs["decode_times"] is False
@@ -1703,10 +1733,11 @@ class TestProcessFunctions:
         mock_prep.return_value = self.dsref
         mock_single.return_value = ("reference", "product", [Path("/out/ref.zarr")])
 
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
         _process_reference(
             Path("/data/zone1/ref.zarr"), [Path("/data/zone1/prod1.nc")],
             {}, (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03")),
-            "comp_argo", "zone1", {"zone1": {}}
+            staged, {"zone1": {}}
         )
 
         assert mock_open.call_args_list[1].kwargs["decode_times"] is True
@@ -1722,9 +1753,8 @@ class TestProcessFunctions:
         metazones = {"zone1": {"tbound": ("2023-01-01", "2023-01-03")}}
         params = {}
 
-        _process_metazone(
-            "zone1", params, mz_files, metazones, "comp_argo", ncouts
-        )
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
+        _process_metazone(staged, params, mz_files, metazones, ncouts)
 
         mock_ref.assert_called_once()
         assert "zone1" in ncouts
@@ -1734,10 +1764,9 @@ class TestProcessFunctions:
         ncouts = {}
         metazones = {"zone1": {"tbound": ("2023-01-01", "2023-01-03")}}
 
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
         with patch("armoor.comp.coloc._process_reference"):
-            _process_metazone(
-                "zone1", {}, {"ref": [], "prod": []}, metazones, "comp_argo", ncouts
-            )
+            _process_metazone(staged, {}, {"ref": [], "prod": []}, metazones, ncouts)
 
         assert "zone1" in ncouts
         assert ncouts["zone1"] == {}
@@ -1747,10 +1776,8 @@ class TestProcessFunctions:
         with patch("armoor.comp.coloc.save_datasets") as mock_save:
             mock_save.return_value = (Path("/out/ref.zarr"), Path("/out/prod.zarr"))
             with patch("pathlib.Path.mkdir"):
-                paths = _save_colocation_results(
-                    [self.dsref], [self.dsprod],
-                    "comp_argo", "zone1", "ref", "prod"
-                )
+                staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
+                paths = _save_colocation_results([self.dsref], [self.dsprod], staged)
 
         assert len(paths) == 2
 

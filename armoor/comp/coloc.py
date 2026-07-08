@@ -21,6 +21,7 @@ from armoor.comp import COMP_VARS
 from armoor.comp.comparison import get_comparison
 from armoor.comp.misc import get_colocation_params, validate_colocation
 from armoor.data.datatype import get_data_type_by_name
+from armoor.data.load import StagedDataset
 
 logger = logging.getLogger(__name__)
 
@@ -568,7 +569,7 @@ def _drop_time_cf_attrs_if_not_datetime(ds):
     return ds.assign_coords(time=clean_time)
 
 
-def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
+def save_datasets(dsref, dsprod, dirout, staged=None):
     """Save datasets to NetCDF files.
 
     Parameters
@@ -579,15 +580,17 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
         Product dataset to save.
     dirout: Path
         Directory to save the datasets.
-    ref_name: str
-        Name for the reference dataset file.
-    prod_name: str
-        Name for the product dataset file.
+    staged: StagedDataset, optional
+        Pipeline context (metazone/comp_func) to carry onto the returned
+        paths. When None, plain Path objects are returned (metazone/
+        comp_func-less, e.g. for callers outside the comp_func pipeline).
 
     Returns
     -------
     tuple
-        Paths to the saved reference and product NetCDF files.
+        Paths to the saved reference and product NetCDF files, as
+        StagedDataset instances carrying `staged`'s metazone/comp_func
+        (or plain Path if `staged` is None).
     """
     ncname = dsref.range.suffix
     ncout_ref = dirout / f"ref{ncname}.zarr"
@@ -626,7 +629,12 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     dsref.close()
     dsprod.close()
 
-    return ncout_ref, ncout_prod
+    if staged is None:
+        return ncout_ref, ncout_prod
+    return (
+        StagedDataset(str(ncout_ref), metazone=staged.metazone, comp_func=staged.comp_func, stage="coloc"),
+        StagedDataset(str(ncout_prod), metazone=staged.metazone, comp_func=staged.comp_func, stage="coloc"),
+    )
 
 
 def _prepare_dataset(ds, comp_func, is_reference=False):
@@ -831,7 +839,7 @@ def select_vars_by_dims(prod_groups, sig):
     return None
 
 
-def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, prod_name):
+def _save_colocation_results(dssref, dssprod, staged):
     """Save colocation results to files.
 
     Parameters
@@ -840,14 +848,8 @@ def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, pro
         List of reference datasets.
     dssprod: list
         List of product datasets.
-    comp_func: str
-        Comparison function identifier.
-    metazone: str
-        Metazone name.
-    ref_name: str
-        Reference dataset name.
-    prod_name: str
-        Product dataset name.
+    staged: StagedDataset
+        Pipeline context (comp_func/metazone) for this colocation run.
 
     Returns
     -------
@@ -861,17 +863,14 @@ def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, pro
         dsref = dssref[ids]
         dsprod = dssprod[ids]
 
-        dirout = Path(
-            f"{comp_func}/coloc/{metazone}/"
-            f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
+        dirout = staged.output_dir(
+            "coloc",
+            ref_name=dsref.attrs['data_name'],
+            prod_name=dsprod.attrs['data_name'],
         )
         dirout.mkdir(parents=True, exist_ok=True)
 
-        ncout_ref, ncout_prod = save_datasets(
-            dsref, dsprod, dirout,
-            dsref.attrs['data_name'],
-            dsprod.attrs['data_name']
-        )
+        ncout_ref, ncout_prod = save_datasets(dsref, dsprod, dirout, staged=staged)
 
         paths.append(ncout_ref)
         paths.append(ncout_prod)
@@ -882,7 +881,7 @@ def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, pro
     return paths
 
 
-def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
+def _process_single_product(dsrefin, ncin, params, tbound, staged):
     """Process colocation for a single product against a reference.
 
     Parameters
@@ -895,16 +894,15 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
         Colocation parameters.
     tbound: tuple
         Time bounds.
-    comp_func: str
-        Comparison function identifier.
-    metazone: str
-        Metazone name.
+    staged: StagedDataset
+        Pipeline context (comp_func/metazone) for this colocation run.
 
     Returns
     -------
     tuple
         (ref_name, prod_name, paths) where paths is a list of output file paths.
     """
+    comp_func = staged.comp_func
     logger.info(f"-- Process {ncin}")
 
     dsprodin = xr.open_dataset(ncin, chunks={})
@@ -971,13 +969,11 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
         dssprod.extend(sub_prod_list)
 
     # Save results and return paths
-    paths = _save_colocation_results(
-        dssref, dssprod, comp_func, metazone, ref_name, prod_name
-    )
+    paths = _save_colocation_results(dssref, dssprod, staged)
     return ref_name, prod_name, paths
 
 
-def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts):
+def _process_reference(ncref, ncins, params, tbound, staged, ncouts):
     """Process all products for a single reference.
 
     Parameters
@@ -990,13 +986,12 @@ def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts
         Colocation parameters.
     tbound: tuple
         Time bounds.
-    comp_func: str
-        Comparison function identifier.
-    metazone: str
-        Metazone name.
+    staged: StagedDataset
+        Pipeline context (comp_func/metazone) for this colocation run.
     ncouts: dict
         Dictionary to store output paths.
     """
+    metazone = staged.metazone
     logger.info(f"Use reference {ncref}")
 
     _ds_meta = xr.open_dataset(ncref, engine="zarr", chunks={}, decode_times=False)
@@ -1004,15 +999,13 @@ def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts
     _ds_meta.close()
     dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={},
                                decode_times=not _is_climato)
-    dsrefin = _prepare_dataset(dsrefin, comp_func, is_reference=True)
+    dsrefin = _prepare_dataset(dsrefin, staged.comp_func, is_reference=True)
 
     results = []
     for ncin in ncins:
-        result = _process_single_product(
-            dsrefin, ncin, params, tbound, comp_func, metazone
-        )
+        result = _process_single_product(dsrefin, ncin, params, tbound, staged)
         results.append(result)
- 
+
     # Merge results into ncouts
     for ref_name, prod_name, paths in results:
         if ref_name not in ncouts[metazone]:
@@ -1025,24 +1018,23 @@ def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts
     gc.collect()
 
 
-def _process_metazone(metazone, params, mz_files, metazones, comp_func, ncouts):
+def _process_metazone(staged, params, mz_files, metazones, ncouts):
     """Process colocation for a single metazone.
 
     Parameters
     ----------
-    metazone: str
-        Metazone name.
+    staged: StagedDataset
+        Pipeline context (comp_func/metazone) for this colocation run.
     params: dict
         Colocation parameters for this metazone.
     mz_files: dict
         Pre-filtered file index with keys "ref" and "prod".
     metazones: dict
         Dictionary containing all metazone information.
-    comp_func: str
-        Comparison function identifier.
     ncouts: dict
         Dictionary to store output paths.
     """
+    metazone = staged.metazone
     logger.info(f"Start colocation for {metazone}.")
     logger.info(f"Colocation parameters are: {params}")
 
@@ -1053,7 +1045,7 @@ def _process_metazone(metazone, params, mz_files, metazones, comp_func, ncouts):
     ncins = mz_files["prod"]
 
     for ncref in ncrefs:
-        _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts)
+        _process_reference(ncref, ncins, params, tbound, staged, ncouts)
 
     logger.info(f"End colocation for {metazone}.")
 
@@ -1101,6 +1093,7 @@ def main_coloc(ncs, metazones, comp_func):
     ncouts = {}
     for metazone, params in coloc_params.items():
         mz_files = ncs_index.get(metazone, {"ref": [], "prod": []})
-        _process_metazone(metazone, params, mz_files, metazones, comp_func, ncouts)
+        staged = StagedDataset("", metazone=metazone, comp_func=comp_func, stage="coloc")
+        _process_metazone(staged, params, mz_files, metazones, ncouts)
 
     return ncouts

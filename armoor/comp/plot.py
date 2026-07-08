@@ -22,6 +22,7 @@ from armoor.base.dispatch import MethodRegistry
 from armoor.base.plot import create_subplots, diagdisp, format_trange, save_figure
 from armoor.comp import GROUP_SUFFIX, METRIC_LABELS
 from armoor.comp.comparison import get_comparison
+from armoor.data.load import StagedDataset
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,7 @@ class PlotComp(MethodRegistry):
         self.methods = {}
         self.func_comp = func_comp
         self.metazone = metazone
+        self.staged = StagedDataset("", metazone=metazone, comp_func=func_comp, stage="plot")
         self.ax_minimap = [0.7, 0.91, 0.19]
         self.plot_title = get_comparison(func_comp).title
         self.dt = xr.open_datatree(nc)
@@ -174,7 +176,7 @@ class PlotComp(MethodRegistry):
                     )
 
                 figname = (
-                    f"{self.func_comp}/plot/{self.metazone}/{ref_name}/"
+                    f"{self.staged.output_dir('plot', ref_name=ref_name)}/"
                     f"diagdisp_glob_{var}_{prod_name}.png"
                     )
                 self.diagdisp(
@@ -247,7 +249,7 @@ class PlotComp(MethodRegistry):
                     )
                 
                 figname = (
-                    f"{self.func_comp}/plot/{self.metazone}/{ref_name}/"
+                    f"{self.staged.output_dir('plot', ref_name=ref_name)}/"
                     f"diagdisp_sel_{var}_{prod_name}{ncname}.png"
                     )
                 
@@ -410,7 +412,7 @@ class PlotComp(MethodRegistry):
                 f"{xtitle}"
                 )
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{refname}/"
+                f"{self.staged.output_dir('plot', ref_name=refname)}/"
                 f"mdiagts_{prod}{xfigname}.png"
                 )
                 
@@ -529,7 +531,7 @@ class PlotComp(MethodRegistry):
                 )
             plot_minimap(dsref, fig=fig, ax=self.ax_minimap, **kw)
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{refname}/"
+                f"{self.staged.output_dir('plot', ref_name=refname)}/"
                 f"udiagts{xfigname}.png"
                 )
             self.save_figure(
@@ -662,7 +664,7 @@ class PlotComp(MethodRegistry):
                 f"{xtitle}"
                 )
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{refname}/"
+                f"{self.staged.output_dir('plot', ref_name=refname)}/"
                 f"mvprofiles_{prod}_{var}{xfigname}.png"
                 )
 
@@ -825,7 +827,7 @@ class PlotComp(MethodRegistry):
                 ax_minimap = plot_minimap((daref.lon, daref.lat), fig=fig, ax=self.ax_minimap, **kw)
 
                 figname = (
-                    f"{self.func_comp}/plot/{self.metazone}/{refname}/"
+                    f"{self.staged.output_dir('plot', ref_name=refname)}/"
                     f"uvprofiles_{varname}{xfigname}.png"
                     )
 
@@ -1305,7 +1307,7 @@ class PlotComp(MethodRegistry):
                 gl.right_labels = False
 
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" +
+                f"{self.staged.output_dir('plot', ref_name=ref_name)}/" +
                 f"map_drifter_trajectories_{prod_name}.png"
                 )
             
@@ -1392,7 +1394,7 @@ class PlotComp(MethodRegistry):
                 gl.right_labels = False
             
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                f"{self.staged.output_dir('plot', ref_name=ref_name)}/" +
                 f"map_drifter_current_{prod_name}.png"
                 )
             
@@ -1613,7 +1615,7 @@ class PlotComp(MethodRegistry):
                             )
                     
                     figname = (
-                        f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                        f"{self.staged.output_dir('plot', ref_name=ref_name)}/" +
                         f"map_{var}_{comp}_{prod_name}{ncname}.png"
                         )
                     
