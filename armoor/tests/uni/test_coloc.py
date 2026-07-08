@@ -1425,6 +1425,46 @@ class TestProcessFunctions:
         # Should process 2 products
         assert mock_single.call_count == 2
 
+    @patch("armoor.comp.coloc.xr.open_dataset")
+    @patch("armoor.comp.coloc._prepare_dataset")
+    @patch("armoor.comp.coloc._process_single_product")
+    def test_process_reference_detects_climatology_via_data_type(
+        self, mock_single, mock_prep, mock_open
+    ):
+        """decode_times is driven by data_type, not by a data_name substring."""
+        self.dsref.attrs = {"data_name": "reference", "data_type": "woa18"}
+        mock_open.return_value = self.dsref
+        mock_prep.return_value = self.dsref
+        mock_single.return_value = ("reference", "product", [Path("/out/ref.zarr")])
+
+        _process_reference(
+            Path("/data/zone1/ref.zarr"), [Path("/data/zone1/prod1.nc")],
+            {}, (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03")),
+            "comp_argo", "zone1", {"zone1": {}}
+        )
+
+        assert mock_open.call_args_list[1].kwargs["decode_times"] is False
+
+    @patch("armoor.comp.coloc.xr.open_dataset")
+    @patch("armoor.comp.coloc._prepare_dataset")
+    @patch("armoor.comp.coloc._process_single_product")
+    def test_process_reference_data_name_substring_no_longer_triggers_climatology(
+        self, mock_single, mock_prep, mock_open
+    ):
+        """A "woa18"-looking data_name alone must not flag a climatology."""
+        self.dsref.attrs = {"data_name": "my_woa18_ref", "data_type": "ocean_model"}
+        mock_open.return_value = self.dsref
+        mock_prep.return_value = self.dsref
+        mock_single.return_value = ("reference", "product", [Path("/out/ref.zarr")])
+
+        _process_reference(
+            Path("/data/zone1/ref.zarr"), [Path("/data/zone1/prod1.nc")],
+            {}, (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03")),
+            "comp_argo", "zone1", {"zone1": {}}
+        )
+
+        assert mock_open.call_args_list[1].kwargs["decode_times"] is True
+
     @patch("armoor.comp.coloc._process_reference")
     def test_process_metazone(self, mock_ref):
         """Test _process_metazone function flow."""

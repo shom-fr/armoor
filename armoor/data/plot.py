@@ -27,6 +27,7 @@ from armoor.base.filters import create_optimized_mask
 from armoor.base.interp import vinterp
 from armoor.base.io import setup_dask_client
 from armoor.base.plot import create_subplots, diagdisp, save_figure
+from armoor.data.datatype import DataEddies, DataOceanModel, get_data_type_by_name
 # from armoor.comp.stats import StatsComp
 
 logger = logging.getLogger(__name__)
@@ -832,10 +833,8 @@ class PlotEddies(_PlotDataBase):
     """
 
 
-_PLOT_REGISTRY = {
-    "ocean_model": PlotOceanModel,
-    "eddies": PlotEddies,
-}
+DataOceanModel.plotter_cls = PlotOceanModel
+DataEddies.plotter_cls = PlotEddies
 
 
 def get_plotter(nc, metazone, vminmax=None):
@@ -863,7 +862,7 @@ def get_plotter(nc, metazone, vminmax=None):
     """
     dt = xr.open_datatree(nc)
     type_name = dt.children["data"].attrs.get("data_type")
-    plot_cls = _PLOT_REGISTRY.get(type_name, PlotOceanModel)
+    plot_cls = get_data_type_by_name(type_name).plotter_cls
     return plot_cls(dt, metazone, vminmax)
 
 

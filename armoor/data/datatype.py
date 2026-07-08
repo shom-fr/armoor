@@ -27,6 +27,8 @@ class DataType:
     data_vars = []
     forbidden_params = []
     outputs_params = {}
+    plotter_cls = None
+    is_climatology = False
 
     def __init_subclass__(cls, **kwargs):
         """Register `cls` in the module-level registries.
@@ -131,6 +133,22 @@ class DataOceanModel(DataType):
                 }
             },
         }
+
+
+class DataWoa18(DataOceanModel):
+    """WOA18 climatology (ocean-model-shaped output, but a climatology)."""
+
+    name = "woa18"
+    fmts = ("woa18",)
+    is_climatology = True
+
+
+class DataBobyclim(DataOceanModel):
+    """Bobyclim climatology (ocean-model-shaped output, but a climatology)."""
+
+    name = "bobyclim"
+    fmts = ("bobyclim",)
+    is_climatology = True
 
 
 class DataEddies(DataType):

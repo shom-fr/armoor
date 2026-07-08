@@ -7,7 +7,10 @@ plot.py have no other automated safety net for this code path.
 import pytest
 
 from armoor import ArmoorError
-from armoor.data.datatype import DataEddies, DataOceanModel, get_data_type
+from armoor.data.datatype import (
+    DataBobyclim, DataEddies, DataOceanModel, DataWoa18,
+    get_data_type, get_data_type_by_name,
+)
 
 
 class TestGetDataType:
@@ -15,6 +18,7 @@ class TestGetDataType:
     def test_known_ocean_model_fmts(self):
         for fmt in ("hycom", "croco", "croco_xios", "cmems_model"):
             assert isinstance(get_data_type(fmt), DataOceanModel)
+            assert get_data_type(fmt).is_climatology is False
 
     def test_known_eddies_fmts(self):
         for fmt in ("eddy_pet", "eddy_sacso", "eddy_shoot"):
@@ -22,6 +26,24 @@ class TestGetDataType:
 
     def test_unknown_fmt_defaults_to_ocean_model(self):
         assert isinstance(get_data_type("some_future_model_fmt"), DataOceanModel)
+
+    def test_climatology_fmts_are_ocean_model_shaped_but_flagged(self):
+        woa18 = get_data_type("woa18")
+        bobyclim = get_data_type("bobyclim")
+        assert isinstance(woa18, DataWoa18)
+        assert isinstance(bobyclim, DataBobyclim)
+        # Subclass DataOceanModel: same outputs_params/plotter_cls, just flagged.
+        assert isinstance(woa18, DataOceanModel)
+        assert isinstance(bobyclim, DataOceanModel)
+        assert woa18.is_climatology is True
+        assert bobyclim.is_climatology is True
+        assert woa18.outputs_params == get_data_type("hycom").outputs_params
+
+    def test_get_data_type_by_name_resolves_climatology_flag(self):
+        assert get_data_type_by_name("woa18").is_climatology is True
+        assert get_data_type_by_name("bobyclim").is_climatology is True
+        assert get_data_type_by_name("ocean_model").is_climatology is False
+        assert get_data_type_by_name(None).is_climatology is False
 
 
 class TestValidateLoadParams:

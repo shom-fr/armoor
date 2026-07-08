@@ -20,6 +20,7 @@ from armoor.base.io import (create_fast_encoding, get_zarr_encoding,
 from armoor.comp import COMP_VARS
 from armoor.comp.comparison import get_comparison
 from armoor.comp.misc import get_colocation_params, validate_colocation
+from armoor.data.datatype import get_data_type_by_name
 
 logger = logging.getLogger(__name__)
 
@@ -956,9 +957,8 @@ def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts
     """
     logger.info(f"Use reference {ncref}")
 
-    _climato_names = {"woa18", "bobyclim"}
     _ds_meta = xr.open_dataset(ncref, engine="zarr", chunks={}, decode_times=False)
-    _is_climato = any(n in _ds_meta.attrs.get("data_name", "") for n in _climato_names)
+    _is_climato = get_data_type_by_name(_ds_meta.attrs.get("data_type")).is_climatology
     _ds_meta.close()
     dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={},
                                decode_times=not _is_climato)
