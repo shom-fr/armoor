@@ -187,21 +187,7 @@ def save_datasets(dsprod, dirout, prod_name):
     tuple
         Paths to the saved reference and product NetCDF files.
     """
-    attrs = dsprod.attrs
-    ncname = ""
-    if "time" in attrs:
-        ncname += f"_{attrs['time']}"
-    elif "trange" in attrs:
-        ncname += f"_{attrs['trange']}"
-    else:
-        pass
-    
-    if "vlevel" in attrs:
-        ncname += f"_{attrs['vlevel']}"
-    elif "vrange" in attrs:
-        ncname += f"_{attrs['vrange']}"
-    else:
-        pass
+    ncname = dsprod.range.suffix
     ncout_prod = dirout / f"prod{ncname}.zarr"
     #logger.info(f"Save {ncout_prod}")
     dsprod = dsprod.chunk("auto")
@@ -796,8 +782,8 @@ class OutputProcessor:
             ds = xr.concat(dss0, "time")
             
             # Handle vrange attributes specially
-            if dss0[0].attrs.get("vrange"):
-                vrange_attrs = [ds0.attrs.get("vrange") for ds0 in dss0]
+            if dss0[0].range.vrange_value:
+                vrange_attrs = [ds0.range.vrange_value for ds0 in dss0]
                 ds.attrs["vrange"] = vrange_attrs
                 
         elif len(dss0) == 1:

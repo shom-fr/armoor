@@ -197,7 +197,7 @@ class StatsComp:
 
         # Handle time aggregation for trange view
         if "trange_seq" in self.mparams and "time" in dims:
-            trange_value = self.dsprod.attrs.get("trange")
+            trange_value = self.dsprod.range.trange
             if trange_value:
                 logger.debug("Assigning trange time coordinate: %s", trange_value)
                 self._apply_time_coord(trange_value)

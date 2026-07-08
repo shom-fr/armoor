@@ -589,18 +589,7 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     tuple
         Paths to the saved reference and product NetCDF files.
     """
-    attrs = dsref.attrs
-    ncname = ""
-    if "time" in attrs:
-        ncname += f"_{attrs['time']}"
-    elif "trange" in attrs:
-        ncname += f"_{attrs['trange']}"
-
-    if "vlevel" in attrs:
-        ncname += f"_{attrs['vlevel']}"
-    elif "vrange" in attrs:
-        ncname += f"_{attrs['vrange']}"
-
+    ncname = dsref.range.suffix
     ncout_ref = dirout / f"ref{ncname}.zarr"
     ncout_prod = dirout / f"prod{ncname}.zarr"
 

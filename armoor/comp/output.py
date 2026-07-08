@@ -549,7 +549,7 @@ class OutputProcessor:
         concatenated = xr.concat(datasets, "time")
 
         # Preserve vrange attributes if present in any dataset
-        vrange_attrs = [ds.attrs.get("vrange") for ds in datasets if ds.attrs.get("vrange")]
+        vrange_attrs = [ds.range.vrange_value for ds in datasets if ds.range.vrange_value]
         if vrange_attrs:
             concatenated.attrs["vrange"] = vrange_attrs
         

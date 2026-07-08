@@ -75,6 +75,6 @@ def vlevels(dssi, vname):
 def get_time_bins(start, end, tbin):
     return pd.date_range(
         start=pd.to_datetime(start),
-        end=pd.to_datetime(end),    
+        end=pd.to_datetime(end),
         freq=tbin,
         )

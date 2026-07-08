@@ -640,6 +640,36 @@ def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, loca
     
     return kw_client
 
+def output_suffix(attrs):
+    """Build the ``_<time-or-trange>_<vlevel-or-vrange>`` output filename suffix.
+
+    Inverse of `extract_suffix_from_filename` below: reads the
+    ``time``/``trange``/``vlevel``/``vrange`` attrs set by
+    `armoor.base.ranges.tfreq`/`trange_seq`/`vlevels`/`vrange`; time-like
+    attrs take priority over the range-like ones when both happen to be set.
+
+    Parameters
+    ----------
+    attrs : dict
+        A dataset's ``.attrs``.
+
+    Returns
+    -------
+    str
+        Empty string if none of the four attrs is present.
+    """
+    parts = []
+    if "time" in attrs:
+        parts.append(attrs["time"])
+    elif "trange" in attrs:
+        parts.append(attrs["trange"])
+    if "vlevel" in attrs:
+        parts.append(attrs["vlevel"])
+    elif "vrange" in attrs:
+        parts.append(attrs["vrange"])
+    return "".join(f"_{p}" for p in parts)
+
+
 def extract_suffix_from_filename(filename):
     """
     Extracts 'time' and 'z' values from a filename in the format ref_[time]_[z].nc
