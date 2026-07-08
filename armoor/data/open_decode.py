@@ -1091,10 +1091,16 @@ def open_decode_croco(path_file, fmt="croco"):
     ds = ds.isel(x_rho=slice(1, -1), y_rho=slice(1, -1))
 
     if "u" in ds.data_vars:
-        dau = shift(ds["u"], {"x_u": "right"}).isel(x_u=slice(None, -1)).xoa.reloc(u="rho")
+        mask_u = (ds["u"] != 0) & (ds["u"] != -999)
+        u = ds["u"].where(mask_u, drop=False)
+        u.encoding = ds["u"].encoding.copy()
+        dau = shift(u, {"x_u": "right"}).isel(x_u=slice(None, -1)).xoa.reloc(u="rho")
         ds["u"] = dau.assign_coords(**ds.ptemp.coords)
     if "v" in ds.data_vars:
-        dav = shift(ds["v"], {"y_v": "top"}).isel(y_v=slice(None, -1)).xoa.reloc(v="rho")
+        mask_v = (ds["v"] != 0) & (ds["v"] != -999)
+        v = ds["v"].where(mask_v, drop=False)
+        v.encoding = ds["v"].encoding.copy()
+        dav = shift(v, {"y_v": "top"}).isel(y_v=slice(None, -1)).xoa.reloc(v="rho")
         ds["v"] = dav.assign_coords(**ds.ptemp.coords)
     logger.info(f"  [timing] u/v shift:        {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
