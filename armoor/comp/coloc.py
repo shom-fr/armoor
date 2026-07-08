@@ -626,15 +626,18 @@ def save_datasets(dsref, dsprod, dirout, staged=None):
     job_prod = dsprod.to_zarr(store=ncout_prod, mode="w", encoding=encoding_prod, compute=False)
 
     dask.compute(job_ref, job_prod)
-    dsref.close()
-    dsprod.close()
 
     if staged is None:
-        return ncout_ref, ncout_prod
-    return (
-        StagedDataset(str(ncout_ref), metazone=staged.metazone, comp_func=staged.comp_func, stage="coloc"),
-        StagedDataset(str(ncout_prod), metazone=staged.metazone, comp_func=staged.comp_func, stage="coloc"),
-    )
+        result = ncout_ref, ncout_prod
+    else:
+        result = (
+            staged.with_range(dsref, path=str(ncout_ref), stage="coloc"),
+            staged.with_range(dsprod, path=str(ncout_prod), stage="coloc"),
+        )
+
+    dsref.close()
+    dsprod.close()
+    return result
 
 
 def _prepare_dataset(ds, comp_func, is_reference=False):

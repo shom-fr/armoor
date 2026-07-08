@@ -222,7 +222,8 @@ class StagedDataset(str):
     """
 
     def __new__(cls, path, *, metazone=None, comp_func=None, stage=None,
-                fmt=None, platform=None):
+                fmt=None, platform=None, vlevel=None, vrange=None,
+                trange=None, time=None):
         """Create a str instance carrying extra pipeline-context attributes.
 
         Parameters
@@ -242,6 +243,18 @@ class StagedDataset(str):
         platform : str, optional
             Original data.ini ``platform`` value. Not yet populated by any
             caller in this codebase; reserved for a future increment.
+        vlevel : str, optional
+            The ``ds.range.vlevel`` value of the dataset this path was
+            written from, when it was produced by a vertical-level split.
+        vrange : str, optional
+            The ``ds.range.vrange_value`` value, when produced by a
+            vertical-range split.
+        trange : str, optional
+            The ``ds.range.trange`` value, when produced by a sequential
+            time-range split.
+        time : str, optional
+            The ``ds.range.time`` value, when produced by a per-time-step
+            split.
 
         Returns
         -------
@@ -254,6 +267,10 @@ class StagedDataset(str):
         obj.stage = stage
         obj.fmt = fmt
         obj.platform = platform
+        obj.vlevel = vlevel
+        obj.vrange = vrange
+        obj.trange = trange
+        obj.time = time
         return obj
 
     def output_dir(self, stage, ref_name=None, prod_name=None, output=None):
@@ -287,6 +304,42 @@ class StagedDataset(str):
         if output:
             parts.append(output)
         return Path(*[p for p in parts if p])
+
+    def with_range(self, ds, path=None, stage=None):
+        """Return a new StagedDataset carrying `ds`'s vlevel/vrange/trange/time.
+
+        Reads `ds.range.vlevel`/`.vrange_value`/`.trange`/`.time` (set by
+        `armoor.base.ranges`' split functions) so a later stage can recover
+        them from the path alone, without reopening the dataset just for
+        this metadata (e.g. `armoor.base.io.sort_ncs_by_suffix`).
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            The dataset this path is about to be/was written from.
+        path : str, optional
+            New path value; defaults to this object's own path (unchanged).
+        stage : str, optional
+            New stage value; defaults to this object's own stage (unchanged).
+
+        Returns
+        -------
+        StagedDataset
+            A new instance with metazone/comp_func/fmt/platform carried over
+            unchanged, and vlevel/vrange/trange/time set from `ds.range`.
+        """
+        return StagedDataset(
+            path if path is not None else str(self),
+            metazone=self.metazone,
+            comp_func=self.comp_func,
+            stage=stage if stage is not None else self.stage,
+            fmt=self.fmt,
+            platform=self.platform,
+            vlevel=ds.range.vlevel,
+            vrange=ds.range.vrange_value,
+            trange=ds.range.trange,
+            time=ds.range.time,
+        )
 
 
 def save_result(dsout, mz_name, func_comp):

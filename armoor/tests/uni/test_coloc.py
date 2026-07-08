@@ -963,6 +963,22 @@ class TestSaveDatasets:
             assert nc.comp_func == "comp_sst"
             assert nc.stage == "coloc"
 
+    @patch("armoor.comp.coloc.get_zarr_encoding")
+    def test_save_datasets_with_staged_carries_range_info(self, mock_encoding, tmp_path):
+        """dsref/dsprod's own vlevel/vrange/trange/time attrs land on the
+        returned StagedDataset (via StagedDataset.with_range), so a later
+        stage can recover them from the path alone."""
+        mock_encoding.return_value = {}
+        self.dsref.attrs = {"time": "2023-01", "vlevel": "10.0", "data_name": "ref"}
+        self.dsprod.attrs = {"vrange": "0-50", "data_name": "prod"}
+        staged = StagedDataset("", metazone="med", comp_func="comp_sst")
+
+        ncout_ref, ncout_prod = save_datasets(self.dsref, self.dsprod, tmp_path, staged=staged)
+
+        assert ncout_ref.time == "2023-01"
+        assert ncout_ref.vlevel == "10.0"
+        assert ncout_prod.vrange == "0-50"
+
 
 # =============================================================================
 # TestDropTimeCfAttrs

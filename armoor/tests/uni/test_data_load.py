@@ -159,3 +159,50 @@ class TestStagedDataset:
         assert all(isinstance(p, StagedDataset) for p in rewrapped)
         assert [str(p) for p in rewrapped] == original[mz_name]
         assert all(p.metazone == mz_name and p.comp_func == "comp_sst" for p in rewrapped)
+
+    def test_with_range_carries_forward_metazone_and_comp_func(self):
+        sd = StagedDataset("old/path.zarr", metazone="med", comp_func="comp_sst")
+        ds = xr.Dataset({"temp": ("time", [1.0])}, coords={"time": [0]})
+
+        new_sd = sd.with_range(ds)
+
+        assert new_sd.metazone == "med"
+        assert new_sd.comp_func == "comp_sst"
+        assert str(new_sd) == "old/path.zarr"
+
+    def test_with_range_reads_vlevel_vrange_trange_time_from_dataset(self):
+        sd = StagedDataset("path.zarr", metazone="med", comp_func="comp_sst")
+        ds = xr.Dataset({"temp": ("time", [1.0])}, coords={"time": [0]})
+        ds.attrs = {
+            "vlevel": "10.0",
+            "vrange": "0-50",
+            "trange": "[2020-01-01T00:00:00_2020-01-31T00:00:00[",
+            "time": "2020-01-01T00:00:00",
+        }
+
+        new_sd = sd.with_range(ds)
+
+        assert new_sd.vlevel == "10.0"
+        assert new_sd.vrange == "0-50"
+        assert new_sd.trange == "[2020-01-01T00:00:00_2020-01-31T00:00:00["
+        assert new_sd.time == "2020-01-01T00:00:00"
+
+    def test_with_range_overrides_path_and_stage(self):
+        sd = StagedDataset("old.zarr", metazone="med", comp_func="comp_sst", stage="load")
+        ds = xr.Dataset({"temp": ("time", [1.0])}, coords={"time": [0]})
+
+        new_sd = sd.with_range(ds, path="new.zarr", stage="coloc")
+
+        assert str(new_sd) == "new.zarr"
+        assert new_sd.stage == "coloc"
+
+    def test_with_range_returns_none_fields_when_dataset_has_no_range_attrs(self):
+        sd = StagedDataset("path.zarr", metazone="med", comp_func="comp_sst")
+        ds = xr.Dataset({"temp": ("time", [1.0])}, coords={"time": [0]})
+
+        new_sd = sd.with_range(ds)
+
+        assert new_sd.vlevel is None
+        assert new_sd.vrange is None
+        assert new_sd.trange is None
+        assert new_sd.time is None

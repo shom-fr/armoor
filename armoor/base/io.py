@@ -715,15 +715,45 @@ def extract_suffix_from_filename(filename):
         
     return result
 
+def _range_info_from_staged(nc):
+    """Read time/vlevel-like info directly off a StagedDataset, if present.
+
+    Returns None when `nc` carries none of these attrs (e.g. a plain str,
+    or a StagedDataset from a stage that never set them), signalling the
+    caller should fall back to `extract_suffix_from_filename`.
+
+    Parameters
+    ----------
+    nc : str or armoor.data.load.StagedDataset
+        A path, possibly carrying `.time`/`.trange`/`.vlevel`/`.vrange`.
+
+    Returns
+    -------
+    dict or None
+        ``{"time": ..., "z": ...}`` (matching `extract_suffix_from_filename`'s
+        shape) if any of the four attrs is set, else None.
+    """
+    time_val = getattr(nc, "time", None)
+    if time_val is None:
+        trange_val = getattr(nc, "trange", None)
+        # trange is bracketed (e.g. "[t1_t2["); strip to match the
+        # filename-derived form output_suffix() already produces on disk.
+        time_val = re.sub(r"[\[\]]", "", trange_val) if trange_val else None
+    z_val = getattr(nc, "vlevel", None) or getattr(nc, "vrange", None)
+    if time_val is None and z_val is None:
+        return None
+    return {"time": time_val, "z": z_val}
+
+
 def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List[str]]:
     """Sort a list of NetCDF files by their suffix.
     """
     ncouts = {}
     for nc in ncs:
-        if not isinstance(nc, str):
-            nc = str(nc)
-        res = extract_suffix_from_filename(nc)
-        
+        res = _range_info_from_staged(nc)
+        if res is None:
+            res = extract_suffix_from_filename(str(nc))
+
         if sort_dim == ["time", "z"]:
             if res.get("time") and res.get("z"):
                 suff = f"{res['time']}_{res['z']}"
