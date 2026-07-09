@@ -354,7 +354,7 @@ class ArmoorDecoder(Decoder):
             variable if it was a coordinate.
         """
         logger.info("Opening armoor files")
-        ds = xr.open_mfdataset(path_files)
+        ds = xr.open_mfdataset(path_files, chunks={})
         if "depth" in ds:
             ds = ds.reset_coords("depth")
         return ds

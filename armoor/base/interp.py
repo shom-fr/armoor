@@ -426,7 +426,15 @@ def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
             ds = ds.reset_coords("depth")
         if "dens" not in ds.coords:
             ds = ds.set_coords("dens")
+    import numba
     import xoa.regrid as xregrid  # noqa: F811
+    # regrid1d's underlying numba kernels are themselves parallel
+    # (numba.njit(parallel=True)); when this runs as a dask task, dask
+    # already parallelizes across chunks/variables, so letting numba also
+    # spawn its own thread pool per task causes thread oversubscription
+    # (dask threads x numba threads) -- cap numba to 1 thread per task and
+    # let dask own the parallelism instead.
+    numba.set_num_threads(1)
     das = []
     for var in ds.data_vars:
         if "z" in ds[var].dims:
