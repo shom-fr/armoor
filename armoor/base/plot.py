@@ -8,6 +8,31 @@ import numpy as np
 import pandas as pd
 
 
+def get_output_vminmax(cfg_outputs, output):
+    """Extract the configured vminmax mapping for one output, if any.
+
+    Shared by `armoor.data.plot.main_plot` and `armoor.comp.plot.main_plot`,
+    both of which call this once per output name while flattening their
+    ``{output: {metazone: [paths]}}`` input into per-file plot tasks.
+
+    Parameters
+    ----------
+    cfg_outputs : dict or None
+        Mapping of output name to its output configuration (may hold a
+        ``vminmax`` entry), e.g. ``cfg["outputs"]`` from `DATA_INI`/
+        `COMP_INI`. ``None`` when no config is available (e.g. HPC
+        --plot-only calls that predate this option).
+    output : str
+        Output name to look up.
+
+    Returns
+    -------
+    dict or None
+        Mapping of variable name to a ``(vmin, vmax)`` pair, or ``None``.
+    """
+    return cfg_outputs[output].get("vminmax") if cfg_outputs else None
+
+
 def format_trange(trange):
     """Format a bracketed ``trange`` attr (e.g. ``"[t1_t2["``) for display/filenames.
 

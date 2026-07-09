@@ -8,7 +8,6 @@ from typing import Dict, List, Optional
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cmocean as cmo
-import dask
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,8 +24,7 @@ from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.dispatch import SubclassingMethodRegistry
 from armoor.base.filters import create_optimized_mask
 from armoor.base.interp import vinterp
-from armoor.base.io import setup_dask_client
-from armoor.base.plot import create_subplots, diagdisp, format_trange, save_figure
+from armoor.base.plot import create_subplots, diagdisp, format_trange, get_output_vminmax, save_figure
 from armoor.data.datatype import DataEddies, DataOceanModel, get_data_type_by_name
 # from armoor.comp.stats import StatsComp
 
@@ -61,6 +59,7 @@ class _PlotDataBase(SubclassingMethodRegistry):
         self.ax_minimap = [0.7, 0.91, 0.19]
         self.dt = dt
         self.vminmax = vminmax
+        self.saved_files = []
         self.__post_init__()
 
     def clean(self):
@@ -90,6 +89,7 @@ class _PlotDataBase(SubclassingMethodRegistry):
         filename = Path(filename)
         filename.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, filename)
+        self.saved_files.append(str(filename.resolve()))
         del fig
 
 
@@ -868,8 +868,18 @@ def get_plotter(nc, metazone, vminmax=None):
     return plot_cls(dt, metazone, vminmax)
 
 
-def main_plot(ncins, metazones, cfg_outputs):
-    """Generate all requested plots for a set of armoor-data outputs.
+def _plot_task(nc, metazone, output, vminmax=None):
+    """Single plot task — must be module-level for spawn pickling."""
+    plotcomp = get_plotter(nc, metazone, vminmax)
+    plotcomp.call(output)
+    plotcomp.clean()
+    saved = plotcomp.saved_files
+    del plotcomp
+    return saved
+
+
+def main_plot(ncins, metazones, cfg_outputs=None, kw_dask=None):
+    """Process plot tasks in parallel using a multiprocessing pool.
 
     Parameters
     ----------
@@ -877,34 +887,48 @@ def main_plot(ncins, metazones, cfg_outputs):
         Mapping of output name to ``{metazone: [zarr_paths]}``.
     metazones : list of str
         Metazone names to plot (others in `ncins` are skipped).
-    cfg_outputs : dict
+    cfg_outputs : dict, optional
         Mapping of output name to its output configuration (may hold a
         ``vminmax`` entry).
+    kw_dask : tuple, optional
+        Dask args as returned by `get_dask_args` (only `[0]`, the worker
+        count, is used here).
 
     Returns
     -------
-    None
-        Figures are written to disk as a side effect.
+    list of str
+        Absolute paths of all PNG files generated.
     """
+    import multiprocessing
 
-    def process_task(nc, metazone, output, vminmax):
-        plotcomp = get_plotter(nc, metazone, vminmax)
-        plotcomp.call(output)
-        plotcomp.clean()
-        del plotcomp
-
-    # Flatten the nested structure into a list of tasks
-    tasks = []
+    logger.info("Start plot")
+    task_args = []
     for output, metas in ncins.items():
-        vminmax = [cfg_outputs[output].get("vminmax") if "vminmax" in cfg_outputs[output] else None][0]
+        vminmax = get_output_vminmax(cfg_outputs, output)
         for metazone, ncs in metas.items():
             if metazone in metazones:
                 for nc in ncs:
-                    tasks.append(dask.delayed(process_task)(nc, metazone, output, vminmax))
+                    task_args.append((nc, metazone, output, vminmax))
 
-    # Execute in parallel
-    # with setup_dask_client():
-    logger.info("Start plot")
-    dask.compute(*tasks)
-        # for task in tasks:
-        #     dask.compute([task])
+    if not task_args:
+        return []
+
+    # Use the same n_workers as the CLI dask config (e.g. --dask-nworkers 4).
+    num_workers = kw_dask[0] if kw_dask else 4
+    num_workers = min(num_workers, len(task_args))
+    logger.info(f"Plotting {len(task_args)} tasks with {num_workers} workers")
+    # Pre-warm cartopy's naturalearth cache in the main process so that
+    # concurrent workers don't race to download the same shapefiles.
+    list(cfeature.LAND.geometries())
+
+    # Use 'spawn' to create clean child processes: avoids both the
+    # "fork() after OpenMP" crash and inherited memory bloat.
+    # ctx = multiprocessing.get_context("spawn")
+    # with ctx.Pool(num_workers) as pool:
+    #     results = pool.starmap(_plot_task, task_args)
+    results = []
+    for arg in task_args:
+        results.append(_plot_task(*arg))
+    png_paths = [p for task_result in results for p in (task_result or [])]
+    logger.info(f"Generated {len(png_paths)} PNG file(s)")
+    return png_paths

@@ -19,7 +19,7 @@ from xoa.plot import plot_minimap, plot_ts
 
 from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.dispatch import MethodRegistry
-from armoor.base.plot import create_subplots, diagdisp, format_trange, save_figure
+from armoor.base.plot import create_subplots, diagdisp, format_trange, get_output_vminmax, save_figure
 from armoor.comp import GROUP_SUFFIX, METRIC_LABELS
 from armoor.comp.comparison import get_comparison
 from armoor.data.load import StagedDataset
@@ -73,7 +73,7 @@ class PlotComp(MethodRegistry):
 
     _dispatch_label = "Comparison plot"
 
-    def __init__(self, nc, func_comp, metazone):
+    def __init__(self, nc, func_comp, metazone, vminmax=None):
         """Initialize the plotter and open the output datatree.
 
         Parameters
@@ -85,6 +85,9 @@ class PlotComp(MethodRegistry):
             up the plot title via `armoor.comp.comparison.get_comparison`.
         metazone : str
             Metazone name, used in plot titles/filenames.
+        vminmax : dict, optional
+            Mapping of variable name to a ``(vmin, vmax)`` pair, overriding
+            the automatic color scaling for that variable (see `maps`).
         """
         self.methods = {}
         self.func_comp = func_comp
@@ -94,6 +97,7 @@ class PlotComp(MethodRegistry):
         self.plot_title = get_comparison(func_comp).title
         self.dt = xr.open_datatree(nc)
         self.saved_files = []
+        self.vminmax = vminmax
         self.__post_init__()
 
 
@@ -1505,7 +1509,9 @@ class PlotComp(MethodRegistry):
                         cmin, cmax = 0, cstd
                     else:
                         cmin, cmax =  - cstd, cstd
-                    if comp == "diff":
+                    if self.vminmax and var in self.vminmax:
+                        vmin, vmax = self.vminmax[var]
+                    elif comp == "diff":
                         vmean = np.mean([dsprod.mean(), dsref.mean()])
                         vstd = np.mean([dsprod.std(), dsref.std()])
                         vmin, vmax = vmean - 1.75 * vstd, vmean + 1.75 * vstd
@@ -1642,9 +1648,9 @@ class PlotComp(MethodRegistry):
         plt.close(fig)
         del fig
 
-def _plot_task(nc, func_comp, metazone, output):
+def _plot_task(nc, func_comp, metazone, output, vminmax=None):
     """Single plot task — must be module-level for spawn pickling."""
-    plotcomp = PlotComp(nc, func_comp, metazone)
+    plotcomp = PlotComp(nc, func_comp, metazone, vminmax=vminmax)
     plotcomp.call(output)
     plotcomp.clean()
     saved = plotcomp.saved_files
@@ -1652,8 +1658,23 @@ def _plot_task(nc, func_comp, metazone, output):
     return saved
 
 
-def main_plot(ncins, metazones, func_comp, kw_dask=None):
+def main_plot(ncins, metazones, func_comp, cfg_outputs=None, kw_dask=None):
     """Process plot tasks in parallel using a multiprocessing pool.
+
+    Parameters
+    ----------
+    ncins : dict
+        Mapping of output name to ``{metazone: [zarr_paths]}``.
+    metazones : list of str
+        Metazone names to plot (others in `ncins` are skipped).
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_sst"``).
+    cfg_outputs : dict, optional
+        Mapping of output name to its output configuration (may hold a
+        ``vminmax`` entry), e.g. ``cfg["outputs"]`` from `COMP_INI`.
+    kw_dask : tuple, optional
+        Dask args as returned by `get_dask_args` (only `[0]`, the worker
+        count, is used here).
 
     Returns
     -------
@@ -1665,10 +1686,11 @@ def main_plot(ncins, metazones, func_comp, kw_dask=None):
     logger.info("Start plot")
     task_args = []
     for output, metas in ncins.items():
+        vminmax = get_output_vminmax(cfg_outputs, output)
         for metazone, ncs in metas.items():
             if metazone in metazones:
                 for nc in ncs:
-                    task_args.append((nc, func_comp, metazone, output))
+                    task_args.append((nc, func_comp, metazone, output, vminmax))
 
     if not task_args:
         return []

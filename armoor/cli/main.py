@@ -237,6 +237,7 @@ def main_data():
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs
     from armoor.base.misc import dict_to_list
+    from armoor.cli.io import get_dask_args
     from armoor.data.load import load_datasets
     from armoor.data.output import main_output as output_data
     _init_heavy()
@@ -272,6 +273,8 @@ def main_data():
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
 
+    kw_dask = get_dask_args(args)
+
     zarrs = load_datasets(cfg["data"], metazones, "data")
 
     if args.filters_only:
@@ -298,7 +301,7 @@ def main_data():
         else:
             if "png" in ofmt:
                 from armoor.data.plot import main_plot as plot_data
-                plot_data(zarr_outputs, metazones, outputs_cfg)
+                plot_data(zarr_outputs, metazones, outputs_cfg, kw_dask=kw_dask)
 
             zarr_outputs = dict_to_list(zarr_outputs)
 
@@ -496,7 +499,10 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
         if plot_only not in zarr_outputs:
             logger.warning(f"otype '{plot_only}' not found in {input_json} — skipping.")
             return
-        png_paths = plot_comp({plot_only: zarr_outputs[plot_only]}, metazones, func_comp, kw_dask=kw_dask)
+        png_paths = plot_comp(
+            {plot_only: zarr_outputs[plot_only]}, metazones, func_comp,
+            cfg_outputs=cfg["outputs"], kw_dask=kw_dask
+            )
         if png_paths:
             _write_json(jsonfile, png_paths)
             logger.info(f"Find the list of generated files in: {jsonfile}")
@@ -574,7 +580,10 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
                 png_paths = []
                 if "png" in ofmt:
                     from armoor.comp.plot import main_plot as plot_comp
-                    png_paths = plot_comp(zarr_outputs, metazones, func_comp, kw_dask=kw_dask)
+                    png_paths = plot_comp(
+                        zarr_outputs, metazones, func_comp,
+                        cfg_outputs=cfg.get("outputs"), kw_dask=kw_dask
+                        )
 
                 zarr_outputs = dict_to_list(zarr_outputs)
                 if "png" in ofmt and png_paths:
