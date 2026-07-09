@@ -698,7 +698,7 @@ def extract_suffix_from_filename(filename):
     match_full = re.search(pattern_full, filename)
     if match_full:
         result['time'] = match_full.group(2)
-        result['z'] = match_full.group(3)
+        result['z'] = match_full.group(4)
 
     # Partial pattern: ref_[time]_*.nc (time without z)
     pattern_time_only = rf'(?P<prefix>[^_]+){pattern_time}\.zarr'

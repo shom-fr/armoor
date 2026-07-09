@@ -32,6 +32,40 @@ class TestOutputSuffix:
         assert output_suffix(attrs) == "_2020-01-01_to_2020-01-02_0-50"
 
 
+class TestExtractSuffixFromFilename:
+    """Regression test for the group-index bug that made `z` a copy of
+    `time` whenever both were present in the filename: the code read
+    `match_full.group(3)` (the *dates* named group, i.e. the same text as
+    `time`) instead of `group(4)` (the actual `pattern_z` capture). This
+    silently collapsed distinct vrange/vlevel bins sharing the same
+    time/trange into a single sort key in `sort_ncs_by_suffix`, which is
+    what caused several vrange-bin datasets to reach
+    `_concatenate_datasets` together and raise "Multi-dataset
+    concatenation not implemented" for output types like "maps".
+    """
+
+    def test_z_is_not_a_copy_of_time_when_both_present(self):
+        filename = "prod_2026-07-05T00:00:00_2026-07-06T00:00:00_10-1000.zarr"
+
+        result = extract_suffix_from_filename(filename)
+
+        assert result["time"] == "_2026-07-05T00:00:00_2026-07-06T00:00:00"
+        assert result["z"] == "10-1000"
+
+    def test_distinct_vrange_bins_yield_distinct_suffixes(self):
+        labels = ("10-1000", "10-100", "100-500", "500-1000")
+        results = [
+            extract_suffix_from_filename(
+                f"prod_2026-07-05T00:00:00_2026-07-06T00:00:00_{label}.zarr"
+            )
+            for label in labels
+        ]
+
+        zs = [r["z"] for r in results]
+        assert zs == list(labels)
+        assert len(set(zs)) == len(labels)
+
+
 class TestSortNcsBySuffix:
     """sort_ncs_by_suffix should prefer a StagedDataset's own time/vlevel-like
     attrs over regex-parsing the filename, when they're present."""
