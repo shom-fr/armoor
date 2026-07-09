@@ -6,20 +6,18 @@ The interpolation operations are optimized for large datasets using Dask distrib
 """
 import logging
 from argparse import ArgumentParser
-from dask.distributed import Client, LocalCluster
 import xarray as xr
 
 import armoor  # noqa: F401 — registers ds.stats accessor
-from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
+from armoor.base.io import ArmoorArgumentHelpFormatter
 from armoor.cli.io import (
     add_comp_io_parser_arguments,
     add_dask_parser_arguments,
-    get_dask_args,
     save_output,
-    check_insitu_platform
-)        
-from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.data.open_decode import open_decode, register_cf
+    armoor_cli_session,
+)
+from armoor.cli.log import add_logging_parser_arguments
+from armoor.data.open_decode import open_decode
 
 
 logger = logging.getLogger(__name__)
@@ -232,51 +230,42 @@ def main_comp():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    register_cf()
-    
-    check_insitu_platform(args.ifmt, args.platform)
-    check_insitu_platform(args.ref_ifmt, args.ref_platform)
-    
-    kw_dask = get_dask_args(args)
-    
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            dsref = open_decode(args.ref_fins, args.ref_ifmt, platform=args.ref_platform)
-            dsprod = open_decode(args.fins, args.ifmt, platform=args.platform)
-            if dsref.sizes != dsprod.sizes:
-                logger.error(f"Reference dims: {dsref.sizes}")
-                logger.error(f"Product dims: {dsprod.sizes}")
-                raise CompError(
-                    "Reference and product don't have the same dimensions."
-                    "Comparison cannot be performed."
-                    )
-            stat_dim = args.dim
-            time_range = False
-            if ("time" in stat_dim) and ("time_range" in dsref):
-                time_range = True
-            vertical_range = False
-            if ("z" in stat_dim) and ("vertical_range" in dsref):
-                vertical_range = True
-            
-            if (time_range == False) and ("time" in stat_dim):
-                raise CompError(
-                    "Statistics over time cannot be performed."
-                    "No time range found."
-                    )
-            if (vertical_range == False) and ("z" in stat_dim):
-                raise CompError(
-                    "Statistics over z cannot be performed."
-                    "No vertical range found."
-                    )
-            
-            if (time_range == False) and (vertical_range == False):
-                ds = process_diff(dsref, dsprod)
-            else:
-                ds = process_stat(dsref, dsprod, stat_dim)
-                
-            save_output(ds, args.fout, args.ofmt)
+
+    with armoor_cli_session(
+        args, (args.ifmt, args.platform), (args.ref_ifmt, args.ref_platform)
+    ):
+        dsref = open_decode(args.ref_fins, args.ref_ifmt, platform=args.ref_platform)
+        dsprod = open_decode(args.fins, args.ifmt, platform=args.platform)
+        if dsref.sizes != dsprod.sizes:
+            logger.error(f"Reference dims: {dsref.sizes}")
+            logger.error(f"Product dims: {dsprod.sizes}")
+            raise CompError(
+                "Reference and product don't have the same dimensions."
+                "Comparison cannot be performed."
+                )
+        stat_dim = args.dim
+        time_range = False
+        if ("time" in stat_dim) and ("time_range" in dsref):
+            time_range = True
+        vertical_range = False
+        if ("z" in stat_dim) and ("vertical_range" in dsref):
+            vertical_range = True
+
+        if (time_range == False) and ("time" in stat_dim):
+            raise CompError(
+                "Statistics over time cannot be performed."
+                "No time range found."
+                )
+        if (vertical_range == False) and ("z" in stat_dim):
+            raise CompError(
+                "Statistics over z cannot be performed."
+                "No vertical range found."
+                )
+
+        if (time_range == False) and (vertical_range == False):
+            ds = process_diff(dsref, dsprod)
+        else:
+            ds = process_stat(dsref, dsprod, stat_dim)
+
+        save_output(ds, args.fout, args.ofmt)
             

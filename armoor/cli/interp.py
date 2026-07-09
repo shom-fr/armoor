@@ -4,23 +4,20 @@ This module provides command-line interfaces for applying various types of inter
 (temporal, horizontal, vertical) to oceanographic and meteorological data files.
 The interpolation operations are optimized for large datasets using Dask distributed computing.
 """
-import logging, shutil
+import logging
 from argparse import ArgumentParser
-from dask.distributed import Client, LocalCluster
-import xarray as xr
 
-from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
+from armoor.base.io import ArmoorArgumentHelpFormatter
 from armoor.base.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
-    get_dask_args,
     save_output,
-    check_insitu_platform
-)        
-from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
+    armoor_cli_session,
+    open_decode_materialized,
+)
+from armoor.cli.log import add_logging_parser_arguments
 import armoor  # noqa: F401 — registers ds.interp accessor
-from armoor.data.open_decode import open_decode, register_cf
 
 
 logger = logging.getLogger(__name__)
@@ -36,7 +33,7 @@ class InterpError(Exception):
     or invalid interpolation specifications.
     """
     pass
-    
+
 
 def get_parser_interp_time():
     """Create argument parser for temporal interpolation operations.
@@ -118,30 +115,14 @@ def main_interp_time():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    register_cf()
-    
-    check_insitu_platform(args.ifmt, args.platform)
-    
-    kw_dask = get_dask_args(args)
-    
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-            if args.ifmt != 'armoor':
-                save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
-                del ds
-                ds = xr.open_dataset("tmp.zarr")
+
+    with armoor_cli_session(args, (args.ifmt, args.platform)):
+        with open_decode_materialized(args.fins, args.ifmt, platform=args.platform) as ds:
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
             ds = ds.interp.tfreq(args.tfreq)
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
-            if args.ifmt != 'armoor':
-                shutil.rmtree("tmp.zarr")
-                
+
 
 def get_parser_interp_horizontal():
     """Create argument parser for horizontal spatial interpolation operations.
@@ -302,10 +283,7 @@ def main_interp_horizontal():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
+
     cloud = args.cloud
     section = args.section
     lon_grid = args.lon_grid
@@ -334,20 +312,9 @@ def main_interp_horizontal():
             )
     elif check == 0:
         raise InterpError("No horizontal interpolation to be performed.")
-        
-    register_cf()
 
-    check_insitu_platform(args.ifmt, args.platform)
-
-    kw_dask = get_dask_args(args)
-
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-            if args.ifmt != 'armoor':
-                save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
-                del ds
-                ds = xr.open_dataset("tmp.zarr")
+    with armoor_cli_session(args, (args.ifmt, args.platform)):
+        with open_decode_materialized(args.fins, args.ifmt, platform=args.platform) as ds:
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
             if cloud:
@@ -367,9 +334,7 @@ def main_interp_horizontal():
                     method=args.coarsen_method,
                 )
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
-            if args.ifmt != 'armoor':
-                shutil.rmtree("tmp.zarr")
-        
+
 
 def get_parser_interp_vertical():
     """Create argument parser for vertical interpolation operations.
@@ -473,18 +438,11 @@ def main_interp_vertical():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    register_cf()
-    
-    check_insitu_platform(args.ifmt, args.platform)
-    
+
     vlevel = args.vlevel
     vfreq = args.vfreq
     vname = args.vname
-    
+
     check = sum(1 for x in (vlevel, vfreq) if x is not None)
     if check > 1:
         raise InterpError(
@@ -493,15 +451,8 @@ def main_interp_vertical():
     elif check == 0:
         raise InterpError("No vertical interpolation to be performed.")
 
-    kw_dask = get_dask_args(args)
-    
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-            if args.ifmt != 'armoor':
-                save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
-                del ds
-                ds = xr.open_dataset("tmp.zarr")
+    with armoor_cli_session(args, (args.ifmt, args.platform)):
+        with open_decode_materialized(args.fins, args.ifmt, platform=args.platform) as ds:
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
             ds_chunked = ds.chunk(dict(z=-1))
@@ -510,6 +461,3 @@ def main_interp_vertical():
             elif vfreq:
                 ds = ds_chunked.interp.vfreq(vname, vfreq)
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
-            if args.ifmt != 'armoor':
-                shutil.rmtree("tmp.zarr")
-            

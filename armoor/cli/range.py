@@ -6,21 +6,19 @@ The interpolation operations are optimized for large datasets using Dask distrib
 """
 import logging
 from argparse import ArgumentParser
-from dask.distributed import Client, LocalCluster
 import pandas as pd
 
-from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
+from armoor.base.io import ArmoorArgumentHelpFormatter
 from armoor.base.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
-    get_dask_args,
     save_output,
-    check_insitu_platform
+    armoor_cli_session,
 )
-from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
+from armoor.cli.log import add_logging_parser_arguments
 import armoor  # noqa: F401 — registers ds.range accessor
-from armoor.data.open_decode import open_decode, register_cf
+from armoor.data.open_decode import open_decode
 
 
 logger = logging.getLogger(__name__)
@@ -112,22 +110,13 @@ def main_range_time():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    register_cf()
-    
-    check_insitu_platform(args.ifmt, args.platform)
-    
-    kw_dask = get_dask_args(args)
-    
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-            ds = ds.range.tfreq(args.tfreq)
-            save_output(ds, args.fout, args.ofmt)
-            
+
+    with armoor_cli_session(args, (args.ifmt, args.platform)):
+        ds = open_decode(args.fins, args.ifmt, platform=args.platform)
+        ds = ds.range.tfreq(args.tfreq)
+        save_output(ds, args.fout, args.ofmt)
+
+
 def get_parser_range_vertical():
     """Create argument parser for vertical range operations.
     
@@ -191,18 +180,8 @@ def main_range_vertical():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    register_cf()
-    
-    check_insitu_platform(args.ifmt, args.platform)
-    
-    kw_dask = get_dask_args(args)
-    
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-            ds = ds.range.vertical(args.vname, [args.vmin, args.vmax])
-            save_output(ds, args.fout, args.ofmt)
+
+    with armoor_cli_session(args, (args.ifmt, args.platform)):
+        ds = open_decode(args.fins, args.ifmt, platform=args.platform)
+        ds = ds.range.vertical(args.vname, [args.vmin, args.vmax])
+        save_output(ds, args.fout, args.ofmt)

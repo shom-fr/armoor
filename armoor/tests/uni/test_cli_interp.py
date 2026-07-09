@@ -107,10 +107,10 @@ class TestDispatchCoarsen:
 
     def _run(self, *extra_argv):
         with patch("sys.argv", _argv(*extra_argv)), \
-             patch("armoor.cli.interp.LocalCluster", return_value=self.mock_cluster), \
-             patch("armoor.cli.interp.Client", return_value=self.mock_client), \
-             patch("armoor.cli.interp.open_decode", return_value=self.ds), \
-             patch("armoor.cli.interp.register_cf"), \
+             patch("dask.distributed.LocalCluster", return_value=self.mock_cluster), \
+             patch("dask.distributed.Client", return_value=self.mock_client), \
+             patch("armoor.data.open_decode.open_decode", return_value=self.ds), \
+             patch("armoor.data.open_decode.register_cf"), \
              patch("armoor.cli.interp.save_output") as mock_save:
             main_interp_horizontal()
         return mock_save
@@ -163,10 +163,10 @@ class TestCoarsenMutualExclusion:
 
     def _run_raises(self, *extra_argv):
         with patch("sys.argv", _argv(*extra_argv)), \
-             patch("armoor.cli.interp.LocalCluster", return_value=self.mock_cluster), \
-             patch("armoor.cli.interp.Client", return_value=self.mock_client), \
-             patch("armoor.cli.interp.open_decode", return_value=self.ds), \
-             patch("armoor.cli.interp.register_cf"), \
+             patch("dask.distributed.LocalCluster", return_value=self.mock_cluster), \
+             patch("dask.distributed.Client", return_value=self.mock_client), \
+             patch("armoor.data.open_decode.open_decode", return_value=self.ds), \
+             patch("armoor.data.open_decode.register_cf"), \
              patch("armoor.cli.interp.save_output"):
             with pytest.raises(InterpError):
                 main_interp_horizontal()
@@ -191,9 +191,9 @@ class TestCoarsenMutualExclusion:
     def test_no_option_raises(self):
         """Calling with no interpolation option must raise InterpError."""
         with patch("sys.argv", _argv()), \
-             patch("armoor.cli.interp.LocalCluster", return_value=self.mock_cluster), \
-             patch("armoor.cli.interp.Client", return_value=self.mock_client), \
-             patch("armoor.cli.interp.open_decode", return_value=self.ds), \
+             patch("dask.distributed.LocalCluster", return_value=self.mock_cluster), \
+             patch("dask.distributed.Client", return_value=self.mock_client), \
+             patch("armoor.data.open_decode.open_decode", return_value=self.ds), \
              patch("armoor.cli.interp.save_output"):
             with pytest.raises(InterpError):
                 main_interp_horizontal()

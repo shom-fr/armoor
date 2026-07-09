@@ -7,10 +7,12 @@ Heavy imports (dask, armoor.base.io) are deferred to the functions that need the
 so that importing this module for argument-parser setup is fast.
 """
 import logging
+from contextlib import contextmanager
 from pathlib import Path
 
 from armoor import ArmoorError
 from armoor.base.misc import comma_separated
+from armoor.cli.log import main_setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -518,6 +520,31 @@ def save_output(ds, fout, ofmt="zarr", scheduler=None):
             write_job.compute()
 
 
+@contextmanager
+def open_decode_materialized(fins, ifmt, platform=None):
+    """Open+decode input files, materializing non-'armoor' formats first.
+
+    Some downstream operations (interpolation, filtering) need dask-backed,
+    chunked arrays; `open_decode` output for non-'armoor' formats isn't
+    guaranteed to be, so it's round-tripped through a temporary zarr store
+    to force materialization. The temporary store is removed on exit.
+    """
+    import shutil
+    import xarray as xr
+    from armoor.data.open_decode import open_decode
+
+    ds = open_decode(fins, ifmt, platform=platform)
+    if ifmt != 'armoor':
+        save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
+        ds.close()
+        ds = xr.open_dataset("tmp.zarr")
+    try:
+        yield ds
+    finally:
+        if ifmt != 'armoor':
+            shutil.rmtree("tmp.zarr", ignore_errors=True)
+
+
 def to_zarr(ds, fout):
     """Save xarray Dataset to zarr format with optimized memory usage.
     
@@ -602,8 +629,35 @@ def get_dask_args(args):
 def check_insitu_platform(fmt, platform):
     if (fmt == "cmems_insitu") and not platform:
         raise ArmoorError("`--platform` option is mandatory is case of specifying `cmems_insitu` format.")
-        
-    
-    
-    
-    
+
+
+@contextmanager
+def armoor_cli_session(args, *ifmt_platform_pairs):
+    """Standard setup/teardown shared by every armoor-* CLI entry point.
+
+    Configures logging, registers CF conventions, validates each
+    (ifmt, platform) pair via `check_insitu_platform`, then yields inside
+    a Dask `LocalCluster` + `Client` context sized from `args`.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments (must carry the `--dask-*` options).
+    *ifmt_platform_pairs : tuple of (str, str or None)
+        One pair per input dataset needing validation, e.g.
+        `(args.ifmt, args.platform)` or, for ref/prod pipelines,
+        `(args.ref_ifmt, args.ref_platform), (args.ifmt, args.platform)`.
+    """
+    from dask.distributed import Client, LocalCluster
+    from armoor.base.io import setup_dask_client
+    from armoor.data.open_decode import register_cf
+
+    main_setup_logging(args)
+    register_cf()
+    for ifmt, platform in ifmt_platform_pairs:
+        check_insitu_platform(ifmt, platform)
+
+    kw_dask = get_dask_args(args)
+    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
+        with Client(cluster):
+            yield
