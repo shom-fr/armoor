@@ -14,10 +14,34 @@ import xarray as xr
 # base/dispatch.py's call() raises this specific ArmoorError family --
 # see armoor/base/dispatch.py's own import, and the dual-class landmine
 # documented in REFACTOR_PLAN_BASE_EXTRACTION.md.
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from armoor.__init__ import ArmoorError
 from armoor.data.plot import PlotEddies, PlotOceanModel, get_plotter, _plot_task, main_plot
+
+
+class _FakePool:
+    """Runs starmap in-process instead of spawning real subprocesses, so
+    tests can mock _plot_task without hitting multiprocessing's pickling
+    (a mocked/MagicMock function isn't picklable)."""
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def starmap(self, func, iterable):
+        return [func(*args) for args in iterable]
+
+
+def _fake_get_context(method):
+    ctx = MagicMock()
+    ctx.Pool.side_effect = _FakePool
+    return ctx
 
 
 def _write_datatree(tmp_path, data_type, name="ds"):
@@ -137,7 +161,8 @@ class TestMainPlotExtractsVminmaxFromCfgOutputs:
         ncins = {"maps": {"mz1": [nc]}}
         cfg_outputs = {"maps": {"otype": "maps", "vminmax": {"ptemp": (5.0, 30.0)}}}
 
-        with patch("armoor.data.plot._plot_task", return_value=["out.png"]) as mock_task:
+        with patch("multiprocessing.get_context", side_effect=_fake_get_context), \
+             patch("armoor.data.plot._plot_task", return_value=["out.png"]) as mock_task:
             png_paths = main_plot(ncins, ["mz1"], cfg_outputs=cfg_outputs)
 
         mock_task.assert_called_once_with(nc, "mz1", "maps", {"ptemp": (5.0, 30.0)})
@@ -147,7 +172,8 @@ class TestMainPlotExtractsVminmaxFromCfgOutputs:
         nc = _write_datatree(tmp_path, "ocean_model")
         ncins = {"maps": {"mz1": [nc]}}
 
-        with patch("armoor.data.plot._plot_task", return_value=["out.png"]) as mock_task:
+        with patch("multiprocessing.get_context", side_effect=_fake_get_context), \
+             patch("armoor.data.plot._plot_task", return_value=["out.png"]) as mock_task:
             main_plot(ncins, ["mz1"])
 
         mock_task.assert_called_once_with(nc, "mz1", "maps", None)
@@ -168,7 +194,8 @@ class TestMainPlotExtractsVminmaxFromCfgOutputs:
         nc = _write_datatree(tmp_path, "ocean_model")
         ncins = {"maps": {"mz1": [nc]}}
 
-        with patch("armoor.data.plot._plot_task", return_value=[]):
+        with patch("multiprocessing.get_context", side_effect=_fake_get_context), \
+             patch("armoor.data.plot._plot_task", return_value=[]):
             png_paths = main_plot(ncins, ["mz1"], kw_dask=(8, False, None, None, None))
 
         assert png_paths == []

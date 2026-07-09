@@ -12,6 +12,30 @@ import xarray as xr
 from armoor.comp.plot import PlotComp, _plot_task, main_plot
 
 
+class _FakePool:
+    """Runs starmap in-process instead of spawning real subprocesses, so
+    tests can mock _plot_task without hitting multiprocessing's pickling
+    (a mocked/MagicMock function isn't picklable)."""
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def starmap(self, func, iterable):
+        return [func(*args) for args in iterable]
+
+
+def _fake_get_context(method):
+    ctx = MagicMock()
+    ctx.Pool.side_effect = _FakePool
+    return ctx
+
+
 def _make_map_datatree(tmp_path, var="ptemp", prod_name="model1", ny=3, nx=4):
     """Minimal datatree matching what `PlotComp.maps` expects: one product
     node with ref/data, prod/data and comp/diff children, on a structured
@@ -114,7 +138,8 @@ class TestMainPlotExtractsVminmaxFromCfgOutputs:
         ncins = {"maps": {"mz1": [nc]}}
         cfg_outputs = {"maps": {"otype": "maps", "vminmax": {"ptemp": (5.0, 30.0)}}}
 
-        with patch("armoor.comp.plot._plot_task", return_value=["out.png"]) as mock_task:
+        with patch("multiprocessing.get_context", side_effect=_fake_get_context), \
+             patch("armoor.comp.plot._plot_task", return_value=["out.png"]) as mock_task:
             png_paths = main_plot(ncins, ["mz1"], "comp_sst", cfg_outputs=cfg_outputs)
 
         mock_task.assert_called_once_with(nc, "comp_sst", "mz1", "maps", {"ptemp": (5.0, 30.0)})
@@ -124,7 +149,8 @@ class TestMainPlotExtractsVminmaxFromCfgOutputs:
         nc = _make_map_datatree(tmp_path)
         ncins = {"maps": {"mz1": [nc]}}
 
-        with patch("armoor.comp.plot._plot_task", return_value=["out.png"]) as mock_task:
+        with patch("multiprocessing.get_context", side_effect=_fake_get_context), \
+             patch("armoor.comp.plot._plot_task", return_value=["out.png"]) as mock_task:
             main_plot(ncins, ["mz1"], "comp_sst")
 
         mock_task.assert_called_once_with(nc, "comp_sst", "mz1", "maps", None)

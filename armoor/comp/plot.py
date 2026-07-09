@@ -1706,12 +1706,9 @@ def main_plot(ncins, metazones, func_comp, cfg_outputs=None, kw_dask=None):
 
     # Use 'spawn' to create clean child processes: avoids both the
     # "fork() after OpenMP" crash and inherited memory bloat.
-    # ctx = multiprocessing.get_context("spawn")
-    # with ctx.Pool(num_workers) as pool:
-    #     results = pool.starmap(_plot_task, task_args)
-    results = []
-    for arg in task_args:
-        results.append(_plot_task(*arg))
+    ctx = multiprocessing.get_context("spawn")
+    with ctx.Pool(num_workers) as pool:
+        results = pool.starmap(_plot_task, task_args)
     png_paths = [p for task_result in results for p in (task_result or [])]
     logger.info(f"Generated {len(png_paths)} PNG file(s)")
     return png_paths
