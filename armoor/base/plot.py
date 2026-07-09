@@ -13,24 +13,36 @@ def get_output_vminmax(cfg_outputs, output):
 
     Shared by `armoor.data.plot.main_plot` and `armoor.comp.plot.main_plot`,
     both of which call this once per output name while flattening their
-    ``{output: {metazone: [paths]}}`` input into per-file plot tasks.
+    ``{otype: {metazone: [paths]}}`` input into per-file plot tasks.
+
+    `cfg_outputs` is keyed by the user-chosen config *section* name (e.g.
+    ``"global_dispersion"``), not by `output` -- `output` is an *otype*
+    string (e.g. ``"diagdisp_glob"``), a field *inside* each section, and
+    the two only coincide when a user happens to name a section after its
+    otype. So this scans section values for the one whose ``otype``
+    matches, rather than indexing `cfg_outputs` directly with `output`.
 
     Parameters
     ----------
     cfg_outputs : dict or None
-        Mapping of output name to its output configuration (may hold a
-        ``vminmax`` entry), e.g. ``cfg["outputs"]`` from `DATA_INI`/
-        `COMP_INI`. ``None`` when no config is available (e.g. HPC
-        --plot-only calls that predate this option).
+        Mapping of config section name to its output configuration (may
+        hold ``otype``/``vminmax`` entries), e.g. ``cfg["outputs"]`` from
+        `DATA_INI`/`COMP_INI`. ``None`` when no config is available (e.g.
+        HPC --plot-only calls that predate this option).
     output : str
-        Output name to look up.
+        Otype to look up (e.g. ``"maps"``, ``"diagdisp_glob"``).
 
     Returns
     -------
     dict or None
         Mapping of variable name to a ``(vmin, vmax)`` pair, or ``None``.
     """
-    return cfg_outputs[output].get("vminmax") if cfg_outputs else None
+    if not cfg_outputs:
+        return None
+    for section in cfg_outputs.values():
+        if hasattr(section, "get") and section.get("otype") == output:
+            return section.get("vminmax")
+    return None
 
 
 def format_trange(trange):
