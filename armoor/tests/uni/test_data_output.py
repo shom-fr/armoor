@@ -2,11 +2,14 @@
 
 Before this, _validate_output_compatibility/_process_output_type always read
 the flat, ocean-model-shaped OUTPUTS_PARAMS dict regardless of the actual
-dataset's type. For an eddies dataset (DataEddies.outputs_params == {}),
-this would have incorrectly treated e.g. otype="maps" as valid (ocean
-model's own entry), letting eddy data reach stats code that assumes
-ptemp/depth. Now it must be skipped (logged forbidden, no crash).
+dataset's type. For an eddies dataset, whose outputs_params only defines
+"pdf_eddies", this would have incorrectly treated e.g. otype="maps" as
+valid (ocean model's own entry), letting eddy data reach stats code that
+assumes ptemp/depth. Now it must be skipped (logged forbidden, no crash).
 """
+import numpy as np
+import xarray as xr
+
 from armoor.data.datatype import DataEddies, DataOceanModel
 from armoor.data.output import OutputProcessor
 
@@ -73,3 +76,60 @@ class TestPrepareInterpolationParamsDoesNotCorruptMetazones:
         assert interp_params == {"mz1": None}
         # The caller's own metazones dict must come out exactly as it went in.
         assert metazones == {"mz1": {}}
+
+
+class TestComputeDiags:
+    """_compute_diags always runs armoor.diags.eddies.compute_vars (a no-op
+    for non-eddy datasets), and additionally runs the pdf diagnostic when
+    otype == "pdf_eddies"."""
+
+    def test_adds_vmax_radius_regardless_of_otype(self):
+        processor = OutputProcessor()
+        ds = xr.Dataset({"vmax_area": ("obs", [np.pi])})
+        ds = processor._compute_diags(ds, "netcdf")
+
+        assert "vmax_radius" in ds
+        np.testing.assert_allclose(ds["vmax_radius"], [1.0])
+
+
+class TestProcessTreeDatasetObsConcat:
+    """Eddy detections are obs-indexed (one row per detection, no time/z
+    grid) -- concat_dim=["obs"] is DataEddies.outputs_params["pdf_eddies"]'s
+    fusion strategy (see armoor.data.datatype), sorting the result by time
+    since detections across files aren't necessarily in chronological
+    order."""
+
+    def _make_node(self, ds):
+        node = type("Node", (), {"to_dataset": lambda self: ds})()
+        return {"data": node}
+
+    def test_concatenates_along_obs_and_sorts_by_time(self):
+        processor = OutputProcessor()
+        ds1 = xr.Dataset(
+            {"vmax_area": ("obs", [1.0, 2.0])},
+            coords={"time": ("obs", np.array(["2020-01-02", "2020-01-03"], dtype="datetime64[ns]"))},
+        )
+        ds2 = xr.Dataset(
+            {"vmax_area": ("obs", [3.0])},
+            coords={"time": ("obs", np.array(["2020-01-01"], dtype="datetime64[ns]"))},
+        )
+        dts0 = [self._make_node(ds1), self._make_node(ds2)]
+
+        out = processor._process_tree_dataset(dts0, "data", ["obs"], {"otype": "netcdf"})
+
+        assert out.sizes["obs"] == 3
+        assert list(out.time.values) == sorted(out.time.values)
+
+    def test_runs_compute_diags_and_assigns_output_attrs(self):
+        processor = OutputProcessor()
+        ds = xr.Dataset(
+            {"vmax_area": ("obs", [np.pi])},
+            coords={"time": ("obs", np.array(["2020-01-01"], dtype="datetime64[ns]"))},
+        )
+        dts0 = [self._make_node(ds)]
+
+        out = processor._process_tree_dataset(dts0, "data", ["obs"], {"otype": "netcdf", "extra": "value"})
+
+        assert "vmax_radius" in out
+        assert out.attrs == {"extra": "value"}
+        assert "otype" not in out.attrs

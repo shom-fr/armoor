@@ -91,6 +91,8 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
     for metazone in metazones_arg:
         if (metazones_cfg[metazone].get("tfreq") != None) & (metazones_cfg[metazone].get("thours") != None):
             raise ArmoorError(f"`tfreq` and `thours` cannot be configured together in {metazone}")
+        if (metazones_cfg[metazone].get("trange_seq") != None) & (metazones_cfg[metazone].get("tbound") == None):
+            raise ArmoorError(f"`trange_seq` argument needs `tbound` in {metazone}.")
         for k, v in metazones_cfg[metazone].items():
             if v == None:
                 del metazones_cfg[metazone][k]

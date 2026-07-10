@@ -152,18 +152,21 @@ class DataBobyclim(DataOceanModel):
 
 
 class DataEddies(DataType):
-    """Eddy-detection tool output (py-eddy-tracker, sacso, shoot).
-
-    Inert until the fmt values below are actually produced by
-    ``armoor.data.open_decode`` (tracked separately) — registering them now
-    reserves the extension point.
-    """
+    """Eddy-detection tool output (py-eddy-tracker, sacso, shoot)."""
 
     name = "eddies"
     fmts = ("eddy_pet", "eddy_sacso", "eddy_shoot")
     data_vars = ["vmax_area", "vmax_radius"]
     forbidden_params = ["tfreq", "vlevel", "vrange", "cloud"]
-    outputs_params = {}
+    outputs_params = {
+        "pdf_eddies": {
+            # Eddy detections are obs-indexed (one row per detection), not
+            # on a regular time/z grid -- concatenate along "obs" instead
+            # of the time/z-based stat/sort armoor.data.datatype.py's
+            # other types use. See armoor.diags.eddies.pdf.
+            "concat": ["obs"],
+            },
+        }
 
 
 def get_data_type(fmt: str) -> DataType:

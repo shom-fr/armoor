@@ -1,4 +1,6 @@
 import numpy as np
+import xarray as xr
+from scipy.stats import gaussian_kde
 
 def diff(dsprod, dsref):
     """
@@ -152,3 +154,34 @@ def crms(dsprod, dsref, dim):
         Centered root mean square difference.
     """
     return np.sqrt((cdiff(dsprod, dsref, dim) ** 2).mean(dim=dim))
+
+
+def pdf(ds, vars):
+    """
+    Calculate the probability density function of a variable.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Product dataset.
+    vars : str or list of str
+        Variable(s) for which to compute the PDF.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset with new probability density function variable(s) (format pdf_{var}).
+    """
+    if isinstance(vars, str):
+        vars = [vars]
+    for var in vars:
+        kde = gaussian_kde(ds[var])
+        bins = np.linspace(0, max(ds[var]).values, 100)
+        pdf_values = kde.pdf(bins)
+        ds[f'{var}_pdf'] = xr.DataArray(pdf_values, dims=['pdf_bins'], attrs=ds[var].attrs)
+        ds[f'{var}_pdf_bins'] = xr.DataArray(
+            bins,
+            dims=['pdf_bins'],
+            attrs={'info': f'bins used to calculate pdf for {var}'}
+        )
+    return ds

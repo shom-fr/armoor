@@ -2,8 +2,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import pytest
+from scipy.stats import gaussian_kde
 
-from armoor.base.stats import diff, cdiff, mean, std, bias, rms, crms
+from armoor.base.stats import diff, cdiff, mean, std, bias, rms, crms, pdf
 
 
 def _make_test_data():
@@ -83,3 +84,15 @@ def test_crms():
 
     out = crms(dsref, dsprod, dim="time")
     assert np.isclose(out["a"].item(), expected)
+
+
+def test_pdf():
+    ds, _ = _make_test_data()
+    out = pdf(ds, "a")["a_pdf"]
+
+    arr = np.array([1., 2., 3., 4.])
+    bins = np.linspace(0, max(arr), 100)
+    kde = gaussian_kde(arr)
+    expected = kde.pdf(bins)
+
+    np.testing.assert_array_almost_equal(out, expected)

@@ -176,7 +176,7 @@ def validate_and_get_params(metazones):
     interp_params = get_interpolation_params(metazones)
     return interp_params
 
-def save_datasets(dsprod, dirout, prod_name):
+def save_datasets(dsprod, dirout, prod_name, ofmt):
     """Save dataset to NetCDF files.
 
     Parameters
@@ -187,7 +187,9 @@ def save_datasets(dsprod, dirout, prod_name):
         Directory to save the datasets.
     prod_name: str
         Name for the product dataset file.
-    
+    ofmt: list
+        Formats to save outputs.
+
     Returns
     -------
     tuple
@@ -195,16 +197,14 @@ def save_datasets(dsprod, dirout, prod_name):
     """
     ncname = dsprod.range.suffix
     ncout_prod = dirout / f"prod{ncname}.zarr"
-    #logger.info(f"Save {ncout_prod}")
     dsprod = dsprod.chunk("auto")
     encoding = get_zarr_encoding(dsprod)
-    # dsprod.to_netcdf(
-    #     ncout_prod,
-    #     encoding=encoding,
-    #     format='NETCDF4',
-    #     engine='netcdf4',
-    #     compute=True  # Forcer le compute immédiat
-    #     )
+    if 'netcdf' in ofmt:
+        dsprod.to_netcdf(
+            dirout / f'prod{ncname}.nc',
+            compute=True,
+            )
+    # Save as zarr anyway, whether it's in ofmt or not
     dsprod.to_zarr(
         store=ncout_prod,
         mode="w",
@@ -253,21 +253,23 @@ class OutputProcessor:
         ArmoorError
             When processing fails
         """
-        # Remove 'fmt' from outputs as it's not needed
-        outputs.pop("fmt", None)
+        # Remove 'fmt' from outputs as it's not needed downstream, but keep
+        # its value: save_datasets uses it to decide whether to also save
+        # a netcdf copy alongside the zarr output.
+        ofmt = outputs.pop("fmt", None) or []
         outputs.pop("vminmax", None)
-        
+
         # Validate and prepare interpolation parameters
         interp_params = self._prepare_interpolation_params(metazones)
         ncouts = {}
-        
+
         # Process each NetCDF file
         for nc_file in ncs:
             logger.info(f"Processing {nc_file}")
             ncouts = self._process_single_netcdf(
-                nc_file, metazones, interp_params, outputs, ncouts
+                nc_file, metazones, interp_params, outputs, ncouts, ofmt
             )
-            
+
         return ncouts
     
     def _prepare_interpolation_params(self, metazones: Dict[str, Any]) -> Dict[str, Optional[Dict]]:
@@ -296,12 +298,13 @@ class OutputProcessor:
         return interp_params
     
     def _process_single_netcdf(self, nc_file: str, metazones: Dict[str, Any],
-                              interp_params: Dict[str, Optional[Dict]], 
+                              interp_params: Dict[str, Optional[Dict]],
                               outputs: Dict[str, Any],
-                              ncouts: Dict[str, Dict[str, List[Path]]]) -> Dict[str, Dict[str, List[Path]]]:
+                              ncouts: Dict[str, Dict[str, List[Path]]],
+                              ofmt: List[str]) -> Dict[str, Dict[str, List[Path]]]:
         """
         Process a single NetCDF file for all metazones.
-        
+
         Parameters
         ----------
         nc_file
@@ -314,7 +317,10 @@ class OutputProcessor:
             Output configurations
         ncouts
             Accumulator for output file paths
-            
+        ofmt
+            Formats to save intermediate interpolated outputs (e.g. also
+            write netcdf alongside zarr)
+
         Returns
         -------
         Updated ncouts dictionary
@@ -329,7 +335,7 @@ class OutputProcessor:
             # Process each metazone
             for metazone, params in interp_params.items():
                 fouts = self._process_metazone(
-                    dsin, metazone, metazones[metazone], params, attrs_in
+                    dsin, metazone, metazones[metazone], params, attrs_in, ofmt
                 )
 
                 # Generate outputs for this metazone
@@ -337,10 +343,10 @@ class OutputProcessor:
                     fouts, metazone, metazones[metazone], outputs,
                     prod_name, ncouts, outputs_params
                 )
-                
+
         finally:
             dsin.close()
-            
+
         return ncouts
     
     def _load_and_prepare_dataset(self, nc_file: str) -> xr.Dataset:
@@ -367,12 +373,12 @@ class OutputProcessor:
         
         return dsin
     
-    def _process_metazone(self, dsin: xr.Dataset, metazone: str, 
+    def _process_metazone(self, dsin: xr.Dataset, metazone: str,
                          mparams: Dict[str, Any], params: Optional[Dict],
-                         attrs_in: Dict[str, Any]) -> List[Path]:
+                         attrs_in: Dict[str, Any], ofmt: List[str]) -> List[Path]:
         """
         Process a dataset for a specific metazone.
-        
+
         Parameters
         ----------
         dsin
@@ -385,13 +391,15 @@ class OutputProcessor:
             Interpolation parameters
         attrs_in
             Original dataset attributes
-            
+        ofmt
+            Formats to save intermediate interpolated outputs
+
         Returns
         -------
         List of output file paths
         """
         ds = dsin.copy()
-        
+
         # Apply interpolations if needed
         if params:
             ds = self._apply_interpolations(ds, params, mparams)
@@ -400,19 +408,19 @@ class OutputProcessor:
                 return []
         else:
             logger.info("No interpolation required")
-        
+
         # Restore attributes and clean up dataset
         ds.attrs.update(attrs_in)
         ds = self._cleanup_dataset(ds)
-        
+
         # Compute and process ranges
         # with setup_dask_client():
         ds = ds.compute()
         dss = self._apply_range_processing(ds, mparams)
-        
+
         # Save processed datasets
-        fouts = self._save_processed_datasets(dss, metazone)
-        
+        fouts = self._save_processed_datasets(dss, metazone, ofmt)
+
         return fouts
     
     def _apply_interpolations(self, ds: xr.Dataset, params: Dict[str, Any],
@@ -516,38 +524,40 @@ class OutputProcessor:
         
         return dss
     
-    def _save_processed_datasets(self, dss: List[xr.Dataset], 
-                                metazone: str) -> List[Path]:
+    def _save_processed_datasets(self, dss: List[xr.Dataset],
+                                metazone: str, ofmt: List[str]) -> List[Path]:
         """
         Save processed datasets to disk.
-        
+
         Parameters
         ----------
         dss
             List of datasets to save
         metazone
             Metazone name for directory structure
-            
+        ofmt
+            Formats to save intermediate interpolated outputs
+
         Returns
         -------
         List of saved file paths
         """
         logger.info("Save interpolated data")
         fouts = []
-        
+
         try:
             for ids, dsprod in enumerate(dss):
                 dirout = Path(f"data/interp/{metazone}/{dsprod.attrs['data_name']}")
                 dirout.mkdir(parents=True, exist_ok=True)
-                
+
                 fout_prod = save_datasets(
-                    dsprod, dirout, dsprod.attrs['data_name']
+                    dsprod, dirout, dsprod.attrs['data_name'], ofmt
                 )
                 fouts.append(fout_prod)
                 dsprod.close()
         finally:
             del dss
-            
+
         return fouts
     
     def _generate_outputs(self, fouts: List[Path], metazone: str,
@@ -692,7 +702,7 @@ class OutputProcessor:
             logger.info(f"Processing sorted group: {name_sort}")
             
             output_file = self._process_sorted_group(
-                fins_sorted, oparams, mparams, metazone, oname,
+                fins_sorted, oparams, mparams, output, metazone, oname,
                 name_sort, prod_name, concat_dim
             )
             
@@ -701,13 +711,14 @@ class OutputProcessor:
         
         return output_files
     
-    def _process_sorted_group(self, fins_sorted: List[Path], 
+    def _process_sorted_group(self, fins_sorted: List[Path],
                              oparams: Dict[str, Any], mparams: Dict[str, Any],
+                             output: Dict[str, Any],
                              metazone: str, oname: str, name_sort: str,
                              prod_name: str, concat_dim: List[str]) -> Optional[Path]:
         """
         Process a sorted group of files to create a single output.
-        
+
         Parameters
         ----------
         fins_sorted
@@ -716,6 +727,9 @@ class OutputProcessor:
             Output parameters
         mparams
             Metazone parameters
+        output
+            Output configuration (otype plus any optional output params,
+            e.g. used by `_compute_diags` for otype-specific diagnostics)
         metazone
             Metazone name
         oname
@@ -726,29 +740,29 @@ class OutputProcessor:
             Product name
         concat_dim
             Concatenation dimensions
-            
+
         Returns
         -------
         Path to generated output file, or None if failed
         """
         # Load datasets
         dss = [xr.open_dataset(fin) for fin in fins_sorted]
-        
+
         try:
             # Get data trees with statistics
             dts0 = get_datatrees(dss, oparams.get("stat"), mparams)
             del dss
-            
+
             # Process each dataset in the tree
             dsouts = {}
             for ds_name in dts0[0].keys():
                 ds = self._process_tree_dataset(
-                    dts0, ds_name, concat_dim
+                    dts0, ds_name, concat_dim, output
                 )
                 dsouts[ds_name] = ds
-            
+
             del dts0
-            
+
             # Save as zarr
             return self._save_datatree_output(
                 dsouts, metazone, oname, name_sort, prod_name
@@ -759,10 +773,10 @@ class OutputProcessor:
             return None
     
     def _process_tree_dataset(self, dts0: List[Any], ds_name: str,
-                             concat_dim: List[str]) -> xr.Dataset:
+                             concat_dim: List[str], output: Dict[str, Any]) -> xr.Dataset:
         """
         Process a single dataset from the data tree.
-        
+
         Parameters
         ----------
         dts0
@@ -771,13 +785,15 @@ class OutputProcessor:
             Name of dataset to extract
         concat_dim
             Concatenation dimensions
-            
+        output
+            Output configuration (otype plus any optional output params)
+
         Returns
         -------
         Processed dataset
         """
         dss0 = [dt[ds_name].to_dataset() for dt in dts0]
-        
+
         if concat_dim == ["time"]:
             # Handle time concatenation
             if dss0[0].sizes["time"] > 1:
@@ -785,23 +801,58 @@ class OutputProcessor:
                 dss1 = []
                 for ds0 in dss0:
                     dss1.extend([
-                        ds0.isel(time=itime) 
+                        ds0.isel(time=itime)
                         for itime in range(ds0.sizes["time"])
                     ])
                 dss0 = dss1
-            
+
             ds = xr.concat(dss0, "time")
-            
+
             # Handle vrange attributes specifically
             if dss0[0].range.vrange_value:
                 vrange_attrs = [ds0.range.vrange_value for ds0 in dss0]
                 ds.attrs["vrange"] = vrange_attrs
-                
+
+        elif concat_dim == ["obs"]:
+            ds = xr.concat(dss0, "obs").sortby("time")
+
         elif len(dss0) == 1:
             ds = dss0[0]
         else:
             raise ArmoorError("Multi-dataset concatenation not implemented")
-        
+
+        ds = self._compute_diags(ds, output["otype"])
+
+        attrs = {k: v for k, v in output.items() if k != "otype"}
+        ds = ds.assign_attrs(attrs)
+
+        return ds
+
+    def _compute_diags(self, ds: xr.Dataset, output_type: str) -> xr.Dataset:
+        """
+        Compute any armoor.diags statistics appropriate for this output type.
+
+        Each diagnostic is added as new variable(s) in the dataset.
+
+        Parameters
+        ----------
+        ds
+            Dataset to augment.
+        output_type
+            The output's otype (e.g. ``"pdf_eddies"``).
+
+        Returns
+        -------
+        xarray.Dataset
+            `ds`, with any applicable diagnostics added.
+        """
+        from armoor.diags.eddies import compute_vars
+        ds = compute_vars(ds)
+
+        if output_type == "pdf_eddies":
+            from armoor.diags.eddies import pdf
+            ds = pdf(ds)
+
         return ds
     
     def _save_datatree_output(self, dsouts: Dict[str, xr.Dataset],

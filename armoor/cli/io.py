@@ -210,6 +210,7 @@ def add_input_fmt_parser_arguments(parser):
             "cmems_insitu", "cora_insitu",
             "cmems_sst_l3", "cersat_sst_l3", "cmems_sst_l4",
             "sloop",
+            "eddy_pet", "eddy_sacso", "eddy_shoot",
             ),
         help="Format of the input files (default: sloop)",
     )

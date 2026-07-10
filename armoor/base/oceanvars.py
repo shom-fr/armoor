@@ -48,7 +48,13 @@ class OceanVars:
             return self.ds.oceanvars.sel_current_speed()
         elif varname == "mld":
             return self.ds.oceanvars.sel_mld()
-    
+        elif varname == "div":
+            return self.ds.oceanvars.sel_divergence()
+        elif varname == "okuboweiss":
+            return self.ds.oceanvars.sel_okuboweiss()
+        elif varname == "relvort":
+            return self.ds.oceanvars.sel_relvort()
+
     def sel_current_direction(self):
         if "cdir" in self.ds:
             return self.ds["cdir"]
@@ -295,3 +301,54 @@ class OceanVars:
             self.ds["mld"] = mld
 
         return self.ds["mld"]
+
+    def sel_divergence(self):
+        """
+        Compute the divergence of the flow.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing the divergence.
+        """
+        if "div" in self.ds:
+            return self.ds["div"]
+        elif set(("u", "v")).issubset(self.ds.data_vars):
+            from shoot.dyn import get_div
+            return get_div(self.ds.u, self.ds.v)
+        else:
+            logger.warning("Divergence cannot be infered or computed")
+
+    def sel_okuboweiss(self):
+        """
+        Compute the Okubo-Weiss parameter.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing the Okubo-Weiss.
+        """
+        if "okuboweiss" in self.ds:
+            return self.ds["okuboweiss"]
+        elif set(("u", "v")).issubset(self.ds.data_vars):
+            from shoot.dyn import get_okuboweiss
+            return get_okuboweiss(self.ds.u, self.ds.v)
+        else:
+            logger.warning("Okubo-Weiss cannot be infered or computed")
+
+    def sel_relvort(self):
+        """
+        Compute the relative vorticity.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing the relative vorticity.
+        """
+        if "relvort" in self.ds:
+            return self.ds["relvort"]
+        elif set(("u", "v")).issubset(self.ds.data_vars):
+            from shoot.dyn import get_relvort
+            return get_relvort(self.ds.u, self.ds.v)
+        else:
+            logger.warning("Relative vorticity cannot be infered or computed")

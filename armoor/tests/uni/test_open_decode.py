@@ -27,6 +27,9 @@ from armoor.data.open_decode import (
     open_decode_cora_insitu,
     open_decode_cmems_insitu,
     open_decode_croco,
+    open_decode_eddy_pet,
+    open_decode_eddy_sacso,
+    open_decode_eddy_shoot,
     get_paths,
     register_cf,
     get_decoder,
@@ -37,6 +40,9 @@ from armoor.data.open_decode import (
     CmemsModelDecoder,
     CoraInsituDecoder,
     CrocoDecoder,
+    EddyPetDecoder,
+    EddySacsoDecoder,
+    EddyShootDecoder,
     HycomDecoder,
     SloopDecoder,
     SstSatelliteDecoder,
@@ -81,7 +87,10 @@ def setup_test_data():
     test_files['cmems_insitu_drifter'] = TEST_DATA_DIR / "*_TS_DB_*.nc"
     test_files['croco'] = TEST_DATA_DIR / "croco_his.nc"
     test_files['croco_v1'] = TEST_DATA_DIR / "croco_v1.3.nc"
-    
+    test_files['eddies_pet'] = TEST_DATA_DIR / "eddy-sample_py-eddy-tracker*"
+    test_files['eddies_sacso'] = TEST_DATA_DIR / "eddy-sample_sacso.txt"
+    test_files['eddies_shoot'] = TEST_DATA_DIR / "eddy-sample_shoot.nc"
+
     yield test_files
     
     # Cleanup is handled by pytest tmpdir fixture if needed
@@ -644,6 +653,86 @@ class TestOpenDecodeCroco:
         
         # Angle should be removed after rotation
         assert 'angle' not in result
+
+
+# ============================================================================
+# Test open_decode_eddies
+# ============================================================================
+
+class TestOpenDecodeEddies:
+    """Tests for the open_decode_eddy_* functions."""
+
+    def test_open_decode_eddies_pet(self, setup_test_data):
+        """
+        Test open_decode with py-eddy-tracker format.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['eddies_pet']
+        ds = open_decode_eddy_pet(get_paths(str(filepath)))
+
+        assert isinstance(ds, xr.Dataset)
+        assert set(["obs", "nb_sample"]).issubset(ds.dims)
+        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert ds.time.dims == ("obs",)
+        assert ds.nb_sample.dims == ("nb_sample",)
+        assert "eddy_type" in ds.data_vars
+        assert "contour_lon" in ds.data_vars
+        assert "contour_lat" in ds.data_vars
+        assert "center_lon" in ds.data_vars
+        assert "center_lat" in ds.data_vars
+        assert "vmax_area" in ds.data_vars
+
+    def test_open_decode_eddies_sacso(self, setup_test_data):
+        """
+        Test open_decode with sacso format.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['eddies_sacso']
+        ds = open_decode_eddy_sacso(get_paths(str(filepath)))
+
+        assert isinstance(ds, xr.Dataset)
+        assert set(["obs", "nb_sample"]).issubset(ds.dims)
+        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert ds.time.dims == ("obs",)
+        assert ds.nb_sample.dims == ("nb_sample",)
+        assert "eddy_type" in ds.data_vars
+        assert "contour_lon" in ds.data_vars
+        assert "contour_lat" in ds.data_vars
+        assert "center_lon" in ds.data_vars
+        assert "center_lat" in ds.data_vars
+        assert "vmax_area" in ds.data_vars
+
+    def test_open_decode_eddies_shoot(self, setup_test_data):
+        """
+        Test open_decode with shoot format.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['eddies_shoot']
+        ds = open_decode_eddy_shoot(get_paths(str(filepath)))
+
+        assert isinstance(ds, xr.Dataset)
+        assert set(["obs", "nb_sample"]).issubset(ds.dims)
+        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert ds.time.dims == ("obs",)
+        assert ds.nb_sample.dims == ("nb_sample",)
+        assert "eddy_type" in ds.data_vars
+        assert "contour_lon" in ds.data_vars
+        assert "contour_lat" in ds.data_vars
+        assert "center_lon" in ds.data_vars
+        assert "center_lat" in ds.data_vars
+        assert "vmax_area" in ds.data_vars
 
 
 # ============================================================================

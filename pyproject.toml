@@ -22,8 +22,9 @@ classifiers = [
 requires-python = ">=3.11"
 dependencies = [
     # xoa now comes from conda-forge (see requirements.txt/environment.yml,
-    # pinned to 2026.7.0) -- woom has no conda-forge package, stays git-based.
-    "woom @ git+https://github.com/shom-fr/woom.git"
+    # pinned to 2026.7.0) -- woom/shoot have no conda-forge package, stay git-based.
+    "woom @ git+https://github.com/shom-fr/woom.git",
+    "shoot @ git+https://github.com/shom-fr/shoot.git@develop"
 ]
 [project.optional-dependencies]
 
