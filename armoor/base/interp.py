@@ -397,35 +397,41 @@ def coarsen(dsi: xr.Dataset, factor: int, boundary: str = "trim", method: str = 
     return getattr(coarsener, method)()
 
 
+#: Mutually-exclusive vertical-coordinate candidates. Only one of these may
+#: be an active coordinate at a time so that `xoa.regrid.regrid1d`'s
+#: `coord_in_name` unambiguously resolves to a single vertical axis --
+#: "dens" (in-situ density) and "pdens" (potential density, used for
+#: isopycnal interpolation) are as mutually exclusive with "depth" as they
+#: are with each other.
+_VERTICAL_COORD_CANDIDATES = ("depth", "dens", "pdens")
+
+
 def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
     """Interpolate an xarray Dataset over specified vertical levels.
-    
+
     Parameters
     ----------
     ds: xr.Dataset
         The input xarray Dataset containing variables to interpolate.
     vname: str
-        The name of the vertical coordinate (e.g., "depth" or "dens").
+        The name of the vertical coordinate (e.g., "depth", "dens" for
+        in-situ density, or "pdens" for potential density -- isopycnal
+        interpolation).
     vlevels: list
         List of vertical levels to interpolate to.
     method: str (optional)
         The interpolation method to use. Default is "linear".
-    
+
     Returns
     -------
     xr.Dataset
         A new Dataset with variables interpolated to the specified vertical levels.
     """
-    if vname == "depth":
-        if "dens" in ds.coords:
-            ds = ds.reset_coords("dens")
-        if "depth" not in ds.coords:
-            ds = ds.set_coords("depth")
-    elif vname == "dens":
-        if "depth" in ds.coords:
-            ds = ds.reset_coords("depth")
-        if "dens" not in ds.coords:
-            ds = ds.set_coords("dens")
+    for candidate in _VERTICAL_COORD_CANDIDATES:
+        if candidate != vname and candidate in ds.coords:
+            ds = ds.reset_coords(candidate)
+    if vname not in ds.coords:
+        ds = ds.set_coords(vname)
     import numba
     import xoa.regrid as xregrid  # noqa: F811
     # regrid1d's underlying numba kernels are themselves parallel

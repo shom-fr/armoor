@@ -521,8 +521,26 @@ class TestVinterp:
         """Test vertical interpolation with nearest method."""
         target_depths = xr.DataArray([0, 5, 10], dims="z")
         result = vinterp(self.ds, 'depth', target_depths, method="nearest")
-        
+
         assert result.sizes["z"] == len(target_depths)
+
+    def test_potential_density_interpolation_isopycnal(self):
+        """Isopycnal (potential-density) interpolation: pdens comes in as a
+        plain data_var (as computed by OceanVars, see armoor.base.oceanvars),
+        not pre-set as a coordinate -- vinterp itself must promote it, same
+        as it already does for depth/dens."""
+        ds = self.ds.assign(
+            pdens=(['time', 'z'], np.array([[1024.0, 1026.0, 1028.0], [1024.0, 1026.0, 1028.0]]))
+        )
+        assert 'pdens' in ds.data_vars
+        assert 'pdens' not in ds.coords
+
+        target_pdens = xr.DataArray([1024.0, 1025.0, 1026.0, 1027.0, 1028.0], dims="z", name="pdens")
+        result = vinterp(ds, 'pdens', target_pdens)
+
+        assert result.sizes["z"] == len(target_pdens)
+        assert 'pdens' in result.coords
+        assert 'depth' in result.data_vars
     
     def test_variables_without_z_preserved(self):
         """Test that variables without z dimension are preserved."""
