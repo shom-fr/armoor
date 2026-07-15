@@ -11,7 +11,7 @@ import numpy as np
 import xarray as xr
 
 from armoor.data.datatype import DataEddies, DataOceanModel
-from armoor.data.output import OutputProcessor
+from armoor.data.output import OutputProcessor, get_datatrees, get_dim_stats
 
 
 class TestValidateOutputCompatibilityPerType:
@@ -133,3 +133,136 @@ class TestProcessTreeDatasetObsConcat:
         assert "vmax_radius" in out
         assert out.attrs == {"extra": "value"}
         assert "otype" not in out.attrs
+
+
+class TestApplyRangeProcessingNativeVerticalFallback:
+    """Regression test for the "all z levels overlaid as one line" bug in
+    armoor-data's timeseries/maps plots (seen in comp_clim-style CI output).
+
+    When a metazone configures neither vlevel nor vrange,
+    _apply_range_processing used to leave the dataset's "z" dimension
+    entirely intact and unsplit -- a plot then draws one line per native
+    z-level on the same axes instead of one figure per level. It must now
+    fall back to splitting by the dataset's own native vertical levels,
+    exactly like ranges.vlevels does when vlevel is explicitly configured.
+    """
+
+    def _make_ds(self):
+        return xr.Dataset(
+            {"temp": (["time", "z", "y", "x"], np.zeros((2, 3, 2, 2)))},
+            coords={
+                "time": ("time", np.array(["2020-01-01", "2020-01-02"], dtype="datetime64[ns]")),
+                "depth": ("z", [0.0, 10.0, 20.0]),
+            },
+        )
+
+    def test_splits_by_native_depth_when_unconfigured(self):
+        processor = OutputProcessor()
+        ds = self._make_ds()
+
+        dss = processor._apply_range_processing(ds, mparams={})
+
+        assert len(dss) == 3
+        assert sorted(d.attrs["vlevel"] for d in dss) == ["0.0", "10.0", "20.0"]
+
+    def test_vlevel_configured_takes_precedence(self):
+        # By this point in the real pipeline, _apply_interpolations has
+        # already vertically interpolated the dataset onto the requested
+        # "levels" -- ranges.vlevels just splits whatever z-points are
+        # already there, it doesn't filter by the "levels" list itself.
+        processor = OutputProcessor()
+        ds = xr.Dataset(
+            {"temp": (["time", "z", "y", "x"], np.zeros((2, 2, 2, 2)))},
+            coords={
+                "time": ("time", np.array(["2020-01-01", "2020-01-02"], dtype="datetime64[ns]")),
+                "depth": ("z", [0.0, 20.0]),
+            },
+        )
+
+        dss = processor._apply_range_processing(
+            ds, mparams={"vlevel": {"vname": "depth", "levels": [0.0, 20.0]}}
+        )
+
+        assert len(dss) == 2
+
+    def test_no_z_dim_is_a_no_op(self):
+        processor = OutputProcessor()
+        ds = xr.Dataset(
+            {"sst": (["time", "y", "x"], np.zeros((2, 2, 2)))},
+            coords={"time": ("time", np.array(["2020-01-01", "2020-01-02"], dtype="datetime64[ns]"))},
+        )
+
+        dss = processor._apply_range_processing(ds, mparams={})
+
+        assert len(dss) == 1
+
+    def test_depth_with_spurious_time_dim_does_not_crash(self):
+        """Regression test: CMEMS glo12 data can carry "depth" with a
+        leftover "time" dim (constant across time in practice, but not
+        squeezed away), which made ranges.vlevels crash with
+        "unsupported format string passed to numpy.ndarray.__format__"
+        when formatting the per-level attrs label."""
+        processor = OutputProcessor()
+        ds = xr.Dataset(
+            {"temp": (["time", "z", "y", "x"], np.zeros((2, 3, 2, 2)))},
+            coords={
+                "time": ("time", np.array(["2020-01-01", "2020-01-02"], dtype="datetime64[ns]")),
+                "depth": (["time", "z"], np.tile([0.0, 10.0, 20.0], (2, 1))),
+            },
+        )
+
+        dss = processor._apply_range_processing(ds, mparams={})
+
+        assert len(dss) == 3
+        assert sorted(d.attrs["vlevel"] for d in dss) == ["0.0", "10.0", "20.0"]
+
+
+class TestGetDatatreesNoStatWhenNothingConfigured:
+    """When a metazone configures neither tfreq/trange_seq nor vrange,
+    get_dim_stats legitimately reduces "maps"'s stat=["time","z"] down to
+    an empty list ("y"/"x" aren't stat candidates for "maps", unlike
+    "timeseries"), and get_datatrees correctly skips creating "mean"/"std"
+    nodes in that case -- there is nothing meaningful to average over.
+    Unlike comp_*, which always has vlevel/vrange/trange_seq configured,
+    armoor-data must let this "nothing configured" case through: the plot
+    layer (armoor.data.plot) is responsible for falling back to the raw
+    "data" node when "mean" isn't there, not this layer manufacturing one.
+    """
+
+    def _make_ds(self):
+        return xr.Dataset(
+            {"temp": (["time", "z", "y", "x"], np.arange(8, dtype=float).reshape(2, 1, 2, 2))},
+            coords={"time": ("time", np.array(["2020-01-01", "2020-01-02"], dtype="datetime64[ns]"))},
+            attrs={"data_name": "glo12"},
+        )
+
+    def test_maps_stat_empty_when_unconfigured(self):
+        ds = self._make_ds()
+
+        result = get_dim_stats(ds, ["time", "z"], mparams={})
+
+        assert result == []
+
+    def test_no_mean_or_std_node_when_stat_is_empty(self):
+        ds = self._make_ds()
+
+        dts = get_datatrees([ds], ["time", "z"], mparams={})
+
+        assert "mean" not in dts[0].children
+        assert "std" not in dts[0].children
+        assert "data" in dts[0].children
+
+    def test_timeseries_stat_still_reduces_yx(self):
+        """"timeseries"-style stat lists (which include "y") are unaffected:
+        time/z stay excluded from stat (preserved as plot axes), "y"/"x"
+        remain to be reduced -- unchanged pre-existing behavior."""
+        ds = self._make_ds()
+
+        result = get_dim_stats(ds, ["time", "z", "y", "x"], mparams={})
+
+        assert result == ["y", "x"]
+
+    def test_no_stat_requested_returns_none(self):
+        ds = self._make_ds()
+
+        assert get_dim_stats(ds, None, mparams={}) is None

@@ -1,6 +1,7 @@
 import logging
 import re
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -65,6 +66,11 @@ def vlevels(dssi, vname):
         var = dsi[vname]
         for ivlevel in range(var.sizes["z"]):
             vlevel = var.isel(z=ivlevel).values
+            # vname (e.g. "depth") can carry leftover non-"z" dims (e.g. a
+            # spurious "time" dim from concatenating multiple native files)
+            # even though the actual level is constant along them -- reduce
+            # to a plain scalar so it can be used as a label.
+            vlevel = float(np.asarray(vlevel).reshape(-1)[0])
             dso = dsi.isel(z=[ivlevel]).copy()
             dso.attrs = dsi.attrs
             dso.attrs["vlevel"] = f"{vlevel:.1f}"

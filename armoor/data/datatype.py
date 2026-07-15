@@ -93,9 +93,6 @@ class DataOceanModel(DataType):
         "maps": {
             "sort": ["time", "z"],
             "stat": ["time", "z"],
-            "mparams_con": {
-                "time": ["tfreq"],
-                }
             },
         "timeseries": {
             "sort": ["z"],

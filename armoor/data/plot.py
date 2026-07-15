@@ -18,7 +18,8 @@ from cartopy.mpl.ticker import (LatitudeFormatter, LatitudeLocator,
                                 LongitudeFormatter, LongitudeLocator)
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from xoa.plot import plot_minimap, plot_ts
+from xoa.plot import plot_minimap, plot_ts, plot_flow
+from xoa import geo as xgeo
 
 from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.dispatch import SubclassingMethodRegistry
@@ -672,12 +673,175 @@ class PlotOceanModel(_PlotDataBase):
                 self.save_figure(fig, figname.format(**locals()))
         return None    
         
+    def _plot_current_background(self, ax, u, v, vmin, vmax, show_flow=True):
+        """Plot current speed (module) as a pcolormesh/scatter background,
+        optionally with current direction overlaid via xoa.plot.plot_flow.
+
+        Parameters
+        ----------
+        ax : matplotlib.axes.Axes
+        u, v : xarray.DataArray
+            Zonal/meridional current components (same shape, lon/lat coords).
+        vmin, vmax : float
+            Color scale bounds for the speed background.
+        show_flow : bool
+            Whether to overlay plot_flow tracks. False for a std panel --
+            standard deviation has no direction, so a flow overlay there
+            doesn't mean anything.
+
+        Returns
+        -------
+        matplotlib.collections.QuadMesh or PathCollection
+            The background mappable, for colorbar attachment.
+        """
+        speed = np.sqrt(u ** 2 + v ** 2)
+        if ("npts" in u.dims) or (u.lon.dims != ("y", "x")):
+            m = ax.scatter(
+                u.lon, u.lat, c=speed,
+                vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
+                )
+        else:
+            m = ax.pcolormesh(
+                u.lon, u.lat, speed,
+                vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
+                )
+
+        if not show_flow:
+            return m
+
+        # plot_flow's own default duration/step estimate divides by a plain
+        # (non-nan-aware) mean of |u|/|v| to pick an integration duration --
+        # ocean model data is land-masked (NaN over land), so that mean is
+        # always NaN, crashing xoa.dyn.flow2d with "cannot convert float NaN
+        # to integer". Reproduce the same estimate with nanmean instead, and
+        # skip the overlay entirely if there's no usable (finite, nonzero)
+        # speed at all (e.g. an all-land tile).
+        mean_speed = np.sqrt(
+            np.nanmean(np.abs(u.values)) ** 2 + np.nanmean(np.abs(v.values)) ** 2
+        )
+        if mean_speed and np.isfinite(mean_speed):
+            dist = xgeo.haversine(
+                float(u.lon.min()), float(u.lat.min()),
+                float(u.lon.max()), float(u.lat.max()),
+                )
+            duration = dist / mean_speed / 30
+            plot_flow(
+                u, v, duration=duration, step=duration / 10, axes=ax,
+                color="white", linewidth=0.6,
+                )
+        else:
+            logger.warning("Current speed is zero or all-NaN -- skipping flow overlay")
+        return m
+
+    def _plot_current_map(self, ds_data_all, ds_mean_all, ds_std_all):
+        """Plot current (u, v) as a map: current speed (module) as
+        background, current direction overlaid via xoa.plot.plot_flow.
+
+        Mean panel shows speed + flow overlay; std panel shows speed std
+        only (no flow overlay -- std has no natural direction). Speed std
+        is approximated from u/v stds assuming independence -- a display
+        heuristic, not a rigorous propagation of uncertainty.
+        """
+        data_name = ds_mean_all.attrs["data_name"]
+        attrs = ds_data_all.attrs
+        ncname = ""
+        xtitle = ""
+        trange = attrs.get("trange")
+        if trange:
+            title_str, suffix_str = format_trange(trange)
+            xtitle += title_str
+            ncname += f"_{suffix_str}"
+        if "z" in ds_data_all["u"].dims:
+            if "vlevel" in attrs:
+                vlevel = attrs.get("vlevel")
+                if isinstance(vlevel, list):
+                    vlevel = vlevel[0]
+                ncname += f"_{vlevel}"
+                xtitle += f" {vlevel} m"
+            elif "vrange" in attrs:
+                vrange = attrs.get("vrange")
+                if isinstance(vrange, list):
+                    vrange = vrange[0]
+                ncname += f"_{vrange}"
+                xtitle += f" {vrange}"
+
+        units = ds_data_all["u"].attrs.get("units")
+        figtitle = (
+            f"{data_name} \n {self.metazone}\n {xtitle}\n "
+            f"current speed, {units}"
+            )
+
+        ds_mean = ds_mean_all[["u", "v"]].squeeze()
+        ds_std = ds_std_all[["u", "v"]].squeeze()
+        speed_mean = np.sqrt(ds_mean["u"] ** 2 + ds_mean["v"] ** 2)
+        speed_std = np.sqrt(ds_std["u"] ** 2 + ds_std["v"] ** 2)
+
+        if "cspeed" in self.vminmax:
+            cmin, cmax = self.vminmax["cspeed"]
+        else:
+            cmin, cmax = 0, speed_mean.mean() + 1.75 * speed_mean.std()
+        vmax = speed_std.mean() + 1.75 * speed_std.std()
+
+        dlat = ds_mean.lat.max() - ds_mean.lat.min()
+        dlon = ds_mean.lon.max() - ds_mean.lon.min()
+        aspect_ratio = 3 / 2 * dlat / dlon
+        fig, axes = create_subplots(
+                nrows=2,
+                figsize=(8 / aspect_ratio, 8),
+                x_label='Date', y_label=None,
+                sharex=True, projection=ccrs.PlateCarree()
+            )
+
+        m0 = self._plot_current_background(axes[0], ds_mean["u"], ds_mean["v"], cmin, cmax)
+        m1 = self._plot_current_background(
+            axes[1], ds_std["u"], ds_std["v"], 0, vmax, show_flow=False
+            )
+
+        cbar0 = fig.colorbar(
+            m0, ax=axes[0], orientation='vertical', label="Mean speed",
+            fraction=0.05, shrink=0.5
+            )
+        cbar1 = fig.colorbar(
+            m1, ax=axes[1], orientation='vertical', label="St.D. speed",
+            fraction=0.05, shrink=0.5
+            )
+
+        plt.subplots_adjust(hspace=0.02, wspace=0.01)
+        for iax, ax in enumerate(axes):
+            gl = axes[iax].gridlines(
+                crs=ccrs.PlateCarree(),
+                draw_labels=True,
+                linewidth=0.5,
+                color='gray',
+                alpha=0.5,
+                linestyle='--'
+                )
+            gl.top_labels = False
+            gl.right_labels = False
+
+        figname = (
+            f"data/plot/{self.metazone}/"
+            f"map_current_{data_name}{ncname}.png"
+            )
+        fig.suptitle(figtitle)
+        self.save_figure(fig, figname)
+
     def maps(self):
         """Plot maps per product."""
         ds_data_all = self.dt.children["data"].to_dataset()
+
+        if "mean" not in self.dt.children:
+            # Nothing configured (no tfreq/trange_seq nor vrange): unlike
+            # comp_*, which always has one of these set, armoor-data lets
+            # this case through with no mean/std to show (see
+            # armoor.data.output.get_dim_stats). Fall back to plotting the
+            # raw native data directly, one single-panel map per native
+            # time step, instead of the usual mean/std pair.
+            return self._maps_raw(ds_data_all)
+
         ds_mean_all = self.dt.children["mean"].to_dataset()
         ds_std_all = self.dt.children["std"].to_dataset()
-        
+
         if "member" in ds_mean_all.dims:
             if "member" in ds_mean_all.lon.dims:
                 ds_mean_all = ds_mean_all.reset_coords(["lon", "lat"])
@@ -687,8 +851,12 @@ class PlotOceanModel(_PlotDataBase):
             if "lon" not in ds_mean_all.coords:
                 ds_mean_all = ds_mean_all.set_coords(["lon", "lat"])
                 ds_std_all = ds_std_all.set_coords(["lon", "lat"])
-                
+
         vars2plot = [var for var in ds_data_all.data_vars if var != "depth"]
+        if "u" in vars2plot and "v" in vars2plot:
+            vars2plot = [var for var in vars2plot if var not in ("u", "v")]
+            self._plot_current_map(ds_data_all, ds_mean_all, ds_std_all)
+
         for var in vars2plot:
             ds_data = ds_data_all[[var]]
             ds_mean = ds_mean_all[[var]]
@@ -821,6 +989,156 @@ class PlotOceanModel(_PlotDataBase):
 
             self.save_figure(fig, figname)
 
+
+        return None
+
+    def _maps_raw(self, ds_data_all):
+        """Plot native, unreduced data as single-panel maps.
+
+        One figure per variable and per native time step, since there is
+        no mean/std to show (see maps()). "z" is expected to already be
+        size 1 by this point (armoor.data.output._apply_range_processing
+        splits by native vertical level when neither vlevel nor vrange is
+        configured), so only "time" is looped over here.
+        """
+        data_name = ds_data_all.attrs.get("data_name")
+        vars2plot = [var for var in ds_data_all.data_vars if var != "depth"]
+        if "u" in vars2plot and "v" in vars2plot:
+            vars2plot = [var for var in vars2plot if var not in ("u", "v")]
+            self._plot_current_map_raw(ds_data_all)
+
+        for var in vars2plot:
+            da_all = ds_data_all[var].squeeze()
+            times = da_all["time"].values if "time" in da_all.dims else [None]
+            for time_val in times:
+                da = da_all.sel(time=time_val) if time_val is not None else da_all
+                units = da.attrs.get("units")
+                time_str = (
+                    pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
+                    if time_val is not None else ""
+                    )
+                figtitle = (
+                    f"{data_name} \n {self.metazone}\n {time_str}\n "
+                    f"{var}, {units}"
+                    )
+
+                if var in self.vminmax:
+                    vmin, vmax = self.vminmax[var]
+                else:
+                    vmin, vmax = float(da.min()), float(da.max())
+
+                dlat = da.lat.max() - da.lat.min()
+                dlon = da.lon.max() - da.lon.min()
+                aspect_ratio = 3 / 2 * dlat / dlon
+                fig, axes = create_subplots(
+                        nrows=1,
+                        figsize=(8 / aspect_ratio, 8),
+                        x_label='Date', y_label=None,
+                        projection=ccrs.PlateCarree()
+                    )
+                ax = axes[0]
+                if ("npts" in da.dims) or (da.lon.dims != ("y", "x")):
+                    m0 = ax.scatter(
+                        da.lon, da.lat,
+                        c=da,
+                        vmin=vmin,
+                        vmax=vmax,
+                        cmap=CMAP_VARS[var]
+                        )
+                else:
+                    m0 = ax.pcolormesh(
+                        da.lon, da.lat, da,
+                        vmin=vmin,
+                        vmax=vmax,
+                        cmap=CMAP_VARS[var]
+                        )
+
+                fig.colorbar(
+                    m0, ax=ax, orientation='vertical', label=var,
+                    fraction=0.05, shrink=0.5
+                    )
+
+                gl = ax.gridlines(
+                    crs=ccrs.PlateCarree(),
+                    draw_labels=True,
+                    linewidth=0.5,
+                    color='gray',
+                    alpha=0.5,
+                    linestyle='--'
+                    )
+                gl.top_labels = False
+                gl.right_labels = False
+
+                figname = (
+                    f"data/plot/{self.metazone}/"
+                    f"map_{var}_{data_name}_{time_str}.png"
+                    )
+                fig.suptitle(figtitle)
+                self.save_figure(fig, figname)
+
+        return None
+
+    def _plot_current_map_raw(self, ds_data_all):
+        """Plot native, unreduced current (u, v) as single-panel maps: one
+        figure per native time step, speed (module) as background,
+        direction overlaid via xoa.plot.plot_flow (see _maps_raw())."""
+        data_name = ds_data_all.attrs.get("data_name")
+        u_all = ds_data_all["u"].squeeze()
+        v_all = ds_data_all["v"].squeeze()
+        units = ds_data_all["u"].attrs.get("units")
+        times = u_all["time"].values if "time" in u_all.dims else [None]
+        for time_val in times:
+            u = u_all.sel(time=time_val) if time_val is not None else u_all
+            v = v_all.sel(time=time_val) if time_val is not None else v_all
+            speed = np.sqrt(u ** 2 + v ** 2)
+            time_str = (
+                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
+                if time_val is not None else ""
+                )
+            figtitle = (
+                f"{data_name} \n {self.metazone}\n {time_str}\n "
+                f"current speed, {units}"
+                )
+
+            if "cspeed" in self.vminmax:
+                vmin, vmax = self.vminmax["cspeed"]
+            else:
+                vmin, vmax = float(speed.min()), float(speed.max())
+
+            dlat = u.lat.max() - u.lat.min()
+            dlon = u.lon.max() - u.lon.min()
+            aspect_ratio = 3 / 2 * dlat / dlon
+            fig, axes = create_subplots(
+                    nrows=1,
+                    figsize=(8 / aspect_ratio, 8),
+                    x_label='Date', y_label=None,
+                    projection=ccrs.PlateCarree()
+                )
+            ax = axes[0]
+            m0 = self._plot_current_background(ax, u, v, vmin, vmax)
+
+            fig.colorbar(
+                m0, ax=ax, orientation='vertical', label="speed",
+                fraction=0.05, shrink=0.5
+                )
+
+            gl = ax.gridlines(
+                crs=ccrs.PlateCarree(),
+                draw_labels=True,
+                linewidth=0.5,
+                color='gray',
+                alpha=0.5,
+                linestyle='--'
+                )
+            gl.top_labels = False
+            gl.right_labels = False
+
+            figname = (
+                f"data/plot/{self.metazone}/"
+                f"map_current_{data_name}_{time_str}.png"
+                )
+            fig.suptitle(figtitle)
+            self.save_figure(fig, figname)
 
         return None
 

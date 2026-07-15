@@ -521,7 +521,18 @@ class OutputProcessor:
             vname = mparams["vrange"]["vname"]
             vbins = list(zip(mparams["vrange"]["bins_min"], mparams["vrange"]["bins_max"]))
             dss = ranges.vrange(dss, vname, vbins)
-        
+        elif any("z" in ds0.dims for ds0 in dss):
+            # Neither vlevel nor vrange configured: fall back to the
+            # dataset's own native vertical levels (still one dataset per
+            # level, like ranges.vlevels), so plots get one figure per
+            # level instead of overlaying every native z index as a line.
+            vname = next(
+                (c for c in ("depth", "pres") if c in dss[0].coords or c in dss[0].data_vars),
+                None,
+            )
+            if vname:
+                dss = ranges.vlevels(dss, vname)
+
         return dss
     
     def _save_processed_datasets(self, dss: List[xr.Dataset],

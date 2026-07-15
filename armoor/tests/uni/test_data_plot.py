@@ -199,3 +199,181 @@ class TestMainPlotExtractsVminmaxFromCfgOutputs:
             png_paths = main_plot(ncins, ["mz1"], kw_dask=(8, False, None, None, None))
 
         assert png_paths == []
+
+
+def _write_maps_raw_datatree(tmp_path, name="glo12", ntime=2):
+    """Datatree with only a "data" child (no "mean"/"std") -- mirrors what
+    armoor.data.output produces for a metazone configuring neither
+    tfreq/trange_seq nor vrange (get_dim_stats' stat ends up empty)."""
+    y, x = 3, 4
+    lat = np.linspace(40, 45, y)
+    lon = np.linspace(-10, -5, x)
+    lon2d, lat2d = np.meshgrid(lon, lat)
+    time = np.array(["2020-01-01", "2020-01-02"], dtype="datetime64[ns]")[:ntime]
+    ds = xr.Dataset(
+        {"temp": (["time", "z", "y", "x"], np.random.rand(ntime, 1, y, x))},
+        coords={
+            "time": time,
+            "lon": (["y", "x"], lon2d),
+            "lat": (["y", "x"], lat2d),
+        },
+        attrs={"data_name": name, "data_type": "ocean_model"},
+    )
+    dt = xr.DataTree.from_dict({"data": ds})
+    path = tmp_path / f"{name}.zarr"
+    dt.to_zarr(path, mode="w")
+    return str(path)
+
+
+class TestMapsRawFallback:
+    """maps() must fall back to plotting the raw "data" node (one map per
+    native time step) when there is no "mean" child -- see
+    armoor.data.output.get_dim_stats, which legitimately produces an empty
+    stat list (hence no mean/std node at all) when a metazone configures
+    neither tfreq/trange_seq nor vrange. Before this fallback, maps()
+    crashed with KeyError('mean')."""
+
+    def test_no_mean_child_plots_raw_data_per_time_step(self, tmp_path):
+        nc = _write_maps_raw_datatree(tmp_path, ntime=2)
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            assert "mean" not in plotter.dt.children
+            plotter.maps()
+            assert len(plotter.saved_files) == 2
+        finally:
+            plotter.clean()
+
+    def test_single_native_time_step(self, tmp_path):
+        nc = _write_maps_raw_datatree(tmp_path, ntime=1)
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.maps()
+            assert len(plotter.saved_files) == 1
+        finally:
+            plotter.clean()
+
+
+def _write_current_datatree(tmp_path, name="glo12", ntime=2, with_scalar_var=True,
+                             land_masked=False):
+    """Datatree with u/v current components (and optionally a plain scalar
+    var), no "mean"/"std" child -- exercises the raw-data current-map
+    fallback (map_current_*) together with the ordinary scalar map.
+
+    land_masked=True sets one grid cell to NaN in every time/z slice,
+    mirroring real ocean-model data (land points are masked) -- this is
+    what makes xoa.plot.plot_flow's own (non-nan-aware) mean-based
+    duration estimate crash with "cannot convert float NaN to integer"."""
+    y, x = 3, 4
+    lat = np.linspace(40, 45, y)
+    lon = np.linspace(-10, -5, x)
+    lon2d, lat2d = np.meshgrid(lon, lat)
+    time = np.array(["2020-01-01", "2020-01-02"], dtype="datetime64[ns]")[:ntime]
+    u = np.random.rand(ntime, 1, y, x)
+    v = np.random.rand(ntime, 1, y, x)
+    if land_masked:
+        u[..., 0, 0] = np.nan
+        v[..., 0, 0] = np.nan
+    data_vars = {
+        "u": (["time", "z", "y", "x"], u),
+        "v": (["time", "z", "y", "x"], v),
+    }
+    if with_scalar_var:
+        data_vars["temp"] = (["time", "z", "y", "x"], np.random.rand(ntime, 1, y, x))
+    ds = xr.Dataset(
+        data_vars,
+        coords={
+            "time": time,
+            "lon": (["y", "x"], lon2d),
+            "lat": (["y", "x"], lat2d),
+        },
+        attrs={"data_name": name, "data_type": "ocean_model"},
+    )
+    dt = xr.DataTree.from_dict({"data": ds})
+    path = tmp_path / f"{name}.zarr"
+    dt.to_zarr(path, mode="w")
+    return str(path)
+
+
+def _write_current_stats_datatree(tmp_path, name="glo12"):
+    """Datatree with "data"/"mean"/"std" children for u/v -- exercises the
+    has-stats current-map path (_plot_current_map), as opposed to the raw
+    fallback exercised by _write_current_datatree."""
+    y, x = 3, 4
+    lat = np.linspace(40, 45, y)
+    lon = np.linspace(-10, -5, x)
+    lon2d, lat2d = np.meshgrid(lon, lat)
+
+    def _ds():
+        return xr.Dataset(
+            {
+                "u": (["y", "x"], np.random.rand(y, x)),
+                "v": (["y", "x"], np.random.rand(y, x)),
+            },
+            coords={"lon": (["y", "x"], lon2d), "lat": (["y", "x"], lat2d)},
+            attrs={"data_name": name, "data_type": "ocean_model"},
+        )
+
+    dt = xr.DataTree.from_dict({"data": _ds(), "mean": _ds(), "std": _ds()})
+    path = tmp_path / f"{name}.zarr"
+    dt.to_zarr(path, mode="w")
+    return str(path)
+
+
+class TestCurrentMap:
+    """maps() must plot current (u,v) as speed (module) background with an
+    xoa.plot.plot_flow direction overlay, instead of separate scalar u/v
+    maps -- both via the raw-data fallback and once mean/std are present."""
+
+    def test_stats_path_overlays_flow_on_mean_only(self, tmp_path):
+        """Regression test: the std panel showed a flow overlay too, which
+        doesn't mean anything for a standard deviation (no direction) --
+        plot_flow must be called exactly once, for the mean panel."""
+        nc = _write_current_stats_datatree(tmp_path)
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            with patch("armoor.data.plot.plot_flow") as mock_flow:
+                plotter.maps()
+            assert mock_flow.call_count == 1
+            assert len(plotter.saved_files) == 1
+            assert "map_current_" in plotter.saved_files[0]
+        finally:
+            plotter.clean()
+
+    def test_raw_fallback_produces_one_current_map_per_time_step(self, tmp_path):
+        nc = _write_current_datatree(tmp_path, ntime=2, with_scalar_var=True)
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.maps()
+            current_files = [f for f in plotter.saved_files if "map_current_" in f]
+            scalar_files = [f for f in plotter.saved_files if "map_temp_" in f]
+            assert len(current_files) == 2
+            assert len(scalar_files) == 2
+        finally:
+            plotter.clean()
+
+    def test_current_only_no_scalar_vars(self, tmp_path):
+        nc = _write_current_datatree(tmp_path, ntime=1, with_scalar_var=False)
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.maps()
+            assert len(plotter.saved_files) == 1
+            assert "map_current_" in plotter.saved_files[0]
+        finally:
+            plotter.clean()
+
+    def test_land_masked_current_does_not_crash(self, tmp_path):
+        """Regression test: xoa.plot.plot_flow's default duration estimate
+        divides by a plain mean of |u|/|v|, which is NaN as soon as a
+        single land point is masked in real ocean-model data --
+        _plot_current_background must compute this estimate with nanmean
+        instead, or the whole map crashes with "cannot convert float NaN
+        to integer"."""
+        nc = _write_current_datatree(
+            tmp_path, ntime=1, with_scalar_var=False, land_masked=True
+        )
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.maps()
+            assert len(plotter.saved_files) == 1
+        finally:
+            plotter.clean()

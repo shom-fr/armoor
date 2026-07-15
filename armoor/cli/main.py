@@ -28,7 +28,8 @@ class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
                                  ArgumentDefaultsHelpFormatter):
     pass
 from armoor.cli import FILTERS_INI, COMP_INI, DATA_INI, METAZONES_INI, BULL_INI
-from armoor.cli.io import add_dask_parser_arguments, get_dask_args, add_comp_parser_arguments
+from armoor.cli.io import (add_dask_parser_arguments, get_dask_args,
+                           add_comp_parser_arguments, add_tbound_parser_arguments)
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 
 logger = logging.getLogger(__name__)
@@ -239,6 +240,7 @@ def get_parser_data():
         help="Path of the configuration file dedicated to the description of metazones.",
         default="metazones.cfg"
         )
+    add_tbound_parser_arguments(parser)
     parser.add_argument(
         '--jsonfile',
         type=Path,
@@ -250,7 +252,7 @@ def get_parser_data():
         action='store_true',
         help="Use for exiting after filters processes.",
         )
-    
+
     return parser
 
 def main_data():
@@ -290,7 +292,8 @@ def main_data():
 
     metazones = check_metazones_in(
        args.metazones,
-       metazones
+       metazones,
+       tbound=args.tbound
        )
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
