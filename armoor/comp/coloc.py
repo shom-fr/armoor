@@ -240,6 +240,13 @@ class HorizontalColocation(AbstractColocation):
                 .rename(rename_dims)
                 .assign_coords(member=prod_data.member)
             )
+        if "npts1" in dist.dims:
+            # A time-independent reference (e.g. a single fixed mooring) has
+            # exactly one point here -- squeeze it out, otherwise it leaks
+            # as a spurious size-1 dim into dsprod via the caller's
+            # `.where(dist < radius)`, breaking the dims-signature match in
+            # `select_vars_by_dims` and silently dropping the whole group.
+            dist = dist.squeeze("npts1", drop=True)
         return dist
     
     def _handle_time_dependent(self, radius_meters: float) -> None:
@@ -380,14 +387,25 @@ class VerticalColocation(AbstractColocation):
         vlevels = xr.DataArray(vlevels, dims="z", name=vname)
         prod_attrs = self.dsprod.attrs
         ref_attrs = self.dsref.attrs
-        if "z" in self.dsref.dims:
+        ref_has_z = "z" in self.dsref.dims
+        prod_has_z = "z" in self.dsprod.dims
+        if ref_has_z:
             self.dsref = vinterp(self.dsref, vname, vlevels)
         else:
             logger.warning("No 'z' dim in reference")
-        if "z" in self.dsprod.dims:
+        if prod_has_z:
             self.dsprod = vinterp(self.dsprod, vname, vlevels)
         else:
             self.logger.warning("no 'z' dim in product")
+        # A single selected level with "z" on only one side (e.g. a
+        # full-depth model compared to a surface-only satellite reference)
+        # otherwise leaves a singleton "z" dim there alone, which breaks
+        # select_vars_by_dims's signature match against the other side.
+        if len(vlevels) == 1:
+            if prod_has_z and not ref_has_z and "z" in self.dsprod.dims:
+                self.dsprod = self.dsprod.squeeze("z", drop=True)
+            if ref_has_z and not prod_has_z and "z" in self.dsref.dims:
+                self.dsref = self.dsref.squeeze("z", drop=True)
         self.dsref.attrs.update(ref_attrs)
         self.dsprod.attrs.update(prod_attrs)
         return self.dsref, self.dsprod
@@ -952,28 +970,41 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged):
         if vcoord in dsprod.data_vars:
             dsprod = dsprod.set_coords(vcoord)
 
-    # Split by dimension signature, then apply ranges per group conditionally
-    ref_groups = _split_by_dims(dsref)
-    prod_groups = _split_by_dims(dsprod)
+    if comp_func == "comp_drifter" and not params.get("horizontal"):
+        # No horizontal colocation step is configured for this comp func
+        # (comp_drifter: spatial matching happens later, via OceanParcels in
+        # preproc_comp_drifter). The product legitimately keeps its full
+        # (y, x) grid here, so a dims-signature match against the point-like
+        # reference would always fail -- skip the split/match and range the
+        # whole pair directly instead.
+        dssref, dssprod = [dsref], [dsprod]
+        if "time" in dsref.dims:
+            dssref, dssprod = _apply_time_ranges(dsref, dsprod, params, tbound)
+        if "z" in dsref.dims:
+            dssref, dssprod = _apply_vertical_ranges(dssref, dssprod, params, comp_func)
+    else:
+        # Split by dimension signature, then apply ranges per group conditionally
+        ref_groups = _split_by_dims(dsref)
+        prod_groups = _split_by_dims(dsprod)
 
-    dssref = []
-    dssprod = []
-    for sig, sub_ref in ref_groups.items():
-        sub_prod = select_vars_by_dims(prod_groups, sig)
+        dssref = []
+        dssprod = []
+        for sig, sub_ref in ref_groups.items():
+            sub_prod = select_vars_by_dims(prod_groups, sig)
 
-        if sub_ref is None or sub_prod is None:
-            continue
+            if sub_ref is None or sub_prod is None:
+                continue
 
-        if "time" in sub_ref.dims:
-            sub_ref_list, sub_prod_list = _apply_time_ranges(sub_ref, sub_prod, params, tbound)
-        else:
-            sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]
+            if "time" in sub_ref.dims:
+                sub_ref_list, sub_prod_list = _apply_time_ranges(sub_ref, sub_prod, params, tbound)
+            else:
+                sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]
 
-        if "z" in sub_ref.dims:
-            sub_ref_list, sub_prod_list = _apply_vertical_ranges(sub_ref_list, sub_prod_list, params, comp_func)
+            if "z" in sub_ref.dims:
+                sub_ref_list, sub_prod_list = _apply_vertical_ranges(sub_ref_list, sub_prod_list, params, comp_func)
 
-        dssref.extend(sub_ref_list)
-        dssprod.extend(sub_prod_list)
+            dssref.extend(sub_ref_list)
+            dssprod.extend(sub_prod_list)
 
     # Save results and return paths
     paths = _save_colocation_results(dssref, dssprod, staged)

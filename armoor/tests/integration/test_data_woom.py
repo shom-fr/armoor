@@ -31,7 +31,7 @@ import woom.workflow as wworkflow
 # ---------------------------------------------------------------------------
 # Geographic extent — must cover the polygon defined in metazones.cfg.
 # ---------------------------------------------------------------------------
-REGION = {"lon_min": -14.0, "lon_max": -10.0, "lat_min": 45.0, "lat_max": 49.0}
+REGION = {"lon_min": -14.0, "lon_max": -7.0, "lat_min": 45.0, "lat_max": 49.0}
 
 # ---------------------------------------------------------------------------
 # Data dependencies (get_data tasks only) for armoor-data's data.cfg
@@ -47,7 +47,7 @@ def _write_workflow_cfg(woomtmpdir):
 name=TEST_DATA
 
 [params]
-rundate=today
+rundate=2026-07-08
 lon_min={REGION['lon_min']}
 lon_max={REGION['lon_max']}
 lat_min={REGION['lat_min']}
@@ -55,7 +55,6 @@ lat_max={REGION['lat_max']}
 
 [stages]
     [[prolog]]
-    copernicus_login=copernicus_login
     get_data={DATA_GET_DATA}
     data=data,data_native
 """

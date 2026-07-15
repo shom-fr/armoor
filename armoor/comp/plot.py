@@ -1264,14 +1264,14 @@ class PlotComp(MethodRegistry):
                 x_label=None, y_label=None,
                 sharex=True, projection=ccrs.PlateCarree()
                 )
-            
+
             lonmin = dsref.lon.min() - 0.5 * dlon
             lonmax = dsref.lon.max() + 0.5 * dlon
             latmin = dsref.lat.min() - 0.5 * dlat
             latmax = dsref.lat.max() + 0.5 * dlat
             axes[0].set_xlim([lonmin, lonmax])
             axes[0].set_ylim([latmin, latmax])
-            
+
             axes[0].plot(
                 dsref.lon,
                 dsref.lat,
@@ -1328,7 +1328,9 @@ class PlotComp(MethodRegistry):
         """Plot maps per product."""
         for prod, node_prod in self.dt.children.items():
             dsprod = node_prod["prod/data"].to_dataset()
-            dsprod = dsprod.isel(time_drifter=[0])
+            # "time_drifter" is a coordinate on the "npt" dim, not a
+            # dimension itself -- select the first observation via "npt".
+            dsprod = dsprod.isel(npt=[0])
 
             dsref = node_prod["ref/data"].to_dataset()
 
@@ -1339,29 +1341,29 @@ class PlotComp(MethodRegistry):
                 f"{self.plot_title} \n"
                 f"{self.metazone}"
                 )
-                
+
             dlat = dsref.lat.max() - dsref.lat.min()
             dlon = dsref.lon.max() - dsref.lon.min()
             mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
             aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
-            
+
             fig, axes = create_subplots(
                 layout_type="one",
                 figsize=(10, 10 * aspect_ratio),
                 x_label=None, y_label=None,
                 sharex=True, projection=ccrs.PlateCarree()
                 )
-            
+
             lonmin = dsref.lon.min() - 0.5 * dlon
             lonmax = dsref.lon.max() + 0.5 * dlon
             latmin = dsref.lat.min() - 0.5 * dlat
             latmax = dsref.lat.max() + 0.5 * dlat
             axes[0].set_xlim([lonmin, lonmax])
             axes[0].set_ylim([latmin, latmax])
-            
+
             dsprod = dsprod.squeeze()
             dsref = dsref.squeeze()
-            
+
             axes[0].quiver(
                 dsref.lon,
                 dsref.lat,

@@ -169,8 +169,13 @@ def preproc_comp_drifter(zins, odt, runtime=None):
         logger.info(drifter)
         for prod, zs in prods.items():
             logger.info(f"Prod: {prod}")
-            zref = [z for z in zs if "ref_" in str(z)][0]
-            zprod = [z for z in zs if "prod_" in str(z)][0]
+            # "ref"/"prod" is always the filename prefix (`save_datasets`),
+            # but the "_<suffix>" part is only appended when a time/vlevel/
+            # vrange attr was actually set -- comp_drifter's colocation has
+            # no "time" key and no vrange attr, so the plain "ref.zarr"/
+            # "prod.zarr" names have no underscore to match on.
+            zref = [z for z in zs if Path(z).name.startswith("ref")][0]
+            zprod = [z for z in zs if Path(z).name.startswith("prod")][0]
             ncprod, timeprod = _prepare_prod_for_parcels(zprod)
             zref = _interpolate_ref_and_run_parcels(
                 zref, odt, timeprod, ncprod, runtime

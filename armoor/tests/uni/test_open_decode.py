@@ -75,11 +75,11 @@ def setup_test_data():
     test_files = {}
     
     # Create sample NetCDF files for different formats
-    test_files['cmems_model'] = TEST_DATA_DIR / "cmems_glo12.nc"
+    test_files['cmems_model'] = TEST_DATA_DIR / "cmems_glo12_*.nc"
     test_files['hycom'] = TEST_DATA_DIR / "hycom_*.nc"
     test_files['woa18'] = TEST_DATA_DIR / "woa18_*.nc"
-    test_files['cmems_sst_l4'] = TEST_DATA_DIR / "20220310120000-UKMO-L4_GHRSST-SSTfnd-OSTIAanom-GLOB-v02.0-fv02.0.nc"
-    test_files['cmems_sst_l3'] = TEST_DATA_DIR / "20230412080000-OSISAF-L3C_GHRSST-SSTsubskin-SEVIRI_IO_SST-ssteqc_meteosat09_20230412_080000-v02.0-fv01.0.nc"
+    test_files['cmems_sst_l4'] = TEST_DATA_DIR / "cmems_sst_l4.nc"
+    test_files['cmems_sst_l3'] = TEST_DATA_DIR / "cmems_sst_l3.nc"
     test_files['cersat_sst_l3'] = TEST_DATA_DIR / "20210623-IFR-L3C_GHRSST-SSTsubskin-ODYSSEA-GLOB_010_adjusted-v2.0-fv1.0.nc"
     test_files['cmems_insitu_argo'] = TEST_DATA_DIR / "*_PR_PF_*.nc"
     test_files['cmems_insitu_glider'] = TEST_DATA_DIR / "*_PR_GL_*.nc"
@@ -243,7 +243,7 @@ class TestOpenDecodeCmemsModel:
             Fixture containing test file paths.
         """
         filepath = setup_test_data['cmems_model']
-        result = open_decode_cmems_model([filepath])
+        result = open_decode_cmems_model(get_paths(str(filepath)))
         
         assert isinstance(result, xr.Dataset)
         assert 'x' in result.dims
@@ -261,7 +261,7 @@ class TestOpenDecodeCmemsModel:
             Fixture containing test file paths.
         """
         filepath = setup_test_data['cmems_model']
-        result = open_decode_cmems_model([filepath])
+        result = open_decode_cmems_model(get_paths(str(filepath)))
         
         assert 'lon' in result.coords
         assert 'lat' in result.coords
@@ -281,7 +281,7 @@ class TestOpenDecodeCmemsModel:
             Fixture containing test file paths.
         """
         filepath = setup_test_data['cmems_model']
-        result = open_decode_cmems_model([filepath])
+        result = open_decode_cmems_model(get_paths(str(filepath)))
         
         if 'depth' in result:
             # Depth should be reset to coords
