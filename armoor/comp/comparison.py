@@ -663,6 +663,15 @@ class CompClim(Comparison):
         "horizontal": ("href",),
         "vertical": ("vlevel",),
     }
+    # Monthly climatological colocation is comp_clim's only sensible time
+    # strategy -- force it as the default so it always applies, regardless
+    # of whether the metazone sets "tmonth" (or nothing at all, e.g. a
+    # metazone shared with other comp_func's that use "tfreq"/"trange_seq"
+    # instead -- those aren't even candidates for comp_clim's "time" key,
+    # see colocation_params_user above, so they're already ignored here).
+    colocation_params_default = {
+        "time": ("tmonth",),
+    }
     outputs_params = {
         "maps": {"sort": ["time", "z"], "stat": ["time"]},
         "timeseries": {

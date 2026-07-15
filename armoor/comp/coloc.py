@@ -704,8 +704,13 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
 
     ds = ds.load()
     # Ensure time coordinate is in nanosecond precision to avoid xarray warnings
-    # when the zarr stores times as datetime64[s] or datetime64[ms].
-    if "time" in ds.coords and ds["time"].dtype != np.dtype("datetime64[ns]"):
+    # when the zarr stores times as datetime64[s] or datetime64[ms]. Only
+    # applies to datasets whose time is already a real datetime -- for
+    # climatologies opened with decode_times=False (e.g. WOA18's raw month
+    # index 1-12), "time" isn't a datetime at all, and astype("datetime64[ns]")
+    # would silently reinterpret the month index as a bogus timestamp.
+    if "time" in ds.coords and np.issubdtype(ds["time"].dtype, np.datetime64) \
+            and ds["time"].dtype != np.dtype("datetime64[ns]"):
         ds["time"] = ds["time"].astype("datetime64[ns]")
     return ds
 
