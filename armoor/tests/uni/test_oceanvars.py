@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
+from armoor import ArmoorError
 from armoor.base.oceanvars import OceanVars
 
 
@@ -123,6 +124,8 @@ class TestOceanVars:
         np.testing.assert_array_equal(result_sal.values, self.sal)
 
     def test_sel_unknown_variable(self):
-        """Test selection of an unknown variable"""
-        result = self.ds.oceanvars.sel('unknown_var')
-        assert result is None
+        """Test selection of an unknown variable raises rather than silently
+        returning None -- dispatched via MethodRegistry.call, see
+        armoor.base.dispatch."""
+        with pytest.raises(ArmoorError, match="Unknown ocean variable"):
+            self.ds.oceanvars.sel('unknown_var')

@@ -4,6 +4,9 @@ import gsw
 import xarray as xr
 import numpy as np
 
+from armoor import ArmoorError
+from armoor.base.dispatch import MethodRegistry
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,45 +18,47 @@ def _gsw_ufunc(func, *args):
         output_dtypes=[np.float32],
     )
 
-class OceanVars:
+class OceanVars(MethodRegistry):
     """
     Sel or compute ocean variable from a dataset in a user-friendly format.
+
+    Variables are dispatched by name via `call` (see
+    `armoor.base.dispatch.MethodRegistry`).
 
     Parameters
     ----------
     xarray_obj : xarray.Dataset
     """
 
+    _dispatch_label = "Ocean variable"
+
+    #: varname (as used in comp_vars/oceanvars filters) -> sel_* method name.
+    _VARNAME_METHODS = {
+        "ptemp": "sel_ptemp",
+        "temp": "sel_temp",
+        "sal": "sel_sal",
+        "sndspeed": "sel_sndspeed",
+        "pdens": "sel_pdens",
+        "u": "sel_current_zonal",
+        "v": "sel_current_meridional",
+        "cdir": "sel_current_direction",
+        "cspeed": "sel_current_speed",
+        "mld": "sel_mld",
+        "div": "sel_divergence",
+        "okuboweiss": "sel_okuboweiss",
+        "relvort": "sel_relvort",
+    }
+
     def __init__(self, ds):
         self.ds = ds
-        
+        self.methods = {}
+        self.__post_init__()
+
     def sel(self, varname: str):
-        if varname == "ptemp":
-            return self.ds.oceanvars.sel_ptemp()
-        elif varname == "temp":
-            return self.ds.oceanvars.sel_temp()
-        elif varname == "sal":
-            return self.ds.oceanvars.sel_sal()
-        elif varname == "sndspeed":
-            return self.ds.oceanvars.sel_sndspeed()
-        elif varname == "pdens":
-            return self.ds.oceanvars.sel_pdens()
-        elif varname == "u":
-            return self.ds.oceanvars.sel_current_zonal()
-        elif varname == "v":
-            return self.ds.oceanvars.sel_current_meridional()
-        elif varname == "cdir":
-            return self.ds.oceanvars.sel_current_direction()
-        elif varname == "cspeed":
-            return self.ds.oceanvars.sel_current_speed()
-        elif varname == "mld":
-            return self.ds.oceanvars.sel_mld()
-        elif varname == "div":
-            return self.ds.oceanvars.sel_divergence()
-        elif varname == "okuboweiss":
-            return self.ds.oceanvars.sel_okuboweiss()
-        elif varname == "relvort":
-            return self.ds.oceanvars.sel_relvort()
+        method_name = self._VARNAME_METHODS.get(varname)
+        if method_name is None:
+            raise ArmoorError(f"Unknown ocean variable '{varname}'")
+        return self.call(method_name)
 
     def sel_current_direction(self):
         if "cdir" in self.ds:
