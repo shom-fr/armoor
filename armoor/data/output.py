@@ -83,7 +83,7 @@ def get_datatrees(dsins, dim, mparams):
         for k, v in xdim.items():
             for data_name, dt0 in dt.items():
                 ds0 = dt0.to_dataset()
-                ds0 = ds0.assign_attrs({"trange_seq": mparams['trange_seq'][0]})
+                ds0 = ds0.assign_attrs({"trange_seq": mparams['trange_seq']['tfreq']})
                 if dim:
                     if ("time" in dim) and (k == "time"):
                         ds0 = set_time_range(ds0, v)
@@ -505,21 +505,21 @@ class OutputProcessor:
             logger.info('Applying trange_seq...')
             try:
                 dss = ranges.trange_seq(
-                    ds, *mparams.get("tbound"), mparams["trange_seq"][0]
+                    ds, *mparams.get("tbound"), mparams["trange_seq"]["tfreq"]
                     )
             except:
                 logger.info('Error for trange_seq. Maybe tbound was not defined in metazones.')
                 sys.exit(1)
         else:
             dss = [ds]
-        
+
         # Vertical level processing
         if "vlevel" in mparams:
-            vname = mparams["vlevel"][0]
+            vname = mparams["vlevel"]["vname"]
             dss = ranges.vlevels(dss, vname)
         elif "vrange" in mparams:
-            vname = mparams["vrange"][1]
-            vbins = mparams["vrange"][2]
+            vname = mparams["vrange"]["vname"]
+            vbins = list(zip(mparams["vrange"]["bins_min"], mparams["vrange"]["bins_max"]))
             dss = ranges.vrange(dss, vname, vbins)
         
         return dss

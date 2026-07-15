@@ -90,11 +90,11 @@ class Comparison:
         """
         vertical_coloc = params["vertical"]
         if "vlevel" in vertical_coloc[0]:
-            vname = vertical_coloc[1][0]
+            vname = vertical_coloc[1]["vname"]
             return ranges.vlevels(dsref_list, vname), ranges.vlevels(dsprod_list, vname)
         elif "vrange" in vertical_coloc[0]:
-            vname = vertical_coloc[1][1]
-            vbins = vertical_coloc[1][2]
+            vname = vertical_coloc[1]["vname"]
+            vbins = list(zip(vertical_coloc[1]["bins_min"], vertical_coloc[1]["bins_max"]))
             return (
                 ranges.vrange(dsref_list, vname, vbins),
                 ranges.vrange(dsprod_list, vname, vbins),
@@ -259,7 +259,7 @@ class CompSst(Comparison):
         "horizontal": ("href", "cloud"),
     }
     colocation_params_default = {
-        "vertical": ("vlevel", ("depth", [0.0])),
+        "vertical": ("vlevel", {"vname": "depth", "levels": [0.0]}),
     }
     outputs_params = {
         "diagdisp_glob": {"concat": ["time"]},
@@ -306,7 +306,7 @@ class CompArgo(Comparison):
         "vertical": ("vrange", "vlevel"),
     }
     colocation_params_default = {
-        "time": ("trange_seq", ("*", "reference", "nearest")),
+        "time": ("trange_seq", {"tfreq": "*", "tref": "reference", "method": "nearest"}),
     }
     outputs_params = {
         "maps": {
@@ -394,7 +394,7 @@ class CompMooring(_ForcedDepthVLevelMixin, Comparison):
         "horizontal": ("radius",),
     }
     colocation_params_default = {
-        "vertical": ("vrange", ("reference", "depth", "*")),
+        "vertical": ("vrange", {"vref": "reference", "vname": "depth"}),
     }
     outputs_params = {
         "timeseries": {
@@ -418,7 +418,7 @@ class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
     ]
     colocation_params_user = {}
     colocation_params_default = {
-        "vertical": ("vrange", ("reference", "depth", "*")),
+        "vertical": ("vrange", {"vref": "reference", "vname": "depth"}),
     }
     outputs_params = {
         "preproc": "oceanparcels",

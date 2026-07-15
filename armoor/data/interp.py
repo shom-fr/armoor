@@ -223,40 +223,40 @@ class VerticalInterpolation(AbstractInterpolation):
         self.methods = {}
         self.logger = logging.getLogger(__name__)
         
-    def vlevel(self, args: (str, list)):
+    def vlevel(self, args: dict):
         """Interpolate datasets to specified vertical levels.
-        
+
         Parameters
         ----------
         args: dict
-            A dictionary with a single key-value pair where the key is the vertical coordinate name
-            and the value is a list of vertical levels to interpolate to.
-        
+            Dict with a ``vname`` key (the vertical coordinate name) and a
+            ``levels`` key (the list of vertical levels to interpolate to).
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
-        vname = args[0]
-        vlevels = args[1]
+        vname = args["vname"]
+        vlevels = args["levels"]
         return self._vinterp_(vname, vlevels)
-        
-    def vfreq(self, args: (str, list)):
+
+    def vfreq(self, args: dict):
         """Interpolate datasets to specified a vertical step.
-        
+
         Parameters
         ----------
         args: dict
-            A dictionary with a single key-value pair where the key is the vertical coordinate name
-            and the value is a list of vertical levels to interpolate to.
-        
+            Dict with a ``vname`` key (the vertical coordinate name) and a
+            ``step`` key (the vertical step to interpolate on).
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
-        vname = args[0]
-        vfreq = float(args[1])
+        vname = args["vname"]
+        vfreq = float(args["step"])
         vlevels = np.arange(
             self.ds[vname].min(),
             self.ds[vname].max(),

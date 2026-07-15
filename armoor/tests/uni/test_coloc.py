@@ -108,9 +108,9 @@ def time_bounds():
 def coloc_params_argo():
     """Create dict with time/horizontal/vertical params for comp_argo."""
     return {
-        "time": ("trange_seq", ("D", "reference")),
+        "time": ("trange_seq", {"tfreq": "D", "tref": "reference"}),
         "horizontal": ("radius", 50.0),
-        "vertical": ("vlevel", ("depth", [0.0, 50.0, 100.0])),
+        "vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 50.0, 100.0]}),
     }
 
 
@@ -229,7 +229,7 @@ class TestTimeColocation:
         mock_interp.return_value = self.dsprod
         coloc = TimeColocation(self.dsref, self.dsprod, self.tbound)
 
-        coloc.trange_seq(("D", "reference"))
+        coloc.trange_seq({"tfreq": "D", "tref": "reference"})
 
         mock_interp.assert_called_once()
 
@@ -239,7 +239,7 @@ class TestTimeColocation:
         mock_interp.return_value = self.dsref
         coloc = TimeColocation(self.dsref, self.dsprod, self.tbound)
 
-        coloc.trange_seq(("D", "product"))
+        coloc.trange_seq({"tfreq": "D", "tref": "product"})
 
         mock_interp.assert_called_once()
 
@@ -248,7 +248,7 @@ class TestTimeColocation:
         coloc = TimeColocation(self.dsref, self.dsprod, self.tbound)
 
         with pytest.raises(ArmoorError, match="Use 'reference' or 'product'"):
-            coloc.trange_seq(("D", "invalid"))
+            coloc.trange_seq({"tfreq": "D", "tref": "invalid"})
 
     @patch("armoor.comp.coloc.interp_time")
     def test_trange_seq_with_custom_method(self, mock_interp):
@@ -256,7 +256,7 @@ class TestTimeColocation:
         mock_interp.return_value = self.dsprod
         coloc = TimeColocation(self.dsref, self.dsprod, self.tbound)
 
-        coloc.trange_seq(("D", "reference", "nearest"))
+        coloc.trange_seq({"tfreq": "D", "tref": "reference", "method": "nearest"})
 
         mock_interp.assert_called_once()
         call_kwargs = mock_interp.call_args
@@ -600,7 +600,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsref
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        coloc.vlevel(("depth", [0.0, 50.0]))
+        coloc.vlevel({"vname": "depth", "levels": [0.0, 50.0]})
 
         assert mock_vinterp.call_count == 2
 
@@ -610,7 +610,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsref.copy()
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        dsref_out, dsprod_out = coloc.vlevel(("depth", [0.0, 50.0]))
+        dsref_out, dsprod_out = coloc.vlevel({"vname": "depth", "levels": [0.0, 50.0]})
 
         # Attributes should be updated
         assert hasattr(dsref_out, "attrs")
@@ -627,7 +627,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsprod
         coloc = VerticalColocation(dsref_no_z, self.dsprod)
 
-        coloc.vlevel(("depth", [0.0, 50.0]))
+        coloc.vlevel({"vname": "depth", "levels": [0.0, 50.0]})
 
         # Should only call vinterp for dsprod
         assert mock_vinterp.call_count == 1
@@ -638,7 +638,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsprod.chunk(dict(z=-1))
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        coloc.vrange(("reference", "depth", [0, 50, 100]))
+        coloc.vrange({"vref": "reference", "vname": "depth"})
 
         mock_vinterp.assert_called_once()
 
@@ -648,7 +648,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsref.chunk(dict(z=-1))
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        coloc.vrange(("product", "depth", [0, 50, 100]))
+        coloc.vrange({"vref": "product", "vname": "depth"})
 
         mock_vinterp.assert_called_once()
 
@@ -657,7 +657,7 @@ class TestVerticalColocation:
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
         with pytest.raises(ArmoorError, match="Use 'reference' or 'product'"):
-            coloc.vrange(("invalid", "depth", [0, 50, 100]))
+            coloc.vrange({"vref": "invalid", "vname": "depth"})
 
     @patch("armoor.comp.coloc.vinterp")
     def test_vrange_preserves_attrs(self, mock_vinterp):
@@ -665,7 +665,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsprod.chunk(dict(z=-1))
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        dsref_out, dsprod_out = coloc.vrange(("reference", "depth", [0, 50]))
+        dsref_out, dsprod_out = coloc.vrange({"vref": "reference", "vname": "depth"})
 
         assert hasattr(dsprod_out, "attrs")
 
@@ -792,7 +792,7 @@ class TestProcessColocationFunctions:
         dsprod_z.attrs["data_name"] = "prod"
         mock_vinterp.return_value = dsref_z
 
-        param = ("vlevel", ("depth", [0.0, 50.0]))
+        param = ("vlevel", {"vname": "depth", "levels": [0.0, 50.0]})
 
         dsref_out, dsprod_out = process_vertical_colocation(
             dsref_z, dsprod_z, param
@@ -1209,7 +1209,7 @@ class TestApplyColocations:
     def test_apply_colocations_calls_vertical_colocation(self, mock_vert_coloc):
         """Test that _apply_colocations calls vertical colocation when param exists."""
         mock_vert_coloc.return_value = (self.dsref, self.dsprod)
-        params = {"vertical": ("vlevel", ("depth", [0.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0]})}
 
         _apply_colocations(self.dsref, self.dsprod, params, self.tbound)
 
@@ -1274,7 +1274,7 @@ class TestApplyTimeRanges:
     def test_apply_time_ranges_calls_trange_seq(self, mock_trange):
         """Test that _apply_time_ranges calls ranges.trange_seq."""
         mock_trange.return_value = [self.dsref]
-        params = {"time": ("trange_seq", ("D", "reference"))}
+        params = {"time": ("trange_seq", {"tfreq": "D", "tref": "reference"})}
 
         _apply_time_ranges(self.dsref, self.dsprod, params, self.tbound)
 
@@ -1282,7 +1282,7 @@ class TestApplyTimeRanges:
 
     def test_apply_time_ranges_skips_wildcard(self):
         """Test that _apply_time_ranges skips when trange_seq has wildcard."""
-        params = {"time": ("trange_seq", ("*", "reference"))}
+        params = {"time": ("trange_seq", {"tfreq": "*", "tref": "reference"})}
 
         dsref_list, dsprod_list = _apply_time_ranges(
             self.dsref, self.dsprod, params, self.tbound
@@ -1327,7 +1327,7 @@ class TestApplyVerticalRanges:
     def test_apply_vertical_ranges_calls_vlevels(self, mock_vlevels):
         """Test that _apply_vertical_ranges calls ranges.vlevels for vlevel."""
         mock_vlevels.return_value = self.dsref_list
-        params = {"vertical": ("vlevel", ("depth", [0.0, 50.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 50.0]})}
 
         _apply_vertical_ranges(
             self.dsref_list, self.dsprod_list, params, "comp_argo"
@@ -1339,7 +1339,10 @@ class TestApplyVerticalRanges:
     def test_apply_vertical_ranges_calls_vrange(self, mock_vrange):
         """Test that _apply_vertical_ranges calls ranges.vrange for vrange."""
         mock_vrange.return_value = self.dsref_list
-        params = {"vertical": ("vrange", ("reference", "depth", [0, 50, 100]))}
+        params = {"vertical": ("vrange", {
+            "vref": "reference", "vname": "depth",
+            "bins_min": [0, 50], "bins_max": [50, 100],
+        })}
 
         _apply_vertical_ranges(
             self.dsref_list, self.dsprod_list, params, "comp_argo"
@@ -1351,7 +1354,7 @@ class TestApplyVerticalRanges:
     def test_apply_vertical_ranges_mooring_uses_depth(self, mock_vlevels):
         """Test that comp_mooring uses 'depth' as vname."""
         mock_vlevels.return_value = self.dsref_list
-        params = {"vertical": ("vlevel", ("depth", [0.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0]})}
 
         _apply_vertical_ranges(
             self.dsref_list, self.dsprod_list, params, "comp_mooring"
@@ -1363,7 +1366,7 @@ class TestApplyVerticalRanges:
 
     def test_apply_vertical_ranges_skips_comp_sst(self):
         """Test that comp_sst skips vertical ranging with vlevel."""
-        params = {"vertical": ("vlevel", ("depth", [0.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0]})}
 
         dsref_out, dsprod_out = _apply_vertical_ranges(
             self.dsref_list, self.dsprod_list, params, "comp_sst"
@@ -1532,7 +1535,7 @@ class TestProcessSingleProductSplitBehavior:
         mock_trange.return_value = ([dsref], [dsprod])
         mock_save.return_value = []
 
-        params = {"vertical": ("vlevel", ("depth", [0.0, 10.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 10.0]})}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
         staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
         _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
@@ -1563,7 +1566,7 @@ class TestProcessSingleProductSplitBehavior:
 
         params = {
             "time": ("tfreq", "D"),
-            "vertical": ("vlevel", ("depth", [0.0, 10.0])),
+            "vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 10.0]}),
         }
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
         staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
@@ -1610,7 +1613,7 @@ class TestProcessSingleProductSplitBehavior:
 
         params = {
             "time": ("tfreq", "D"),
-            "vertical": ("vlevel", ("depth", [0.0, 10.0])),
+            "vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 10.0]}),
         }
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
         staged = StagedDataset("", metazone="z1", comp_func="comp_argo")

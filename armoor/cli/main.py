@@ -21,8 +21,7 @@ from pathlib import Path
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
 from armoor import ArmoorError
-from armoor.base.misc import (comma_separated, parse_coords,
-                              parse_mixed_param, parse_qc_tuple)
+from armoor.base.misc import comma_separated, parse_coords, parse_qc_tuple
 
 
 class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
@@ -51,7 +50,15 @@ def _init_heavy():
     import armoor  # noqa: F401 — registers all xarray accessors
     from xoa.cfgm import register_validation_functions
     register_validation_functions(coordinates=parse_coords)
-    register_validation_functions(mlist=parse_mixed_param)
+
+
+_SUBSECTION_PRIMARY_KEY = {
+    "trange_seq": "tfreq",
+    "vlevel": "vname",
+    "vrange": "vname",
+    "vfreq": "vname",
+    "bathy": "path",
+}
 
 
 def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
@@ -89,6 +96,19 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
                     metazones_cfg[metazone].update({k: v})
     metazones = {}
     for metazone in metazones_arg:
+        # Subsections (trange_seq/vlevel/vrange/vfreq/bathy) are always
+        # materialized by configobj.validate(), filled with None sub-keys,
+        # even when the metazone never configures them. Drop them here so
+        # "key absent" still means "not configured" for every check below
+        # and every downstream consumer, and convert the ones that are
+        # configured from configobj.Section to a plain dict.
+        for key, primary in _SUBSECTION_PRIMARY_KEY.items():
+            value = metazones_cfg[metazone].get(key)
+            if isinstance(value, dict):
+                if value.get(primary) is None:
+                    del metazones_cfg[metazone][key]
+                else:
+                    metazones_cfg[metazone][key] = dict(value)
         if (metazones_cfg[metazone].get("tfreq") != None) & (metazones_cfg[metazone].get("thours") != None):
             raise ArmoorError(f"`tfreq` and `thours` cannot be configured together in {metazone}")
         if (metazones_cfg[metazone].get("trange_seq") != None) & (metazones_cfg[metazone].get("tbound") == None):

@@ -97,26 +97,23 @@ class TimeColocation(AbstractColocation):
         )
         return ds_ref_monthly, ds_prod_monthly
 
-    def trange_seq(self, args: [str, str]) -> xr.Dataset:
+    def trange_seq(self, args: dict) -> xr.Dataset:
         """
         Colocate reference and product on the same time axis before ranging.
 
         Parameters
         ----------
-        args: list
-            List of two elements, the first one is the bin period, 
-            the second one is the reference time axis (reference or product).
+        args: dict
+            Dict with a ``tref`` key (the reference time axis, "reference" or
+            "product") and an optional ``method`` key (interpolation method,
+            defaults to "linear").
 
         Returns
         -------
         xarray.Dataset, xarray.Dataset
         """
-        tfreq = args[0]
-        ref = args[1]
-        if len(args) > 2:
-            method = args[2]
-        else:
-            method = "linear"
+        ref = args["tref"]
+        method = args.get("method") or "linear"
         if ref == "reference":
             self.dsprod = interp_time(self.dsprod, self.dsref.time, method=method)
             self.dsprod["time"].encoding = self.dsref.time.encoding
@@ -364,22 +361,22 @@ class VerticalColocation(AbstractColocation):
         self.methods = {}
         self.logger = logging.getLogger(__name__)
         
-    def vlevel(self, args: (str, list)):
+    def vlevel(self, args: dict):
         """Interpolate datasets to specified vertical levels.
-        
+
         Parameters
         ----------
         args: dict
-            A dictionary with a single key-value pair where the key is the vertical coordinate name
-            and the value is a list of vertical levels to interpolate to.
-        
+            Dict with a ``vname`` key (the vertical coordinate name) and a
+            ``levels`` key (the list of vertical levels to interpolate to).
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
-        vname = args[0]
-        vlevels = args[1]
+        vname = args["vname"]
+        vlevels = args["levels"]
         vlevels = xr.DataArray(vlevels, dims="z", name=vname)
         prod_attrs = self.dsprod.attrs
         ref_attrs = self.dsref.attrs
@@ -395,23 +392,24 @@ class VerticalColocation(AbstractColocation):
         self.dsprod.attrs.update(prod_attrs)
         return self.dsref, self.dsprod
     
-    def vrange(self, args: [str, str, list]) -> xr.Dataset:
+    def vrange(self, args: dict) -> xr.Dataset:
         """
         Colocate reference and product on the same vertical axis before ranging.
 
         Parameters
         ----------
-        args: list
-            List of three elements, the first one is the vertical reference (reference or product),
-            the second one is the vertical coodinate,
-            the third one is the list of bounds of the vertical bins.
+        args: dict
+            Dict with a ``vref`` key (the vertical reference, "reference" or
+            "product") and a ``vname`` key (the vertical coordinate name).
+            The bin bounds (``bins_min``/``bins_max``) aren't used here — they
+            only matter for the later output-side range splitting.
 
         Returns
         -------
         xarray.Dataset, xarray.Dataset
         """
-        vref = args[0]
-        vcoord = args[1]
+        vref = args["vref"]
+        vcoord = args["vname"]
         if vref == "reference":
             attrs = self.dsprod.attrs
             self.dsprod = vinterp(
@@ -784,10 +782,11 @@ def _apply_time_ranges(dsref, dsprod, params, tbound):
         return ranges.tfreq(dsref), ranges.tfreq(dsprod)
 
     if "trange_seq" in time_coloc[0]:
-        if time_coloc[1][0] != "*":
+        tfreq = time_coloc[1]["tfreq"]
+        if tfreq != "*":
             return (
-                ranges.trange_seq(dsref, *tbound, time_coloc[1][0]),
-                ranges.trange_seq(dsprod, *tbound, time_coloc[1][0])
+                ranges.trange_seq(dsref, *tbound, tfreq),
+                ranges.trange_seq(dsprod, *tbound, tfreq)
             )
 
     return [dsref], [dsprod]

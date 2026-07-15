@@ -5,8 +5,8 @@ places touched by the "vfreq type fix" commit:
   argument to float before calling np.arange.
 - armoor/data/output.py: validate_interpolation / get_interpolation_params
   must treat vfreq as a vertical-interpolation candidate on par with vlevel.
-- armoor/cli/metazones.ini: vfreq must be parsed as an mlist (like vlevel),
-  not a dict.
+- armoor/cli/metazones.ini: vfreq is a named [[vfreq]] subsection (vname/step),
+  like vlevel/vrange/bathy/trange_seq.
 """
 
 import numpy as np
@@ -14,7 +14,6 @@ import pytest
 import xarray as xr
 
 from armoor.__init__ import ArmoorError
-from armoor.base.misc import parse_mixed_param
 from armoor.data import INTERP_PARAMS_USER
 from armoor.data.interp import VerticalInterpolation, process_vertical_interpolation
 from armoor.data.output import get_interpolation_params, validate_interpolation
@@ -36,10 +35,10 @@ class TestVerticalInterpolationVfreq:
         self.ds = _profile_ds()
 
     def test_string_step_is_accepted(self):
-        """Config-parsed step arrives as a string (see parse_mixed_param);
-        vfreq must cast it rather than pass it straight to np.arange."""
+        """Step may arrive as a string; vfreq must cast it rather than pass
+        it straight to np.arange."""
         coloc = VerticalInterpolation(self.ds)
-        result = coloc.vfreq(("depth", "25.0"))
+        result = coloc.vfreq({"vname": "depth", "step": "25.0"})
         assert result is not None
 
     def test_string_step_raised_typeerror_before_fix(self):
@@ -49,14 +48,14 @@ class TestVerticalInterpolationVfreq:
 
     def test_regular_step_levels(self):
         coloc = VerticalInterpolation(self.ds)
-        result = coloc.vfreq(("depth", "25.0"))
+        result = coloc.vfreq({"vname": "depth", "step": "25.0"})
         expected = np.arange(0.0, 490.0, 25.0)
         np.testing.assert_allclose(result["depth"].values, expected)
         assert result.sizes["z"] == len(expected)
 
     def test_string_and_float_step_are_equivalent(self):
-        result_str = VerticalInterpolation(_profile_ds()).vfreq(("depth", "25.0"))
-        result_float = VerticalInterpolation(_profile_ds()).vfreq(("depth", 25.0))
+        result_str = VerticalInterpolation(_profile_ds()).vfreq({"vname": "depth", "step": "25.0"})
+        result_float = VerticalInterpolation(_profile_ds()).vfreq({"vname": "depth", "step": 25.0})
         np.testing.assert_allclose(
             result_str["depth"].values, result_float["depth"].values
         )
@@ -66,19 +65,14 @@ class TestVerticalInterpolationVfreq:
             {"temp": 20.0}, coords={"depth": 0.0}
         )
         coloc = VerticalInterpolation(ds_flat)
-        assert coloc.vfreq(("depth", "25.0")) is None
+        assert coloc.vfreq({"vname": "depth", "step": "25.0"}) is None
 
     def test_process_vertical_interpolation_dispatches_vfreq(self):
-        result = process_vertical_interpolation(self.ds, ("vfreq", ["depth", "25.0"]))
+        result = process_vertical_interpolation(
+            self.ds, ("vfreq", {"vname": "depth", "step": "25.0"})
+        )
         expected = np.arange(0.0, 490.0, 25.0)
         assert result.sizes["z"] == len(expected)
-
-
-class TestParseMixedParamVfreqContract:
-    """Documents the contract that motivates the float() cast in vfreq()."""
-
-    def test_numeric_token_stays_a_string(self):
-        assert parse_mixed_param('"depth", 25.0') == ["depth", "25.0"]
 
 
 class TestValidateInterpolationVfreq:
@@ -86,15 +80,18 @@ class TestValidateInterpolationVfreq:
 
     def test_vlevel_and_vfreq_both_set_raises(self):
         metazones = {
-            "zone1": {"vlevel": ["depth", [0, 10, 20]], "vfreq": ["depth", "25.0"]}
+            "zone1": {
+                "vlevel": {"vname": "depth", "levels": [0, 10, 20]},
+                "vfreq": {"vname": "depth", "step": "25.0"},
+            }
         }
         with pytest.raises(ArmoorError):
             validate_interpolation(metazones)
 
     def test_vfreq_alone_is_valid(self):
-        metazones = {"zone1": {"vfreq": ["depth", "25.0"]}}
+        metazones = {"zone1": {"vfreq": {"vname": "depth", "step": "25.0"}}}
         result = validate_interpolation(metazones)
-        assert result["zone1"] == {"vfreq": ["depth", "25.0"]}
+        assert result["zone1"] == {"vfreq": {"vname": "depth", "step": "25.0"}}
 
     def test_neither_vlevel_nor_vfreq_set(self):
         metazones = {"zone1": {}}
@@ -125,31 +122,29 @@ class TestGetInterpolationParamsVfreq:
         assert "vfreq" in INTERP_PARAMS_USER["vertical"]
 
     def test_vfreq_extracted_as_vertical_param(self):
-        metazones = {"zone1": {"vfreq": ["depth", "25.0"]}}
+        metazones = {"zone1": {"vfreq": {"vname": "depth", "step": "25.0"}}}
         result = get_interpolation_params(metazones)
-        assert result["zone1"]["vertical"] == ("vfreq", ["depth", "25.0"])
+        assert result["zone1"]["vertical"] == ("vfreq", {"vname": "depth", "step": "25.0"})
 
     def test_vlevel_still_works_alone(self):
-        metazones = {"zone1": {"vlevel": ["depth", [0, 10, 20]]}}
+        metazones = {"zone1": {"vlevel": {"vname": "depth", "levels": [0, 10, 20]}}}
         result = get_interpolation_params(metazones)
-        assert result["zone1"]["vertical"] == ("vlevel", ["depth", [0, 10, 20]])
+        assert result["zone1"]["vertical"] == ("vlevel", {"vname": "depth", "levels": [0, 10, 20]})
 
 
 class TestMetazonesIniVfreqSchema:
-    """Test suite for the metazones.ini schema change (vfreq: dict -> mlist)."""
+    """Test suite for the metazones.ini vfreq subsection schema."""
 
-    def test_vfreq_parsed_as_list(self, tmp_path):
-        from xoa.cfgm import ConfigManager, register_validation_functions
+    def test_vfreq_parsed_as_subsection(self, tmp_path):
+        from xoa.cfgm import ConfigManager
 
         from armoor.cli import METAZONES_INI
 
-        register_validation_functions(mlist=parse_mixed_param)
-
         cfgfile = tmp_path / "metazones.cfg"
         cfgfile.write_text(
-            '[zone1]\nname = "zone1"\nvfreq = "depth", 25.0\n'
+            '[zone1]\nname = "zone1"\n[[vfreq]]\nvname = depth\nstep = 25.0\n'
         )
 
         metazones = ConfigManager(METAZONES_INI).load(str(cfgfile))
 
-        assert metazones["zone1"]["vfreq"] == ["depth", "25.0"]
+        assert dict(metazones["zone1"]["vfreq"]) == {"vname": "depth", "step": 25.0}

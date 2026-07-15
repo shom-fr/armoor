@@ -62,14 +62,12 @@ def build_filters_config(mz_param, data_name):
         filters_config['tsmooth'] = mz_param.get("tsmooth")
     
     if 'bathy' in mz_param:
-        # Assuming quality variable name based on data_name or a specific field
-        bathy_min = mz_param.get('bathy')[2]
-        bathy_max = mz_param.get('bathy')[3]
+        bathy = mz_param.get('bathy')
         filters_config['bathy'] = {
-            'path': mz_param.get('bathy')[0],
-            'fmt': mz_param.get('bathy')[1],
-            'min': None if bathy_min == "None" else float(bathy_min),
-            'max': None if bathy_max == "None" else float(bathy_max)
+            'path': bathy['path'],
+            'fmt': bathy['fmt'],
+            'min': bathy.get('min'),
+            'max': bathy.get('max'),
             }
     
     if 'oceanvars' in mz_param:
