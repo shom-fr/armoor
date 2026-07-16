@@ -100,17 +100,41 @@ class DataOceanModel(DataType):
             "stat": ["time", "z", "y", "x"],
             "output": "merge",
             },
-        "mvprofiles": {
+        "vprofiles_sel": {
+            # Vertical profiles, one figure per trange/time and/or
+            # vrange/vlevel group -- works with or without cloud
+            # (_mvprofiles overlays every point/member as its own line).
+            # Needs an actual grouping param configured: a bare metazone
+            # (no tfreq/trange_seq/vlevel/vrange at all) only has the
+            # native-z fallback to split by, which isn't a real
+            # "selection" -- use mvprofiles there instead.
             "sort": ["time", "z"],
+            "mparams_pro": {
+                "selection": ["tfreq", "trange_seq", "vlevel", "vrange"],
+                },
             "mparams_con": {
                 "vertical": ["vlevel"],
                 }
             },
-        "mdiagts": {
-            "sort": ["time", "z"],
+        "mvprofiles": {
+            # Vertical profiles, every point/member overlaid on one figure
+            # per variable, merged across the whole series -- works with
+            # or without cloud. concat over both time and z (not just
+            # time) so the native-z-fallback case (no vlevel/vrange
+            # configured, one file per native level) gets reassembled
+            # into one full profile instead of 384 single-level slices;
+            # _merge_z_group keeps vrange bins from being wrongly
+            # duplicated along z.
+            "concat": ["time", "z"],
+            "output": "merge",
+            "mparams_con": {
+                "vertical": ["vlevel"],
+                }
             },
         "uvprofiles": {
-            "concat": ["time"],
+            # Cloud vertical profiles, one figure per point in the cloud.
+            # concat (not sort) over both time and z -- see mvprofiles.
+            "concat": ["time", "z"],
             "output": "merge",
             "mparams_pro": {
                 "horizontal": ["cloud"]
@@ -119,11 +143,35 @@ class DataOceanModel(DataType):
                 "vertical": ["vlevel"],
                 }
             },
+        "diagts_sel": {
+            # Theta-saln diagram, one figure per trange/time and/or
+            # vrange/vlevel group -- works with or without cloud
+            # (_mdiagts stacks every point into "npt" regardless). Needs
+            # an actual grouping param configured -- see vprofiles_sel.
+            "sort": ["time", "z"],
+            "mparams_pro": {
+                "selection": ["tfreq", "trange_seq", "vlevel", "vrange"],
+                },
+            },
+        "mdiagts": {
+            # Theta-saln diagram merging every time/z group into one
+            # dataset (no sort -> single group; concat over both dims) so
+            # mdiagts() -- which stacks everything into a single "npt"
+            # dim -- draws one figure over the whole dataset, with no
+            # splitting and no time/z loop in the plot function itself.
+            # Works with or without cloud.
+            "concat": ["time", "z"],
+            "output": "merge",
+            "mparams_con": {
+                "vertical": ["vrange", "vlevel"],
+                }
+            },
         "udiagts": {
-            "concat": ["time"],
+            # Cloud theta-saln diagram, one figure per profile in the cloud.
+            "concat": ["time", "z"],
             "output": "merge",
             "mparams_pro": {
-                "horizontal": ["cloud"]
+                "horizontal": ["cloud"],
                 },
             "mparams_con": {
                 "vertical": ["vlevel"],

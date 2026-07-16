@@ -25,7 +25,9 @@ from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.dispatch import SubclassingMethodRegistry
 from armoor.base.filters import create_optimized_mask
 from armoor.base.interp import vinterp
-from armoor.base.plot import create_subplots, diagdisp, format_trange, get_output_vminmax, save_figure
+from armoor.base.plot import (create_subplots, diagdisp, format_time_label,
+                              format_vertical_label, get_output_vminmax,
+                              save_figure)
 from armoor.data.datatype import DataEddies, DataOceanModel, get_data_type_by_name
 # from armoor.comp.stats import StatsComp
 
@@ -194,31 +196,44 @@ class PlotOceanModel(_PlotDataBase):
             figname.format(**locals())
             )
     
-    def mdiagts(self):
-        """Plot multi-profiles theta-saln."""
+    def _diagts_merged(self, prefix, include_vertical):
+        """Render one theta-saln diagram merging every point it is given.
+
+        Shared by the two "merge everything into one figure" variants
+        (`mdiagts`, and -- per group -- `diagts_sel`): stacking every
+        remaining dim into a single ``npt`` axis works uniformly whether
+        there's one profile, a handful of named stations, or a full
+        lat/lon grid, so there's no need to loop over individual points
+        here -- and it works identically with or without `cloud`
+        configured (`_mdiagts`'s minimap already branches on
+        ``lon.dims``).
+
+        Parameters
+        ----------
+        prefix : str
+            Output-file/otype prefix (``"diagts_sel"`` or ``"mdiagts"``).
+        include_vertical : bool
+            Whether to append a vlevel/vrange label -- only meaningful
+            when this call covers a single vertical group, not a full
+            merge across every vlevel/vrange.
+
+        Returns
+        -------
+        None
+        """
         dsprod = self.dt.children["data"].to_dataset()
         dsprod = dsprod.stack({"npt": list(dsprod.sizes.keys())})
         dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
+        if dsprod.sizes.get("npt", 0) == 0:
+            logger.warning(f"No valid ptemp points for {prefix}, skipping")
+            return
         data_name = dsprod.attrs.get("data_name")
-        trange = dsprod.attrs.get("trange")
-        tfreq = dsprod.attrs.get("time")
-        vlevel = dsprod.attrs.get("vlevel")
-        vrange = dsprod.attrs.get("vrange")
-        xtitle = ""
-        xfigname = ""
-        if trange:
-            title_str, suffix_str = format_trange(trange)
-            xtitle += f"{title_str} "
-            xfigname += f"_{suffix_str}"
-        elif tfreq:
-            xtitle += f"{tfreq} "
-            xfigname += f"_{tfreq}"
-        if vlevel:
-            xtitle += f"\n {vlevel}"
-            xfigname += f"_{vlevel}"
-        elif vrange:
-            xtitle += f"\n {vrange}"
-            xfigname += f"_{vrange}"
+        attrs = dsprod.attrs
+        xtitle, xfigname = format_time_label(attrs, ds=dsprod)
+        if include_vertical:
+            v_title, v_name = format_vertical_label(attrs)
+            xtitle += f"\n{v_title}"
+            xfigname += v_name
         figtitle = (
             f"{data_name} \n"
             f"{self.metazone}\n"
@@ -226,35 +241,39 @@ class PlotOceanModel(_PlotDataBase):
             )
         figname = (
             f"data/plot/{self.metazone}/"
-            f"mdiagts_{data_name}{xfigname}.png"
+            f"{prefix}_{data_name}{xfigname}.png"
             )
         self._mdiagts(dsprod, figtitle, figname)
-    
+
+    def diagts_sel(self):
+        """Plot one theta-saln diagram per trange/time and/or vrange/vlevel group."""
+        self._diagts_merged("diagts_sel", include_vertical=True)
+
+    def mdiagts(self):
+        """Plot one theta-saln diagram merging the whole series, cloud or not."""
+        self._diagts_merged("mdiagts", include_vertical=False)
+
     def udiagts(self):
-        """Plot uniquely profiles theta-saln."""
+        """Plot one theta-saln diagram per profile in a cloud of points, per timestep.
+
+        (When several profiles should be merged per time interval instead
+        of one figure per single timestep, use `diagts_sel`.)
+        """
         dsprod = self.dt.children["data"].to_dataset()
-        vranges = dsprod.attrs.get('vrange')
-        vlevels = dsprod.attrs.get('vlevel')
         npts = dsprod.sizes["npts"]
         data_name = dsprod.attrs.get("data_name")
         for inpt in range(npts):
-            for itime in range(dsprod.sizes["time"]):
-                if isinstance(vranges, list):
-                    vrange = vranges[itime]
-                else:
-                    vrange = vranges
-                if isinstance(vlevels, list):
-                    vlevel = vlevels[itime]
-                else:
-                    vlevel = vlevels
-                ds = dsprod.isel(time=[itime], npts=inpt)#.squeeze()
-                lon_pt = f"{ds.lon:.2f}"
-                lat_pt = f"{ds.lat:.2f}"
-                time = pd.to_datetime(ds.time.values[0])
-                mask = ~ds.ptemp.isnull()
-                if (~mask).all():
+            ds_pt = dsprod.isel(npts=inpt)
+            lon_pt = f"{ds_pt.lon:.2f}"
+            lat_pt = f"{ds_pt.lat:.2f}"
+            for itime in range(ds_pt.sizes["time"]):
+                ds = ds_pt.isel(time=itime)
+                time = pd.to_datetime(ds.time.values)
+                ds = ds.stack({"npt": list(ds.sizes.keys())})
+                ds = ds.where(~ds.ptemp.isnull(), drop=True)
+                if ds.sizes.get("npt", 0) == 0:
                     continue
-                depth = ds.depth.where(mask, drop=True)
+                depth = ds.depth
                 if 'depth' in self.vminmax:
                     zmin, zmax = self.vminmax['depth']
                 else:
@@ -262,12 +281,6 @@ class PlotOceanModel(_PlotDataBase):
                     zmax = -depth.min()
                 xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
                 xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
-                if vrange:
-                    xtitle += f"\n {vrange}"
-                    xfigname  += "_{vrange}"
-                if vlevel:
-                    xtitle += f"\n {vlevel}"
-                    xfigname  += "_{vlevel}"
                 figname = (
                     f"data/plot/{self.metazone}/"
                     f"udiagts_{data_name}_{lat_pt}_{lon_pt}{xfigname}.png"
@@ -317,10 +330,6 @@ class PlotOceanModel(_PlotDataBase):
                     shrink=0.7,
                     label="Depth, m"
                     )
-                # ax.legend(
-                #     #loc='upper left', 
-                #     fontsize=11, frameon=True, fancybox=True
-                #     )
                 ax = tsprod["axes"]
                 ax.set_ylabel("temp, degrees_C")
                 ax.set_xlabel("sal, psu")
@@ -336,8 +345,8 @@ class PlotOceanModel(_PlotDataBase):
                 self.save_figure(
                     fig,
                     figname.format(**locals())
-                    )    
-        
+                    )
+
     def _mvprofiles(self, dsprod, figtitle, figname):
         """Render and save multiple vertical profiles, one figure per variable.
 
@@ -363,7 +372,14 @@ class PlotOceanModel(_PlotDataBase):
         if set(["x", "y"]).issubset(set(dsprod.dims)):
             dsprod = dsprod.stack(member=['x', 'y'])
         mask = ~dsprod.ptemp.isnull()
-        depth = dsprod.depth.where(mask, drop=True)
+        # depth may only vary along "z" (a clean per-level coordinate),
+        # not share mask's other dims (time/member/npts) -- reduce the
+        # mask down to "z" first so .where() has matching dims, keeping
+        # whichever levels have at least one valid point.
+        z_mask = mask if mask.dims == ("z",) else mask.any(
+            dim=[d for d in mask.dims if d != "z"]
+            )
+        depth = dsprod.depth.where(z_mask, drop=True)
         if 'depth' in self.vminmax:
             zmin, zmax = self.vminmax['depth']
         else:
@@ -376,6 +392,8 @@ class PlotOceanModel(_PlotDataBase):
         else:
             dsprod = dsprod.transpose("z", "time")
         for var in dsprod.data_vars:
+            if var == "depth":
+                continue
             if "z" not in dsprod[var].squeeze().dims:
                 continue
             units = dsprod[var].attrs.get('units')
@@ -434,25 +452,30 @@ class PlotOceanModel(_PlotDataBase):
                 figname.format(**locals())
                 )
     
-    def mvprofiles(self):
-        """Plot multiple vertical profiles per product."""
+    def _vprofiles_merged(self, prefix):
+        """Render vertical profiles, one figure per variable, for whatever
+        points/times this call is given (shared by `vprofiles_sel` and
+        `mvprofiles` -- `_mvprofiles` already overlays every point/member
+        as its own line, so no per-point loop is needed whether there's
+        one profile, a handful of named stations, or a full cloud; this
+        works identically with or without `cloud` configured).
+
+        Parameters
+        ----------
+        prefix : str
+            Output-file/otype prefix (``"vprofiles_sel"`` or
+            ``"mvprofiles"``).
+
+        Returns
+        -------
+        None
+        """
         dsprod = self.dt.children["data"].to_dataset()
-        # dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
-        trange = dsprod.attrs.get("trange")
-        vlevel = dsprod.attrs.get("vlevel")
-        vrange = dsprod.attrs.get("vrange")
-        xtitle = ""
-        xfigname = ""
-        if trange:
-            title_str, suffix_str = format_trange(trange)
-            xtitle += f"{title_str} "
-            xfigname += f"_{suffix_str}"
-        if vlevel:
-            xtitle += f"\n {vlevel}"
-            xfigname += f"_{vlevel}"
-        elif vrange:
-            xtitle += f"\n {vrange}"
-            xfigname += f"_{vrange}"
+        attrs = dsprod.attrs
+        xtitle, xfigname = format_time_label(attrs, ds=dsprod)
+        v_title, v_name = format_vertical_label(attrs)
+        xtitle += f"\n{v_title}"
+        xfigname += v_name
         var = "{var}"
         prodname = dsprod.attrs.get("data_name")
         figtitle = (
@@ -462,30 +485,28 @@ class PlotOceanModel(_PlotDataBase):
             )
         figname = (
             f"data/plot/{self.metazone}/"
-            f"mvprofiles_{prodname}_{var}{xfigname}.png"
+            f"{prefix}_{prodname}_{var}{xfigname}.png"
             )
         self._mvprofiles(dsprod, figtitle, figname)
+
+    def vprofiles_sel(self):
+        """Plot vertical profiles per trange/time and/or vrange/vlevel group."""
+        self._vprofiles_merged("vprofiles_sel")
+
+    def mvprofiles(self):
+        """Plot vertical profiles merging the whole series, cloud or not."""
+        self._vprofiles_merged("mvprofiles")
 
     def uvprofiles(self):
         """Plot uniquely vertical profiles."""
         dsprod = self.dt.children["data"].to_dataset()
         data_name = dsprod.attrs.get("data_name")
         npts = dsprod.sizes["npts"]
-        trange = dsprod.attrs.get("trange")
-        vlevel = dsprod.attrs.get("vlevel")
-        vrange = dsprod.attrs.get("vrange")[0]
-        xtitle = ""
-        xfigname = ""
-        if trange:
-            title_str, suffix_str = format_trange(trange)
-            xtitle += f"{title_str} "
-            xfigname += f"_{suffix_str}"
-        if vlevel:
-            xtitle += f"\n {vlevel}"
-            xfigname += f"_{vlevel}"
-        elif vrange:
-            xtitle += f"\n {vrange}"
-            xfigname += f"_{vrange}"
+        attrs = dsprod.attrs
+        xtitle, xfigname = format_time_label(attrs, ds=dsprod)
+        v_title, v_name = format_vertical_label(attrs)
+        xtitle += f"\n{v_title}"
+        xfigname += v_name
         for inpt in range(npts):
             ds = dsprod.isel(npts=inpt)
 
@@ -571,9 +592,79 @@ class PlotOceanModel(_PlotDataBase):
                     figname.format(**locals())
                     )
         
+    def _timeseries_raw(self, ds_data):
+        """Plot the raw per-point (and, when depth-resolved, per-native-
+        level) series directly, one figure per variable/point/level.
+
+        Fallback for otype=timeseries when neither trange_seq nor
+        vrange/vlevel is configured and there's no x/y grid to reduce
+        either (e.g. a bare cloud metazone): `get_dim_stats`
+        (armoor.data.output) then has no axis left to average over, so
+        no mean/std subtree gets built.
+
+        Parameters
+        ----------
+        ds_data : xarray.Dataset
+            The unreduced "data" child, straight from disk.
+
+        Returns
+        -------
+        None
+        """
+        attrs = ds_data.attrs
+        data_name = attrs.get("data_name")
+        npts = ds_data.sizes["npts"] if "npts" in ds_data.dims else 1
+        vars2plot = [var for var in ds_data.data_vars if var != "depth"]
+        for var in vars2plot:
+            da_var = ds_data[var]
+            nz = da_var.sizes["z"] if "z" in da_var.dims else 1
+            for inpt in range(npts):
+                da_pt = da_var.isel(npts=inpt) if npts > 1 else da_var
+                depth_pt = ds_data.depth
+                if npts > 1:
+                    pt = ds_data.isel(npts=inpt)
+                    if "npts" in depth_pt.dims:
+                        depth_pt = depth_pt.isel(npts=inpt)
+                    lon_pt = f"{pt.lon:.2f}"
+                    lat_pt = f"{pt.lat:.2f}"
+                    pt_title = f" {lat_pt}°N; {lon_pt}°E"
+                    pt_name = f"_{lat_pt}_{lon_pt}"
+                else:
+                    pt_title = ""
+                    pt_name = ""
+                for iz in range(nz):
+                    da = da_pt.isel(z=iz) if "z" in da_pt.dims else da_pt
+                    if "z" in da_pt.dims:
+                        depth_val = float(depth_pt.isel(z=iz))
+                        z_title = f" {depth_val:.1f} m"
+                        z_name = f"_{depth_val:.1f}"
+                    else:
+                        z_title = ""
+                        z_name = ""
+                    units = da.attrs.get("units")
+                    figname = (
+                        f"data/plot/{self.metazone}/"
+                        f"timeseries_{data_name}_{var}{pt_name}{z_name}.png"
+                        )
+                    fig, axes = create_subplots(
+                        nrows=1, figsize=(10, 4),
+                        x_label='Date', y_label=None,
+                        )
+                    ax = axes[0]
+                    fig.suptitle(
+                        f"{data_name} \n{self.metazone} \n{pt_title}{z_title}\n"
+                        f"{var}, {units} \n",
+                        y=1.01
+                        )
+                    ax.plot(da["time"], da, color="slateblue", linewidth=2)
+                    ax.set_ylabel(var)
+                    self.save_figure(fig, figname)
+
     def timeseries(self):
         """Plot time series differences."""
         ds_data = self.dt.children["data"].to_dataset()
+        if "mean" not in self.dt.children:
+            return self._timeseries_raw(ds_data)
         ds_mean = self.dt.children["mean"].to_dataset()
         ds_std = self.dt.children["std"].to_dataset()
         attrs = ds_data.attrs
@@ -675,7 +766,8 @@ class PlotOceanModel(_PlotDataBase):
         
     def _plot_current_background(self, ax, u, v, vmin, vmax, show_flow=True):
         """Plot current speed (module) as a pcolormesh/scatter background,
-        optionally with current direction overlaid via xoa.plot.plot_flow.
+        optionally with current direction overlaid via xoa.plot.plot_flow
+        (gridded data) or a quiver plot (cloud data).
 
         Parameters
         ----------
@@ -695,7 +787,8 @@ class PlotOceanModel(_PlotDataBase):
             The background mappable, for colorbar attachment.
         """
         speed = np.sqrt(u ** 2 + v ** 2)
-        if ("npts" in u.dims) or (u.lon.dims != ("y", "x")):
+        is_cloud = ("npts" in u.dims) or (u.lon.dims != ("y", "x"))
+        if is_cloud:
             m = ax.scatter(
                 u.lon, u.lat, c=speed,
                 vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
@@ -707,6 +800,14 @@ class PlotOceanModel(_PlotDataBase):
                 )
 
         if not show_flow:
+            return m
+
+        # plot_flow/xoa.dyn.flow2d needs a genuine 2D grid to trace
+        # pathlines -- meaningless (and a hard XoaError) for a handful of
+        # scattered cloud points with no spatial structure to flow across.
+        # A quiver plot needs no such structure, so use that instead.
+        if is_cloud:
+            ax.quiver(u.lon, u.lat, u, v, color="black", scale_units="xy")
             return m
 
         # plot_flow's own default duration/step estimate divides by a plain
@@ -744,26 +845,11 @@ class PlotOceanModel(_PlotDataBase):
         """
         data_name = ds_mean_all.attrs["data_name"]
         attrs = ds_data_all.attrs
-        ncname = ""
-        xtitle = ""
-        trange = attrs.get("trange")
-        if trange:
-            title_str, suffix_str = format_trange(trange)
-            xtitle += title_str
-            ncname += f"_{suffix_str}"
+        xtitle, ncname = format_time_label(attrs)
         if "z" in ds_data_all["u"].dims:
-            if "vlevel" in attrs:
-                vlevel = attrs.get("vlevel")
-                if isinstance(vlevel, list):
-                    vlevel = vlevel[0]
-                ncname += f"_{vlevel}"
-                xtitle += f" {vlevel} m"
-            elif "vrange" in attrs:
-                vrange = attrs.get("vrange")
-                if isinstance(vrange, list):
-                    vrange = vrange[0]
-                ncname += f"_{vrange}"
-                xtitle += f" {vrange}"
+            v_title, v_name = format_vertical_label(attrs)
+            xtitle += v_title
+            ncname += v_name
 
         units = ds_data_all["u"].attrs.get("units")
         figtitle = (
@@ -863,30 +949,11 @@ class PlotOceanModel(_PlotDataBase):
             ds_std = ds_std_all[[var]]
             
             attrs = ds_data.attrs
-            ncname = ""
-            xtitle = ""
-            trange = attrs.get("trange")
-            if trange:
-                title_str, suffix_str = format_trange(trange)
-                xtitle += title_str
-                ncname += f"_{suffix_str}"
+            xtitle, ncname = format_time_label(attrs)
             if "z" in ds_data[var].dims:
-                if "vlevel" in attrs:
-                    vlevel = attrs.get("vlevel")
-                    if isinstance(vlevel, list):
-                        vlevel = vlevel[0]
-                    ncname += f"_{vlevel}"
-                    xtitle += f" {vlevel} m"
-                elif "vrange" in attrs:
-                    vrange = attrs.get("vrange")
-                    if isinstance(vrange, list):
-                        vrange = vrange[0]
-                    ncname += f"_{vrange}"
-                    xtitle += f" {vrange}"
-                else:
-                    pass
-            else:
-                pass
+                v_title, v_name = format_vertical_label(attrs)
+                xtitle += v_title
+                ncname += v_name
             units = ds_data[var].attrs.get('units')
             data_name = ds_mean_all.attrs["data_name"]
             
@@ -1002,13 +1069,23 @@ class PlotOceanModel(_PlotDataBase):
         configured), so only "time" is looped over here.
         """
         data_name = ds_data_all.attrs.get("data_name")
+        vlevel = ds_data_all.attrs.get("vlevel")
+        vlevel_str = f"{vlevel}m" if vlevel is not None else ""
         vars2plot = [var for var in ds_data_all.data_vars if var != "depth"]
         if "u" in vars2plot and "v" in vars2plot:
             vars2plot = [var for var in vars2plot if var not in ("u", "v")]
             self._plot_current_map_raw(ds_data_all)
 
         for var in vars2plot:
-            da_all = ds_data_all[var].squeeze()
+            da_full = ds_data_all[var]
+            # Squeeze away size-1 dims (e.g. "z", already split to one
+            # native level per file) but keep "time" as a real dim even
+            # when it's also size-1 -- native per-day splitting means it
+            # normally is, and a bare .squeeze() would otherwise collapse
+            # it to a scalar coord, making every day's figure share the
+            # same date-less filename.
+            squeeze_dims = [d for d, s in da_full.sizes.items() if s == 1 and d != "time"]
+            da_all = da_full.squeeze(dim=squeeze_dims) if squeeze_dims else da_full
             times = da_all["time"].values if "time" in da_all.dims else [None]
             for time_val in times:
                 da = da_all.sel(time=time_val) if time_val is not None else da_all
@@ -1018,7 +1095,7 @@ class PlotOceanModel(_PlotDataBase):
                     if time_val is not None else ""
                     )
                 figtitle = (
-                    f"{data_name} \n {self.metazone}\n {time_str}\n "
+                    f"{data_name} \n {self.metazone}\n {time_str} {vlevel_str}\n "
                     f"{var}, {units}"
                     )
 
@@ -1069,9 +1146,10 @@ class PlotOceanModel(_PlotDataBase):
                 gl.top_labels = False
                 gl.right_labels = False
 
+                vlevel_suffix = f"_{vlevel}" if vlevel is not None else ""
                 figname = (
                     f"data/plot/{self.metazone}/"
-                    f"map_{var}_{data_name}_{time_str}.png"
+                    f"map_{var}_{data_name}_{time_str}{vlevel_suffix}.png"
                     )
                 fig.suptitle(figtitle)
                 self.save_figure(fig, figname)
@@ -1083,8 +1161,15 @@ class PlotOceanModel(_PlotDataBase):
         figure per native time step, speed (module) as background,
         direction overlaid via xoa.plot.plot_flow (see _maps_raw())."""
         data_name = ds_data_all.attrs.get("data_name")
-        u_all = ds_data_all["u"].squeeze()
-        v_all = ds_data_all["v"].squeeze()
+        vlevel = ds_data_all.attrs.get("vlevel")
+        vlevel_str = f"{vlevel}m" if vlevel is not None else ""
+        # Squeeze away size-1 dims (e.g. "z") but keep "time" as a real dim
+        # even when it's also size-1 -- see _maps_raw()'s identical guard.
+        squeeze_dims = [
+            d for d, s in ds_data_all["u"].sizes.items() if s == 1 and d != "time"
+            ]
+        u_all = ds_data_all["u"].squeeze(dim=squeeze_dims) if squeeze_dims else ds_data_all["u"]
+        v_all = ds_data_all["v"].squeeze(dim=squeeze_dims) if squeeze_dims else ds_data_all["v"]
         units = ds_data_all["u"].attrs.get("units")
         times = u_all["time"].values if "time" in u_all.dims else [None]
         for time_val in times:
@@ -1096,7 +1181,7 @@ class PlotOceanModel(_PlotDataBase):
                 if time_val is not None else ""
                 )
             figtitle = (
-                f"{data_name} \n {self.metazone}\n {time_str}\n "
+                f"{data_name} \n {self.metazone}\n {time_str} {vlevel_str}\n "
                 f"current speed, {units}"
                 )
 
@@ -1133,9 +1218,10 @@ class PlotOceanModel(_PlotDataBase):
             gl.top_labels = False
             gl.right_labels = False
 
+            vlevel_suffix = f"_{vlevel}" if vlevel is not None else ""
             figname = (
                 f"data/plot/{self.metazone}/"
-                f"map_current_{data_name}_{time_str}.png"
+                f"map_current_{data_name}_{time_str}{vlevel_suffix}.png"
                 )
             fig.suptitle(figtitle)
             self.save_figure(fig, figname)

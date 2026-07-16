@@ -524,8 +524,10 @@ class TestOpenDecodeCmemsInsitu:
         assert all(np.float32 == ds.lon.dtype for ds in result)
         assert all(np.float32 == ds.lat.dtype for ds in result)
         assert all('depth' in ds.coords for ds in result)
-        assert all(() == ds.lon.dims for ds in result)
-        assert all(() == ds.lat.dims for ds in result)
+        # Real moorings vary: some report a fixed position (scalar lon/lat),
+        # others a slightly drifting one ((time,) lon/lat) -- both are valid.
+        assert all(ds.lon.dims in ((), ('time',)) for ds in result)
+        assert all(ds.lat.dims in ((), ('time',)) for ds in result)
         assert all(('z', ) == ds.depth.dims for ds in result)
         
     def test_open_decode_cmems_insitu_drifter(self, setup_test_data):

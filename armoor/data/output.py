@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -818,6 +819,7 @@ class OutputProcessor:
                 dss0 = dss1
 
             ds = xr.concat(dss0, "time")
+            ds = self._recompute_trange_attr(ds)
 
             # Handle vrange attributes specifically
             if dss0[0].range.vrange_value:
@@ -826,6 +828,9 @@ class OutputProcessor:
 
         elif concat_dim == ["obs"]:
             ds = xr.concat(dss0, "obs").sortby("time")
+
+        elif concat_dim and set(concat_dim) <= {"time", "z"}:
+            ds = self._concat_time_z(dss0, concat_dim)
 
         elif len(dss0) == 1:
             ds = dss0[0]
@@ -837,6 +842,127 @@ class OutputProcessor:
         attrs = {k: v for k, v in output.items() if k != "otype"}
         ds = ds.assign_attrs(attrs)
 
+        return ds
+
+    def _concat_time_z(self, dss0: List[xr.Dataset],
+                       concat_dim: List[str]) -> xr.Dataset:
+        """
+        Merge datasets split along "time" and/or "z" back into one.
+
+        Each input in `dss0` is one time-group and/or one vlevel-group
+        produced upstream by `_apply_range_processing` (via `ranges.tfreq`/
+        `trange_seq` and `ranges.vlevels`); this reassembles them along
+        whichever of "time"/"z" is requested so an otype like ``mdiagts``
+        can render a single figure over the full dataset with no residual
+        splitting and no per-dim looping in the plot function itself.
+
+        Parameters
+        ----------
+        dss0
+            Datasets to merge, one per upstream time/z group.
+        concat_dim
+            Subset of ``["time", "z"]`` naming the dims to reassemble.
+
+        Returns
+        -------
+        xarray.Dataset
+            A single dataset spanning every group along `concat_dim`.
+        """
+        dss = dss0
+        if "time" in concat_dim:
+            expanded = []
+            for ds0 in dss:
+                if ds0.sizes.get("time", 1) > 1:
+                    expanded.extend(
+                        ds0.isel(time=[itime])
+                        for itime in range(ds0.sizes["time"])
+                        )
+                else:
+                    expanded.append(ds0)
+            dss = expanded
+
+        if "z" in concat_dim:
+            if "time" in concat_dim:
+                groups = {}
+                for ds0 in dss:
+                    key = pd.Timestamp(ds0.time.values[0])
+                    groups.setdefault(key, []).append(ds0)
+                dss = [self._merge_z_group(g) for g in groups.values()]
+            else:
+                dss = [self._merge_z_group(dss)]
+
+        if "time" in concat_dim:
+            dss = sorted(dss, key=lambda d: pd.Timestamp(d.time.values[0]))
+            ds = xr.concat(dss, "time")
+            ds = self._recompute_trange_attr(ds)
+            if dss[0].range.vrange_value:
+                ds.attrs["vrange"] = [d0.range.vrange_value for d0 in dss]
+        else:
+            ds = dss[0]
+
+        return ds
+
+    def _merge_z_group(self, group: List[xr.Dataset]) -> xr.Dataset:
+        """Merge one time-slice's z-split fragments back into one dataset.
+
+        Native/explicit vlevel fragments (tagged via ``attrs["vlevel"]``)
+        each cover a distinct, non-overlapping depth -- concatenating them
+        along "z" reconstructs the full profile. vrange bins (tagged via
+        ``attrs["vrange"]``) instead each keep the *same* full native
+        depth range, just NaN-masked outside their own bin -- concatenating
+        those along "z" would duplicate every depth value instead of
+        reconstructing anything, so they're combined with `combine_first`
+        (first non-null value wins) instead.
+
+        Parameters
+        ----------
+        group
+            Datasets covering the same time-slice, one per z-fragment.
+
+        Returns
+        -------
+        xarray.Dataset
+            A single dataset spanning every fragment's depth.
+        """
+        if len(group) == 1:
+            return group[0]
+        if "depth" in group[0].coords:
+            depths = [tuple(np.round(np.asarray(g["depth"]).ravel(), 6)) for g in group]
+            if len(set(depths)) == 1:
+                merged = group[0]
+                for g in group[1:]:
+                    merged = merged.combine_first(g)
+                merged.attrs = group[0].attrs
+                return merged
+
+        def by_vlevel(ds0):
+            return float(ds0.attrs.get("vlevel", 0))
+
+        return xr.concat(sorted(group, key=by_vlevel), dim="z")
+
+    def _recompute_trange_attr(self, ds: xr.Dataset) -> xr.Dataset:
+        """Recompute a stale "trange" attr after merging along "time".
+
+        `xr.concat` keeps attrs from just the first input by default, so a
+        "trange" tag (set per trange_seq bucket by `ranges.trange_seq`)
+        would otherwise still show only the first bucket's bounds once
+        every bucket has been merged into one otype like `mvprofiles` --
+        recompute it from the actual merged "time" span instead.
+
+        Parameters
+        ----------
+        ds
+            Dataset just concatenated along "time".
+
+        Returns
+        -------
+        xarray.Dataset
+            `ds`, with "trange" (if present) reflecting the full span.
+        """
+        if "trange" in ds.attrs and "time" in ds.dims and ds.sizes["time"] > 1:
+            t1 = pd.Timestamp(ds.time.min().values)
+            t2 = pd.Timestamp(ds.time.max().values)
+            ds.attrs["trange"] = f"[{t1:%Y-%m-%dT%H:%M:%S}_{t2:%Y-%m-%dT%H:%M:%S}["
         return ds
 
     def _compute_diags(self, ds: xr.Dataset, output_type: str) -> xr.Dataset:

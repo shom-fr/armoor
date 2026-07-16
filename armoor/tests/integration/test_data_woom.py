@@ -56,7 +56,8 @@ lat_max={REGION['lat_max']}
 [stages]
     [[prolog]]
     get_data={DATA_GET_DATA}
-    data=data,data_native
+    data=data
+    #,data_native
 """
     with open(cfg_path, "w") as f:
         f.write(content)

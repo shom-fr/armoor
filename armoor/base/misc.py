@@ -52,7 +52,9 @@ def validate_metazone_params(metazones, params, label="colocation"):
         A dictionary of metazones with their parameters.
     params : dict
         A dictionary where keys are parameter categories and values are lists
-        of parameter pairs to validate.
+        of parameter candidates to validate -- either a single candidate
+        (e.g. ``("cloud",)``) or a mutually-exclusive pair (e.g.
+        ``("vlevel", "vfreq")``).
     label : str
         Word used in log/error messages to name the kind of choice being
         validated (e.g. "colocation", "interpolation").
@@ -61,20 +63,25 @@ def validate_metazone_params(metazones, params, label="colocation"):
     -------
     dict
         A new dict (metazones is not mutated) mapping each metazone to its
-        original params, or to None where neither candidate of a pair is
-        defined. Returning a copy matters: callers of this function (e.g.
-        armoor.data.output.OutputProcessor) go on to look up the *original*
-        metazone config again later for unrelated processing (time/vertical
-        ranges, filters) -- mutating the caller's own dict in place would
-        silently replace that config with None.
+        original params, or to None where *no* candidate in any category is
+        defined. A metazone missing just one optional pair (e.g. no
+        vlevel/vfreq) while another category *is* set (e.g. cloud) keeps its
+        original params -- only a category with neither candidate of a pair
+        set is itself left unselected; it doesn't null out categories that
+        are configured. Returning a copy matters: callers of this function
+        (e.g. armoor.data.output.OutputProcessor) go on to look up the
+        *original* metazone config again later for unrelated processing
+        (time/vertical ranges, filters) -- mutating the caller's own dict in
+        place would silently replace that config with None.
 
     Raises
     ------
     ArmoorError
-        If both parameters are defined or neither is defined.
+        If both parameters of a pair are defined for the same metazone.
     """
     result = dict(metazones)
     for mz_name, mz_param in metazones.items():
+        any_set = False
         for k, v in params.items():
             if len(v) == 2:
                 param1, param2 = v[0], v[1]
@@ -85,14 +92,17 @@ def validate_metazone_params(metazones, params, label="colocation"):
                         f"Both '{param1}' and '{param2}' are defined for {mz_name}. "
                         f"Please choose either '{param1}' or '{param2}' {label}."
                     )
-
                 if val1 is None and val2 is None:
                     logger.info(
                         f"Neither '{param1}' nor '{param2}' is defined for {mz_name}. "
                         f"Please choose either '{param1}' or '{param2}' {label}."
                     )
-                    result[mz_name] = None
-                    continue
+                else:
+                    any_set = True
+            elif any(mz_param.get(candidate) is not None for candidate in v):
+                any_set = True
+        if not any_set:
+            result[mz_name] = None
     return result
 
 def parse_coords(s):

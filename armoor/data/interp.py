@@ -279,7 +279,10 @@ class VerticalInterpolation(AbstractInterpolation):
         xarray.Dataset, xarray.Dataset
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
-        vlevels = xr.DataArray(vlevels, dims="z", name=vname)
+        # xoa's regrid1d requires monotonically sorted target levels --
+        # passed out of order (e.g. metazones.cfg's `levels=10,1000,500`),
+        # it silently interpolates most cells to NaN instead of raising.
+        vlevels = xr.DataArray(sorted(vlevels), dims="z", name=vname)
         attrs = self.ds.attrs
         if "z" in self.ds.dims:
             self.ds = vinterp(self.ds, vname, vlevels)

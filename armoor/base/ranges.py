@@ -72,6 +72,26 @@ def vlevels(dssi, vname):
             # to a plain scalar so it can be used as a label.
             vlevel = float(np.asarray(vlevel).reshape(-1)[0])
             dso = dsi.isel(z=[ivlevel]).copy()
+            data_vars = [v for v in dso.data_vars if v != vname]
+            if data_vars and all(bool(dso[v].isnull().all()) for v in data_vars):
+                # Deepest native levels of a global-ocean model routinely
+                # have no valid data at all over a shallow/shelf regional
+                # subset (below the seafloor everywhere in it) -- skip
+                # rather than emit an empty group that later otypes
+                # (maps, profiles, diagts) can't render.
+                logger.info(
+                    f"Skipping vlevel {vlevel:.1f} -- no valid data anywhere"
+                    )
+                continue
+            # vname itself can be broadcast to leftover non-"z" dims from
+            # loading (e.g. armoor.data.open_decode's cmems_model loader
+            # broadcasts "depth" to the full (time,z,y,x) shape) -- now
+            # that this is a single level, replace it with a clean
+            # (z,)-only coordinate so downstream code isn't handed a
+            # "depth" that still varies along time/x/y/npts.
+            vname_attrs = dso[vname].attrs
+            dso = dso.assign_coords({vname: ("z", [vlevel])})
+            dso[vname] = dso[vname].assign_attrs(**vname_attrs)
             dso.attrs = dsi.attrs
             dso.attrs["vlevel"] = f"{vlevel:.1f}"
             dss.append(dso)

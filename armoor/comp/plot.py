@@ -19,7 +19,9 @@ from xoa.plot import plot_minimap, plot_ts
 
 from armoor.base import LINE_COLORS, CMAP_VARS
 from armoor.base.dispatch import MethodRegistry
-from armoor.base.plot import create_subplots, diagdisp, format_trange, get_output_vminmax, save_figure
+from armoor.base.plot import (create_subplots, diagdisp, format_time_label,
+                              format_vertical_label, get_output_vminmax,
+                              save_figure)
 from armoor.comp import GROUP_SUFFIX, METRIC_LABELS
 from armoor.comp.comparison import get_comparison
 from armoor.data.load import StagedDataset
@@ -217,33 +219,11 @@ class PlotComp(MethodRegistry):
                     dsref = dsref.mean(dim="member", keep_attrs=True)
 
                 attrs = dsref.attrs
-                ncname = ""
-                xtitle = ""
-                trange = attrs.get("trange")
-                if trange:
-                    title_str, suffix_str = format_trange(trange)
-                    xtitle += f"{title_str} "
-                    ncname += f"_{suffix_str}"
-                elif dsref.sizes["time"] == 1:
-                    time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
-                    xtitle += f"{time}"
-                    ncname += f"_{time}"
+                xtitle, ncname = format_time_label(attrs, ds=dsref)
+                v_title, v_name = format_vertical_label(attrs)
+                xtitle += v_title
+                ncname += v_name
 
-                if "vlevel" in attrs:
-                    vlevel = attrs.get("vlevel")
-                    if isinstance(vlevel, list):
-                        vlevel = vlevel[0]
-                    ncname += f"_{vlevel}"
-                    xtitle += f" {vlevel} m"
-                elif "vrange" in attrs:
-                    vrange = attrs.get("vrange")
-                    if isinstance(vrange, list):
-                        vrange = vrange[0]
-                    ncname += f"_{vrange}"
-                    xtitle += f" {vrange}"
-                else:
-                    pass
-                
                 units = dsref[var].attrs.get('units')
                     
                 figtitle = (
@@ -391,22 +371,12 @@ class PlotComp(MethodRegistry):
             dsref = dsref.stack({"npt": list(dsref.sizes.keys())})
             dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
             dsref = dsref.where(~dsref.ptemp.isnull(), drop=True)
-            trange = dsprod.attrs.get("trange")
-            vlevel = dsprod.attrs.get("vlevel")
-            vrange = dsprod.attrs.get("vrange")
-            xtitle = ""
-            xfigname = ""
-            if trange:
-                title_str, suffix_str = format_trange(trange)
-                xtitle += f"{title_str} "
-                xfigname += f"_{suffix_str}"
-            if vlevel:
-                xtitle += f" {vlevel}"
-                xfigname += f"_{vlevel}"
-            elif vrange:
-                xtitle += f" {vrange}"
-                xfigname += f"_{vrange}"
-            
+            attrs = dsprod.attrs
+            xtitle, xfigname = format_time_label(attrs, ds=dsprod)
+            v_title, v_name = format_vertical_label(attrs)
+            xtitle += v_title
+            xfigname += v_name
+
             refname = dsref.attrs.get("data_name")
             prodname = dsprod.attrs.get("data_name")
             figtitle = (
@@ -643,21 +613,11 @@ class PlotComp(MethodRegistry):
 
             dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
             dsref = dsref.where(~dsref.ptemp.isnull(), drop=True)
-            trange = dsprod.attrs.get("trange")
-            vlevel = dsprod.attrs.get("vlevel")
-            vrange = dsprod.attrs.get("vrange")
-            xtitle = ""
-            xfigname = ""
-            if trange:
-                title_str, suffix_str = format_trange(trange)
-                xtitle += f"{title_str} "
-                xfigname += f"_{suffix_str}"
-            if vlevel:
-                xtitle += f"\n {vlevel}"
-                xfigname += f"_{vlevel}"
-            elif vrange:
-                xtitle += f"\n {vrange}"
-                xfigname += f"_{vrange}"
+            attrs = dsprod.attrs
+            xtitle, xfigname = format_time_label(attrs, ds=dsprod)
+            v_title, v_name = format_vertical_label(attrs)
+            xtitle += f"\n{v_title}"
+            xfigname += v_name
             var = "{var}"
             refname = dsref.attrs.get("data_name")
             prodname = dsprod.attrs.get("data_name")
@@ -853,23 +813,7 @@ class PlotComp(MethodRegistry):
         ds_ref_std = dt_ref["std"].to_dataset()
         ref_name = ds_ref_data.attrs.get("data_name")
         attrs = ds_ref_data.attrs
-        ncname = ""
-        xtitle = ""
-
-        if "vlevel" in attrs:
-            vlevel = attrs.get("vlevel")
-            if isinstance(vlevel, list):
-                vlevel = vlevel[0]
-            ncname += f"_{vlevel}"
-            xtitle += f" {vlevel} m"
-        elif "vrange" in attrs:
-            vrange = attrs.get("vrange")
-            if isinstance(vrange, list):
-                vrange = vrange[0]
-            ncname += f"_{vrange}"
-            xtitle += f" {vrange}"
-        else:
-            pass
+        xtitle, ncname = format_vertical_label(attrs)
 
         if "npts" in ds_ref_mean.dims:
             npts = ds_ref_mean.sizes["npts"]
@@ -1039,18 +983,8 @@ class PlotComp(MethodRegistry):
             ]
         attrs = ds_ref.attrs
         ref_name = attrs.get("data_name")
-        
-        ncname = ""
-        xtitle = ""
 
-        if "vlevel" in attrs:
-            vlevel = attrs.get("vlevel")
-            if isinstance(vlevel, list):
-                vlevel = vlevel[0]
-            ncname += f"_{vlevel}"
-            xtitle += f" {vlevel} m"
-        else:
-            pass
+        xtitle, ncname = format_vertical_label(attrs, allow_vrange=False)
         
         if "npts" in ds_ref.dims:
             npts = ds_ref.sizes["npts"]
@@ -1459,37 +1393,11 @@ class PlotComp(MethodRegistry):
                     dsprod = dsprod_all[[var]]
                     
                     attrs = dsref.attrs
-                    ncname = ""
-                    xtitle = ""
-                    trange = attrs.get("trange")
-                    if trange:
-                        title_str, suffix_str = format_trange(trange)
-                        xtitle += f"{title_str} "
-                        ncname += f"_{suffix_str}"
-                    elif dsref.sizes.get("time") == 1:
-                        time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
-                        xtitle += f"{time}"
-                        ncname += f"_{time}"
-                    elif "clim_month" in attrs:
-                        import calendar
-                        xtitle += calendar.month_name[attrs["clim_month"]]
-                        ncname += f"_m{attrs['clim_month']:02d}"
+                    xtitle, ncname = format_time_label(attrs, ds=dsref, allow_clim_month=True)
+                    v_title, v_name = format_vertical_label(attrs)
+                    xtitle += v_title
+                    ncname += v_name
 
-                    if "vlevel" in attrs:
-                        vlevel = attrs.get("vlevel")
-                        if isinstance(vlevel, list):
-                            vlevel = vlevel[0]
-                        ncname += f"_{vlevel}"
-                        xtitle += f" {vlevel} m"
-                    elif "vrange" in attrs:
-                        vrange = attrs.get("vrange")
-                        if isinstance(vrange, list):
-                            vrange = vrange[0]
-                        ncname += f"_{vrange}"
-                        xtitle += f" {vrange}"
-                    else:
-                        pass
-                    
                     units = dsref[var].attrs.get('units')
                     
                     figtitle = (

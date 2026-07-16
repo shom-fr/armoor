@@ -66,6 +66,89 @@ def format_trange(trange):
     return title_str, suffix_str
 
 
+def format_time_label(attrs, ds=None, allow_clim_month=False):
+    """Build the temporal part of a figure title/filename from range attrs.
+
+    Shared by `armoor.data.plot` and `armoor.comp.plot`, which independently
+    tag output datasets with the same attrs set by `armoor.base.ranges`:
+    ``trange`` (a date range, from `trange_seq`) takes priority over
+    ``time`` (a single per-day timestamp, from `tfreq`) -- both must be
+    checked, since a `tfreq`-configured metazone (e.g. a native daily
+    split) never sets `trange`, and skipping it means every native
+    timestep's figure silently shares one filename.
+
+    Parameters
+    ----------
+    attrs : dict
+        A dataset's ``.attrs``.
+    ds : xarray.Dataset, optional
+        Consulted for a single "time" value as a last resort, when neither
+        `trange` nor `time` is set but `ds` still has exactly one time
+        step (e.g. a single-date comparison with no range/tfreq config).
+    allow_clim_month : bool
+        Whether to fall back to a ``clim_month`` attr (set for climatology
+        references, e.g. WOA18, when comparing against a multi-time
+        product with no overlapping time step -- see
+        `armoor.comp.stats.StatsComp.get_diff`).
+
+    Returns
+    -------
+    tuple of str
+        ``(xtitle_part, ncname_part)`` -- empty strings when nothing
+        applies; `ncname_part` already includes its leading ``"_"``.
+    """
+    trange = attrs.get("trange")
+    tfreq = attrs.get("time")
+    if trange:
+        title_str, suffix_str = format_trange(trange)
+        return title_str, f"_{suffix_str}"
+    if tfreq:
+        return tfreq, f"_{tfreq}"
+    if ds is not None and ds.sizes.get("time") == 1:
+        time_str = f"{pd.to_datetime(ds.time.values[0]):%Y-%m-%dT%H:%M:%S}"
+        return time_str, f"_{time_str}"
+    if allow_clim_month and "clim_month" in attrs:
+        import calendar
+        return calendar.month_name[attrs["clim_month"]], f"_m{attrs['clim_month']:02d}"
+    return "", ""
+
+
+def format_vertical_label(attrs, allow_vrange=True):
+    """Build the vertical part of a figure title/filename from range attrs.
+
+    Shared by `armoor.data.plot` and `armoor.comp.plot`: ``vlevel`` (a
+    single depth, from `armoor.base.ranges.vlevels`) takes priority over
+    ``vrange`` (a depth bin, from `armoor.base.ranges.vrange`).
+
+    Parameters
+    ----------
+    attrs : dict
+        A dataset's ``.attrs``.
+    allow_vrange : bool
+        Whether to fall back to a ``vrange`` attr when there's no
+        ``vlevel``. Some otypes (e.g. a single-point vertical profile
+        selection) only ever carry ``vlevel`` and don't need the fallback.
+
+    Returns
+    -------
+    tuple of str
+        ``(xtitle_part, ncname_part)`` -- empty strings when neither attr
+        is set; `ncname_part` already includes its leading ``"_"``.
+    """
+    vlevel = attrs.get("vlevel")
+    if vlevel is not None:
+        if isinstance(vlevel, list):
+            vlevel = vlevel[0]
+        return f" \n depth={vlevel}m", f"_{vlevel}"
+    if allow_vrange:
+        vrange = attrs.get("vrange")
+        if vrange is not None:
+            if isinstance(vrange, list):
+                vrange = vrange[0]
+            return f"\n depth=[{vrange}]m", f"_{vrange}"
+    return "", ""
+
+
 def _get_plt():
     """Return matplotlib.pyplot, applying the armoor style on first import."""
     import matplotlib.pyplot as _plt
