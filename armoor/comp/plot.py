@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
+from tqdm import tqdm
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts
@@ -1592,6 +1593,13 @@ def _plot_task(nc, func_comp, metazone, output, vminmax=None):
     return saved
 
 
+def _plot_task_star(args):
+    """Unpack one `main_plot` task tuple -- `imap_unordered` (unlike
+    `starmap`) only maps over a single iterable, so this adapts
+    `_plot_task`'s multi-arg signature to it."""
+    return _plot_task(*args)
+
+
 def main_plot(ncins, metazones, func_comp, cfg_outputs=None, kw_dask=None):
     """Process plot tasks in parallel using a multiprocessing pool.
 
@@ -1642,7 +1650,11 @@ def main_plot(ncins, metazones, func_comp, cfg_outputs=None, kw_dask=None):
     # "fork() after OpenMP" crash and inherited memory bloat.
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(num_workers) as pool:
-        results = pool.starmap(_plot_task, task_args)
+        results = list(tqdm(
+            pool.imap_unordered(_plot_task_star, task_args),
+            total=len(task_args),
+            desc="Plotting figures",
+            ))
     png_paths = [p for task_result in results for p in (task_result or [])]
     logger.info(f"Generated {len(png_paths)} PNG file(s)")
     return png_paths
