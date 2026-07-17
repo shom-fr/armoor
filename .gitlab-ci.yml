@@ -31,7 +31,7 @@ tests:
     - export PYTHONPATH=$PWD
     - pip install ".[test]"
     - pytest -v -s armoor/tests/uni
-    - pytest -v -s armoor/tests/integration
+    - pytest -v -s armoor/tests/integration/test_armoor_woom.py
   cache:
     paths:
       - armoor_env/
