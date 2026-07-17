@@ -61,6 +61,70 @@ def _bin_datasets(node):
         return [node[c].to_dataset() for c in sorted(children, key=int)]
     return [node.to_dataset()]
 
+
+def _drifter_map_extent(lonmin, lonmax, latmin, latmax):
+    """Figure aspect ratio and padded (xlim, ylim) for a drifter map.
+
+    Pads the raw lon/lat extent by 15% on every side, then reconciles the
+    padded window's aspect ratio with whatever the figure box actually
+    ends up using once clamped to a readable range: a drifter track's
+    natural aspect is often far outside [0.4, 2.5] (long, mostly one-way
+    meanders). Growing the padded window here keeps the displayed extent
+    equal to what the box can show -- no invisible extra padding, and no
+    data ever cropped.
+
+    A `PlateCarree` axes' default `aspect='equal'` enforces *raw*
+    `dlat/dlon` (degrees as literal equal units) -- it does NOT correct
+    for longitude foreshortening at latitude, despite `get_aspect()`
+    reporting `1.0` either way. If the figure box's own aspect (from
+    `aspect_ratio` below) doesn't match that raw degree ratio, cartopy
+    silently shrinks the axes within its box to reconcile them, which
+    reads as a large blank band around the map. Callers must pass
+    `geo_aspect` to `ax.set_aspect()` explicitly so the axes stretches
+    latitude the intended (cos-corrected) amount instead of enforcing
+    the uncorrected default -- confirmed empirically to make the axes
+    fill its box exactly, with zero shrink.
+
+    Parameters
+    ----------
+    lonmin, lonmax, latmin, latmax : float
+        Raw (unpadded) extent covering every track to be drawn.
+
+    Returns
+    -------
+    aspect_ratio : float
+        Clamped height/width ratio to build the figure with
+        (``figsize=(10, 10 * aspect_ratio)``).
+    xlim, ylim : list of float
+        ``[min, max]`` pairs ready for ``ax.set_xlim``/``set_ylim``.
+    geo_aspect : float
+        Pass to ``ax.set_aspect(geo_aspect)`` right after setting
+        xlim/ylim, so the axes' enforced aspect matches
+        `aspect_ratio` instead of the uncorrected raw-degree default.
+    """
+    dlon = lonmax - lonmin
+    dlat = latmax - latmin
+    mid_lat = 0.5 * (latmin + latmax)
+    cosfac = np.cos(np.radians(mid_lat))
+    aspect_ratio = min(max(dlat / (dlon * cosfac), 0.4), 2.5)
+
+    view_lonmin, view_lonmax = lonmin - 0.15 * dlon, lonmax + 0.15 * dlon
+    view_latmin, view_latmax = latmin - 0.15 * dlat, latmax + 0.15 * dlat
+    view_dlon = view_lonmax - view_lonmin
+    view_dlat = view_latmax - view_latmin
+    view_aspect = view_dlat / (view_dlon * cosfac)
+    if view_aspect > aspect_ratio:
+        target_dlon = view_dlat / (aspect_ratio * cosfac)
+        extra = 0.5 * (target_dlon - view_dlon)
+        view_lonmin, view_lonmax = view_lonmin - extra, view_lonmax + extra
+    elif view_aspect < aspect_ratio:
+        target_dlat = view_dlon * aspect_ratio * cosfac
+        extra = 0.5 * (target_dlat - view_dlat)
+        view_latmin, view_latmax = view_latmin - extra, view_latmax + extra
+
+    return aspect_ratio, [view_lonmin, view_lonmax], [view_latmin, view_latmax], 1 / cosfac
+
+
 matplotlib.use('Agg')
 plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({'font.size': 8})
@@ -1199,14 +1263,14 @@ class PlotComp(MethodRegistry):
                 f"{self.metazone}"
                 )
 
-            dlat = dsref.lat.max() - dsref.lat.min()
-            dlon = dsref.lon.max() - dsref.lon.min()
-            mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
-            aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
-            # See maps_current_drifter: a drifter track is rarely as wide
-            # as it is tall, so clamp to a readable figure range instead
-            # of sizing off the raw (often very elongated) trajectory.
-            aspect_ratio = min(max(aspect_ratio, 0.4), 2.5)
+            # Extent must cover the simulated parcels too, not just the
+            # reference drifter -- they can spread well beyond its own
+            # track, and fixing the view to dsref alone would clip them.
+            lonmin = float(min(dsref.lon.min(), dsprod.lon_parcels.min()))
+            lonmax = float(max(dsref.lon.max(), dsprod.lon_parcels.max()))
+            latmin = float(min(dsref.lat.min(), dsprod.lat_parcels.min()))
+            latmax = float(max(dsref.lat.max(), dsprod.lat_parcels.max()))
+            aspect_ratio, xlim, ylim, geo_aspect = _drifter_map_extent(lonmin, lonmax, latmin, latmax)
             fig, axes = create_subplots(
                 layout_type="one",
                 figsize=(10, 10 * aspect_ratio),
@@ -1214,12 +1278,13 @@ class PlotComp(MethodRegistry):
                 sharex=True, projection=ccrs.PlateCarree()
                 )
 
-            lonmin = dsref.lon.min() - 0.5 * dlon
-            lonmax = dsref.lon.max() + 0.5 * dlon
-            latmin = dsref.lat.min() - 0.5 * dlat
-            latmax = dsref.lat.max() + 0.5 * dlat
-            axes[0].set_xlim([lonmin, lonmax])
-            axes[0].set_ylim([latmin, latmax])
+            axes[0].set_xlim(xlim)
+            axes[0].set_ylim(ylim)
+            # The default aspect='equal' on a PlateCarree axes enforces
+            # raw dlat/dlon (no cos-latitude correction), which mismatches
+            # aspect_ratio above and makes cartopy shrink the axes inside
+            # its box -- set it explicitly so the axes fills its box.
+            axes[0].set_aspect(geo_aspect)
 
             axes[0].plot(
                 dsref.lon,
@@ -1243,10 +1308,16 @@ class PlotComp(MethodRegistry):
                     **kw
                     )
             
+            # figsize height scales with aspect_ratio while width stays
+            # fixed at 10in -- absolute point sizes would then read far
+            # smaller on a tall (high aspect_ratio) figure than on a
+            # short one, so scale text size by aspect_ratio to keep it
+            # visually consistent across metazones/products.
             handles, labels = axes[0].get_legend_handles_labels()
             fig.legend(handles, labels, ncol=1, loc='center left',
-                       edgecolor='gray', bbox_to_anchor=(0.11,0.94)) 
-            
+                       edgecolor='gray', bbox_to_anchor=(0.11,0.94),
+                       fontsize=8 * aspect_ratio)
+
             for iax, ax in enumerate(axes):
                 gl = axes[iax].gridlines(
                     crs=ccrs.PlateCarree(),
@@ -1258,13 +1329,15 @@ class PlotComp(MethodRegistry):
                     )
                 gl.top_labels = False
                 gl.right_labels = False
+                gl.xlabel_style = {'size': 8 * aspect_ratio}
+                gl.ylabel_style = {'size': 8 * aspect_ratio}
 
             figname = (
                 f"{self.staged.output_dir('plot', ref_name=ref_name)}/" +
                 f"map_drifter_trajectories_{prod_name}.png"
                 )
-            
-            fig.suptitle(figtitle, fontsize="x-large", y=0.95)
+
+            fig.suptitle(figtitle, fontsize=11.52 * aspect_ratio, y=0.95)
             
             self.save_figure(fig, figname)
             dsprod.close()
@@ -1277,10 +1350,10 @@ class PlotComp(MethodRegistry):
         """Plot maps per product."""
         for prod, node_prod in self.dt.children.items():
             dsprod = node_prod["prod/data"].to_dataset()
-            # "time_drifter" is a coordinate on the "npt" dim, not a
-            # dimension itself -- select the first observation via "npt".
-            dsprod = dsprod.isel(npt=[0])
-
+            # "npt" is the model-interpolated-onto-drifter-position track,
+            # one entry per drifter observation time (same length as
+            # dsref's own "time") -- keep it in full so both quivers show
+            # a comparable multi-point track instead of a single arrow.
             dsref = node_prod["ref/data"].to_dataset()
 
             prod_name = dsprod.attrs.get("data_name")
@@ -1291,19 +1364,14 @@ class PlotComp(MethodRegistry):
                 f"{self.metazone}"
                 )
 
-            dlat = dsref.lat.max() - dsref.lat.min()
-            dlon = dsref.lon.max() - dsref.lon.min()
-            mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
-            aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
-            # Unlike a fixed regional domain, a drifter track is rarely as
-            # wide as it is tall -- it's usually a long, mostly one-way
-            # meander. Sizing the figure to the raw aspect ratio then
-            # makes it absurdly thin or tall. Clamp it to a readable
-            # range instead; cartopy's geographic axes keep true-to-scale
-            # distances on their own (that's what the cos(mid_lat) factor
-            # above is for), so the only visible effect is extra
-            # whitespace padding the shorter side, not distortion.
-            aspect_ratio = min(max(aspect_ratio, 0.4), 2.5)
+            # Extent must cover the simulated drifter track too, not just
+            # the reference one -- it can drift well beyond the real
+            # track, and fixing the view to dsref alone would clip it.
+            lonmin = float(min(dsref.lon.min(), dsprod.lon_drifter.min()))
+            lonmax = float(max(dsref.lon.max(), dsprod.lon_drifter.max()))
+            latmin = float(min(dsref.lat.min(), dsprod.lat_drifter.min()))
+            latmax = float(max(dsref.lat.max(), dsprod.lat_drifter.max()))
+            aspect_ratio, xlim, ylim, geo_aspect = _drifter_map_extent(lonmin, lonmax, latmin, latmax)
 
             fig, axes = create_subplots(
                 layout_type="one",
@@ -1312,12 +1380,13 @@ class PlotComp(MethodRegistry):
                 sharex=True, projection=ccrs.PlateCarree()
                 )
 
-            lonmin = dsref.lon.min() - 0.5 * dlon
-            lonmax = dsref.lon.max() + 0.5 * dlon
-            latmin = dsref.lat.min() - 0.5 * dlat
-            latmax = dsref.lat.max() + 0.5 * dlat
-            axes[0].set_xlim([lonmin, lonmax])
-            axes[0].set_ylim([latmin, latmax])
+            axes[0].set_xlim(xlim)
+            axes[0].set_ylim(ylim)
+            # The default aspect='equal' on a PlateCarree axes enforces
+            # raw dlat/dlon (no cos-latitude correction), which mismatches
+            # aspect_ratio above and makes cartopy shrink the axes inside
+            # its box -- set it explicitly so the axes fills its box.
+            axes[0].set_aspect(geo_aspect)
 
             dsprod = dsprod.squeeze()
             dsref = dsref.squeeze()
@@ -1341,10 +1410,16 @@ class PlotComp(MethodRegistry):
                 alpha=0.65,
                 )
             
+            # figsize height scales with aspect_ratio while width stays
+            # fixed at 10in -- absolute point sizes would then read far
+            # smaller on a tall (high aspect_ratio) figure than on a
+            # short one, so scale text size by aspect_ratio to keep it
+            # visually consistent across metazones/products.
             handles, labels = axes[0].get_legend_handles_labels()
             fig.legend(handles, labels, ncol=1, loc='center left',
-                       edgecolor='gray', bbox_to_anchor=(0.11, 0.94)) 
-            
+                       edgecolor='gray', bbox_to_anchor=(0.11, 0.94),
+                       fontsize=8 * aspect_ratio)
+
             for iax, ax in enumerate(axes):
                 gl = axes[iax].gridlines(
                     crs=ccrs.PlateCarree(),
@@ -1356,13 +1431,15 @@ class PlotComp(MethodRegistry):
                     )
                 gl.top_labels = False
                 gl.right_labels = False
-            
+                gl.xlabel_style = {'size': 8 * aspect_ratio}
+                gl.ylabel_style = {'size': 8 * aspect_ratio}
+
             figname = (
                 f"{self.staged.output_dir('plot', ref_name=ref_name)}/" +
                 f"map_drifter_current_{prod_name}.png"
                 )
-            
-            fig.suptitle(figtitle, fontsize="x-large", y=0.95)
+
+            fig.suptitle(figtitle, fontsize=11.52 * aspect_ratio, y=0.95)
             
             self.save_figure(fig, figname)
             dsprod.close()
