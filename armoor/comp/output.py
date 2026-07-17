@@ -1002,6 +1002,15 @@ class OutputPipelineManager:
         for metazone_name, metazone_config in metazones_in.items():
             if metazone_config:
                 ncins = ncs.get(metazone_name)
+                if not ncins:
+                    # No colocation output for this metazone at all (e.g. no
+                    # drifter/mooring/argo profile actually fell inside it
+                    # for the requested period) -- skip it instead of
+                    # crashing deep inside preproc() on a None ncins.
+                    logger.warning(
+                        f"No colocated input for metazone '{metazone_name}', skipping"
+                        )
+                    continue
                 if preproc:
                     self.comparison.preproc(ncins, **kwargs)
                 prepared_metazones[metazone_name] = {

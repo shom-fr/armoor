@@ -79,6 +79,12 @@ def validate_metazone_params(metazones, params, label="colocation"):
     ArmoorError
         If both parameters of a pair are defined for the same metazone.
     """
+    if not params:
+        # No candidate categories at all to validate (e.g. CompDrifter's
+        # colocation_params_user is {} -- it relies entirely on
+        # colocation_params_default, never on a user-configured choice)
+        # -- nothing to null out, pass every metazone through unchanged.
+        return dict(metazones)
     result = dict(metazones)
     for mz_name, mz_param in metazones.items():
         any_set = False
