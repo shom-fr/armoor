@@ -29,6 +29,9 @@ class _FakePool:
     def starmap(self, func, iterable):
         return [func(*args) for args in iterable]
 
+    def imap_unordered(self, func, iterable):
+        return [func(args) for args in iterable]
+
 
 def _fake_get_context(method):
     ctx = MagicMock()
