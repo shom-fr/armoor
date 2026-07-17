@@ -529,7 +529,11 @@ class PlotOceanModel(_PlotDataBase):
                     continue
                 else:
                     daprod = daprod.transpose("z", "time")
-                    depth = ds.depth.transpose("z", "time")
+                    # depth may only vary along "z" (a clean per-level
+                    # coordinate) -- broadcast it to daprod's full (z,time)
+                    # shape before transposing, since the LineCollection
+                    # below needs one depth value per (z,time) cell.
+                    depth = ds.depth.broadcast_like(daprod).transpose("z", "time")
                 mask = ~daprod.isnull()
                 depth = depth.where(mask, drop=True)
                 daprod = daprod.where(mask, drop=True)
