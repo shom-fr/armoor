@@ -176,8 +176,8 @@ class PlotComp(MethodRegistry):
                 units = dsref[var].attrs.get('units')
 
                 figtitle = (
-                    f"{self.plot_title} \n"
-                    f"{self.metazone} \n"
+                    f"{self.plot_title}\n"
+                    f"{self.metazone}\n"
                     f"{var}, {units}"
                     )
 
@@ -226,13 +226,13 @@ class PlotComp(MethodRegistry):
                 ncname += v_name
 
                 units = dsref[var].attrs.get('units')
-                    
-                figtitle = (
-                    f"{self.plot_title} \n"
-                    f"{self.metazone} \n {xtitle}\n "
-                    f"{var}, {units}"
-                    )
-                
+
+                title_lines = [self.plot_title, self.metazone]
+                if xtitle.strip():
+                    title_lines.append(xtitle.strip())
+                title_lines.append(f"{var}, {units}")
+                figtitle = "\n".join(title_lines)
+
                 figname = (
                     f"{self.staged.output_dir('plot', ref_name=ref_name)}/"
                     f"diagdisp_sel_{var}_{prod_name}{ncname}.png"
@@ -382,8 +382,8 @@ class PlotComp(MethodRegistry):
             refname = dsref.attrs.get("data_name")
             prodname = dsprod.attrs.get("data_name")
             figtitle = (
-                f"{self.plot_title} \n"
-                f"{prodname} vs {refname} \n"
+                f"{self.plot_title}\n"
+                f"{prodname} vs {refname}\n"
                 f"{self.metazone}\n"
                 f"{xtitle}"
                 )
@@ -442,10 +442,10 @@ class PlotComp(MethodRegistry):
             xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
             xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
             if vrange:
-                xtitle += f"\n {vrange}"
+                xtitle += f"\n{vrange}"
                 xfigname  += f"_{vrange}"
             if vlevel:
-                xtitle += f"\n {vlevel}"
+                xtitle += f"\n{vlevel}"
                 xfigname  += f"_{vlevel}"
 
             fig, ax = create_subplots(
@@ -453,10 +453,11 @@ class PlotComp(MethodRegistry):
                 figsize=(5, 8),
                 )
             fig.suptitle(
-                f"{self.plot_title} \n"
-                f"{self.metazone} \n{xtitle}",
+                f"{self.plot_title}\n"
+                f"{self.metazone}\n{xtitle}",
                 y=1.01
                 )
+            fig.subplots_adjust(top=0.85)
             ax = ax[0]
             kw_ref = {"label": dsref.attrs["data_name"]}
             tsref = plot_ts(
@@ -625,8 +626,8 @@ class PlotComp(MethodRegistry):
             refname = dsref.attrs.get("data_name")
             prodname = dsprod.attrs.get("data_name")
             figtitle = (
-                f"{self.plot_title} \n"
-                f"{prodname} vs {refname} \n"
+                f"{self.plot_title}\n"
+                f"{prodname} vs {refname}\n"
                 f"{self.metazone}\n"
                 f"{xtitle}"
                 )
@@ -723,7 +724,7 @@ class PlotComp(MethodRegistry):
             xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
             xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
             if vrange:
-                xtitle += f"\n {vrange}"
+                xtitle += f"\n{vrange}"
                 xfigname  += f"_{vrange}"
             for varname in dsref.data_vars:
                 units = dsref[varname].attrs.get("units")
@@ -737,10 +738,11 @@ class PlotComp(MethodRegistry):
                     figsize=(5, 8),
                     )
                 fig.suptitle(
-                    f"{self.plot_title} \n"
-                    f"{self.metazone} \n {xtitle}",
+                    f"{self.plot_title}\n"
+                    f"{self.metazone}\n{xtitle}",
                     y=1.01
                     )
+                fig.subplots_adjust(top=0.85)
                 ax = ax[0]
                 kw_ref = {"label": dsref.attrs["data_name"]}
                 ax.plot(
@@ -854,19 +856,21 @@ class PlotComp(MethodRegistry):
                 if npts > 1:
                     lon_pt = f"{ds_ref_data.lon.isel(npts=inpt):.2f}"
                     lat_pt = f"{ds_ref_data.lat.isel(npts=inpt):.2f}"
-                    xcoord = f"{lat_pt}°N; {lon_pt}°E\n"
+                    xcoord = f"{lat_pt}°N; {lon_pt}°E"
                 else:
                     xcoord = ""
                 for iprod in range(len(dts_prod)):
                     if iprod == 0:
                         da_ref = ds_ref_data[var]
                         units = da_ref.attrs.get("units")
-                        fig.suptitle(
-                            f"{self.plot_title} \n"
-                            f"{self.metazone} \n {xtitle} {xcoord}\n"
-                            f"{var}, {units} \n",
-                            y=1.01
-                            )
+                        title_lines = [self.plot_title, self.metazone]
+                        if xtitle.strip():
+                            title_lines.append(xtitle.strip())
+                        if xcoord:
+                            title_lines.append(xcoord)
+                        title_lines.append(f"{var}, {units}")
+                        fig.suptitle("\n".join(title_lines), y=1.01)
+                        fig.subplots_adjust(top=0.90)
                         lw = 2
                         da = ds_ref_mean[var].squeeze()
                         if npts > 1:
@@ -1008,28 +1012,30 @@ class PlotComp(MethodRegistry):
                     x_label='Date', y_label=None,
                     sharex=True
                     )
+                xcoord = ""
                 if npts > 1:
                     da_ref = ds_ref[var].isel(npts=inpt)
                     das_prod = [ds[var].isel(npts=inpt) for ds in dss_prod]
                     das_comp = [ds[var].isel(npts=inpt) for ds in dss_comp]
                     lon_pt = f"{ds_ref.lon.isel(npts=inpt):.2f}"
                     lat_pt = f"{ds_ref.lat.isel(npts=inpt):.2f}"
-                    xtitle_pt = xtitle + f"{lat_pt}°N; {lon_pt}°E"
+                    xcoord = f"{lat_pt}°N; {lon_pt}°E"
                 else:
                     da_ref = ds_ref[var]
                     das_prod = [ds[var] for ds in dss_prod]
                     das_comp = [ds[var] for ds in dss_comp]
-                    xtitle_pt = xtitle
                 for iprod, da_prod in enumerate(das_prod):
 
                     if iprod == 0:
                         units = da_ref.attrs.get("units")
-                        fig.suptitle(
-                            f"{self.plot_title} \n"
-                            f"{self.metazone} \n {xtitle_pt}\n"
-                            f"{var}, {units} \n",
-                            y=1.01
-                            )
+                        title_lines = [self.plot_title, self.metazone]
+                        if xtitle.strip():
+                            title_lines.append(xtitle.strip())
+                        if xcoord:
+                            title_lines.append(xcoord)
+                        title_lines.append(f"{var}, {units}")
+                        fig.suptitle("\n".join(title_lines), y=1.01)
+                        fig.subplots_adjust(top=0.85)
                         lw = 2
                         axes[0].plot(
                             da_ref["time"],
@@ -1128,11 +1134,12 @@ class PlotComp(MethodRegistry):
             sharex=True
             )
         fig.suptitle(
-            f"{self.plot_title} \n"
-            f"{self.metazone} \n {ref_name}\n",
+            f"{self.plot_title}\n"
+            f"{self.metazone}\n{ref_name}",
             y=1.01
             )
-        
+        fig.subplots_adjust(top=0.85)
+
         plot_minimap(
             ds_ref.set_coords(["lon", "lat"]),
             ax=self.ax_minimap,
@@ -1187,14 +1194,18 @@ class PlotComp(MethodRegistry):
             ref_name = dsref.attrs.get("data_name")
                                         
             figtitle = (
-                f"{self.plot_title} \n"
+                f"{self.plot_title}\n"
                 f"{self.metazone}"
                 )
-                
+
             dlat = dsref.lat.max() - dsref.lat.min()
             dlon = dsref.lon.max() - dsref.lon.min()
             mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
             aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
+            # See maps_current_drifter: a drifter track is rarely as wide
+            # as it is tall, so clamp to a readable figure range instead
+            # of sizing off the raw (often very elongated) trajectory.
+            aspect_ratio = min(max(aspect_ratio, 0.4), 2.5)
             fig, axes = create_subplots(
                 layout_type="one",
                 figsize=(10, 10 * aspect_ratio),
@@ -1275,7 +1286,7 @@ class PlotComp(MethodRegistry):
             ref_name = dsref.attrs.get("data_name")
 
             figtitle = (
-                f"{self.plot_title} \n"
+                f"{self.plot_title}\n"
                 f"{self.metazone}"
                 )
 
@@ -1413,11 +1424,11 @@ class PlotComp(MethodRegistry):
 
                     units = dsref[var].attrs.get('units')
                     
-                    figtitle = (
-                        f"{self.plot_title} \n"
-                        f"{self.metazone} \n {xtitle}\n "
-                        f"{var}, {units}"
-                        )
+                    title_lines = [self.plot_title, self.metazone]
+                    if xtitle.strip():
+                        title_lines.append(xtitle.strip())
+                    title_lines.append(f"{var}, {units}")
+                    figtitle = "\n".join(title_lines)
                 
                     prod_name = dsprod.attrs["data_name"]
                     ref_name = dsref.attrs["data_name"]
@@ -1525,8 +1536,8 @@ class PlotComp(MethodRegistry):
                         m2, ax=axes[2], orientation='vertical', fraction=0.02, pad=0.02, shrink=0.7
                         )
                     cbar2.set_label(METRIC_LABELS[comp])
-                    
-                    plt.subplots_adjust(hspace=0.02, wspace=0.01)
+
+                    plt.subplots_adjust(hspace=0.02, wspace=0.01, top=0.88)
                     for iax, ax in enumerate(axes):
                         gl = axes[iax].gridlines(
                             crs=ccrs.PlateCarree(),

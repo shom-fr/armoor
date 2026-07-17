@@ -663,8 +663,10 @@ class PlotOceanModel(_PlotDataBase):
                         )
                     ax = axes[0]
                     title_lines = [data_name, self.metazone]
-                    if pt_title or z_title:
-                        title_lines.append(f"{pt_title}{z_title}".strip())
+                    if z_title.strip():
+                        title_lines.append(z_title.strip())
+                    if pt_title.strip():
+                        title_lines.append(pt_title.strip())
                     title_lines.append(f"{var}, {units}")
                     fig.suptitle("\n".join(title_lines), y=1.01)
                     fig.subplots_adjust(top=0.78)
@@ -710,7 +712,7 @@ class PlotOceanModel(_PlotDataBase):
         vars2plot = [var for var in ds_data.data_vars if var != "depth"]
         for var in vars2plot:
             for inpt in range(npts):
-                xtitle = ""
+                v_part = ""
                 ncname = ""
                 if "z" in ds_data[var].dims:
                     if "vlevel" in attrs:
@@ -718,34 +720,38 @@ class PlotOceanModel(_PlotDataBase):
                         if isinstance(vlevel, list):
                             vlevel = vlevel[0]
                         ncname += f"_{vlevel}"
-                        xtitle += f" {vlevel} m"
+                        v_part = f"{vlevel} m"
                     elif "vrange" in attrs:
                         vrange = attrs.get("vrange")
                         if isinstance(vrange, list):
                             vrange = vrange[0]
                         ncname += f"_{vrange}"
-                        xtitle += f" {vrange}"
-                if "trange_seq" in attrs:
-                    xtitle += f" time range {attrs.get('trange_seq')}"
+                        v_part = f"{vrange}"
+                t_part = f"time range {attrs.get('trange_seq')}" if "trange_seq" in attrs else ""
                 fig, axes = create_subplots(
                     nrows=2, figsize=(10, 6),
                     x_label='Date', y_label=None,
                     sharex=True
                     )
+                pt_part = ""
                 if npts > 1:
                     da_mean = ds_mean[var].isel(npts=inpt)
                     da_std = ds_std[var].isel(npts=inpt)
                     lon_pt = f"{da_mean.lon:.2f}"
                     lat_pt = f"{da_mean.lat:.2f}"
-                    xtitle += f" {lat_pt}°N; {lon_pt}°E"
+                    pt_part = f"{lat_pt}°N; {lon_pt}°E"
                 else:
                     da_mean = ds_mean[var]
                     da_std = ds_std[var]
 
                 units = da_mean.attrs.get("units")
                 title_lines = [data_name, self.metazone]
-                if xtitle.strip():
-                    title_lines.append(xtitle.strip())
+                if t_part:
+                    title_lines.append(t_part)
+                if v_part:
+                    title_lines.append(v_part)
+                if pt_part:
+                    title_lines.append(pt_part)
                 title_lines.append(f"{var}, {units}")
                 fig.suptitle("\n".join(title_lines), y=1.01)
                 fig.subplots_adjust(top=0.85)
