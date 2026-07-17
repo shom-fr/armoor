@@ -221,7 +221,8 @@ class PlotComp(MethodRegistry):
                 attrs = dsref.attrs
                 xtitle, ncname = format_time_label(attrs, ds=dsref)
                 v_title, v_name = format_vertical_label(attrs)
-                xtitle += v_title
+                if v_title:
+                    xtitle += f"\n{v_title}"
                 ncname += v_name
 
                 units = dsref[var].attrs.get('units')
@@ -374,7 +375,8 @@ class PlotComp(MethodRegistry):
             attrs = dsprod.attrs
             xtitle, xfigname = format_time_label(attrs, ds=dsprod)
             v_title, v_name = format_vertical_label(attrs)
-            xtitle += v_title
+            if v_title:
+                xtitle += f"\n{v_title}"
             xfigname += v_name
 
             refname = dsref.attrs.get("data_name")
@@ -616,7 +618,8 @@ class PlotComp(MethodRegistry):
             attrs = dsprod.attrs
             xtitle, xfigname = format_time_label(attrs, ds=dsprod)
             v_title, v_name = format_vertical_label(attrs)
-            xtitle += f"\n{v_title}"
+            if v_title:
+                xtitle += f"\n{v_title}"
             xfigname += v_name
             var = "{var}"
             refname = dsref.attrs.get("data_name")
@@ -1404,7 +1407,8 @@ class PlotComp(MethodRegistry):
                     attrs = dsref.attrs
                     xtitle, ncname = format_time_label(attrs, ds=dsref, allow_clim_month=True)
                     v_title, v_name = format_vertical_label(attrs)
-                    xtitle += v_title
+                    if v_title:
+                        xtitle += f"\n{v_title}"
                     ncname += v_name
 
                     units = dsref[var].attrs.get('units')

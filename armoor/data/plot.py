@@ -191,6 +191,7 @@ class PlotOceanModel(_PlotDataBase):
             figtitle.format(**locals()),
             y=1.02
             )
+        fig.subplots_adjust(top=0.85)
         self.save_figure(
             fig,
             figname.format(**locals())
@@ -232,10 +233,11 @@ class PlotOceanModel(_PlotDataBase):
         xtitle, xfigname = format_time_label(attrs, ds=dsprod)
         if include_vertical:
             v_title, v_name = format_vertical_label(attrs)
-            xtitle += f"\n{v_title}"
+            if v_title:
+                xtitle += f"\n{v_title}"
             xfigname += v_name
         figtitle = (
-            f"{data_name} \n"
+            f"{data_name}\n"
             f"{self.metazone}\n"
             f"{xtitle}"
             )
@@ -286,7 +288,7 @@ class PlotOceanModel(_PlotDataBase):
                     f"udiagts_{data_name}_{lat_pt}_{lon_pt}{xfigname}.png"
                     )
                 figtitle = (
-                    f"{data_name} \n"
+                    f"{data_name}\n"
                     f"{self.metazone}\n"
                     f"{lat_pt}N; {lon_pt}E\n"
                     f"{xtitle}"
@@ -299,6 +301,7 @@ class PlotOceanModel(_PlotDataBase):
                     figtitle,
                     y=1.01
                     )
+                fig.subplots_adjust(top=0.85)
                 ax = ax[0]
                 kw_prod = {"label": data_name}
                 tsprod = plot_ts(
@@ -446,7 +449,8 @@ class PlotOceanModel(_PlotDataBase):
                 figtitle.format(**locals()),
                 y=1.01
                 )
-            
+            fig.subplots_adjust(top=0.85)
+
             self.save_figure(
                 fig,
                 figname.format(**locals())
@@ -474,12 +478,13 @@ class PlotOceanModel(_PlotDataBase):
         attrs = dsprod.attrs
         xtitle, xfigname = format_time_label(attrs, ds=dsprod)
         v_title, v_name = format_vertical_label(attrs)
-        xtitle += f"\n{v_title}"
+        if v_title:
+            xtitle += f"\n{v_title}"
         xfigname += v_name
         var = "{var}"
         prodname = dsprod.attrs.get("data_name")
         figtitle = (
-            f"{prodname} \n"
+            f"{prodname}\n"
             f"{self.metazone}\n"
             f"{xtitle}"
             )
@@ -505,7 +510,8 @@ class PlotOceanModel(_PlotDataBase):
         attrs = dsprod.attrs
         xtitle, xfigname = format_time_label(attrs, ds=dsprod)
         v_title, v_name = format_vertical_label(attrs)
-        xtitle += f"\n{v_title}"
+        if v_title:
+            xtitle += f"\n{v_title}"
         xfigname += v_name
         for inpt in range(npts):
             ds = dsprod.isel(npts=inpt)
@@ -519,7 +525,7 @@ class PlotOceanModel(_PlotDataBase):
                     "uvprofiles_{data_name}_{var}_{lat_pt}_{lon_pt}{xfigname}.png"
                     )
                 figtitle = (
-                    f"{data_name} \n"
+                    f"{data_name}\n"
                     f"{self.metazone}\n"
                     f"{lat_pt}N; {lon_pt}E\n"
                     f"{xtitle}"
@@ -590,12 +596,13 @@ class PlotOceanModel(_PlotDataBase):
                     figtitle.format(**locals()),
                     y=1.01
                     )
-                
+                fig.subplots_adjust(top=0.85)
+
                 self.save_figure(
                     fig,
                     figname.format(**locals())
                     )
-        
+
     def _timeseries_raw(self, ds_data):
         """Plot the raw per-point (and, when depth-resolved, per-native-
         level) series directly, one figure per variable/point/level.
@@ -655,11 +662,11 @@ class PlotOceanModel(_PlotDataBase):
                         x_label='Date', y_label=None,
                         )
                     ax = axes[0]
-                    fig.suptitle(
-                        f"{data_name} \n{self.metazone} \n{pt_title}{z_title}\n"
-                        f"{var}, {units} \n",
-                        y=1.01
-                        )
+                    title_lines = [data_name, self.metazone]
+                    if pt_title or z_title:
+                        title_lines.append(f"{pt_title}{z_title}".strip())
+                    title_lines.append(f"{var}, {units}")
+                    fig.suptitle("\n".join(title_lines), y=1.01)
                     fig.subplots_adjust(top=0.78)
                     if ds_data.lon.dims == ("x", "y"):
                         plot_coords = "filledbox"
@@ -736,12 +743,12 @@ class PlotOceanModel(_PlotDataBase):
                     da_std = ds_std[var]
 
                 units = da_mean.attrs.get("units")
-                fig.suptitle(
-                    f"{data_name} \n"
-                    f"{self.metazone} \n {xtitle}\n"
-                    f"{var}, {units} \n",
-                    y=1.01
-                    )
+                title_lines = [data_name, self.metazone]
+                if xtitle.strip():
+                    title_lines.append(xtitle.strip())
+                title_lines.append(f"{var}, {units}")
+                fig.suptitle("\n".join(title_lines), y=1.01)
+                fig.subplots_adjust(top=0.85)
                 lw = 2
                 
                 if ds_data.lon.dims == ("x", "y"):
@@ -864,16 +871,19 @@ class PlotOceanModel(_PlotDataBase):
         data_name = ds_mean_all.attrs["data_name"]
         attrs = ds_data_all.attrs
         xtitle, ncname = format_time_label(attrs)
+        v_title = ""
         if "z" in ds_data_all["u"].dims:
             v_title, v_name = format_vertical_label(attrs)
-            xtitle += v_title
             ncname += v_name
 
         units = ds_data_all["u"].attrs.get("units")
-        figtitle = (
-            f"{data_name} \n {self.metazone}\n {xtitle}\n "
-            f"current speed, {units}"
-            )
+        title_lines = [data_name, self.metazone]
+        if xtitle.strip():
+            title_lines.append(xtitle.strip())
+        if v_title.strip():
+            title_lines.append(v_title.strip())
+        title_lines.append(f"current speed, {units}")
+        figtitle = "\n".join(title_lines)
 
         ds_mean = ds_mean_all[["u", "v"]].squeeze()
         ds_std = ds_std_all[["u", "v"]].squeeze()
@@ -910,7 +920,7 @@ class PlotOceanModel(_PlotDataBase):
             fraction=0.05, shrink=0.5
             )
 
-        plt.subplots_adjust(hspace=0.02, wspace=0.01)
+        plt.subplots_adjust(hspace=0.02, wspace=0.01, top=0.88)
         for iax, ax in enumerate(axes):
             gl = axes[iax].gridlines(
                 crs=ccrs.PlateCarree(),
@@ -968,17 +978,20 @@ class PlotOceanModel(_PlotDataBase):
             
             attrs = ds_data.attrs
             xtitle, ncname = format_time_label(attrs)
+            v_title = ""
             if "z" in ds_data[var].dims:
                 v_title, v_name = format_vertical_label(attrs)
-                xtitle += v_title
                 ncname += v_name
             units = ds_data[var].attrs.get('units')
             data_name = ds_mean_all.attrs["data_name"]
-            
-            figtitle = (
-                f"{data_name} \n {self.metazone}\n {xtitle}\n "
-                f"{var}, {units}"
-                )
+
+            title_lines = [data_name, self.metazone]
+            if xtitle.strip():
+                title_lines.append(xtitle.strip())
+            if v_title.strip():
+                title_lines.append(v_title.strip())
+            title_lines.append(f"{var}, {units}")
+            figtitle = "\n".join(title_lines)
 
             ds_data = ds_data[var]
             ds_mean = ds_mean[var]
@@ -1047,7 +1060,7 @@ class PlotOceanModel(_PlotDataBase):
                 fraction=0.05, shrink=0.5#, pad=0.02,
                 )
             
-            plt.subplots_adjust(hspace=0.02, wspace=0.01)
+            plt.subplots_adjust(hspace=0.02, wspace=0.01, top=0.88)
             for iax, ax in enumerate(axes):
                 gl = axes[iax].gridlines(
                     crs=ccrs.PlateCarree(),
@@ -1059,9 +1072,9 @@ class PlotOceanModel(_PlotDataBase):
                     )
                 gl.top_labels = False
                 gl.right_labels = False
-            
+
             figname = (
-                f"data/plot/{self.metazone}/" + 
+                f"data/plot/{self.metazone}/" +
                 f"map_{var}_{data_name}{ncname}.png"
                 )
             
@@ -1112,10 +1125,13 @@ class PlotOceanModel(_PlotDataBase):
                     pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
                     if time_val is not None else ""
                     )
-                figtitle = (
-                    f"{data_name} \n {self.metazone}\n {time_str} {vlevel_str}\n "
-                    f"{var}, {units}"
-                    )
+                title_lines = [data_name, self.metazone]
+                if time_str:
+                    title_lines.append(time_str)
+                if vlevel_str:
+                    title_lines.append(vlevel_str)
+                title_lines.append(f"{var}, {units}")
+                figtitle = "\n".join(title_lines)
 
                 if var in self.vminmax:
                     vmin, vmax = self.vminmax[var]
@@ -1170,6 +1186,7 @@ class PlotOceanModel(_PlotDataBase):
                     f"map_{var}_{data_name}_{time_str}{vlevel_suffix}.png"
                     )
                 fig.suptitle(figtitle)
+                fig.subplots_adjust(top=0.88)
                 self.save_figure(fig, figname)
 
         return None
@@ -1198,10 +1215,13 @@ class PlotOceanModel(_PlotDataBase):
                 pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
                 if time_val is not None else ""
                 )
-            figtitle = (
-                f"{data_name} \n {self.metazone}\n {time_str} {vlevel_str}\n "
-                f"current speed, {units}"
-                )
+            title_lines = [data_name, self.metazone]
+            if time_str:
+                title_lines.append(time_str)
+            if vlevel_str:
+                title_lines.append(vlevel_str)
+            title_lines.append(f"current speed, {units}")
+            figtitle = "\n".join(title_lines)
 
             if "cspeed" in self.vminmax:
                 vmin, vmax = self.vminmax["cspeed"]
@@ -1242,6 +1262,7 @@ class PlotOceanModel(_PlotDataBase):
                 f"map_current_{data_name}_{time_str}{vlevel_suffix}.png"
                 )
             fig.suptitle(figtitle)
+            fig.subplots_adjust(top=0.88)
             self.save_figure(fig, figname)
 
         return None
