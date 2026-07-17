@@ -1280,6 +1280,15 @@ class PlotComp(MethodRegistry):
             dlon = dsref.lon.max() - dsref.lon.min()
             mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
             aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
+            # Unlike a fixed regional domain, a drifter track is rarely as
+            # wide as it is tall -- it's usually a long, mostly one-way
+            # meander. Sizing the figure to the raw aspect ratio then
+            # makes it absurdly thin or tall. Clamp it to a readable
+            # range instead; cartopy's geographic axes keep true-to-scale
+            # distances on their own (that's what the cos(mid_lat) factor
+            # above is for), so the only visible effect is extra
+            # whitespace padding the shorter side, not distortion.
+            aspect_ratio = min(max(aspect_ratio, 0.4), 2.5)
 
             fig, axes = create_subplots(
                 layout_type="one",

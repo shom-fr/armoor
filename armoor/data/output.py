@@ -926,7 +926,7 @@ class OutputProcessor:
         """
         if len(group) == 1:
             return group[0]
-        if "depth" in group[0].coords:
+        if "depth" in group[0].variables:
             depths = [tuple(np.round(np.asarray(g["depth"]).ravel(), 6)) for g in group]
             if len(set(depths)) == 1:
                 merged = group[0]
@@ -938,7 +938,14 @@ class OutputProcessor:
         def by_vlevel(ds0):
             return float(ds0.attrs.get("vlevel", 0))
 
-        return xr.concat(sorted(group, key=by_vlevel), dim="z")
+        ds = xr.concat(sorted(group, key=by_vlevel), dim="z")
+        # xr.concat keeps attrs from just the first fragment by default,
+        # so "vlevel" would otherwise still name that one native/explicit
+        # level even though every level has now been merged into one
+        # full profile -- drop it so titles/filenames built from attrs
+        # don't claim a single depth that no longer applies.
+        ds.attrs.pop("vlevel", None)
+        return ds
 
     def _recompute_trange_attr(self, ds: xr.Dataset) -> xr.Dataset:
         """Recompute a stale "trange" attr after merging along "time".

@@ -651,7 +651,7 @@ class PlotOceanModel(_PlotDataBase):
                         f"timeseries_{data_name}_{var}{pt_name}{z_name}.png"
                         )
                     fig, axes = create_subplots(
-                        nrows=1, figsize=(10, 4),
+                        nrows=1, figsize=(10, 5),
                         x_label='Date', y_label=None,
                         )
                     ax = axes[0]
@@ -659,6 +659,20 @@ class PlotOceanModel(_PlotDataBase):
                         f"{data_name} \n{self.metazone} \n{pt_title}{z_title}\n"
                         f"{var}, {units} \n",
                         y=1.01
+                        )
+                    fig.subplots_adjust(top=0.78)
+                    if ds_data.lon.dims == ("x", "y"):
+                        plot_coords = "filledbox"
+                    else:
+                        plot_coords = "points"
+                    plot_minimap(
+                        ds_data.isel(npts=inpt) if npts > 1 else ds_data,
+                        ax=self.ax_minimap,
+                        plot_coords=plot_coords,
+                        coords_markersize=4,
+                        gridlines_draw_labels=True,
+                        gridlines_xlabel_style={'size': 6},
+                        gridlines_ylabel_style={'size': 6},
                         )
                     ax.plot(da["time"], da, color="slateblue", linewidth=2)
                     ax.set_ylabel(var)
