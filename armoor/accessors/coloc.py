@@ -3,9 +3,9 @@
 Usage
 -----
 >>> session = ds_prod.coloc.with_ref(ds_ref)
->>> ds_prod2, ds_ref2 = session.time(("trange_seq", ["3D", "reference"]), tbound=tbound)
+>>> ds_prod2, ds_ref2 = session.time(("trange_seq", {"tfreq": "3D", "tref": "reference"}), tbound=tbound)
 >>> session2 = session.time(...).horizontal(...)
->>> ds_prod3, ds_ref3 = session2.vertical(("vrange", [...]))
+>>> ds_prod3, ds_ref3 = session2.vertical(("vrange", {"vref": "reference", "vname": "depth", ...}))
 
 ColocSession supports chaining and iteration unpacking:
 >>> ds_p, ds_r = ds_prod.coloc.with_ref(ds_ref).time(param)
@@ -48,7 +48,8 @@ class ColocSession:
         Parameters
         ----------
         param : tuple
-            E.g. ``("trange_seq", ["3D", "reference"])`` or ``("tfreq", [...])``
+            E.g. ``("trange_seq", {"tfreq": "3D", "tref": "reference"})`` or
+            ``("tfreq", [...])``
         tbound : list or tuple, optional
             Time bounds ``[start, end]``.
 
@@ -84,7 +85,7 @@ class ColocSession:
         Parameters
         ----------
         param : tuple
-            E.g. ``("vrange", [...])``
+            E.g. ``("vrange", {"vref": "reference", "vname": "depth", ...})``
 
         Returns
         -------

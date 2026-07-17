@@ -1,50 +1,17 @@
+"""Interpolation candidate params and per-otype output params for armoor-data.
+
+See `armoor.data.datatype` for the per-data-type hierarchy that now backs
+`OUTPUTS_PARAMS`.
+"""
 INTERP_PARAMS_USER = {
     "time": ("tfreq",),
     "horizontal": ("cloud",),
     "vertical": ("vlevel","vfreq"),
     }
 
-OUTPUTS_PARAMS = {
-    "maps": {
-        "sort": ["time", "z"],
-        "stat": ["time", "z"],
-        "mparams_con": {
-            "time": ["tfreq"],
-            }
-        },
-    "timeseries": {
-        "sort": ["z"],
-        "concat": ["time"],
-        "stat": ["time", "z", "y", "x"],
-        "output": "merge",
-        },
-    "mvprofiles": {
-        "sort": ["time", "z"],
-        "mparams_con": {
-            "vertical": ["vlevel"],
-            }
-        },
-    "mdiagts": {
-        "sort": ["time", "z"],
-        },
-    "uvprofiles": {
-        "concat": ["time"],
-        "output": "merge",
-        "mparams_pro": {
-            "horizontal": ["cloud"]
-            },
-        "mparams_con": {
-            "vertical": ["vlevel"],
-            }
-        },
-    "udiagts": {
-        "concat": ["time"],
-        "output": "merge",
-        "mparams_pro": {
-            "horizontal": ["cloud"]
-            },
-        "mparams_con": {
-            "vertical": ["vlevel"],
-            }
-        },
-    }
+# Kept for backward compatibility with call sites still importing this dict
+# directly; the source of truth is now DataOceanModel.outputs_params
+# (armoor.data.datatype) — see the per-data-type hierarchy there.
+from armoor.data.datatype import DataOceanModel
+
+OUTPUTS_PARAMS = DataOceanModel().outputs_params

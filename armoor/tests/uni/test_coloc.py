@@ -10,6 +10,7 @@ import pytest
 import xarray as xr
 
 from armoor.__init__ import ArmoorError
+from armoor.data.load import StagedDataset
 from armoor.comp.coloc import (
     AbstractColocation,
     TimeColocation,
@@ -107,9 +108,9 @@ def time_bounds():
 def coloc_params_argo():
     """Create dict with time/horizontal/vertical params for comp_argo."""
     return {
-        "time": ("trange_seq", ("D", "reference")),
+        "time": ("trange_seq", {"tfreq": "D", "tref": "reference"}),
         "horizontal": ("radius", 50.0),
-        "vertical": ("vlevel", ("depth", [0.0, 50.0, 100.0])),
+        "vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 50.0, 100.0]}),
     }
 
 
@@ -228,7 +229,7 @@ class TestTimeColocation:
         mock_interp.return_value = self.dsprod
         coloc = TimeColocation(self.dsref, self.dsprod, self.tbound)
 
-        coloc.trange_seq(("D", "reference"))
+        coloc.trange_seq({"tfreq": "D", "tref": "reference"})
 
         mock_interp.assert_called_once()
 
@@ -238,7 +239,7 @@ class TestTimeColocation:
         mock_interp.return_value = self.dsref
         coloc = TimeColocation(self.dsref, self.dsprod, self.tbound)
 
-        coloc.trange_seq(("D", "product"))
+        coloc.trange_seq({"tfreq": "D", "tref": "product"})
 
         mock_interp.assert_called_once()
 
@@ -247,7 +248,7 @@ class TestTimeColocation:
         coloc = TimeColocation(self.dsref, self.dsprod, self.tbound)
 
         with pytest.raises(ArmoorError, match="Use 'reference' or 'product'"):
-            coloc.trange_seq(("D", "invalid"))
+            coloc.trange_seq({"tfreq": "D", "tref": "invalid"})
 
     @patch("armoor.comp.coloc.interp_time")
     def test_trange_seq_with_custom_method(self, mock_interp):
@@ -255,7 +256,7 @@ class TestTimeColocation:
         mock_interp.return_value = self.dsprod
         coloc = TimeColocation(self.dsref, self.dsprod, self.tbound)
 
-        coloc.trange_seq(("D", "reference", "nearest"))
+        coloc.trange_seq({"tfreq": "D", "tref": "reference", "method": "nearest"})
 
         mock_interp.assert_called_once()
         call_kwargs = mock_interp.call_args
@@ -599,7 +600,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsref
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        coloc.vlevel(("depth", [0.0, 50.0]))
+        coloc.vlevel({"vname": "depth", "levels": [0.0, 50.0]})
 
         assert mock_vinterp.call_count == 2
 
@@ -609,7 +610,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsref.copy()
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        dsref_out, dsprod_out = coloc.vlevel(("depth", [0.0, 50.0]))
+        dsref_out, dsprod_out = coloc.vlevel({"vname": "depth", "levels": [0.0, 50.0]})
 
         # Attributes should be updated
         assert hasattr(dsref_out, "attrs")
@@ -626,7 +627,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsprod
         coloc = VerticalColocation(dsref_no_z, self.dsprod)
 
-        coloc.vlevel(("depth", [0.0, 50.0]))
+        coloc.vlevel({"vname": "depth", "levels": [0.0, 50.0]})
 
         # Should only call vinterp for dsprod
         assert mock_vinterp.call_count == 1
@@ -637,7 +638,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsprod.chunk(dict(z=-1))
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        coloc.vrange(("reference", "depth", [0, 50, 100]))
+        coloc.vrange({"vref": "reference", "vname": "depth"})
 
         mock_vinterp.assert_called_once()
 
@@ -647,7 +648,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsref.chunk(dict(z=-1))
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        coloc.vrange(("product", "depth", [0, 50, 100]))
+        coloc.vrange({"vref": "product", "vname": "depth"})
 
         mock_vinterp.assert_called_once()
 
@@ -656,7 +657,7 @@ class TestVerticalColocation:
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
         with pytest.raises(ArmoorError, match="Use 'reference' or 'product'"):
-            coloc.vrange(("invalid", "depth", [0, 50, 100]))
+            coloc.vrange({"vref": "invalid", "vname": "depth"})
 
     @patch("armoor.comp.coloc.vinterp")
     def test_vrange_preserves_attrs(self, mock_vinterp):
@@ -664,7 +665,7 @@ class TestVerticalColocation:
         mock_vinterp.return_value = self.dsprod.chunk(dict(z=-1))
         coloc = VerticalColocation(self.dsref, self.dsprod)
 
-        dsref_out, dsprod_out = coloc.vrange(("reference", "depth", [0, 50]))
+        dsref_out, dsprod_out = coloc.vrange({"vref": "reference", "vname": "depth"})
 
         assert hasattr(dsprod_out, "attrs")
 
@@ -791,7 +792,7 @@ class TestProcessColocationFunctions:
         dsprod_z.attrs["data_name"] = "prod"
         mock_vinterp.return_value = dsref_z
 
-        param = ("vlevel", ("depth", [0.0, 50.0]))
+        param = ("vlevel", {"vname": "depth", "levels": [0.0, 50.0]})
 
         dsref_out, dsprod_out = process_vertical_colocation(
             dsref_z, dsprod_z, param
@@ -843,7 +844,7 @@ class TestSaveDatasets:
         mock_encoding.return_value = {}
 
         ncout_ref, ncout_prod = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         assert ncout_ref.exists()
@@ -855,7 +856,7 @@ class TestSaveDatasets:
         mock_encoding.return_value = {}
 
         ncout_ref, ncout_prod = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         assert "2023-01" in str(ncout_ref)
@@ -867,7 +868,7 @@ class TestSaveDatasets:
         self.dsref.attrs = {"trange": "2023-01_to_2023-02", "data_name": "ref"}
 
         ncout_ref, ncout_prod = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         assert "2023-01_to_2023-02" in str(ncout_ref)
@@ -879,7 +880,7 @@ class TestSaveDatasets:
         self.dsref["mask"] = (["y", "x"], np.ones((3, 4), dtype=bool))
 
         ncout_ref, _ = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         # Verify the file was created
@@ -892,7 +893,7 @@ class TestSaveDatasets:
         self.dsref.attrs = {"vlevel": "0-100m", "data_name": "ref"}
 
         ncout_ref, _ = save_datasets(
-            self.dsref, self.dsprod, tmp_path, "ref", "prod"
+            self.dsref, self.dsprod, tmp_path
         )
 
         assert "0-100m" in str(ncout_ref)
@@ -928,7 +929,7 @@ class TestSaveDatasets:
         dsprod.attrs = {"data_name": "glo12"}
 
         # Must not raise
-        ncout_ref, ncout_prod = save_datasets(dsref, dsprod, tmp_path, "ref", "prod")
+        ncout_ref, ncout_prod = save_datasets(dsref, dsprod, tmp_path)
 
         assert ncout_ref.exists()
         assert ncout_prod.exists()
@@ -937,6 +938,46 @@ class TestSaveDatasets:
         ds_read = xr.open_zarr(ncout_ref)
         assert np.issubdtype(ds_read["time"].dtype, np.floating)
         np.testing.assert_array_equal(ds_read["time"].values, time_vals)
+
+    @patch("armoor.comp.coloc.get_zarr_encoding")
+    def test_save_datasets_without_staged_returns_plain_paths(self, mock_encoding, tmp_path):
+        """No `staged` arg -> plain Path, not StagedDataset."""
+        mock_encoding.return_value = {}
+
+        ncout_ref, ncout_prod = save_datasets(self.dsref, self.dsprod, tmp_path)
+
+        assert not isinstance(ncout_ref, StagedDataset)
+        assert not isinstance(ncout_prod, StagedDataset)
+
+    @patch("armoor.comp.coloc.get_zarr_encoding")
+    def test_save_datasets_with_staged_returns_staged_datasets(self, mock_encoding, tmp_path):
+        """A `staged` arg carries its metazone/comp_func onto both return paths."""
+        mock_encoding.return_value = {}
+        staged = StagedDataset("", metazone="med", comp_func="comp_sst")
+
+        ncout_ref, ncout_prod = save_datasets(self.dsref, self.dsprod, tmp_path, staged=staged)
+
+        for nc in (ncout_ref, ncout_prod):
+            assert isinstance(nc, StagedDataset)
+            assert nc.metazone == "med"
+            assert nc.comp_func == "comp_sst"
+            assert nc.stage == "coloc"
+
+    @patch("armoor.comp.coloc.get_zarr_encoding")
+    def test_save_datasets_with_staged_carries_range_info(self, mock_encoding, tmp_path):
+        """dsref/dsprod's own vlevel/vrange/trange/time attrs land on the
+        returned StagedDataset (via StagedDataset.with_range), so a later
+        stage can recover them from the path alone."""
+        mock_encoding.return_value = {}
+        self.dsref.attrs = {"time": "2023-01", "vlevel": "10.0", "data_name": "ref"}
+        self.dsprod.attrs = {"vrange": "0-50", "data_name": "prod"}
+        staged = StagedDataset("", metazone="med", comp_func="comp_sst")
+
+        ncout_ref, ncout_prod = save_datasets(self.dsref, self.dsprod, tmp_path, staged=staged)
+
+        assert ncout_ref.time == "2023-01"
+        assert ncout_ref.vlevel == "10.0"
+        assert ncout_prod.vrange == "0-50"
 
 
 # =============================================================================
@@ -1168,7 +1209,7 @@ class TestApplyColocations:
     def test_apply_colocations_calls_vertical_colocation(self, mock_vert_coloc):
         """Test that _apply_colocations calls vertical colocation when param exists."""
         mock_vert_coloc.return_value = (self.dsref, self.dsprod)
-        params = {"vertical": ("vlevel", ("depth", [0.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0]})}
 
         _apply_colocations(self.dsref, self.dsprod, params, self.tbound)
 
@@ -1233,7 +1274,7 @@ class TestApplyTimeRanges:
     def test_apply_time_ranges_calls_trange_seq(self, mock_trange):
         """Test that _apply_time_ranges calls ranges.trange_seq."""
         mock_trange.return_value = [self.dsref]
-        params = {"time": ("trange_seq", ("D", "reference"))}
+        params = {"time": ("trange_seq", {"tfreq": "D", "tref": "reference"})}
 
         _apply_time_ranges(self.dsref, self.dsprod, params, self.tbound)
 
@@ -1241,7 +1282,7 @@ class TestApplyTimeRanges:
 
     def test_apply_time_ranges_skips_wildcard(self):
         """Test that _apply_time_ranges skips when trange_seq has wildcard."""
-        params = {"time": ("trange_seq", ("*", "reference"))}
+        params = {"time": ("trange_seq", {"tfreq": "*", "tref": "reference"})}
 
         dsref_list, dsprod_list = _apply_time_ranges(
             self.dsref, self.dsprod, params, self.tbound
@@ -1286,7 +1327,7 @@ class TestApplyVerticalRanges:
     def test_apply_vertical_ranges_calls_vlevels(self, mock_vlevels):
         """Test that _apply_vertical_ranges calls ranges.vlevels for vlevel."""
         mock_vlevels.return_value = self.dsref_list
-        params = {"vertical": ("vlevel", ("depth", [0.0, 50.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 50.0]})}
 
         _apply_vertical_ranges(
             self.dsref_list, self.dsprod_list, params, "comp_argo"
@@ -1298,7 +1339,10 @@ class TestApplyVerticalRanges:
     def test_apply_vertical_ranges_calls_vrange(self, mock_vrange):
         """Test that _apply_vertical_ranges calls ranges.vrange for vrange."""
         mock_vrange.return_value = self.dsref_list
-        params = {"vertical": ("vrange", ("reference", "depth", [0, 50, 100]))}
+        params = {"vertical": ("vrange", {
+            "vref": "reference", "vname": "depth",
+            "bins_min": [0, 50], "bins_max": [50, 100],
+        })}
 
         _apply_vertical_ranges(
             self.dsref_list, self.dsprod_list, params, "comp_argo"
@@ -1310,7 +1354,7 @@ class TestApplyVerticalRanges:
     def test_apply_vertical_ranges_mooring_uses_depth(self, mock_vlevels):
         """Test that comp_mooring uses 'depth' as vname."""
         mock_vlevels.return_value = self.dsref_list
-        params = {"vertical": ("vlevel", ("depth", [0.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0]})}
 
         _apply_vertical_ranges(
             self.dsref_list, self.dsprod_list, params, "comp_mooring"
@@ -1322,7 +1366,7 @@ class TestApplyVerticalRanges:
 
     def test_apply_vertical_ranges_skips_comp_sst(self):
         """Test that comp_sst skips vertical ranging with vlevel."""
-        params = {"vertical": ("vlevel", ("depth", [0.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0]})}
 
         dsref_out, dsprod_out = _apply_vertical_ranges(
             self.dsref_list, self.dsprod_list, params, "comp_sst"
@@ -1445,12 +1489,12 @@ class TestProcessSingleProductSplitBehavior:
     @patch("armoor.comp.coloc._apply_time_ranges")
     @patch("armoor.comp.coloc._apply_vertical_ranges")
     @patch("armoor.comp.coloc._apply_colocations")
-    @patch("armoor.comp.coloc._compute_oceanvars")
+    @patch("armoor.comp.coloc.get_comparison")
     @patch("armoor.comp.coloc._save_colocation_results")
     @patch("armoor.comp.coloc._prepare_dataset")
     @patch("armoor.comp.coloc.xr.open_dataset")
     def test_time_ranges_skipped_when_no_time_dim(
-        self, mock_open, mock_prep, mock_save, mock_ocean,
+        self, mock_open, mock_prep, mock_save, mock_get_comparison,
         mock_coloc, mock_vrange, mock_trange
     ):
         """Variables without 'time' dim must not trigger _apply_time_ranges."""
@@ -1458,26 +1502,27 @@ class TestProcessSingleProductSplitBehavior:
         dsprod = self._make_ds({"temp": ("z",)}, {"data_name": "prod"})
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
-        mock_ocean.side_effect = lambda ds, _: ds
+        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds: ds
         mock_coloc.return_value = (dsref, dsprod)
         mock_vrange.return_value = ([dsref], [dsprod])
         mock_save.return_value = []
 
         params = {"time": ("tfreq", "D")}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
-        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+        staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
 
         mock_trange.assert_not_called()
 
     @patch("armoor.comp.coloc._apply_time_ranges")
     @patch("armoor.comp.coloc._apply_vertical_ranges")
     @patch("armoor.comp.coloc._apply_colocations")
-    @patch("armoor.comp.coloc._compute_oceanvars")
+    @patch("armoor.comp.coloc.get_comparison")
     @patch("armoor.comp.coloc._save_colocation_results")
     @patch("armoor.comp.coloc._prepare_dataset")
     @patch("armoor.comp.coloc.xr.open_dataset")
     def test_vertical_ranges_skipped_when_no_z_dim(
-        self, mock_open, mock_prep, mock_save, mock_ocean,
+        self, mock_open, mock_prep, mock_save, mock_get_comparison,
         mock_coloc, mock_vrange, mock_trange
     ):
         """Variables without 'z' dim must not trigger _apply_vertical_ranges."""
@@ -1485,26 +1530,27 @@ class TestProcessSingleProductSplitBehavior:
         dsprod = self._make_ds({"sst": ("time",)}, {"data_name": "prod"})
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
-        mock_ocean.side_effect = lambda ds, _: ds
+        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds: ds
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_save.return_value = []
 
-        params = {"vertical": ("vlevel", ("depth", [0.0, 10.0]))}
+        params = {"vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 10.0]})}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
-        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+        staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
 
         mock_vrange.assert_not_called()
 
     @patch("armoor.comp.coloc._apply_time_ranges")
     @patch("armoor.comp.coloc._apply_vertical_ranges")
     @patch("armoor.comp.coloc._apply_colocations")
-    @patch("armoor.comp.coloc._compute_oceanvars")
+    @patch("armoor.comp.coloc.get_comparison")
     @patch("armoor.comp.coloc._save_colocation_results")
     @patch("armoor.comp.coloc._prepare_dataset")
     @patch("armoor.comp.coloc.xr.open_dataset")
     def test_both_ranges_applied_when_time_and_z(
-        self, mock_open, mock_prep, mock_save, mock_ocean,
+        self, mock_open, mock_prep, mock_save, mock_get_comparison,
         mock_coloc, mock_vrange, mock_trange
     ):
         """Both ranges called when ref sub-dataset has time and z dims."""
@@ -1512,7 +1558,7 @@ class TestProcessSingleProductSplitBehavior:
         dsprod = self._make_ds({"temp": ("time", "z")}, {"data_name": "prod"})
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
-        mock_ocean.side_effect = lambda ds, _: ds
+        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds: ds
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_vrange.return_value = ([dsref], [dsprod])
@@ -1520,10 +1566,11 @@ class TestProcessSingleProductSplitBehavior:
 
         params = {
             "time": ("tfreq", "D"),
-            "vertical": ("vlevel", ("depth", [0.0, 10.0])),
+            "vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 10.0]}),
         }
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
-        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+        staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
 
         mock_trange.assert_called_once()
         mock_vrange.assert_called_once()
@@ -1531,12 +1578,12 @@ class TestProcessSingleProductSplitBehavior:
     @patch("armoor.comp.coloc._apply_time_ranges")
     @patch("armoor.comp.coloc._apply_vertical_ranges")
     @patch("armoor.comp.coloc._apply_colocations")
-    @patch("armoor.comp.coloc._compute_oceanvars")
+    @patch("armoor.comp.coloc.get_comparison")
     @patch("armoor.comp.coloc._save_colocation_results")
     @patch("armoor.comp.coloc._prepare_dataset")
     @patch("armoor.comp.coloc.xr.open_dataset")
     def test_mixed_dims_split_into_groups(
-        self, mock_open, mock_prep, mock_save, mock_ocean,
+        self, mock_open, mock_prep, mock_save, mock_get_comparison,
         mock_coloc, mock_vrange, mock_trange
     ):
         """Dataset with mixed dims is split: time ranges called once (3-D group only)."""
@@ -1558,7 +1605,7 @@ class TestProcessSingleProductSplitBehavior:
         )
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
-        mock_ocean.side_effect = lambda ds, _: ds
+        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds: ds
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_vrange.return_value = ([dsref], [dsprod])
@@ -1566,10 +1613,11 @@ class TestProcessSingleProductSplitBehavior:
 
         params = {
             "time": ("tfreq", "D"),
-            "vertical": ("vlevel", ("depth", [0.0, 10.0])),
+            "vertical": ("vlevel", {"vname": "depth", "levels": [0.0, 10.0]}),
         }
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
-        _process_single_product(dsref, Path("/fake.nc"), params, tbound, "comp_argo", "z1")
+        staged = StagedDataset("", metazone="z1", comp_func="comp_argo")
+        _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
 
         # Two dim groups: {time,z} and {time}
         # time ranges called for both (both have 'time'), vertical ranges only for {time,z}
@@ -1608,10 +1656,8 @@ class TestProcessFunctions:
         self.dsprod.attrs["data_name"] = "product"
 
         with patch("pathlib.Path.mkdir") as mock_mkdir:
-            _save_colocation_results(
-                [self.dsref], [self.dsprod],
-                "comp_argo", "zone1", "reference", "product"
-            )
+            staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
+            _save_colocation_results([self.dsref], [self.dsprod], staged)
 
             mock_mkdir.assert_called()
 
@@ -1635,9 +1681,10 @@ class TestProcessFunctions:
         params = {}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
 
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
         _process_single_product(
             self.dsref, Path("/fake/path.nc"),
-            params, tbound, "comp_argo", "zone1"
+            params, tbound, staged
         )
 
         mock_open.assert_called_once()
@@ -1660,9 +1707,10 @@ class TestProcessFunctions:
         params = {}
         tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
 
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
         _process_reference(
             Path("/data/zone1/ref.zarr"), ncins,
-            params, tbound, "comp_argo", "zone1", ncouts
+            params, tbound, staged, ncouts
         )
 
         # open_dataset is called twice: once with decode_times=False to detect
@@ -1670,6 +1718,48 @@ class TestProcessFunctions:
         assert mock_open.call_count == 2
         # Should process 2 products
         assert mock_single.call_count == 2
+
+    @patch("armoor.comp.coloc.xr.open_dataset")
+    @patch("armoor.comp.coloc._prepare_dataset")
+    @patch("armoor.comp.coloc._process_single_product")
+    def test_process_reference_detects_climatology_via_data_type(
+        self, mock_single, mock_prep, mock_open
+    ):
+        """decode_times is driven by data_type, not by a data_name substring."""
+        self.dsref.attrs = {"data_name": "reference", "data_type": "woa18"}
+        mock_open.return_value = self.dsref
+        mock_prep.return_value = self.dsref
+        mock_single.return_value = ("reference", "product", [Path("/out/ref.zarr")])
+
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
+        _process_reference(
+            Path("/data/zone1/ref.zarr"), [Path("/data/zone1/prod1.nc")],
+            {}, (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03")),
+            staged, {"zone1": {}}
+        )
+
+        assert mock_open.call_args_list[1].kwargs["decode_times"] is False
+
+    @patch("armoor.comp.coloc.xr.open_dataset")
+    @patch("armoor.comp.coloc._prepare_dataset")
+    @patch("armoor.comp.coloc._process_single_product")
+    def test_process_reference_data_name_substring_no_longer_triggers_climatology(
+        self, mock_single, mock_prep, mock_open
+    ):
+        """A "woa18"-looking data_name alone must not flag a climatology."""
+        self.dsref.attrs = {"data_name": "my_woa18_ref", "data_type": "ocean_model"}
+        mock_open.return_value = self.dsref
+        mock_prep.return_value = self.dsref
+        mock_single.return_value = ("reference", "product", [Path("/out/ref.zarr")])
+
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
+        _process_reference(
+            Path("/data/zone1/ref.zarr"), [Path("/data/zone1/prod1.nc")],
+            {}, (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03")),
+            staged, {"zone1": {}}
+        )
+
+        assert mock_open.call_args_list[1].kwargs["decode_times"] is True
 
     @patch("armoor.comp.coloc._process_reference")
     def test_process_metazone(self, mock_ref):
@@ -1682,9 +1772,8 @@ class TestProcessFunctions:
         metazones = {"zone1": {"tbound": ("2023-01-01", "2023-01-03")}}
         params = {}
 
-        _process_metazone(
-            "zone1", params, mz_files, metazones, "comp_argo", ncouts
-        )
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
+        _process_metazone(staged, params, mz_files, metazones, ncouts)
 
         mock_ref.assert_called_once()
         assert "zone1" in ncouts
@@ -1694,10 +1783,9 @@ class TestProcessFunctions:
         ncouts = {}
         metazones = {"zone1": {"tbound": ("2023-01-01", "2023-01-03")}}
 
+        staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
         with patch("armoor.comp.coloc._process_reference"):
-            _process_metazone(
-                "zone1", {}, {"ref": [], "prod": []}, metazones, "comp_argo", ncouts
-            )
+            _process_metazone(staged, {}, {"ref": [], "prod": []}, metazones, ncouts)
 
         assert "zone1" in ncouts
         assert ncouts["zone1"] == {}
@@ -1707,10 +1795,8 @@ class TestProcessFunctions:
         with patch("armoor.comp.coloc.save_datasets") as mock_save:
             mock_save.return_value = (Path("/out/ref.zarr"), Path("/out/prod.zarr"))
             with patch("pathlib.Path.mkdir"):
-                paths = _save_colocation_results(
-                    [self.dsref], [self.dsprod],
-                    "comp_argo", "zone1", "ref", "prod"
-                )
+                staged = StagedDataset("", metazone="zone1", comp_func="comp_argo")
+                paths = _save_colocation_results([self.dsref], [self.dsprod], staged)
 
         assert len(paths) == 2
 

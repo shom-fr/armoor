@@ -1,15 +1,15 @@
-"""ds.stats accessor — thin facade over armoor.base.stats and armoor.comp.stats.
+"""ds.stats accessor - thin facade over armoor.base.stats and armoor.comp.stats.
 
 All computation lives in those modules; this accessor only wires them
 onto xr.Dataset and handles the ``dim=None`` (point-wise) fallback.
 
-    ds.stats.mean(dim="time")          # → base.stats.mean
-    ds.stats.std(dim="time")           # → base.stats.std
-    ds.stats.bias(ds_ref)              # → base.stats.diff  (point-wise)
-    ds.stats.bias(ds_ref, dim="time")  # → base.stats.bias
-    ds.stats.rmse(ds_ref, dim="time")  # → base.stats.rms
-    ds.stats.rmsec(ds_ref, dim="time") # → base.stats.crms
-    ds.stats.compare(ds_ref, dims=[…]) # → comp.stats.StatsComp
+    ds.stats.mean(dim="time")            # base.stats.mean
+    ds.stats.std(dim="time")             # base.stats.std
+    ds.stats.bias(ds_ref)                # base.stats.diff  (point-wise)
+    ds.stats.bias(ds_ref, dim="time")    # base.stats.bias
+    ds.stats.rmse(ds_ref, dim="time")    # base.stats.rms
+    ds.stats.rmsec(ds_ref, dim="time")   # base.stats.crms
+    ds.stats.compare(ds_ref, dims=[...]) # comp.stats.StatsComp
 """
 
 import numpy as np
@@ -59,10 +59,10 @@ class StatsAccessor:
     # ------------------------------------------------------------------
 
     def bias(self, ds_ref: xr.Dataset, dim=None) -> xr.Dataset:
-        """Bias (prod − ref).
+        """Bias (prod - ref).
 
-        * ``dim=None`` — point-wise difference via :func:`armoor.base.stats.diff`.
-        * ``dim=...``  — mean bias via :func:`armoor.base.stats.bias`.
+        * ``dim=None`` - point-wise difference via :func:`armoor.base.stats.diff`.
+        * ``dim=...``  - mean bias via :func:`armoor.base.stats.bias`.
         """
         if dim is None:
             return _stats.diff(self._obj, ds_ref)
@@ -71,8 +71,8 @@ class StatsAccessor:
     def rmse(self, ds_ref: xr.Dataset, dim=None) -> xr.Dataset:
         """Root-mean-square error.
 
-        * ``dim=None`` — point-wise ``|prod − ref|`` via :func:`armoor.base.stats.diff`.
-        * ``dim=...``  — RMSE via :func:`armoor.base.stats.rms`.
+        * ``dim=None`` - point-wise ``|prod - ref|`` via :func:`armoor.base.stats.diff`.
+        * ``dim=...``  - RMSE via :func:`armoor.base.stats.rms`.
         """
         if dim is None:
             return np.sqrt(_stats.diff(self._obj, ds_ref) ** 2)
@@ -81,8 +81,8 @@ class StatsAccessor:
     def rmsec(self, ds_ref: xr.Dataset, dim=None) -> xr.Dataset:
         """Centered (unbiased) RMSE.
 
-        * ``dim=None`` — point-wise via :func:`armoor.base.stats.diff` on anomalies.
-        * ``dim=...``  — centered RMSE via :func:`armoor.base.stats.crms`.
+        * ``dim=None`` - point-wise via :func:`armoor.base.stats.diff` on anomalies.
+        * ``dim=...``  - centered RMSE via :func:`armoor.base.stats.crms`.
         """
         if dim is None:
             d = _stats.diff(self._obj - self._obj.mean(), ds_ref - ds_ref.mean())
@@ -109,7 +109,7 @@ class StatsAccessor:
         Returns
         -------
         tuple
-            ``(dtprod, dtref, dtcomps)`` — three :class:`xr.DataTree` objects.
+            ``(dtprod, dtref, dtcomps)`` - three :class:`xr.DataTree` objects.
         """
         from armoor.comp.stats import StatsComp
 

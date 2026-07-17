@@ -9,11 +9,14 @@ onto xr.Dataset.
     ds.range.vrange(vname, vbins)      # → base.ranges.vrange       (returns list)
     ds.range.vlevels(vname)            # → base.ranges.vlevels      (returns list)
     ds.range.by_time()                 # → base.ranges.tfreq        (returns list)
+    ds.range.time / .trange / .vlevel / .vrange_value  # read back the attrs above
+    ds.range.suffix                    # → base.io.output_suffix
 """
 
 import xarray as xr
 
 from armoor.base import ranges as _ranges
+from armoor.base.io import output_suffix as _output_suffix
 from armoor.data.range import process_time_range, process_vertical_range
 
 
@@ -149,3 +152,39 @@ class RangeAccessor:
             One dataset per ``z`` index, each carrying a ``"vlevel"`` attribute.
         """
         return _ranges.vlevels([self._obj], vname)
+
+    # ------------------------------------------------------------------
+    # Read-side properties — read back attrs set by the methods above
+    # ------------------------------------------------------------------
+
+    @property
+    def time(self):
+        """The ``"time"`` attr set by `by_time`, or None."""
+        return self._obj.attrs.get("time")
+
+    @property
+    def trange(self):
+        """The ``"trange"`` attr set by `trange_seq`, or None."""
+        return self._obj.attrs.get("trange")
+
+    @property
+    def vlevel(self):
+        """The ``"vlevel"`` attr set by `vlevels`, or None."""
+        return self._obj.attrs.get("vlevel")
+
+    @property
+    def vrange_value(self):
+        """The ``"vrange"`` attr set by `vrange`, or None.
+
+        Named ``vrange_value`` (not ``vrange``) to avoid shadowing the
+        `vrange` splitting method above.
+        """
+        return self._obj.attrs.get("vrange")
+
+    @property
+    def suffix(self) -> str:
+        """The ``_<time-or-trange>_<vlevel-or-vrange>`` output filename suffix.
+
+        Delegates to :func:`armoor.base.io.output_suffix`.
+        """
+        return _output_suffix(self._obj.attrs)

@@ -47,6 +47,8 @@ dependencies:
   # - sphinxcontrib-qthelp
   # - sphinxcontrib-serializinghtml
   - sqlite=3.47.0
+  - tqdm
   - xarray=2025.1.1
   - xesmf=0.8.8
+  - xoa=2026.7.0
   - zarr=2.18.7

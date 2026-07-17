@@ -6,10 +6,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple
 
 import dask
-import numpy as np
 import pandas as pd
 import xarray as xr
-from xoa.geo import haversine, bearing
 from collections import defaultdict
 
 from armoor import ArmoorError
@@ -18,8 +16,10 @@ from armoor.base.io import (
     sort_ncs_by_suffix,
     write_dataset_to_zarr
     )
-from armoor.comp import COMP_VARS, GROUP_SUFFIX, OUTPUTS_PARAMS
+from armoor.comp import GROUP_SUFFIX
+from armoor.comp.comparison import get_comparison
 from armoor.comp.stats import StatsComp
+from armoor.data.load import StagedDataset
 import armoor  # noqa: F401 — registers all xarray accessors
 from armoor.diags.parcels import Parcels
 
@@ -28,27 +28,55 @@ logger = logging.getLogger(__name__)
 DATA_TYPES = ("prod", "ref", "comp")
 EPOCH = "1950-01-01"
 
-_DRIFTER_OTYPE_REMAP = {
-    "timeseries": "timeseries_drifter",
-    "maps_current": "maps_current_drifter",
-    "maps_trajectory": "maps_trajectory_drifter",
-}
+# Re-exported for backward compatibility (still imported directly by tests).
+_DRIFTER_OTYPE_REMAP = get_comparison("comp_drifter").otype_remap
 
 
+def _compute_oceanvars(ds, func_comp):
+    """Compute derived oceanographic variables on a colocated dataset.
+
+    Derived variables (pdens, sndspeed, temp-from-ptemp, …) are computed
+    here rather than during colocation so that the expensive gsw calls
+    run on the small colocated data, not the full product grid.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Colocated dataset to augment in place.
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_sst"``).
+
+    Returns
+    -------
+    xarray.Dataset
+        `ds`, with any missing comparison variables added where derivable.
+    """
+    return get_comparison(func_comp).compute_oceanvars(ds)
 
 
 def check_output(func_name, outputs):
-    for oname, output in outputs.items():
-        if func_name == "comp_drifter":
-            otype = output.get('otype')
-            if otype in _DRIFTER_OTYPE_REMAP:
-                output["otype"] = _DRIFTER_OTYPE_REMAP[otype]
-        if output.get('otype') not in OUTPUTS_PARAMS[func_name].keys():
-            raise ArmoorError(
-                f"Not implemented output for {func_name}: {output}"
-                )
-    return outputs
-        
+    """Validate that every requested output type is implemented.
+
+    Parameters
+    ----------
+    func_name : str
+        Comparison type identifier (e.g. ``"comp_sst"``).
+    outputs : dict
+        Mapping of output name to output configuration.
+
+    Returns
+    -------
+    dict
+        `outputs`, unchanged (or with ``"otype"`` remapped for comp_drifter).
+
+    Raises
+    ------
+    ArmoorError
+        If an output's ``"otype"`` is not implemented for `func_name`.
+    """
+    return get_comparison(func_name).check_output(outputs)
+
+
 def _convert_time_to_epoch_seconds(ds, epoch=EPOCH):
     """Convert dataset time coordinates to seconds since epoch."""
     return [
@@ -141,8 +169,13 @@ def preproc_comp_drifter(zins, odt, runtime=None):
         logger.info(drifter)
         for prod, zs in prods.items():
             logger.info(f"Prod: {prod}")
-            zref = [z for z in zs if "ref_" in str(z)][0]
-            zprod = [z for z in zs if "prod_" in str(z)][0]
+            # "ref"/"prod" is always the filename prefix (`save_datasets`),
+            # but the "_<suffix>" part is only appended when a time/vlevel/
+            # vrange attr was actually set -- comp_drifter's colocation has
+            # no "time" key and no vrange attr, so the plain "ref.zarr"/
+            # "prod.zarr" names have no underscore to match on.
+            zref = [z for z in zs if Path(z).name.startswith("ref")][0]
+            zprod = [z for z in zs if Path(z).name.startswith("prod")][0]
             ncprod, timeprod = _prepare_prod_for_parcels(zprod)
             zref = _interpolate_ref_and_run_parcels(
                 zref, odt, timeprod, ncprod, runtime
@@ -154,12 +187,24 @@ def preproc_comp_drifter(zins, odt, runtime=None):
     return zins
 
 def preproc_comp(func_comp, ncs, **kwargs):
-    if func_comp == "comp_drifter":
-        return preproc_comp_drifter(
-            ncs,
-            kwargs.get("freq_drift"),
-            runtime=kwargs.get("period_drift")
-            )
+    """Preprocess loaded inputs before output computation.
+
+    Parameters
+    ----------
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_drifter"``).
+    ncs : list of str
+        Paths to the loaded/colocated input files.
+    **kwargs
+        Comparison-specific extra arguments (e.g. ``freq_drift``).
+
+    Returns
+    -------
+    None or object
+        See `armoor.comp.comparison.Comparison.preproc`.
+    """
+    return get_comparison(func_comp).preproc(ncs, **kwargs)
+
 
 def concat_then_merge(datasets, dim="time"):
     """
@@ -249,16 +294,25 @@ def concat_then_merge(datasets, dim="time"):
         concat_groups = dominant + renamed_minor
 
     return xr.merge(concat_groups, combine_attrs="override")
-        
+
+
 class OutputProcessor:
     """
-    A class to handle output processing with statistical comparisons between 
+    A class to handle output processing with statistical comparisons between
     production and reference datasets.
     """
-    
+
     def __init__(self, func_comp=None):
-        """Initialize the OutputProcessor."""
+        """Initialize the OutputProcessor.
+
+        Parameters
+        ----------
+        func_comp : str, optional
+            Comparison type identifier (e.g. ``"comp_sst"``), used to look
+            up the `Comparison` instance driving output/compatibility rules.
+        """
         self.func_comp = func_comp
+        self.comparison = get_comparison(func_comp)
     
     def process_output(self, ocfg: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[str]]]:
         """
@@ -305,7 +359,7 @@ class OutputProcessor:
             return {output: {metazone: []}}
         
         # Get output parameters and initialize result structure
-        output_params = OUTPUTS_PARAMS[self.func_comp][output]
+        output_params = self.comparison.outputs_params[output]
         ncouts = {output: {metazone: []}}
         ref_ncins = mparams.get("ncins")
         
@@ -321,8 +375,9 @@ class OutputProcessor:
                 sorted_prods, mparams, output_params, output
                 )
             # Save outputs
+            staged = StagedDataset("", metazone=metazone, comp_func=self.func_comp, stage="output")
             output_files = self._save_outputs(
-                processed_datasets, sorted_prods, metazone, 
+                processed_datasets, sorted_prods, staged,
                 ref_name, output, output_params
                 )
             
@@ -332,89 +387,6 @@ class OutputProcessor:
             del processed_datasets
             gc.collect()
         return ncouts
-    
-    def _drifter(self, dsref, dsprod, output):
-        """Compute drifter-specific comparison metrics.
-
-        For timeseries_drifter: computes haversine distance and bearing angle
-        differences between reference drifter trajectories and parcels-simulated
-        trajectories, averaged across all particles per time step.
-
-        For maps_current_drifter / maps_trajectory_drifter: no comparison is
-        computed (returns None); these outputs only need prod/ref data.
-
-        Parameters
-        ----------
-        dsref
-            Reference dataset with drifter positions.
-        dsprod
-            Production dataset with parcels simulation output.
-        output
-            Output type string.
-
-        Returns
-        -------
-        xr.DataTree with 'diff' node containing distance/direction, or None.
-        """
-        if output in ("maps_current_drifter", "maps_trajectory_drifter"):
-            return None
-
-        coords = ["time", "lon", "lat"]
-        suff = "_parcels"
-        dsref = dsref[coords].set_coords(["time", "lat", "lon"]).squeeze()
-        vrenames = {f"{vname}{suff}": vname for vname in coords}
-        dsprod = dsprod[[f"{vname}{suff}" for vname in coords]]
-        dsprod = dsprod.rename_vars(vrenames)
-
-        data_list = []
-        for iptc in range(dsprod.sizes["trajectory_parcels"]):
-            dsparti = dsprod.isel(trajectory_parcels=iptc)
-            dsparti = dsparti.where(dsparti.time.notnull(), drop=True)
-            dsparti = dsparti.swap_dims({"obs_parcels": "time"})
-            dsdrift = dsref.sel(time=slice(dsparti.time.min(), dsparti.time.max()))
-            dsparti = dsparti.sel(time=slice(dsdrift.time.min(), dsdrift.time.max()))
-            dist = haversine(dsdrift.lon, dsdrift.lat, dsparti.lon, dsparti.lat)
-            bear_drift = bearing(
-                dsdrift.lon.isel(time=slice(1, None)),
-                dsdrift.lat.isel(time=slice(1, None)),
-                dsdrift.lon.isel(time=slice(None, -1)),
-                dsdrift.lat.isel(time=slice(None, -1))
-                )
-            bear_parti = bearing(
-                dsparti.lon.isel(time=slice(1, None)),
-                dsparti.lat.isel(time=slice(1, None)),
-                dsparti.lon.isel(time=slice(None, -1)),
-                dsparti.lat.isel(time=slice(None, -1))
-                )
-            angle = (((bear_drift - bear_parti) + 180) % 360) - 180
-            if isinstance(angle, np.float64):
-                angle = [angle]
-            angle = np.concatenate([[0], angle])
-            data_list.append(pd.DataFrame({
-                'time': (dsparti.time - dsparti.time.min()).values / pd.to_timedelta("1d"),
-                'dist': dist.values if hasattr(dist, 'values') else dist,
-                'angle': angle.values if hasattr(angle, 'values') else angle
-            }))
-
-        df_all = pd.concat(data_list, ignore_index=True)
-        grouped = df_all.groupby('time').agg({
-            'dist': 'mean',
-            'angle': 'mean'
-        })
-        dtcomps = xr.DataTree(name="comps")
-        dtcomps.update(xr.DataTree.from_dict({
-            "diff": xr.Dataset(
-                data_vars=dict(
-                    distance=(["time"], grouped['dist'].values),
-                    direction=(["time"], grouped['angle'].values)
-                    ),
-                coords=dict(
-                    time=grouped.index.values
-                    )
-                )
-            }))
-        return dtcomps
-                
     
     def _parse_configuration(self, ocfg: List[Dict[str, Any]]) -> Tuple[str, str, Dict[str, Any], Dict[str, Any]]:
         """
@@ -458,35 +430,7 @@ class OutputProcessor:
         -------
         True if compatible, False otherwise
         """
-        try:
-            if self.func_comp == "comp_drifter" and output in _DRIFTER_OTYPE_REMAP:
-                output = _DRIFTER_OTYPE_REMAP[output]
-            output_config = OUTPUTS_PARAMS[self.func_comp][output]
-        except KeyError:
-            logger.warning(f"Output type '{output}' not found in OUTPUTS_PARAMS for {self.func_comp}")
-            return False
-        
-        # Check required parameters
-        if output_config.get("mparams_pro"):
-            for dim, required_params in output_config.get("mparams_pro").items():
-                if not bool(set(required_params) & set(mparams.keys())):
-                    logger.info(
-                        f"{output} cannot be processed for {metazone} "
-                        f"caused by missing {required_params}"
-                    )
-                    return False
-        
-        # Check conflicting parameters
-        if output_config.get("mparams_con"):
-            for dim, conflicting_params in output_config.get("mparams_con").items():
-                if bool(set(conflicting_params) & set(mparams.keys())):
-                    logger.info(
-                        f"{output} cannot be processed for {metazone} "
-                        f"caused by conflicting {conflicting_params}"
-                    )
-                    return False
-        
-        return True
+        return self.comparison.validate_output_compatibility(oparams, mparams, metazone, output)
     
     def _sort_products(self, prods: Dict[str, Dict[str, List]], 
                       output_params: Dict[str, Any]) -> Dict[str, Dict[str, Dict]]:
@@ -583,7 +527,11 @@ class OutputProcessor:
             Metazone parameters
         output_params
             Output parameters
-            
+        output
+            Output type name (``otype``), forwarded to
+            `Comparison.compute_comparison` for comparison types that
+            override the generic statistics (e.g. comp_drifter).
+
         Returns
         -------
         Dictionary containing lists of computed statistics for each data type
@@ -612,7 +560,6 @@ class OutputProcessor:
             for file_idx in range(num_files):
                 ds_prod = prod_datasets[file_idx]
                 ds_ref = ref_datasets[file_idx]
-
                 # Colocation runs once per metazone and is shared by every
                 # otype, so a sort_key bucket here can also hold the
                 # mld-only file (no "z", split apart upstream by dims
@@ -687,8 +634,7 @@ class OutputProcessor:
         dt_prod, dt_ref, dt_comps = StatsComp(
             mparams, ds_prod, ds_ref, stats
         ).compute()
-        if self.func_comp == "comp_drifter":
-            dt_comps = self._drifter(ds_ref, ds_prod, output)
+        dt_comps = self.comparison.compute_comparison(dt_comps, ds_ref, ds_prod, output)
         if closest_ds is not None:
             dt_prod.update(xr.DataTree.from_dict({"closest": closest_ds}))
 
@@ -741,6 +687,10 @@ class OutputProcessor:
                 # `ds_name`.
                 concatenated_dataset = datasets
             else:
+                logger.info(
+                        "Concatenation request: %s datasets: %s",
+                        len(datasets),
+                        datasets)
                 raise ArmoorError("Multi-dataset concatenation not implemented")
 
             concatenated_data[ds_name] = concatenated_dataset
@@ -774,42 +724,42 @@ class OutputProcessor:
         concatenated = concat_then_merge(datasets)
 
         # Preserve vrange attributes if present in any dataset
-        vrange_attrs = [ds.attrs.get("vrange") for ds in datasets if ds.attrs.get("vrange")]
+        vrange_attrs = [ds.range.vrange_value for ds in datasets if ds.range.vrange_value]
         if vrange_attrs:
             concatenated.attrs["vrange"] = vrange_attrs
 
         return concatenated
     
-    def _save_outputs(self, processed_datasets: Dict[str, Dict], 
+    def _save_outputs(self, processed_datasets: Dict[str, Dict],
                      sorted_prods: Dict[str, Dict],
-                     metazone: str, ref_name: str, output: str,
+                     staged: StagedDataset, ref_name: str, output: str,
                      output_params: Dict[str, Any]) -> List[str]:
         """
         Save processed datasets to output files.
-        
+
         Parameters
         ----------
         processed_datasets
             Processed datasets organized by product and type
         sorted_prods
             Sorted product information
-        metazone
-            Metazone name
+        staged
+            Pipeline context (comp_func/metazone) for this output run
         ref_name
             Reference dataset name
         output
             Output type name
         output_params
             Output configuration parameters
-            
+
         Returns
         -------
         List of saved output file paths
         """
         output_files = []
-        
+
         # Create base output directory
-        dirout = Path(f"{self.func_comp}/output/{metazone}/{ref_name}/{output}")
+        dirout = staged.output_dir("output", ref_name=ref_name, output=output)
         
         # Get all sorting keys
         sort_keys = list(sorted_prods[list(sorted_prods.keys())[0]]["prod"].keys())
@@ -937,9 +887,17 @@ class OutputPipelineManager:
     """
     
     def __init__(self, func_comp=None):
-        """Initialize the OutputPipelineManager."""
+        """Initialize the OutputPipelineManager.
+
+        Parameters
+        ----------
+        func_comp : str, optional
+            Comparison type identifier (e.g. ``"comp_sst"``), used to look
+            up the `Comparison` instance driving output/preproc rules.
+        """
         self.processor = OutputProcessor(func_comp=func_comp)
         self.func_comp = func_comp
+        self.comparison = get_comparison(func_comp)
     
     def process_and_extract(self, output_config: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[str]]]:
         """
@@ -1037,18 +995,27 @@ class OutputPipelineManager:
         # Remove format specification and validate outputs
         output_configs = outputs.copy()
         output_configs.pop("fmt", None)
-        output_configs = check_output(self.func_comp, output_configs)
-        preproc = OUTPUTS_PARAMS[self.func_comp].get("preproc")
+        output_configs = self.comparison.check_output(output_configs)
+        preproc = self.comparison.outputs_params.get("preproc")
         # Prepare metazone configurations
         prepared_metazones = {}
         for metazone_name, metazone_config in metazones_in.items():
             if metazone_config:
                 ncins = ncs.get(metazone_name)
+                if not ncins:
+                    # No colocation output for this metazone at all (e.g. no
+                    # drifter/mooring/argo profile actually fell inside it
+                    # for the requested period) -- skip it instead of
+                    # crashing deep inside preproc() on a None ncins.
+                    logger.warning(
+                        f"No colocated input for metazone '{metazone_name}', skipping"
+                        )
+                    continue
                 if preproc:
-                    preproc_comp(self.func_comp, ncins, **kwargs)
+                    self.comparison.preproc(ncins, **kwargs)
                 prepared_metazones[metazone_name] = {
                     "ncins": ncins,
-                    "vars": COMP_VARS[self.func_comp],
+                    "vars": self.comparison.comp_vars,
                     **metazone_config.copy()
                 }
         

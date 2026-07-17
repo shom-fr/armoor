@@ -21,15 +21,15 @@ from pathlib import Path
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
 from armoor import ArmoorError
-from armoor.base.misc import (comma_separated, parse_coords,
-                              parse_mixed_param, parse_qc_tuple)
+from armoor.base.misc import comma_separated, parse_coords, parse_qc_tuple
 
 
 class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
                                  ArgumentDefaultsHelpFormatter):
     pass
 from armoor.cli import FILTERS_INI, COMP_INI, DATA_INI, METAZONES_INI, BULL_INI
-from armoor.cli.io import add_dask_parser_arguments, get_dask_args, add_comp_parser_arguments
+from armoor.cli.io import (add_dask_parser_arguments, get_dask_args,
+                           add_comp_parser_arguments, add_tbound_parser_arguments)
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,15 @@ def _init_heavy():
     import armoor  # noqa: F401 — registers all xarray accessors
     from xoa.cfgm import register_validation_functions
     register_validation_functions(coordinates=parse_coords)
-    register_validation_functions(mlist=parse_mixed_param)
+
+
+_SUBSECTION_PRIMARY_KEY = {
+    "trange_seq": "tfreq",
+    "vlevel": "vname",
+    "vrange": "vname",
+    "vfreq": "vname",
+    "bathy": "path",
+}
 
 
 def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
@@ -89,8 +97,23 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
                     metazones_cfg[metazone].update({k: v})
     metazones = {}
     for metazone in metazones_arg:
+        # Subsections (trange_seq/vlevel/vrange/vfreq/bathy) are always
+        # materialized by configobj.validate(), filled with None sub-keys,
+        # even when the metazone never configures them. Drop them here so
+        # "key absent" still means "not configured" for every check below
+        # and every downstream consumer, and convert the ones that are
+        # configured from configobj.Section to a plain dict.
+        for key, primary in _SUBSECTION_PRIMARY_KEY.items():
+            value = metazones_cfg[metazone].get(key)
+            if isinstance(value, dict):
+                if value.get(primary) is None:
+                    del metazones_cfg[metazone][key]
+                else:
+                    metazones_cfg[metazone][key] = dict(value)
         if (metazones_cfg[metazone].get("tfreq") != None) & (metazones_cfg[metazone].get("thours") != None):
             raise ArmoorError(f"`tfreq` and `thours` cannot be configured together in {metazone}")
+        if (metazones_cfg[metazone].get("trange_seq") != None) & (metazones_cfg[metazone].get("tbound") == None):
+            raise ArmoorError(f"`trange_seq` argument needs `tbound` in {metazone}.")
         for k, v in metazones_cfg[metazone].items():
             if v == None:
                 del metazones_cfg[metazone][k]
@@ -217,6 +240,7 @@ def get_parser_data():
         help="Path of the configuration file dedicated to the description of metazones.",
         default="metazones.cfg"
         )
+    add_tbound_parser_arguments(parser)
     parser.add_argument(
         '--jsonfile',
         type=Path,
@@ -228,7 +252,7 @@ def get_parser_data():
         action='store_true',
         help="Use for exiting after filters processes.",
         )
-    
+
     return parser
 
 def main_data():
@@ -237,6 +261,7 @@ def main_data():
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs
     from armoor.base.misc import dict_to_list
+    from armoor.cli.io import get_dask_args
     from armoor.data.load import load_datasets
     from armoor.data.output import main_output as output_data
     _init_heavy()
@@ -267,10 +292,13 @@ def main_data():
 
     metazones = check_metazones_in(
        args.metazones,
-       metazones
+       metazones,
+       tbound=args.tbound
        )
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
+
+    kw_dask = get_dask_args(args)
 
     zarrs = load_datasets(cfg["data"], metazones, "data")
 
@@ -298,7 +326,7 @@ def main_data():
         else:
             if "png" in ofmt:
                 from armoor.data.plot import main_plot as plot_data
-                plot_data(zarr_outputs, metazones, outputs_cfg)
+                plot_data(zarr_outputs, metazones, outputs_cfg, kw_dask=kw_dask)
 
             zarr_outputs = dict_to_list(zarr_outputs)
 
@@ -404,13 +432,62 @@ def _detect_scheduler(hosts_cfg=None):
 def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
               ofilter, ocoloc, no_plot, plot_only, input_json,
               kw_dask, comp_args={}, load_only=None, input_zarrs=None):
+    """Run (a stage of) the armoor-comp-* pipeline: load, colocate, output, plot.
+
+    Also serves as the per-wave worker entry point for the HPC pipeline
+    (`armoor.cli.hpc.run_hpc`) via the `load_only`/`input_zarrs`/`no_plot`/
+    `plot_only` arguments, which each activate a single-stage mode instead
+    of running the full pipeline.
+
+    Parameters
+    ----------
+    cfgfile : Path
+        Path to the comp.ini-schema data/outputs configuration file.
+    metafile : Path
+        Path to the metazones.ini-schema metazone configuration file.
+    metazones : list of str
+        Metazone names to process.
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_sst"``).
+    jsonfile : Path
+        Output path for the final JSON listing generated files (may contain
+        a ``{func_comp}`` placeholder).
+    ofilter : bool
+        If True, stop after filtering/loading and write netcdf outputs.
+    ocoloc : bool
+        If True, stop after colocation and write netcdf outputs.
+    no_plot : bool
+        If True, skip plotting (HPC Wave-1 mode: compute outputs only).
+    plot_only : str or None
+        If set, skip load/coloc/output and only plot this otype from
+        `input_json` (HPC Wave-3 mode).
+    input_json : Path or None
+        Zarr-outputs JSON to read from when `plot_only` is set.
+    kw_dask : tuple
+        Dask configuration arguments (n_workers, ...).
+    comp_args : dict, optional
+        Extra comparison-specific arguments (e.g. ``qc``, ``tbound``,
+        ``radius``, ``freq_drift``, ``period_drift``).
+    load_only : str or None, optional
+        If set, only load this dataset key for all metazones and write its
+        zarr paths JSON (HPC Wave-0 mode).
+    input_zarrs : list of str or None, optional
+        Pre-loaded dataset JSONs to read from instead of calling
+        `load_datasets` (HPC Wave-1 mode).
+
+    Returns
+    -------
+    None
+        Results are written to `jsonfile` (and to zarr/netcdf/png files on
+        disk); nothing is returned.
+    """
     import dask
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs
     from armoor.base.misc import dict_to_list
-    from armoor.comp import METAZONE_PARAMS
+    from armoor.comp.comparison import get_comparison
     from armoor.comp.coloc import main_coloc
-    from armoor.data.load import load_datasets
+    from armoor.data.load import load_datasets, StagedDataset
 
     dask.config.set({
         'scheduler': 'threads',
@@ -441,13 +518,16 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
             return
         from armoor.comp.plot import main_plot as plot_comp
         metas = ConfigManager(METAZONES_INI).load(str(metafile))
-        metazones = check_metazones_in(metazones, metas, func_param=METAZONE_PARAMS[func_comp])
+        metazones = check_metazones_in(metazones, metas, func_param=get_comparison(func_comp).metazone_params)
         with open(input_json) as f:
             zarr_outputs = json.load(f)
         if plot_only not in zarr_outputs:
             logger.warning(f"otype '{plot_only}' not found in {input_json} — skipping.")
             return
-        png_paths = plot_comp({plot_only: zarr_outputs[plot_only]}, metazones, func_comp, kw_dask=kw_dask)
+        png_paths = plot_comp(
+            {plot_only: zarr_outputs[plot_only]}, metazones, func_comp,
+            cfg_outputs=cfg["outputs"], kw_dask=kw_dask
+            )
         if png_paths:
             _write_json(jsonfile, png_paths)
             logger.info(f"Find the list of generated files in: {jsonfile}")
@@ -460,7 +540,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
     metazones = check_metazones_in(
         metazones,
         metas,
-        func_param=METAZONE_PARAMS[func_comp],
+        func_param=get_comparison(func_comp).metazone_params,
         **comp_args
         )
 
@@ -473,7 +553,7 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
         for nc in (ncouts or []):
             if nc is None:
                 continue
-            mz_name = Path(nc).parts[2]
+            mz_name = getattr(nc, "metazone", None) or Path(nc).parts[2]
             mz_paths.setdefault(mz_name, []).append(str(Path(nc).resolve()))
         _write_json(jsonfile, mz_paths)
         return
@@ -488,7 +568,13 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
             try:
                 with open(zarr_json) as f:
                     paths = json.load(f)
-                zarr.extend(paths.get(mz_name, []))
+                # JSON round-trip strips any StagedDataset attributes -- these
+                # come back as plain strings, re-wrap them immediately so
+                # downstream code (main_coloc) has rich objects again.
+                zarr.extend(
+                    StagedDataset(p, metazone=mz_name, comp_func=func_comp, stage="load")
+                    for p in paths.get(mz_name, [])
+                    )
             except FileNotFoundError:
                 logger.warning(f"Input zarr JSON not found (skipping): {zarr_json}")
     else:
@@ -519,7 +605,10 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
                 png_paths = []
                 if "png" in ofmt:
                     from armoor.comp.plot import main_plot as plot_comp
-                    png_paths = plot_comp(zarr_outputs, metazones, func_comp, kw_dask=kw_dask)
+                    png_paths = plot_comp(
+                        zarr_outputs, metazones, func_comp,
+                        cfg_outputs=cfg.get("outputs"), kw_dask=kw_dask
+                        )
 
                 zarr_outputs = dict_to_list(zarr_outputs)
                 if "png" in ofmt and png_paths:

@@ -180,3 +180,39 @@ class TestRangeByTime:
         result = ds_time.range.by_time()
         for ds in result:
             assert "time" in ds.attrs
+
+
+# ---------------------------------------------------------------------------
+# ds.range read-side properties + suffix
+# ---------------------------------------------------------------------------
+
+class TestRangeReadProperties:
+    def test_properties_reflect_attrs_set_by_by_time(self, ds_time):
+        result = ds_time.range.by_time()[0]
+        assert result.range.time == result.attrs["time"]
+        assert result.range.suffix == f"_{result.attrs['time']}"
+
+    def test_properties_reflect_attrs_set_by_trange_seq(self, ds_time):
+        result = ds_time.range.trange_seq("2020-01-01", "2020-01-05", "2D")[0]
+        assert result.range.trange == result.attrs["trange"]
+        # trange is a bracketed range (e.g. "[t1_t2["); the brackets aren't
+        # filename-safe, so the suffix strips them.
+        stripped = result.attrs["trange"].replace("[", "").replace("]", "")
+        assert result.range.suffix == f"_{stripped}"
+
+    def test_properties_reflect_attrs_set_by_vlevels(self, ds_3d):
+        result = ds_3d.range.vlevels("depth")[0]
+        assert result.range.vlevel == result.attrs["vlevel"]
+        assert result.range.suffix == f"_{result.attrs['vlevel']}"
+
+    def test_properties_reflect_attrs_set_by_vrange(self, ds_3d):
+        result = ds_3d.range.vrange("depth", [(0, 50)])[0]
+        assert result.range.vrange_value == result.attrs["vrange"]
+        assert result.range.suffix == f"_{result.attrs['vrange']}"
+
+    def test_properties_are_none_and_suffix_empty_without_attrs(self, ds_time):
+        assert ds_time.range.time is None
+        assert ds_time.range.trange is None
+        assert ds_time.range.vlevel is None
+        assert ds_time.range.vrange_value is None
+        assert ds_time.range.suffix == ""

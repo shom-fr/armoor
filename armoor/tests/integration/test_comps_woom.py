@@ -8,6 +8,16 @@ Data downloads use ``--skip-existing`` so they are performed only once across
 the session, even when several comp tests run sequentially.  The shared data
 lives in ``scratch_dir`` (``$HOME/armoor_tests``) regardless of which
 workflow file triggered the download.
+
+``test_bull`` (defined last) exercises ``make_bull`` on its own, relying on
+the ``comp_sst``/``comp_argo``/``comp_mooring``/``comp_drifter`` run
+directories left in ``scratch_dir`` by the parametrized ``test_comp`` tests
+above — see its docstring. The production ``workflow.cfg`` no longer runs
+``comp``/``bull`` itself (this file is now the only place that does), since
+``comp_*``/``make_bull`` task run-dir lookups (``workflow.get_task_run_dir``)
+resolve through the shared taskmanager and ``scratch_dir`` regardless of
+which workflow/app triggered them — they don't need to be declared in the
+same workflow.cfg that runs make_bull.
 """
 
 import os
@@ -21,7 +31,7 @@ import woom.workflow as wworkflow
 # Geographic extent — must cover the polygon defined in metazones.cfg.
 # All comp functions use the same region.
 # ---------------------------------------------------------------------------
-REGION = {"lon_min": -14.0, "lon_max": -10.0, "lat_min": 45.0, "lat_max": 49.0}
+REGION = {"lon_min": -14.0, "lon_max": -7.0, "lat_min": 45.0, "lat_max": 49.0}
 
 # ---------------------------------------------------------------------------
 # Per-comp data dependencies (get_data tasks only)
@@ -34,6 +44,10 @@ COMP_DATA_DEPS = {
     "comp_drifter": "get_cmems_insitu,get_cmems_glo12_temp,get_cmems_glo12_sal,get_cmems_glo12_curr",
 }
 
+# comp_* tasks that make_bull (tasks.cfg) links artifacts from — comp_clim is
+# deliberately excluded, matching make_bull's own commandline.
+BULL_COMP_DEPS = ("comp_sst", "comp_argo", "comp_mooring", "comp_drifter")
+
 
 def _write_workflow_cfg(woomtmpdir, comp, get_data):
     """Write a minimal workflow cfg for *comp* into *woomtmpdir*."""
@@ -43,7 +57,7 @@ def _write_workflow_cfg(woomtmpdir, comp, get_data):
 name=TEST_{comp.upper()}
 
 [params]
-rundate=today
+rundate=2026-07-08
 lon_min={REGION['lon_min']}
 lon_max={REGION['lon_max']}
 lat_min={REGION['lat_min']}
@@ -51,7 +65,6 @@ lat_max={REGION['lat_max']}
 
 [stages]
     [[prolog]]
-    copernicus_login=copernicus_login
     get_data={get_data}
     comp={comp}
 """
@@ -118,4 +131,57 @@ def test_comp(comp, woom_env):
     cfg_path = _write_workflow_cfg(woomtmpdir, comp, get_data)
 
     workflow = wworkflow.Workflow(cfg_path, taskmanager)
+    _run_and_assert(workflow)
+
+
+def _write_bull_workflow_cfg(woomtmpdir):
+    """Write a workflow cfg that runs only ``make_bull`` into *woomtmpdir*."""
+    cfg_path = os.path.join(woomtmpdir, "workflow_bull.cfg")
+    content = f"""\
+[app]
+name=TEST_BULL
+
+[params]
+rundate=2026-07-08
+lon_min={REGION['lon_min']}
+lon_max={REGION['lon_max']}
+lat_min={REGION['lat_min']}
+lat_max={REGION['lat_max']}
+
+[stages]
+    [[prolog]]
+    bull=make_bull
+"""
+    with open(cfg_path, "w") as f:
+        f.write(content)
+    return cfg_path
+
+
+def test_bull(woom_env):
+    """Run make_bull alone, on top of the comp_* runs from ``test_comp``.
+
+    ``make_bull`` (see ``tasks.cfg``) locates its inputs via
+    ``workflow.get_task_run_dir('comp_sst')`` and friends, which resolve
+    through the shared taskmanager + ``scratch_dir`` — not through this
+    workflow's own task tree. So it finds the run directories that
+    ``test_comp[comp_sst|comp_argo|comp_mooring|comp_drifter]`` already
+    populated earlier in this same session, without re-running them.
+    This test therefore depends on those four ``test_comp`` cases having
+    already run in this session (guaranteed by top-to-bottom pytest
+    ordering within this module) and will fail if run in isolation.
+    """
+    taskmanager, woomtmpdir = woom_env
+    cfg_path = _write_bull_workflow_cfg(woomtmpdir)
+
+    workflow = wworkflow.Workflow(cfg_path, taskmanager)
+
+    missing = [
+        c for c in BULL_COMP_DEPS
+        if not os.path.isdir(workflow.get_task_run_dir(c))
+    ]
+    assert not missing, (
+        f"comp_* run dirs missing for {missing}: run test_comp for these "
+        "comps (or the full module) before test_bull"
+    )
+
     _run_and_assert(workflow)

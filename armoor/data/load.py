@@ -17,6 +17,7 @@ import armoor  # noqa: F401 — registers all xarray accessors (ds.filters, …)
 from armoor.base.io import (setup_dask_client, create_fast_encoding,
                             write_dataset_to_zarr, compute_bundled_zarr_writes)
 from armoor.base.misc import optimize_for_low_swap
+from armoor.data.datatype import get_data_type
 from armoor.data.open_decode import open_decode, register_cf
 
 
@@ -61,14 +62,12 @@ def build_filters_config(mz_param, data_name):
         filters_config['tsmooth'] = mz_param.get("tsmooth")
     
     if 'bathy' in mz_param:
-        # Assuming quality variable name based on data_name or a specific field
-        bathy_min = mz_param.get('bathy')[2]
-        bathy_max = mz_param.get('bathy')[3]
+        bathy = mz_param.get('bathy')
         filters_config['bathy'] = {
-            'path': mz_param.get('bathy')[0],
-            'fmt': mz_param.get('bathy')[1],
-            'min': None if bathy_min == "None" else float(bathy_min),
-            'max': None if bathy_max == "None" else float(bathy_max)
+            'path': bathy['path'],
+            'fmt': bathy['fmt'],
+            'min': bathy.get('min'),
+            'max': bathy.get('max'),
             }
     
     if 'oceanvars' in mz_param:
@@ -160,6 +159,7 @@ def process_single_combination(ds, mz_name, mz_param):
     
     data_name = ds.attrs["data_name"]
     data_ref = ds.attrs["data_ref"]
+    data_type = ds.attrs.get("data_type")
 
     # Build filters configuration
     filters_config = build_filters_config(mz_param, data_name)
@@ -182,18 +182,18 @@ def process_single_combination(ds, mz_name, mz_param):
         if any(dsout.sizes[dim] == 0 for dim in dsout.dims):
             logger.warning(f"Dataset empty after filtering for {combination_id}")
             return None
+        elif "time" not in dsout.dims:
+            logger.warning(f"No index found for coordinate 'time' for {combination_id}")
         elif dsout.sizes["time"] == 1:
             logger.warning(f"One time step in the filtered dataset for {combination_id}, this may cause troubleshooting.")
-        elif "time" not in dsout.dims:
-            logger.warning(f"no index found for coordinate 'time' for {combination_id}")
-            return None
-            
-    
+        #return None
+
     # Final metadata
     if dsout is not None:
         dsout.attrs = {
             "data_name": data_name,
             "data_ref": data_ref,
+            "data_type": data_type,
         }
 
     elapsed = time.time() - start_time
@@ -201,9 +201,165 @@ def process_single_combination(ds, mz_name, mz_param):
         
     return dsout
 
+class StagedDataset(str):
+    """A pipeline output path that also carries the config metadata it was
+    produced with (metazone, comp_func, ...).
+
+    Behaves identically to a plain str/path everywhere (isinstance str is
+    True, json.dumps serializes it as a plain string, Path(x) works, string
+    matching in main_coloc's file-index scan works) -- this is purely
+    additive metadata riding along on the same object, not a new on-disk
+    shape. Lets callers recover pipeline context without re-parsing it back
+    out of the path or re-threading it as separate loose parameters.
+
+    Any operation that returns a *new* plain str (slicing, str(x), a JSON
+    round-trip) drops these attributes -- they only survive as long as the
+    StagedDataset instance itself is passed along. Callers that cross a
+    JSON/process boundary (see armoor.cli.hpc/main.py's HPC waves) must
+    re-wrap the recovered path explicitly.
+    """
+
+    def __new__(cls, path, *, metazone=None, comp_func=None, stage=None,
+                fmt=None, platform=None, vlevel=None, vrange=None,
+                trange=None, time=None):
+        """Create a str instance carrying extra pipeline-context attributes.
+
+        Parameters
+        ----------
+        path : str
+            The output path (used as the string value itself).
+        metazone : str, optional
+            Metazone name to attach.
+        comp_func : str, optional
+            Comparison type identifier (e.g. ``"comp_sst"``).
+        stage : str, optional
+            Pipeline stage that produced this path (e.g. ``"load"``,
+            ``"coloc"``, ``"output"``).
+        fmt : str, optional
+            Original data.ini ``fmt`` value. Not yet populated by any
+            caller in this codebase; reserved for a future increment.
+        platform : str, optional
+            Original data.ini ``platform`` value. Not yet populated by any
+            caller in this codebase; reserved for a future increment.
+        vlevel : str, optional
+            The ``ds.range.vlevel`` value of the dataset this path was
+            written from, when it was produced by a vertical-level split.
+        vrange : str, optional
+            The ``ds.range.vrange_value`` value, when produced by a
+            vertical-range split.
+        trange : str, optional
+            The ``ds.range.trange`` value, when produced by a sequential
+            time-range split.
+        time : str, optional
+            The ``ds.range.time`` value, when produced by a per-time-step
+            split.
+
+        Returns
+        -------
+        StagedDataset
+            A str equal to `path`, carrying the given attributes.
+        """
+        obj = super().__new__(cls, path)
+        obj.metazone = metazone
+        obj.comp_func = comp_func
+        obj.stage = stage
+        obj.fmt = fmt
+        obj.platform = platform
+        obj.vlevel = vlevel
+        obj.vrange = vrange
+        obj.trange = trange
+        obj.time = time
+        return obj
+
+    def output_dir(self, stage, ref_name=None, prod_name=None, output=None):
+        """Build the per-stage output directory from this object's context.
+
+        Single source of truth for the ``<comp_func>/<stage>/<metazone>/...``
+        convention independently re-implemented in comp/coloc.py,
+        comp/output.py and comp/plot.py before this method existed.
+
+        Parameters
+        ----------
+        stage : str
+            Pipeline stage name (e.g. ``"coloc"``, ``"output"``, ``"plot"``).
+        ref_name : str, optional
+            Reference dataset name, appended if given.
+        prod_name : str, optional
+            Product dataset name, appended if given.
+        output : str, optional
+            Output/otype name, appended if given.
+
+        Returns
+        -------
+        pathlib.Path
+            The directory path for this stage/context.
+        """
+        parts = [self.comp_func or "", stage, self.metazone]
+        if ref_name:
+            parts.append(ref_name)
+        if prod_name:
+            parts.append(prod_name)
+        if output:
+            parts.append(output)
+        return Path(*[p for p in parts if p])
+
+    def with_range(self, ds, path=None, stage=None):
+        """Return a new StagedDataset carrying `ds`'s vlevel/vrange/trange/time.
+
+        Reads `ds.range.vlevel`/`.vrange_value`/`.trange`/`.time` (set by
+        `armoor.base.ranges`' split functions) so a later stage can recover
+        them from the path alone, without reopening the dataset just for
+        this metadata (e.g. `armoor.base.io.sort_ncs_by_suffix`).
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            The dataset this path is about to be/was written from.
+        path : str, optional
+            New path value; defaults to this object's own path (unchanged).
+        stage : str, optional
+            New stage value; defaults to this object's own stage (unchanged).
+
+        Returns
+        -------
+        StagedDataset
+            A new instance with metazone/comp_func/fmt/platform carried over
+            unchanged, and vlevel/vrange/trange/time set from `ds.range`.
+        """
+        return StagedDataset(
+            path if path is not None else str(self),
+            metazone=self.metazone,
+            comp_func=self.comp_func,
+            stage=stage if stage is not None else self.stage,
+            fmt=self.fmt,
+            platform=self.platform,
+            vlevel=ds.range.vlevel,
+            vrange=ds.range.vrange_value,
+            trange=ds.range.trange,
+            time=ds.range.time,
+        )
+
+
 def save_result(dsout, mz_name, func_comp):
-    """Sauvegarde optimisée (< 30s)."""
-    # Préparer les chemins
+    """Save a processed dataset to zarr (optimized for < 30s writes).
+
+    Parameters
+    ----------
+    dsout : xarray.Dataset
+        Processed dataset to save; must carry ``data_name``/``data_ref``
+        attrs (and, if present, ``data_type``).
+    mz_name : str
+        Metazone name, used in the output path.
+    func_comp : str or None
+        Comparison type identifier (e.g. ``"comp_sst"``), used as a path
+        prefix; when None/empty, the path omits it.
+
+    Returns
+    -------
+    StagedDataset
+        The zarr path written, carrying `mz_name` as its `.metazone`
+        attribute.
+    """
     refprod = "ref" if dsout.attrs["data_ref"] == "True" else "prod"
     data_name = dsout.attrs["data_name"]
     parent_dir = f"{func_comp}/metazones" if func_comp else "metazones"
@@ -236,7 +392,7 @@ def save_result(dsout, mz_name, func_comp):
     dsout.close()
     del dsout
     logger.info(f"Saved: {nc}")
-    return str(nc)
+    return StagedDataset(str(nc), metazone=mz_name, comp_func=func_comp, stage="load")
 
 def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     """Process a single dataset×metazone combination."""
@@ -734,6 +890,30 @@ def load_datasets(data_cfg, metazones, dirout):
 
     Small datasets (< threshold after prefilter) are passed directly to
     processing.  Large datasets use the two-phase pipelined zarr path.
+
+    Before decoding, each dataset's `fmt` is resolved to a
+    `armoor.data.datatype.DataType` and validated against `metazones` via
+    `DataType.validate_load_params` (e.g. rejects interpolation params on
+    eddy-detection inputs); the resolved type's name is then attached to
+    every decoded sub-dataset as ``ds.attrs["data_type"]``.
+
+    Parameters
+    ----------
+    data_cfg : dict
+        Mapping of dataset key to its data.ini-schema configuration (must
+        include ``name``, ``path``, ``fmt``, and may include ``platform``,
+        ``ref``).
+    metazones : dict
+        Mapping of metazone name to its parameters.
+    dirout : str
+        Output directory identifier, forwarded to `save_result` as
+        `func_comp` (path prefix).
+
+    Returns
+    -------
+    list of StagedDataset
+        Paths of the saved zarr outputs, one per dataset×metazone
+        combination that produced data.
     """
     register_cf()
     ncouts = []
@@ -745,6 +925,9 @@ def load_datasets(data_cfg, metazones, dirout):
         dataset_name = cfg_data["name"]
         logger.info(f"Load {dataset_name}...")
         start_time = time.time()
+
+        data_type = get_data_type(cfg_data["fmt"])
+        data_type.validate_load_params(cfg_data["fmt"], metazones)
 
         try:
             dss = open_decode(
@@ -766,6 +949,7 @@ def load_datasets(data_cfg, metazones, dirout):
             else:
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
             ds.attrs["data_ref"] = str(cfg_data.get("ref"))
+            ds.attrs["data_type"] = data_type.name
 
         # Apply union prefilter FIRST so the size decision is made on
         # the actual data volume, not the full global domain.

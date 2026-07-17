@@ -17,6 +17,9 @@ DEFAULT_LOGGING_CONFIG = {
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            # logging.StreamHandler defaults to sys.stderr; force stdout so
+            # routine progress logging doesn't get mixed in with real errors.
+            "stream": "ext://sys.stdout",
             "formatter": "brief",
             "level": "INFO",
         },

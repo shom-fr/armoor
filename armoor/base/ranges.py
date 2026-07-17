@@ -1,6 +1,7 @@
 import logging
 import re
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -12,8 +13,11 @@ def timegroups_to_list(grouped, label="trange"):
     dss = []
     for name, ds in grouped:
         dso = ds.copy()
-        tlabel = pd.to_datetime(name)
-        dso.attrs[label] = f"{tlabel:%Y-%m-%dT%H:%M:%S}"
+        if label == "time":
+            tlabel = pd.to_datetime(name)
+            dso.attrs[label] = f"{tlabel:%Y-%m-%dT%H:%M:%S}"
+        else:
+            dso.attrs[label] = f"[{name.left:%Y-%m-%dT%H:%M:%S}_{name.right:%Y-%m-%dT%H:%M:%S}["
         dss.append(dso)
     return dss
    
@@ -28,12 +32,8 @@ def trange_seq(ds, tstart, tend, tbin):
             "Use trange=1MS, 2MS... to specify a  monthly sequential range."
             )
     time_bins = pd.date_range(start=tstart, end=tend, freq=tbin)
-    labels = [
-        time_bins[it] + 0.5 * (time_bins[it + 1] - time_bins[it])
-        for it in range(len(time_bins) - 1)
-        ]
     grouped = ds.groupby_bins(
-        "time", time_bins, labels=labels, right=False
+        "time", time_bins, right=False
         )
     return timegroups_to_list(grouped, label="trange")
     
@@ -66,7 +66,32 @@ def vlevels(dssi, vname):
         var = dsi[vname]
         for ivlevel in range(var.sizes["z"]):
             vlevel = var.isel(z=ivlevel).values
+            # vname (e.g. "depth") can carry leftover non-"z" dims (e.g. a
+            # spurious "time" dim from concatenating multiple native files)
+            # even though the actual level is constant along them -- reduce
+            # to a plain scalar so it can be used as a label.
+            vlevel = float(np.asarray(vlevel).reshape(-1)[0])
             dso = dsi.isel(z=[ivlevel]).copy()
+            data_vars = [v for v in dso.data_vars if v != vname]
+            if data_vars and all(bool(dso[v].isnull().all()) for v in data_vars):
+                # Deepest native levels of a global-ocean model routinely
+                # have no valid data at all over a shallow/shelf regional
+                # subset (below the seafloor everywhere in it) -- skip
+                # rather than emit an empty group that later otypes
+                # (maps, profiles, diagts) can't render.
+                logger.info(
+                    f"Skipping vlevel {vlevel:.1f} -- no valid data anywhere"
+                    )
+                continue
+            # vname itself can be broadcast to leftover non-"z" dims from
+            # loading (e.g. armoor.data.open_decode's cmems_model loader
+            # broadcasts "depth" to the full (time,z,y,x) shape) -- now
+            # that this is a single level, replace it with a clean
+            # (z,)-only coordinate so downstream code isn't handed a
+            # "depth" that still varies along time/x/y/npts.
+            vname_attrs = dso[vname].attrs
+            dso = dso.assign_coords({vname: ("z", [vlevel])})
+            dso[vname] = dso[vname].assign_attrs(**vname_attrs)
             dso.attrs = dsi.attrs
             dso.attrs["vlevel"] = f"{vlevel:.1f}"
             dss.append(dso)
@@ -75,6 +100,6 @@ def vlevels(dssi, vname):
 def get_time_bins(start, end, tbin):
     return pd.date_range(
         start=pd.to_datetime(start),
-        end=pd.to_datetime(end),    
+        end=pd.to_datetime(end),
         freq=tbin,
         )

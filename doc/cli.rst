@@ -57,6 +57,12 @@ Decoding data consists in following armoor conventions :
     
 See armoor conventions for more variables in the :download:`cf.cfg <../armoor/data/cf.cfg>` file.
 
+Armoor can also decode outputs from the following eddy detection tools :
+
+    - `SHOOT <http://apps.shom.fr/shoot/index.html>`_,
+    - `py-eddy-tracker <https://py-eddy-tracker.readthedocs.io/en/stable/>`_
+    - SACSO-T (SOAP3.5).
+
 .. toctree::
    :maxdepth: 1
    

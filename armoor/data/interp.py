@@ -5,74 +5,20 @@ import pandas as pd
 import xarray as xr
 from xoa.geo import m2deg
 
-from armoor.__init__ import ArmoorError
+from armoor.base.dispatch import SubclassingMethodRegistry
 from armoor.base.interp import grid2loc, interp_time, vinterp, regrid, grid2section, coarsen as _coarsen
 
 logger = logging.getLogger(__name__)
 
-    
-class AbstractInterpolation:
-    """Abstract class for interpolation."""
-    
-    def __init__(self):
-        """Initialize the AbstractInterpolation instance with an empty dictionary to store methods."""
-        self.methods = {}
 
-    def register_method(self, func):
-        """Register a method in the methods dictionary.
+class AbstractInterpolation(SubclassingMethodRegistry):
+    """Abstract base for interpolation strategies (time/horizontal/vertical).
 
-        Parameters
-        ----------
-        func
-            The method to be registered.
+    Subclasses register their own methods for dispatch via `call`; see
+    `armoor.base.dispatch.SubclassingMethodRegistry`.
+    """
 
-        Returns
-        -------
-        The registered method.
-        """
-        self.methods[func.__name__] = func
-        return func
-
-    def __post_init__(self):
-        """Register all callable methods of the class after initialization.
-        
-        This method is called after the instance is initialized.
-        """
-        for name, method in vars(self.__class__).items():
-            if callable(method) and not name.startswith("__"):
-                self.register_method(method)
-
-    def call(self, method_name, *args, **kwargs):
-        """Call a method by its name.
-
-        Parameters
-        ----------
-        method_name: str
-            The name of the method to call.
-
-        Returns
-        -------
-        The result of the called method.
-
-        Raises
-        ------
-        AttributeError: If the method is not found.
-        """
-        method = self.methods.get(method_name)
-        if method:
-            return method(self, *args, **kwargs)
-        raise ArmoorError(f"Interpolation '{method_name}' not found")
-
-    def __init_subclass__(cls):
-        """Initialize the subclass by adding the __post_init__ method to the class.
-        
-        This method is called after the class is defined.
-        """
-        def __post_init__(self):
-            for name, method in vars(cls).items():
-                if callable(method) and not name.startswith("__"):
-                    self.register_method(method)
-        cls.__post_init__ = __post_init__
+    _dispatch_label = "Interpolation"
 
 
 class TimeInterpolation(AbstractInterpolation):
@@ -277,40 +223,40 @@ class VerticalInterpolation(AbstractInterpolation):
         self.methods = {}
         self.logger = logging.getLogger(__name__)
         
-    def vlevel(self, args: (str, list)):
+    def vlevel(self, args: dict):
         """Interpolate datasets to specified vertical levels.
-        
+
         Parameters
         ----------
         args: dict
-            A dictionary with a single key-value pair where the key is the vertical coordinate name
-            and the value is a list of vertical levels to interpolate to.
-        
+            Dict with a ``vname`` key (the vertical coordinate name) and a
+            ``levels`` key (the list of vertical levels to interpolate to).
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
-        vname = args[0]
-        vlevels = args[1]
+        vname = args["vname"]
+        vlevels = args["levels"]
         return self._vinterp_(vname, vlevels)
-        
-    def vfreq(self, args: (str, list)):
+
+    def vfreq(self, args: dict):
         """Interpolate datasets to specified a vertical step.
-        
+
         Parameters
         ----------
         args: dict
-            A dictionary with a single key-value pair where the key is the vertical coordinate name
-            and the value is a list of vertical levels to interpolate to.
-        
+            Dict with a ``vname`` key (the vertical coordinate name) and a
+            ``step`` key (the vertical step to interpolate on).
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
-        vname = args[0]
-        vfreq = float(args[1])
+        vname = args["vname"]
+        vfreq = float(args["step"])
         vlevels = np.arange(
             self.ds[vname].min(),
             self.ds[vname].max(),
@@ -333,7 +279,10 @@ class VerticalInterpolation(AbstractInterpolation):
         xarray.Dataset, xarray.Dataset
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
-        vlevels = xr.DataArray(vlevels, dims="z", name=vname)
+        # xoa's regrid1d requires monotonically sorted target levels --
+        # passed out of order (e.g. metazones.cfg's `levels=10,1000,500`),
+        # it silently interpolates most cells to NaN instead of raising.
+        vlevels = xr.DataArray(sorted(vlevels), dims="z", name=vname)
         attrs = self.ds.attrs
         if "z" in self.ds.dims:
             self.ds = vinterp(self.ds, vname, vlevels)

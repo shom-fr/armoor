@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from armoor.__init__ import ArmoorError
+from armoor.base.misc import validate_metazone_params
 
 logger = logging.getLogger(__name__)
 
@@ -20,31 +20,18 @@ def validate_colocation(metazones, params):
         A dictionary where keys are colocation types and values are lists
         of parameter pairs to validate.
 
+    Returns
+    -------
+    dict
+        A new dict mapping each metazone to its original params, or to
+        None where neither candidate of a pair is defined.
+
     Raises
     ------
     ArmoorError
         If both parameters are defined or neither is defined.
     """
-    for mz_name, mz_param in metazones.items():
-        for k, v in params.items():
-            if len(v) == 2:
-                param1, param2 = v[0], v[1]
-                val1 = mz_param.get(param1)
-                val2 = mz_param.get(param2)
-                if val1 is not None and val2 is not None:
-                    raise ArmoorError(
-                        f"Both '{param1}' and '{param2}' are defined for {mz_name}. "
-                        f"Please choose either '{param1}' or '{param2}' colocation."
-                    )
-                    
-                if val1 is None and val2 is None:
-                    logger.info(
-                        f"Neither '{param1}' nor '{param2}' is defined for {mz_name}. "
-                        f"Please choose either '{param1}' or '{param2}' colocation."
-                    )
-                    metazones[mz_name] = None
-                    continue
-    return metazones
+    return validate_metazone_params(metazones, params)
 
 def get_colocation_params(metazones, params_user, params_default=None):
     """

@@ -13,14 +13,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
+from tqdm import tqdm
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts
 
-from armoor.__init__ import ArmoorError
 from armoor.base import LINE_COLORS, CMAP_VARS
-from armoor.base.plot import create_subplots, diagdisp, save_figure
-from armoor.comp import GROUP_SUFFIX, METRIC_LABELS, TITLE_PLOTS
+from armoor.base.dispatch import MethodRegistry
+from armoor.base.plot import (create_subplots, diagdisp, format_time_label,
+                              format_vertical_label, get_output_vminmax,
+                              save_figure)
+from armoor.comp import GROUP_SUFFIX, METRIC_LABELS
+from armoor.comp.comparison import get_comparison
+from armoor.data.load import StagedDataset
 
 logger = logging.getLogger(__name__)
 
@@ -56,80 +61,111 @@ def _bin_datasets(node):
         return [node[c].to_dataset() for c in sorted(children, key=int)]
     return [node.to_dataset()]
 
+
+def _drifter_map_extent(lonmin, lonmax, latmin, latmax):
+    """Figure aspect ratio and padded (xlim, ylim) for a drifter map.
+
+    Pads the raw lon/lat extent by 15% on every side, then reconciles the
+    padded window's aspect ratio with whatever the figure box actually
+    ends up using once clamped to a readable range: a drifter track's
+    natural aspect is often far outside [0.4, 2.5] (long, mostly one-way
+    meanders). Growing the padded window here keeps the displayed extent
+    equal to what the box can show -- no invisible extra padding, and no
+    data ever cropped.
+
+    A `PlateCarree` axes' default `aspect='equal'` enforces *raw*
+    `dlat/dlon` (degrees as literal equal units) -- it does NOT correct
+    for longitude foreshortening at latitude, despite `get_aspect()`
+    reporting `1.0` either way. If the figure box's own aspect (from
+    `aspect_ratio` below) doesn't match that raw degree ratio, cartopy
+    silently shrinks the axes within its box to reconcile them, which
+    reads as a large blank band around the map. Callers must pass
+    `geo_aspect` to `ax.set_aspect()` explicitly so the axes stretches
+    latitude the intended (cos-corrected) amount instead of enforcing
+    the uncorrected default -- confirmed empirically to make the axes
+    fill its box exactly, with zero shrink.
+
+    Parameters
+    ----------
+    lonmin, lonmax, latmin, latmax : float
+        Raw (unpadded) extent covering every track to be drawn.
+
+    Returns
+    -------
+    aspect_ratio : float
+        Clamped height/width ratio to build the figure with
+        (``figsize=(10, 10 * aspect_ratio)``).
+    xlim, ylim : list of float
+        ``[min, max]`` pairs ready for ``ax.set_xlim``/``set_ylim``.
+    geo_aspect : float
+        Pass to ``ax.set_aspect(geo_aspect)`` right after setting
+        xlim/ylim, so the axes' enforced aspect matches
+        `aspect_ratio` instead of the uncorrected raw-degree default.
+    """
+    dlon = lonmax - lonmin
+    dlat = latmax - latmin
+    mid_lat = 0.5 * (latmin + latmax)
+    cosfac = np.cos(np.radians(mid_lat))
+    aspect_ratio = min(max(dlat / (dlon * cosfac), 0.4), 2.5)
+
+    view_lonmin, view_lonmax = lonmin - 0.15 * dlon, lonmax + 0.15 * dlon
+    view_latmin, view_latmax = latmin - 0.15 * dlat, latmax + 0.15 * dlat
+    view_dlon = view_lonmax - view_lonmin
+    view_dlat = view_latmax - view_latmin
+    view_aspect = view_dlat / (view_dlon * cosfac)
+    if view_aspect > aspect_ratio:
+        target_dlon = view_dlat / (aspect_ratio * cosfac)
+        extra = 0.5 * (target_dlon - view_dlon)
+        view_lonmin, view_lonmax = view_lonmin - extra, view_lonmax + extra
+    elif view_aspect < aspect_ratio:
+        target_dlat = view_dlon * aspect_ratio * cosfac
+        extra = 0.5 * (target_dlat - view_dlat)
+        view_latmin, view_latmax = view_latmin - extra, view_latmax + extra
+
+    return aspect_ratio, [view_lonmin, view_lonmax], [view_latmin, view_latmax], 1 / cosfac
+
+
 matplotlib.use('Agg')
 plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({'font.size': 8})
 
 
-class PlotComp:
-    """Class for plot comparison."""
-    
-    def __init__(self, nc, func_comp, metazone):
-        """Initialize the AbstractPlotComp instance with an empty dictionary to store methods."""
+class PlotComp(MethodRegistry):
+    """Generate comparison plots (dispersion diagrams, profiles, maps, time
+    series) from a colocated armoor-comp-* output datatree.
+
+    Plot methods are dispatched by name via `call` (see
+    `armoor.base.dispatch.MethodRegistry`).
+    """
+
+    _dispatch_label = "Comparison plot"
+
+    def __init__(self, nc, func_comp, metazone, vminmax=None):
+        """Initialize the plotter and open the output datatree.
+
+        Parameters
+        ----------
+        nc : str
+            Path to the zarr datatree holding the comparison output.
+        func_comp : str
+            Comparison type identifier (e.g. ``"comp_sst"``), used to look
+            up the plot title via `armoor.comp.comparison.get_comparison`.
+        metazone : str
+            Metazone name, used in plot titles/filenames.
+        vminmax : dict, optional
+            Mapping of variable name to a ``(vmin, vmax)`` pair, overriding
+            the automatic color scaling for that variable (see `maps`).
+        """
         self.methods = {}
         self.func_comp = func_comp
         self.metazone = metazone
+        self.staged = StagedDataset("", metazone=metazone, comp_func=func_comp, stage="plot")
         self.ax_minimap = [0.7, 0.91, 0.19]
-        self.plot_title = TITLE_PLOTS[func_comp]
+        self.plot_title = get_comparison(func_comp).title
         self.dt = xr.open_datatree(nc)
         self.saved_files = []
+        self.vminmax = vminmax
         self.__post_init__()
-
-    def register_method(self, func):
-        """Register a method in the methods dictionary.
-
-        Parameters
-        ----------
-        func
-            The method to be registered.
-
-        Returns
-        -------
-        The registered method.
-        """
-        self.methods[func.__name__] = func
-        return func
-
-    def __post_init__(self):
-        """Register all callable methods of the class after initialization.
-        
-        This method is called after the instance is initialized.
-        """
-        for name, method in vars(self.__class__).items():
-            if callable(method) and not name.startswith("__"):
-                self.register_method(method)
-
-    def call(self, method_name, *args, **kwargs):
-        """Call a method by its name.
-
-        Parameters
-        ----------
-        method_name: str
-            The name of the method to call.
-
-        Returns
-        -------
-        The result of the called method.
-
-        Raises
-        ------
-        AttributeError: If the method is not found.
-        """
-        method = self.methods.get(method_name)
-        if method:
-            return method(self, *args, **kwargs)
-        raise ArmoorError(f"Comparison plot '{method_name}' not found")
-
-    def __init_subclass__(cls):
-        """Initialize the subclass by adding the __post_init__ method to the class.
-        
-        This method is called after the class is defined.
-        """
-        def __post_init__(self):
-            for name, method in vars(cls).items():
-                if callable(method) and not name.startswith("__"):
-                    self.register_method(method)
-        cls.__post_init__ = __post_init__
 
 
     def clean(self):
@@ -205,13 +241,13 @@ class PlotComp:
                 units = dsref[var].attrs.get('units')
 
                 figtitle = (
-                    f"{self.plot_title} \n"
-                    f"{self.metazone} \n"
+                    f"{self.plot_title}\n"
+                    f"{self.metazone}\n"
                     f"{var}, {units}"
                     )
 
                 figname = (
-                    f"{self.func_comp}/plot/{self.metazone}/{ref_name}/"
+                    f"{self.staged.output_dir('plot', ref_name=ref_name)}/"
                     f"diagdisp_glob_{var}_{prod_name}.png"
                     )
                 self.diagdisp(
@@ -248,42 +284,22 @@ class PlotComp:
                     dsref = dsref.mean(dim="member", keep_attrs=True)
 
                 attrs = dsref.attrs
-                ncname = ""
-                xtitle = ""
-                trange = attrs.get("trange")
-                if trange:
-                    xtitle += f"{trange} "
-                    ncname += f"_{trange}"
-                elif dsref.sizes["time"] == 1:
-                    time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
-                    xtitle += f"{time}"
-                    ncname += f"_{time}"
+                xtitle, ncname = format_time_label(attrs, ds=dsref)
+                v_title, v_name = format_vertical_label(attrs)
+                if v_title:
+                    xtitle += f"\n{v_title}"
+                ncname += v_name
 
-                if "vlevel" in attrs:
-                    vlevel = attrs.get("vlevel")
-                    if isinstance(vlevel, list):
-                        vlevel = vlevel[0]
-                    ncname += f"_{vlevel}"
-                    xtitle += f" {vlevel} m"
-                elif "vrange" in attrs:
-                    vrange = attrs.get("vrange")
-                    if isinstance(vrange, list):
-                        vrange = vrange[0]
-                    ncname += f"_{vrange}"
-                    xtitle += f" {vrange}"
-                else:
-                    pass
-                
                 units = dsref[var].attrs.get('units')
-                    
-                figtitle = (
-                    f"{self.plot_title} \n"
-                    f"{self.metazone} \n {xtitle}\n "
-                    f"{var}, {units}"
-                    )
-                
+
+                title_lines = [self.plot_title, self.metazone]
+                if xtitle.strip():
+                    title_lines.append(xtitle.strip())
+                title_lines.append(f"{var}, {units}")
+                figtitle = "\n".join(title_lines)
+
                 figname = (
-                    f"{self.func_comp}/plot/{self.metazone}/{ref_name}/"
+                    f"{self.staged.output_dir('plot', ref_name=ref_name)}/"
                     f"diagdisp_sel_{var}_{prod_name}{ncname}.png"
                     )
                 
@@ -421,31 +437,23 @@ class PlotComp:
             dsref = dsref.stack({"npt": list(dsref.sizes.keys())})
             dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
             dsref = dsref.where(~dsref.ptemp.isnull(), drop=True)
-            trange = dsprod.attrs.get("trange")
-            vlevel = dsprod.attrs.get("vlevel")
-            vrange = dsprod.attrs.get("vrange")
-            xtitle = ""
-            xfigname = ""
-            if trange:
-                xtitle += f"{trange} "
-                xfigname += f"_{trange}"
-            if vlevel:
-                xtitle += f" {vlevel}"
-                xfigname += f"_{vlevel}"
-            elif vrange:
-                xtitle += f" {vrange}"
-                xfigname += f"_{vrange}"
-            
+            attrs = dsprod.attrs
+            xtitle, xfigname = format_time_label(attrs, ds=dsprod)
+            v_title, v_name = format_vertical_label(attrs)
+            if v_title:
+                xtitle += f"\n{v_title}"
+            xfigname += v_name
+
             refname = dsref.attrs.get("data_name")
             prodname = dsprod.attrs.get("data_name")
             figtitle = (
-                f"{self.plot_title} \n"
-                f"{prodname} vs {refname} \n"
+                f"{self.plot_title}\n"
+                f"{prodname} vs {refname}\n"
                 f"{self.metazone}\n"
                 f"{xtitle}"
                 )
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{refname}/"
+                f"{self.staged.output_dir('plot', ref_name=refname)}/"
                 f"mdiagts_{prod}{xfigname}.png"
                 )
                 
@@ -499,10 +507,10 @@ class PlotComp:
             xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
             xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
             if vrange:
-                xtitle += f"\n {vrange}"
+                xtitle += f"\n{vrange}"
                 xfigname  += f"_{vrange}"
             if vlevel:
-                xtitle += f"\n {vlevel}"
+                xtitle += f"\n{vlevel}"
                 xfigname  += f"_{vlevel}"
 
             fig, ax = create_subplots(
@@ -510,10 +518,11 @@ class PlotComp:
                 figsize=(5, 8),
                 )
             fig.suptitle(
-                f"{self.plot_title} \n"
-                f"{self.metazone} \n{xtitle}",
+                f"{self.plot_title}\n"
+                f"{self.metazone}\n{xtitle}",
                 y=1.01
                 )
+            fig.subplots_adjust(top=0.85)
             ax = ax[0]
             kw_ref = {"label": dsref.attrs["data_name"]}
             tsref = plot_ts(
@@ -564,7 +573,7 @@ class PlotComp:
                 )
             plot_minimap(dsref, fig=fig, ax=self.ax_minimap, **kw)
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{refname}/"
+                f"{self.staged.output_dir('plot', ref_name=refname)}/"
                 f"udiagts{xfigname}.png"
                 )
             self.save_figure(
@@ -672,31 +681,23 @@ class PlotComp:
 
             dsprod = dsprod.where(~dsprod.ptemp.isnull(), drop=True)
             dsref = dsref.where(~dsref.ptemp.isnull(), drop=True)
-            trange = dsprod.attrs.get("trange")
-            vlevel = dsprod.attrs.get("vlevel")
-            vrange = dsprod.attrs.get("vrange")
-            xtitle = ""
-            xfigname = ""
-            if trange:
-                xtitle += f"{trange} "
-                xfigname += f"_{trange}"
-            if vlevel:
-                xtitle += f"\n {vlevel}"
-                xfigname += f"_{vlevel}"
-            elif vrange:
-                xtitle += f"\n {vrange}"
-                xfigname += f"_{vrange}"
+            attrs = dsprod.attrs
+            xtitle, xfigname = format_time_label(attrs, ds=dsprod)
+            v_title, v_name = format_vertical_label(attrs)
+            if v_title:
+                xtitle += f"\n{v_title}"
+            xfigname += v_name
             var = "{var}"
             refname = dsref.attrs.get("data_name")
             prodname = dsprod.attrs.get("data_name")
             figtitle = (
-                f"{self.plot_title} \n"
-                f"{prodname} vs {refname} \n"
+                f"{self.plot_title}\n"
+                f"{prodname} vs {refname}\n"
                 f"{self.metazone}\n"
                 f"{xtitle}"
                 )
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{refname}/"
+                f"{self.staged.output_dir('plot', ref_name=refname)}/"
                 f"mvprofiles_{prod}_{var}{xfigname}.png"
                 )
 
@@ -788,7 +789,7 @@ class PlotComp:
             xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
             xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
             if vrange:
-                xtitle += f"\n {vrange}"
+                xtitle += f"\n{vrange}"
                 xfigname  += f"_{vrange}"
             for varname in dsref.data_vars:
                 units = dsref[varname].attrs.get("units")
@@ -802,10 +803,11 @@ class PlotComp:
                     figsize=(5, 8),
                     )
                 fig.suptitle(
-                    f"{self.plot_title} \n"
-                    f"{self.metazone} \n {xtitle}",
+                    f"{self.plot_title}\n"
+                    f"{self.metazone}\n{xtitle}",
                     y=1.01
                     )
+                fig.subplots_adjust(top=0.85)
                 ax = ax[0]
                 kw_ref = {"label": dsref.attrs["data_name"]}
                 ax.plot(
@@ -859,7 +861,7 @@ class PlotComp:
                 ax_minimap = plot_minimap((daref.lon, daref.lat), fig=fig, ax=self.ax_minimap, **kw)
 
                 figname = (
-                    f"{self.func_comp}/plot/{self.metazone}/{refname}/"
+                    f"{self.staged.output_dir('plot', ref_name=refname)}/"
                     f"uvprofiles_{varname}{xfigname}.png"
                     )
 
@@ -881,23 +883,7 @@ class PlotComp:
         ds_ref_std = dt_ref["std"].to_dataset()
         ref_name = ds_ref_data.attrs.get("data_name")
         attrs = ds_ref_data.attrs
-        ncname = ""
-        xtitle = ""
-
-        if "vlevel" in attrs:
-            vlevel = attrs.get("vlevel")
-            if isinstance(vlevel, list):
-                vlevel = vlevel[0]
-            ncname += f"_{vlevel}"
-            xtitle += f" {vlevel} m"
-        elif "vrange" in attrs:
-            vrange = attrs.get("vrange")
-            if isinstance(vrange, list):
-                vrange = vrange[0]
-            ncname += f"_{vrange}"
-            xtitle += f" {vrange}"
-        else:
-            pass
+        xtitle, ncname = format_vertical_label(attrs)
 
         if "npts" in ds_ref_mean.dims:
             npts = ds_ref_mean.sizes["npts"]
@@ -935,19 +921,21 @@ class PlotComp:
                 if npts > 1:
                     lon_pt = f"{ds_ref_data.lon.isel(npts=inpt):.2f}"
                     lat_pt = f"{ds_ref_data.lat.isel(npts=inpt):.2f}"
-                    xcoord = f"{lat_pt}°N; {lon_pt}°E\n"
+                    xcoord = f"{lat_pt}°N; {lon_pt}°E"
                 else:
                     xcoord = ""
                 for iprod in range(len(dts_prod)):
                     if iprod == 0:
                         da_ref = ds_ref_data[var]
                         units = da_ref.attrs.get("units")
-                        fig.suptitle(
-                            f"{self.plot_title} \n"
-                            f"{self.metazone} \n {xtitle} {xcoord}\n"
-                            f"{var}, {units} \n",
-                            y=1.01
-                            )
+                        title_lines = [self.plot_title, self.metazone]
+                        if xtitle.strip():
+                            title_lines.append(xtitle.strip())
+                        if xcoord:
+                            title_lines.append(xcoord)
+                        title_lines.append(f"{var}, {units}")
+                        fig.suptitle("\n".join(title_lines), y=1.01)
+                        fig.subplots_adjust(top=0.90)
                         lw = 2
                         da = ds_ref_mean[var].squeeze()
                         if npts > 1:
@@ -1067,18 +1055,8 @@ class PlotComp:
             ]
         attrs = ds_ref.attrs
         ref_name = attrs.get("data_name")
-        
-        ncname = ""
-        xtitle = ""
 
-        if "vlevel" in attrs:
-            vlevel = attrs.get("vlevel")
-            if isinstance(vlevel, list):
-                vlevel = vlevel[0]
-            ncname += f"_{vlevel}"
-            xtitle += f" {vlevel} m"
-        else:
-            pass
+        xtitle, ncname = format_vertical_label(attrs, allow_vrange=False)
         
         if "npts" in ds_ref.dims:
             npts = ds_ref.sizes["npts"]
@@ -1099,28 +1077,30 @@ class PlotComp:
                     x_label='Date', y_label=None,
                     sharex=True
                     )
+                xcoord = ""
                 if npts > 1:
                     da_ref = ds_ref[var].isel(npts=inpt)
                     das_prod = [ds[var].isel(npts=inpt) for ds in dss_prod]
                     das_comp = [ds[var].isel(npts=inpt) for ds in dss_comp]
                     lon_pt = f"{ds_ref.lon.isel(npts=inpt):.2f}"
                     lat_pt = f"{ds_ref.lat.isel(npts=inpt):.2f}"
-                    xtitle_pt = xtitle + f"{lat_pt}°N; {lon_pt}°E"
+                    xcoord = f"{lat_pt}°N; {lon_pt}°E"
                 else:
                     da_ref = ds_ref[var]
                     das_prod = [ds[var] for ds in dss_prod]
                     das_comp = [ds[var] for ds in dss_comp]
-                    xtitle_pt = xtitle
                 for iprod, da_prod in enumerate(das_prod):
 
                     if iprod == 0:
                         units = da_ref.attrs.get("units")
-                        fig.suptitle(
-                            f"{self.plot_title} \n"
-                            f"{self.metazone} \n {xtitle_pt}\n"
-                            f"{var}, {units} \n",
-                            y=1.01
-                            )
+                        title_lines = [self.plot_title, self.metazone]
+                        if xtitle.strip():
+                            title_lines.append(xtitle.strip())
+                        if xcoord:
+                            title_lines.append(xcoord)
+                        title_lines.append(f"{var}, {units}")
+                        fig.suptitle("\n".join(title_lines), y=1.01)
+                        fig.subplots_adjust(top=0.85)
                         lw = 2
                         axes[0].plot(
                             da_ref["time"],
@@ -1219,11 +1199,12 @@ class PlotComp:
             sharex=True
             )
         fig.suptitle(
-            f"{self.plot_title} \n"
-            f"{self.metazone} \n {ref_name}\n",
+            f"{self.plot_title}\n"
+            f"{self.metazone}\n{ref_name}",
             y=1.01
             )
-        
+        fig.subplots_adjust(top=0.85)
+
         plot_minimap(
             ds_ref.set_coords(["lon", "lat"]),
             ax=self.ax_minimap,
@@ -1278,28 +1259,33 @@ class PlotComp:
             ref_name = dsref.attrs.get("data_name")
                                         
             figtitle = (
-                f"{self.plot_title} \n"
+                f"{self.plot_title}\n"
                 f"{self.metazone}"
                 )
-                
-            dlat = dsref.lat.max() - dsref.lat.min()
-            dlon = dsref.lon.max() - dsref.lon.min()
-            mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
-            aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
+
+            # Extent must cover the simulated parcels too, not just the
+            # reference drifter -- they can spread well beyond its own
+            # track, and fixing the view to dsref alone would clip them.
+            lonmin = float(min(dsref.lon.min(), dsprod.lon_parcels.min()))
+            lonmax = float(max(dsref.lon.max(), dsprod.lon_parcels.max()))
+            latmin = float(min(dsref.lat.min(), dsprod.lat_parcels.min()))
+            latmax = float(max(dsref.lat.max(), dsprod.lat_parcels.max()))
+            aspect_ratio, xlim, ylim, geo_aspect = _drifter_map_extent(lonmin, lonmax, latmin, latmax)
             fig, axes = create_subplots(
                 layout_type="one",
                 figsize=(10, 10 * aspect_ratio),
                 x_label=None, y_label=None,
                 sharex=True, projection=ccrs.PlateCarree()
                 )
-            
-            lonmin = dsref.lon.min() - 0.5 * dlon
-            lonmax = dsref.lon.max() + 0.5 * dlon
-            latmin = dsref.lat.min() - 0.5 * dlat
-            latmax = dsref.lat.max() + 0.5 * dlat
-            axes[0].set_xlim([lonmin, lonmax])
-            axes[0].set_ylim([latmin, latmax])
-            
+
+            axes[0].set_xlim(xlim)
+            axes[0].set_ylim(ylim)
+            # The default aspect='equal' on a PlateCarree axes enforces
+            # raw dlat/dlon (no cos-latitude correction), which mismatches
+            # aspect_ratio above and makes cartopy shrink the axes inside
+            # its box -- set it explicitly so the axes fills its box.
+            axes[0].set_aspect(geo_aspect)
+
             axes[0].plot(
                 dsref.lon,
                 dsref.lat,
@@ -1322,10 +1308,16 @@ class PlotComp:
                     **kw
                     )
             
+            # figsize height scales with aspect_ratio while width stays
+            # fixed at 10in -- absolute point sizes would then read far
+            # smaller on a tall (high aspect_ratio) figure than on a
+            # short one, so scale text size by aspect_ratio to keep it
+            # visually consistent across metazones/products.
             handles, labels = axes[0].get_legend_handles_labels()
             fig.legend(handles, labels, ncol=1, loc='center left',
-                       edgecolor='gray', bbox_to_anchor=(0.11,0.94)) 
-            
+                       edgecolor='gray', bbox_to_anchor=(0.11,0.94),
+                       fontsize=8 * aspect_ratio)
+
             for iax, ax in enumerate(axes):
                 gl = axes[iax].gridlines(
                     crs=ccrs.PlateCarree(),
@@ -1337,13 +1329,15 @@ class PlotComp:
                     )
                 gl.top_labels = False
                 gl.right_labels = False
+                gl.xlabel_style = {'size': 8 * aspect_ratio}
+                gl.ylabel_style = {'size': 8 * aspect_ratio}
 
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" +
+                f"{self.staged.output_dir('plot', ref_name=ref_name)}/" +
                 f"map_drifter_trajectories_{prod_name}.png"
                 )
-            
-            fig.suptitle(figtitle, fontsize="x-large", y=0.95)
+
+            fig.suptitle(figtitle, fontsize=11.52 * aspect_ratio, y=0.95)
             
             self.save_figure(fig, figname)
             dsprod.close()
@@ -1356,40 +1350,47 @@ class PlotComp:
         """Plot maps per product."""
         for prod, node_prod in self.dt.children.items():
             dsprod = node_prod["prod/data"].to_dataset()
-            dsprod = dsprod.isel(time_drifter=[0])
-
+            # "npt" is the model-interpolated-onto-drifter-position track,
+            # one entry per drifter observation time (same length as
+            # dsref's own "time") -- keep it in full so both quivers show
+            # a comparable multi-point track instead of a single arrow.
             dsref = node_prod["ref/data"].to_dataset()
 
             prod_name = dsprod.attrs.get("data_name")
             ref_name = dsref.attrs.get("data_name")
 
             figtitle = (
-                f"{self.plot_title} \n"
+                f"{self.plot_title}\n"
                 f"{self.metazone}"
                 )
-                
-            dlat = dsref.lat.max() - dsref.lat.min()
-            dlon = dsref.lon.max() - dsref.lon.min()
-            mid_lat = 0.5 * (dsref.lat.min() + dsref.lat.max())
-            aspect_ratio = float(dlat / (dlon * np.cos(np.radians(mid_lat))))
-            
+
+            # Extent must cover the simulated drifter track too, not just
+            # the reference one -- it can drift well beyond the real
+            # track, and fixing the view to dsref alone would clip it.
+            lonmin = float(min(dsref.lon.min(), dsprod.lon_drifter.min()))
+            lonmax = float(max(dsref.lon.max(), dsprod.lon_drifter.max()))
+            latmin = float(min(dsref.lat.min(), dsprod.lat_drifter.min()))
+            latmax = float(max(dsref.lat.max(), dsprod.lat_drifter.max()))
+            aspect_ratio, xlim, ylim, geo_aspect = _drifter_map_extent(lonmin, lonmax, latmin, latmax)
+
             fig, axes = create_subplots(
                 layout_type="one",
                 figsize=(10, 10 * aspect_ratio),
                 x_label=None, y_label=None,
                 sharex=True, projection=ccrs.PlateCarree()
                 )
-            
-            lonmin = dsref.lon.min() - 0.5 * dlon
-            lonmax = dsref.lon.max() + 0.5 * dlon
-            latmin = dsref.lat.min() - 0.5 * dlat
-            latmax = dsref.lat.max() + 0.5 * dlat
-            axes[0].set_xlim([lonmin, lonmax])
-            axes[0].set_ylim([latmin, latmax])
-            
+
+            axes[0].set_xlim(xlim)
+            axes[0].set_ylim(ylim)
+            # The default aspect='equal' on a PlateCarree axes enforces
+            # raw dlat/dlon (no cos-latitude correction), which mismatches
+            # aspect_ratio above and makes cartopy shrink the axes inside
+            # its box -- set it explicitly so the axes fills its box.
+            axes[0].set_aspect(geo_aspect)
+
             dsprod = dsprod.squeeze()
             dsref = dsref.squeeze()
-            
+
             axes[0].quiver(
                 dsref.lon,
                 dsref.lat,
@@ -1409,10 +1410,16 @@ class PlotComp:
                 alpha=0.65,
                 )
             
+            # figsize height scales with aspect_ratio while width stays
+            # fixed at 10in -- absolute point sizes would then read far
+            # smaller on a tall (high aspect_ratio) figure than on a
+            # short one, so scale text size by aspect_ratio to keep it
+            # visually consistent across metazones/products.
             handles, labels = axes[0].get_legend_handles_labels()
             fig.legend(handles, labels, ncol=1, loc='center left',
-                       edgecolor='gray', bbox_to_anchor=(0.11, 0.94)) 
-            
+                       edgecolor='gray', bbox_to_anchor=(0.11, 0.94),
+                       fontsize=8 * aspect_ratio)
+
             for iax, ax in enumerate(axes):
                 gl = axes[iax].gridlines(
                     crs=ccrs.PlateCarree(),
@@ -1424,13 +1431,15 @@ class PlotComp:
                     )
                 gl.top_labels = False
                 gl.right_labels = False
-            
+                gl.xlabel_style = {'size': 8 * aspect_ratio}
+                gl.ylabel_style = {'size': 8 * aspect_ratio}
+
             figname = (
-                f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                f"{self.staged.output_dir('plot', ref_name=ref_name)}/" +
                 f"map_drifter_current_{prod_name}.png"
                 )
-            
-            fig.suptitle(figtitle, fontsize="x-large", y=0.95)
+
+            fig.suptitle(figtitle, fontsize=11.52 * aspect_ratio, y=0.95)
             
             self.save_figure(fig, figname)
             dsprod.close()
@@ -1485,43 +1494,19 @@ class PlotComp:
                     dsprod = dsprod_all[[var]]
                     
                     attrs = dsref.attrs
-                    ncname = ""
-                    xtitle = ""
-                    trange = attrs.get("trange")
-                    if trange:
-                        xtitle += f"{trange} "
-                        ncname += f"_{trange}"
-                    elif dsref.sizes.get("time") == 1:
-                        time = f"{pd.to_datetime(dsref.time.values[0]):%Y-%m-%dT%H:%M:%S}"
-                        xtitle += f"{time}"
-                        ncname += f"_{time}"
-                    elif "clim_month" in attrs:
-                        import calendar
-                        xtitle += calendar.month_name[attrs["clim_month"]]
-                        ncname += f"_m{attrs['clim_month']:02d}"
+                    xtitle, ncname = format_time_label(attrs, ds=dsref, allow_clim_month=True)
+                    v_title, v_name = format_vertical_label(attrs)
+                    if v_title:
+                        xtitle += f"\n{v_title}"
+                    ncname += v_name
 
-                    if "vlevel" in attrs:
-                        vlevel = attrs.get("vlevel")
-                        if isinstance(vlevel, list):
-                            vlevel = vlevel[0]
-                        ncname += f"_{vlevel}"
-                        xtitle += f" {vlevel} m"
-                    elif "vrange" in attrs:
-                        vrange = attrs.get("vrange")
-                        if isinstance(vrange, list):
-                            vrange = vrange[0]
-                        ncname += f"_{vrange}"
-                        xtitle += f" {vrange}"
-                    else:
-                        pass
-                    
                     units = dsref[var].attrs.get('units')
                     
-                    figtitle = (
-                        f"{self.plot_title} \n"
-                        f"{self.metazone} \n {xtitle}\n "
-                        f"{var}, {units}"
-                        )
+                    title_lines = [self.plot_title, self.metazone]
+                    if xtitle.strip():
+                        title_lines.append(xtitle.strip())
+                    title_lines.append(f"{var}, {units}")
+                    figtitle = "\n".join(title_lines)
                 
                     prod_name = dsprod.attrs["data_name"]
                     ref_name = dsref.attrs["data_name"]
@@ -1536,7 +1521,9 @@ class PlotComp:
                         cmin, cmax = 0, cstd
                     else:
                         cmin, cmax =  - cstd, cstd
-                    if comp == "diff":
+                    if self.vminmax and var in self.vminmax:
+                        vmin, vmax = self.vminmax[var]
+                    elif comp == "diff":
                         vmean = np.mean([dsprod.mean(), dsref.mean()])
                         vstd = np.mean([dsprod.std(), dsref.std()])
                         vmin, vmax = vmean - 1.75 * vstd, vmean + 1.75 * vstd
@@ -1627,8 +1614,8 @@ class PlotComp:
                         m2, ax=axes[2], orientation='vertical', fraction=0.02, pad=0.02, shrink=0.7
                         )
                     cbar2.set_label(METRIC_LABELS[comp])
-                    
-                    plt.subplots_adjust(hspace=0.02, wspace=0.01)
+
+                    plt.subplots_adjust(hspace=0.02, wspace=0.01, top=0.88)
                     for iax, ax in enumerate(axes):
                         gl = axes[iax].gridlines(
                             crs=ccrs.PlateCarree(),
@@ -1646,7 +1633,7 @@ class PlotComp:
                             )
                     
                     figname = (
-                        f"{self.func_comp}/plot/{self.metazone}/{ref_name}/" + 
+                        f"{self.staged.output_dir('plot', ref_name=ref_name)}/" +
                         f"map_{var}_{comp}_{prod_name}{ncname}.png"
                         )
                     
@@ -1673,9 +1660,9 @@ class PlotComp:
         plt.close(fig)
         del fig
 
-def _plot_task(nc, func_comp, metazone, output):
+def _plot_task(nc, func_comp, metazone, output, vminmax=None):
     """Single plot task — must be module-level for spawn pickling."""
-    plotcomp = PlotComp(nc, func_comp, metazone)
+    plotcomp = PlotComp(nc, func_comp, metazone, vminmax=vminmax)
     plotcomp.call(output)
     plotcomp.clean()
     saved = plotcomp.saved_files
@@ -1683,8 +1670,30 @@ def _plot_task(nc, func_comp, metazone, output):
     return saved
 
 
-def main_plot(ncins, metazones, func_comp, kw_dask=None):
+def _plot_task_star(args):
+    """Unpack one `main_plot` task tuple -- `imap_unordered` (unlike
+    `starmap`) only maps over a single iterable, so this adapts
+    `_plot_task`'s multi-arg signature to it."""
+    return _plot_task(*args)
+
+
+def main_plot(ncins, metazones, func_comp, cfg_outputs=None, kw_dask=None):
     """Process plot tasks in parallel using a multiprocessing pool.
+
+    Parameters
+    ----------
+    ncins : dict
+        Mapping of output name to ``{metazone: [zarr_paths]}``.
+    metazones : list of str
+        Metazone names to plot (others in `ncins` are skipped).
+    func_comp : str
+        Comparison type identifier (e.g. ``"comp_sst"``).
+    cfg_outputs : dict, optional
+        Mapping of output name to its output configuration (may hold a
+        ``vminmax`` entry), e.g. ``cfg["outputs"]`` from `COMP_INI`.
+    kw_dask : tuple, optional
+        Dask args as returned by `get_dask_args` (only `[0]`, the worker
+        count, is used here).
 
     Returns
     -------
@@ -1696,10 +1705,11 @@ def main_plot(ncins, metazones, func_comp, kw_dask=None):
     logger.info("Start plot")
     task_args = []
     for output, metas in ncins.items():
+        vminmax = get_output_vminmax(cfg_outputs, output)
         for metazone, ncs in metas.items():
             if metazone in metazones:
                 for nc in ncs:
-                    task_args.append((nc, func_comp, metazone, output))
+                    task_args.append((nc, func_comp, metazone, output, vminmax))
 
     if not task_args:
         return []
@@ -1715,12 +1725,13 @@ def main_plot(ncins, metazones, func_comp, kw_dask=None):
 
     # Use 'spawn' to create clean child processes: avoids both the
     # "fork() after OpenMP" crash and inherited memory bloat.
-    # ctx = multiprocessing.get_context("spawn")
-    # with ctx.Pool(num_workers) as pool:
-    #     results = pool.starmap(_plot_task, task_args)
-    results = []
-    for arg in task_args:
-        results.append(_plot_task(*arg))
+    ctx = multiprocessing.get_context("spawn")
+    with ctx.Pool(num_workers) as pool:
+        results = list(tqdm(
+            pool.imap_unordered(_plot_task_star, task_args),
+            total=len(task_args),
+            desc="Plotting figures",
+            ))
     png_paths = [p for task_result in results for p in (task_result or [])]
     logger.info(f"Generated {len(png_paths)} PNG file(s)")
     return png_paths

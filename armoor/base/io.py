@@ -13,7 +13,6 @@ from dask.diagnostics import ProgressBar
 # dask.distributed is imported lazily in setup_dask_client to avoid the
 # heavy import cost at module load time on NFS HPC filesystems.
 from numcodecs import Blosc
-from armoor.comp import COLOCATION_PARAMS_DEFAULT, COLOCATION_PARAMS_USER, COMP_VARS
 
 logger = logging.getLogger(__name__)
 
@@ -480,7 +479,7 @@ def write_dataset_to_zarr(
         compute=False,
         encoding=encoding,
         **kwargs
-    )
+        )
 
     if write_delayed is None:
         # Older xarray (< 2022.06) writes synchronously for non-dask datasets
@@ -641,6 +640,38 @@ def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, loca
     
     return kw_client
 
+def output_suffix(attrs):
+    """Build the ``_<time-or-trange>_<vlevel-or-vrange>`` output filename suffix.
+
+    Inverse of `extract_suffix_from_filename` below: reads the
+    ``time``/``trange``/``vlevel``/``vrange`` attrs set by
+    `armoor.base.ranges.tfreq`/`trange_seq`/`vlevels`/`vrange`; time-like
+    attrs take priority over the range-like ones when both happen to be set.
+    `trange` is a bracketed range (e.g. ``"[2020-01-01T00:00:00_2020-01-31T00:00:00["``)
+    -- the brackets aren't filename-safe, so they're stripped here.
+
+    Parameters
+    ----------
+    attrs : dict
+        A dataset's ``.attrs``.
+
+    Returns
+    -------
+    str
+        Empty string if none of the four attrs is present.
+    """
+    parts = []
+    if "time" in attrs:
+        parts.append(attrs["time"])
+    elif "trange" in attrs:
+        parts.append(re.sub(r"[\[\]]", "", attrs["trange"]))
+    if "vlevel" in attrs:
+        parts.append(attrs["vlevel"])
+    elif "vrange" in attrs:
+        parts.append(attrs["vrange"])
+    return "".join(f"_{p}" for p in parts)
+
+
 def extract_suffix_from_filename(filename):
     """
     Extracts 'time' and 'z' values from a filename in the format ref_[time]_[z].nc
@@ -657,37 +688,72 @@ def extract_suffix_from_filename(filename):
     """
     result = {'time': None, 'z': None}
     
+    sub_pattern_time = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+    pattern_time = rf'(_(?P<dates>{sub_pattern_time}(?:_{sub_pattern_time})?))'
+
+    pattern_z = r'_([0-9.-]+)'
+
     # Main pattern: ref_[time]_[z].nc
-    pattern_full = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})_([0-9.-]+)\.zarr'
+    pattern_full = rf'(?P<prefix>[^_]+){pattern_time}{pattern_z}\.zarr'
     match_full = re.search(pattern_full, filename)
     if match_full:
         result['time'] = match_full.group(2)
-        result['z'] = match_full.group(3)
-        return result
-    
+        result['z'] = match_full.group(4)
+
     # Partial pattern: ref_[time]_*.nc (time without z)
-    pattern_time_only = r'([^/]+)_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.zarr'
+    pattern_time_only = rf'(?P<prefix>[^_]+){pattern_time}\.zarr'
     match_time = re.search(pattern_time_only, filename)
-    
+
     if match_time:
-        result['time'] = match_time.group(2)
-    
+        result['time'] = match_time.groups()[-1]
+
     # Partial pattern: ref_*_[z].nc (z without valid time)
-    pattern_z_only = r'([^/]+)_([0-9.-]+)\.zarr'
+    pattern_z_only = rf'(?P<prefix>[^_]+){pattern_z}\.zarr'
     match_z = re.search(pattern_z_only, filename)
-    
     if match_z and not result['time']:  # Only if time not already found
         result['z'] = match_z.group(2)
+        
     return result
+
+def _range_info_from_staged(nc):
+    """Read time/vlevel-like info directly off a StagedDataset, if present.
+
+    Returns None when `nc` carries none of these attrs (e.g. a plain str,
+    or a StagedDataset from a stage that never set them), signalling the
+    caller should fall back to `extract_suffix_from_filename`.
+
+    Parameters
+    ----------
+    nc : str or armoor.data.load.StagedDataset
+        A path, possibly carrying `.time`/`.trange`/`.vlevel`/`.vrange`.
+
+    Returns
+    -------
+    dict or None
+        ``{"time": ..., "z": ...}`` (matching `extract_suffix_from_filename`'s
+        shape) if any of the four attrs is set, else None.
+    """
+    time_val = getattr(nc, "time", None)
+    if time_val is None:
+        trange_val = getattr(nc, "trange", None)
+        # trange is bracketed (e.g. "[t1_t2["); strip to match the
+        # filename-derived form output_suffix() already produces on disk.
+        time_val = re.sub(r"[\[\]]", "", trange_val) if trange_val else None
+    z_val = getattr(nc, "vlevel", None) or getattr(nc, "vrange", None)
+    if time_val is None and z_val is None:
+        return None
+    return {"time": time_val, "z": z_val}
+
 
 def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List[str]]:
     """Sort a list of NetCDF files by their suffix.
     """
     ncouts = {}
     for nc in ncs:
-        if not isinstance(nc, str):
-            nc = str(nc)
-        res = extract_suffix_from_filename(nc)
+        res = _range_info_from_staged(nc)
+        if res is None:
+            res = extract_suffix_from_filename(str(nc))
+
         if sort_dim == ["time", "z"]:
             if res.get("time") and res.get("z"):
                 suff = f"{res['time']}_{res['z']}"
@@ -709,24 +775,10 @@ def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List
                 suff = "None"
         else:
             suff = "None"
+
         if not ncouts.get(suff):
             ncouts[suff] = []
         
         ncouts[suff].append(nc)
 
     return ncouts
-
-
-def _compute_oceanvars(ds, func_comp):
-    """Compute derived oceanographic variables on a colocated dataset.
-
-    Derived variables (pdens, sndspeed, temp-from-ptemp, …) are computed
-    here rather than during colocation so that the expensive gsw calls
-    run on the small colocated data, not the full product grid.
-    """
-    for var in COMP_VARS[func_comp]:
-        if var not in ds.data_vars:
-            da = ds.oceanvars.sel(var)
-            if isinstance(da, xr.DataArray):
-                ds[var] = da
-    return ds

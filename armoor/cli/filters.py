@@ -3,25 +3,22 @@
 This module provides command-line interfaces for applying various types of filters
 (time, horizontal, quality) to oceanographic and meteorological data files.
 """
-import logging, shutil
+import logging
 import asyncio
 from argparse import ArgumentParser
-from dask.distributed import Client, LocalCluster
 import dask.config
-import xarray as xr
 
 import armoor  # noqa: F401 — registers ds.filters accessor
-from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
+from armoor.base.io import ArmoorArgumentHelpFormatter
 from armoor.base.misc import parse_date, parse_hours, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
-    get_dask_args,
     save_output,
-    check_insitu_platform
-)        
-from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.data.open_decode import open_decode, register_cf
+    armoor_cli_session,
+    open_decode_materialized,
+)
+from armoor.cli.log import add_logging_parser_arguments
 
 
 logger = logging.getLogger(__name__)
@@ -40,56 +37,33 @@ class FiltersError(Exception):
     pass
 
 
-def process_filters(fins, ifmt, platform, fout, ofmt, filters_config, kw_dask):
+def process_filters(args, filters_config):
     """Process input files by applying specified filters and saving output.
-    
+
     This function opens input files, applies the configured filters using
     Dask distributed computing, and saves the filtered results to the
     specified output format.
-    
+
     Parameters
     ----------
-    fins : list of str
-        List of input file paths to be processed.
-    ifmt : str
-        Input file format (e.g., 'netcdf', 'zarr').
-    fout : str
-        Output file path where filtered data will be saved.
-    ofmt : str
-        Output file format (e.g., 'netcdf', 'zarr').
+    args : argparse.Namespace
+        Parsed CLI arguments (fins, ifmt, platform, fout, ofmt, dask-*).
     filters_config : dict
         Dictionary containing filter configurations. Each key represents
         a filter type with its corresponding parameters.
-    
+
     Raises
     ------
     FiltersError
         If filters_config is empty or None.
-    
-    Examples
-    --------
-    >>> filters_config = {
-    ...     'time_selection': {'minimum': '2020-01-01', 'maximum': '2020-12-31'},
-    ...     'tide': 'godin'
-    ... }
-    >>> process_filters(['input.nc'], 'netcdf', 'output.nc', 'netcdf', filters_config)
     """
     if is_dict_empty(filters_config):
         raise FiltersError("No filters to be applied.")
-    
-    register_cf()
-    
-    check_insitu_platform(ifmt, platform)
-    
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            ds = open_decode(fins, ifmt, platform=platform)
-            save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
-            del ds
-            ds = xr.open_dataset("tmp.zarr")
+
+    with armoor_cli_session(args, (args.ifmt, args.platform)):
+        with open_decode_materialized(args.fins, args.ifmt, platform=args.platform) as ds:
             ds = ds.filters.combined(filters_config)
-            save_output(ds, fout, ofmt=ofmt, scheduler="threads")
-            shutil.rmtree("tmp.zarr")
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
 
 
 def get_parser_filters_time():
@@ -180,12 +154,9 @@ def main_filters_time():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
+
     filters_config = {}
-    
+
     # Date range
     date_range = args.date_range
     if date_range:
@@ -227,12 +198,7 @@ def main_filters_time():
             'tsmooth': smooth
             })
     
-    kw_dask = get_dask_args(args)
-    
-    process_filters(
-        args.fins, args.ifmt, args.platform, args.fout, args.ofmt, filters_config,
-        kw_dask
-        )
+    process_filters(args, filters_config)
 
 
 def get_parser_filters_horizontal():
@@ -341,12 +307,9 @@ def main_filters_horizontal():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
+
     filters_config = {}
-    
+
     coords = args.polygon_coords
     if coords:
         if len(coords) >= 3:
@@ -383,12 +346,7 @@ def main_filters_horizontal():
                 }
             })
         
-    kw_dask = get_dask_args(args)
-        
-    process_filters(
-        args.fins, args.ifmt, args.platform, args.fout, args.ofmt, filters_config,
-        kw_dask
-        )
+    process_filters(args, filters_config)
 
 def get_parser_filters_quality():
     """Create argument parser for quality control filtering operations.
@@ -461,12 +419,7 @@ def main_filters_quality():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    filters_config = {}
-   
+
     filters_config = {
         "quality":{
             "qname": args.vname,
@@ -474,13 +427,8 @@ def main_filters_quality():
             "qmax": args.qc_thr[1]
             }
         }
-    
-    kw_dask = get_dask_args(args)
-    
-    process_filters(
-        args.fins, args.ifmt, args.platform, args.fout, args.ofmt, filters_config,
-        kw_dask
-        )
+
+    process_filters(args, filters_config)
 
 def get_parser_filters_oceanvars():
     """Create argument parser for ocean variables filtering operations.
@@ -528,7 +476,7 @@ def main_filters_oceanvars():
     
     .. code-block:: bash
     
-        armoor-filters-quality input.nc output.nc ptemp sal
+        armoor-filters-oceanvars input.nc output.nc ptemp sal
     
     Notes
     -----
@@ -540,19 +488,9 @@ def main_filters_oceanvars():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    filters_config = {}
-   
+
     filters_config = {
         "oceanvars": args.vnames
         }
-    
-    kw_dask = get_dask_args(args)
-    
-    process_filters(
-        args.fins, args.ifmt, args.platform, args.fout, args.ofmt, filters_config,
-        kw_dask
-        )
+
+    process_filters(args, filters_config)

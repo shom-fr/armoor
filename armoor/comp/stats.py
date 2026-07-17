@@ -197,7 +197,7 @@ class StatsComp:
 
         # Handle time aggregation for trange view
         if "trange_seq" in self.mparams and "time" in dims:
-            trange_value = self.dsprod.attrs.get("trange")
+            trange_value = self.dsprod.range.trange
             if trange_value:
                 logger.debug("Assigning trange time coordinate: %s", trange_value)
                 self._apply_time_coord(trange_value)
@@ -210,6 +210,24 @@ class StatsComp:
     def _update_tree(tree: xr.DataTree, name: str, ds: xr.Dataset):
         """Insert dataset into a DataTree child node."""
         tree.update(xr.DataTree.from_dict({name: ds}))
+
+    @staticmethod
+    def _mean_preserving_coords(ds: xr.Dataset, dim: str) -> xr.Dataset:
+        """Reduce over `dim`, keeping any coordinate that depends on it.
+
+        xarray silently drops non-index coordinates that depend on a
+        reduced dimension instead of averaging them (e.g. a drifter's
+        real per-observation lat/lon, which vary with "time") -- reset
+        them to data variables first so they survive the reduction as
+        an averaged position, then restore their coordinate status.
+        """
+        coord_deps = [c for c in ds.coords if c != dim and dim in ds[c].dims]
+        if coord_deps:
+            ds = ds.reset_coords(coord_deps)
+        ds_mean = ds.mean(dim)
+        if coord_deps:
+            ds_mean = ds_mean.set_coords(coord_deps)
+        return ds_mean
 
     # -------------------------------------------------------------------------
 
@@ -245,7 +263,11 @@ class StatsComp:
             ds = ds.drop_vars("time")
 
         ds = ds.expand_dims("time")
-        ds = ds.assign_coords(time=[pd.to_datetime(timestamp).as_unit("ns")])
+        
+        t1, t2 = [pd.to_datetime(t) for t in timestamp.strip('[').split('_')]
+        med_time = t1+0.5*(t2-t1)
+        
+        ds = ds.assign_coords(time=[med_time.as_unit("ns")])
         return ds
 
     # -------------------------------------------------------------------------
@@ -278,8 +300,8 @@ class StatsComp:
                     "reducing both over time before diff",
                     dsprod.sizes["time"], dsref.sizes["time"],
                 )
-                dsprod_mean = dsprod.mean("time")
-                dsref_mean = dsref.mean("time")
+                dsprod_mean = self._mean_preserving_coords(dsprod, "time")
+                dsref_mean = self._mean_preserving_coords(dsref, "time")
                 # Store climatology month in attrs so plot.py can label axes.
                 # WOA18 time is encoded as a float month index (e.g. 4.0) stored
                 # without CF units, which xarray decodes as N nanoseconds — so

@@ -287,7 +287,9 @@ class InterpAccessor:
         xr.Dataset or None
             ``None`` if the dataset has no ``"z"`` dimension.
         """
-        return process_vertical_interpolation(self._obj, ("vlevel", (vname, vlevels)))
+        return process_vertical_interpolation(
+            self._obj, ("vlevel", {"vname": vname, "levels": vlevels})
+        )
 
     def vfreq(self, vname, step):
         """Vertical interpolation at a regular step.
@@ -307,7 +309,9 @@ class InterpAccessor:
         xr.Dataset or None
             ``None`` if the dataset has no ``"z"`` dimension.
         """
-        return process_vertical_interpolation(self._obj, ("vfreq", (vname, step)))
+        return process_vertical_interpolation(
+            self._obj, ("vfreq", {"vname": vname, "step": step})
+        )
 
 
 # Register after class definition — suppress warning because we intentionally

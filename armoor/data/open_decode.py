@@ -182,7 +182,7 @@ def register_cf():
     )
     for cfg_file in cfg_files:
         logger.info(f"register {cfg_file}")
-        mycfspecs = MetaSpecs(cfg_file, default=False, user=False)
+        mycfspecs = MetaSpecs(cfg_file, default=True, user=False)
         xmeta.register_meta_specs(mycfspecs)
     
 def _normalize_geo_coords(ds):
@@ -199,73 +199,509 @@ def _normalize_geo_coords(ds):
     return ds
 
 
-def open_decode(
-    path_files, fmt, platform=None, func=None, type=None
-) -> xr.Dataset:
+_DECODER_REGISTRY = {}  # fmt string -> Decoder instance
+
+
+class Decoder:
+    """One armoor-data input format.
+
+    Subclasses register themselves under every fmt string listed in
+    ``fmts`` (several fmt values can share one decoder, e.g. hycom/hycom3d).
+    """
+
+    name = None
+    fmts = ()
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if cls.name is not None:
+            instance = cls()
+            for fmt in cls.fmts:
+                _DECODER_REGISTRY[fmt] = instance
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode `path_files` into a dataset. Must be overridden.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files (already resolved via
+            `get_paths`).
+        fmt : str
+            The exact fmt string that was requested (some decoders use it
+            internally, e.g. SstSatelliteDecoder).
+        platform : str, optional
+            Type of in-situ platform (argo/glider/mooring/drifter), used
+            only by the cmems_insitu/cora_insitu decoders.
+
+        Returns
+        -------
+        xarray.Dataset
+            Decoded dataset.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, in the base class.
+        """
+        raise NotImplementedError
+
+
+class CmemsInsituDecoder(Decoder):
+    """CMEMS in-situ observations (argo/glider/mooring/drifter)."""
+
+    name = "cmems_insitu"
+    fmts = ("cmems_insitu",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode CMEMS in-situ files for a given platform.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Platform type: ``"argo"``, ``"glider"``, ``"mooring"`` or
+            ``"drifter"``.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_cmems_insitu`.
+        """
+        logger.info("Opening/decoding insitu cmems files")
+        return open_decode_cmems_insitu(path_files, platform=platform)
+
+
+class CoraInsituDecoder(Decoder):
+    """CORA in-situ observations."""
+
+    name = "cora_insitu"
+    fmts = ("cora_insitu",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode CORA in-situ files for a given platform.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Platform type.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_cora_insitu`.
+        """
+        logger.info("Opening/decoding insitu cmems files")
+        return open_decode_cora_insitu(path_files, platform=platform)
+
+
+class CmemsModelDecoder(Decoder):
+    """CMEMS gridded model output."""
+
+    name = "cmems_model"
+    fmts = ("cmems_model",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode CMEMS model files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_cmems_model`.
+        """
+        logger.info("Opening/decoding model cmems files")
+        return open_decode_cmems_model(path_files)
+
+
+class ArmoorDecoder(Decoder):
+    """Already-armoor-formatted netcdf files (pass-through decode)."""
+
+    name = "armoor"
+    fmts = ("armoor",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Open already-armoor-formatted files with no format conversion.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            The multi-file dataset, with ``depth`` reset to a data
+            variable if it was a coordinate.
+        """
+        logger.info("Opening armoor files")
+        ds = xr.open_mfdataset(path_files, chunks={})
+        if "depth" in ds:
+            ds = ds.reset_coords("depth")
+        return ds
+
+
+class SstSatelliteDecoder(Decoder):
+    """Satellite SST products (cmems_sst_l4, cmems_sst_l3, cersat_sst_l3)."""
+
+    name = "sst_satellite"
+    fmts = ("cmems_sst_l4", "cmems_sst_l3", "cersat_sst_l3")
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode satellite SST files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            The exact fmt requested (``"cmems_sst_l4"``, ``"cmems_sst_l3"``
+            or ``"cersat_sst_l3"``); used to look up the matching CF meta
+            specs.
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_sst_satellite`.
+        """
+        logger.info("Opening/decoding sst satellite files")
+        return open_decode_sst_satellite(path_files, fmt)
+
+
+class HycomDecoder(Decoder):
+    """HYCOM ocean-model output (hycom, hycom3d)."""
+
+    name = "hycom"
+    fmts = ("hycom", "hycom3d")
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode HYCOM files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (``"hycom"`` and ``"hycom3d"`` share this decoder and
+            need no internal branching).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_hycom`.
+        """
+        logger.info("Opening/decoding hycom files")
+        return open_decode_hycom(path_files)
+
+
+class CrocoDecoder(Decoder):
+    """CROCO ocean-model output (croco, croco_xios)."""
+
+    name = "croco"
+    fmts = ("croco", "croco_xios")
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode CROCO files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            The exact fmt requested (``"croco"`` or ``"croco_xios"``);
+            forwarded for routing but not consumed internally.
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_croco`.
+        """
+        logger.info("Opening/decoding croco files")
+        return open_decode_croco(path_files, fmt)
+
+
+class SloopDecoder(Decoder):
+    """Sloop output files."""
+
+    name = "sloop"
+    fmts = ("sloop",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode Sloop files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_sloop`.
+        """
+        logger.info("Opening/decoding sloop files")
+        return open_decode_sloop(path_files)
+
+
+class ArpegeInstaDecoder(Decoder):
+    """Instantaneous Arpege GRIB2 atmospheric forcing files."""
+
+    name = "arpege_insta"
+    fmts = ("arpege_insta",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode instantaneous Arpege files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_arpege_insta`.
+        """
+        logger.info("Opening/decoding instantaneous arpege files")
+        return open_decode_arpege_insta(path_files)
+
+
+class Woa18Decoder(Decoder):
+    """WOA18 climatology."""
+
+    name = "woa18"
+    fmts = ("woa18",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode WOA18 climatology files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_woa18`.
+        """
+        logger.info("Opening/decoding woa18 climato")
+        return open_decode_woa18(path_files)
+
+
+class BobyclimDecoder(Decoder):
+    """Bobyclim climatology."""
+
+    name = "bobyclim"
+    fmts = ("bobyclim",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode Bobyclim climatology files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_bobyclim`.
+        """
+        logger.info("Opening/decoding Bobyclim climato")
+        return open_decode_bobyclim(path_files)
+
+
+class EddyPetDecoder(Decoder):
+    """py-eddy-tracker eddy detection netcdf output."""
+
+    name = "eddy_pet"
+    fmts = ("eddy_pet",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode py-eddy-tracker eddy detection netcdf files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_eddy_pet`.
+        """
+        logger.info("Opening/decoding py-eddy-tracker eddy detection netcdf")
+        return open_decode_eddy_pet(path_files)
+
+
+class EddySacsoDecoder(Decoder):
+    """Sacso eddy detection text file output."""
+
+    name = "eddy_sacso"
+    fmts = ("eddy_sacso",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode sacso eddy detection text files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_eddy_sacso`.
+        """
+        logger.info("Opening/decoding sacso eddy detection text file")
+        return open_decode_eddy_sacso(path_files)
+
+
+class EddyShootDecoder(Decoder):
+    """Shoot eddy detection netcdf output."""
+
+    name = "eddy_shoot"
+    fmts = ("eddy_shoot",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode shoot eddy detection netcdf files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_eddy_shoot`.
+        """
+        logger.info("Opening/decoding shoot eddy detection netcdf")
+        return open_decode_eddy_shoot(path_files)
+
+
+def get_decoder(fmt) -> Decoder:
+    """Look up the Decoder for a data.ini/comp.ini `fmt` value.
+
+    Parameters
+    ----------
+    fmt : str
+        Input format identifier.
+
+    Returns
+    -------
+    Decoder
+        The registered instance for `fmt`.
+
+    Raises
+    ------
+    ArmoorError
+        If no `Decoder` subclass is registered under `fmt`.
+    """
+    if fmt not in _DECODER_REGISTRY:
+        raise ArmoorError(f"Unknown format: {fmt!r}")
+    return _DECODER_REGISTRY[fmt]
+
+
+def open_decode(path_files, fmt, platform=None) -> xr.Dataset:
     """
     Open a netcdf/txt file and store it into a dataset
+
     Parameters
     ----------
     path_files : str, list of str
         Path to the netcdf files.
-    func : str
-       Poste 1 : functionnality.
-    type : str
-       type of txt file or model.
-    steps : float
-       Horizontal and vertical steps.
+    fmt : str
+        Input format identifier (see Decoder subclasses in this module).
+    platform : str, optional
+        Type of in-situ platform (argo/glider/mooring/drifter), used by
+        the cmems_insitu/cora_insitu decoders.
 
     Returns
     -------
     xarray.Dataset
         Model or observation dataset.
+
+    Raises
+    ------
+    ArmoorError
+        If `fmt` is not a registered format (see `get_decoder`).
     """
-    # Xoa initialisation
-    # register_cf()
     path_files = get_paths(path_files)
-    # Open file
-    if fmt == "cmems_insitu":
-        logger.info("Opening/decoding insitu cmems files")
-        result = open_decode_cmems_insitu(path_files, platform=platform)
-    elif fmt == "cora_insitu":
-        logger.info("Opening/decoding insitu cmems files")
-        result = open_decode_cora_insitu(path_files, platform=platform)
-    elif fmt == "cmems_model":
-        logger.info("Opening/decoding model cmems files")
-        result = open_decode_cmems_model(path_files)
-    elif fmt == "armoor":
-        logger.info("Opening armoor files")
-        ds = xr.open_mfdataset(path_files)
-        if "depth" in ds:
-            ds = ds.reset_coords("depth")
-        result = ds
-    elif fmt is not None and "_sst_l" in fmt:
-        logger.info("Opening/decoding sst satellite files")
-        result = open_decode_sst_satellite(path_files, fmt)
-    elif (fmt == "hycom") or (fmt == "hycom3d"):
-        logger.info("Opening/decoding hycom files")
-        result = open_decode_hycom(path_files)
-    elif (fmt == "croco") or (fmt == "croco_xios"):
-        logger.info("Opening/decoding croco files")
-        result = open_decode_croco(path_files, fmt)
-    elif fmt == "sloop":
-        logger.info("Opening/decoding sloop files")
-        result = open_decode_sloop(path_files)
-    elif fmt == "arpege_insta":
-        logger.info("Opening/decoding instantaneous arpege files")
-        result = open_decode_arpege_insta(path_files)
-    elif fmt == "woa18":
-        logger.info("Opening/decoding woa18 climato")
-        result = open_decode_woa18(path_files)
-    elif fmt == "bobyclim":
-        logger.info("Opening/decoding Bobyclim climato")
-        result = open_decode_bobyclim(path_files)
-    else:
-        raise logger.error("Unknow format")
+    result = get_decoder(fmt).decode(path_files, fmt, platform=platform)
     return _normalize_geo_coords(result)
-    
+
 
 def open_decode_arpege_insta(path_files):
+    """Open and decode instantaneous Arpege GRIB2 atmospheric forcing files.
+
+    Merges the 0/2/10 m levels for each file, concatenates over time, and
+    renames coordinates to the armoor convention (lon/lat/time).
+
+    Parameters
+    ----------
+    path_files : list of str
+        Paths to the GRIB2 files.
+
+    Returns
+    -------
+    xarray.Dataset
+        Decoded, time-sorted dataset.
+    """
     logger.info("atmfrc - insta")
     insta_gribs = path_files
     cfspecs = xmeta.get_meta_specs("meteofrance")
@@ -1240,6 +1676,245 @@ def open_decode_cora(path_files):
     cora = convert_lons(cora)
 
     return cora
+
+
+def open_decode_eddy_pet(path_files):
+    """
+    Open py-eddy-tracker netcdf file(s) and store it in dataset.
+
+    Parameters
+    ----------
+    path_files : str, list of str
+        Path to the netcdf files.
+
+    Returns
+    -------
+    xarray.Dataset
+        dataset
+    """
+    outputs = []
+    all_paths = [path for path in path_files if 'Cyclonic' in path]
+
+    for file in all_paths:
+        cyclones = xr.open_dataset(file)
+        anticyclones = xr.open_dataset(file.replace("Cyclonic", "Anticyclonic"))
+
+        ds_cyclones = xr.Dataset(
+            {
+                "contour_lat": (["obs", "nb_sample"], cyclones.speed_contour_latitude.data),
+                "contour_lon": (["obs", "nb_sample"], cyclones.speed_contour_longitude.data),
+                "center_lat": (["obs"], cyclones.latitude.data),
+                "center_lon": (["obs"], cyclones.longitude.data),
+                "eddy_type": (
+                    ["obs"],
+                    np.zeros(cyclones.obs.shape[0]) - 1,
+                    {'comment': '-1 if cyclone, +1 if anticyclone'
+                     }),
+                "vmax_area": (
+                    ["obs"],
+                    np.pi * cyclones.speed_radius.data**2 / 1e6,
+                    {'comment': 'Area of the vmax contour',
+                     'units': 'km2'
+                     }),
+            },
+            coords={
+                "nb_sample": (["nb_sample"], cyclones.NbSample.data),
+            }
+        )
+
+        ds_anticyclones = xr.Dataset(
+            {
+                "contour_lat": (["obs", "nb_sample"], anticyclones.speed_contour_latitude.data),
+                "contour_lon": (["obs", "nb_sample"], anticyclones.speed_contour_longitude.data),
+                "center_lat": (["obs"], anticyclones.latitude.data),
+                "center_lon": (["obs"], anticyclones.longitude.data),
+                "eddy_type": (
+                    ["obs"],
+                    np.zeros(anticyclones.obs.shape[0]) + 1,
+                    {'comment': '-1 if cyclone, +1 if anticyclone'
+                     }),
+                "vmax_area": (
+                    ["obs"],
+                    np.pi * anticyclones.speed_radius.data**2 / 1e6,
+                    {'comment': 'Area of the vmax contour',
+                     'units': 'km2'
+                     }),
+            },
+            coords={
+                "nb_sample": (["nb_sample"], anticyclones.NbSample.data),
+            }
+        )
+
+        da = xr.concat([ds_cyclones, ds_anticyclones], dim="obs")
+
+        outputs += [
+            da.assign_coords(
+                time=("obs", [datetime.datetime.strptime(file[-11:-3], '%Y%m%d')] * da.obs.shape[0])
+            )
+        ]
+
+    ds = xr.concat(outputs, "obs")
+
+    return ds
+
+
+def open_decode_eddy_sacso(path_files):
+    """
+    Open sacso text file(s) and store it in dataset.
+
+    Parameters
+    ----------
+    path_files : str, list of str
+        Path to the netcdf files.
+
+    Returns
+    -------
+    xarray.Dataset
+        dataset
+    """
+    # Initialize
+    all_points = []; current_block = []; eddy_type = []
+    center_lat = []; center_lon = []; dates = []; surfaces = []
+    suffix_date = 'Date' + ' ' * 33
+    suffix_type = 'Sens_de_rotation' + ' ' * 21       # suffix+spaces = 37
+    suffix_center = 'Centre(lon/lat)' + ' ' * 22
+    suffix_surface = 'Surface(km2)' + ' ' * 25
+
+    content = []
+    for path in path_files:
+        with open(path, "r") as file:
+            content += file.readlines()
+
+    start_reading = False
+    for line in content:
+        line = line.strip()  # remove spaces and line breaks
+
+        if "Date" in line:
+            dates.append(datetime.datetime.strptime(line[len(suffix_date):], '%Y-%m-%d/%H:%M'))
+
+        # Check if new list of coordinates
+        if line == "Liste_Points(lon/lat)":
+            if current_block:
+                # Pass full block to all_points
+                all_points.append(np.array(current_block))
+                current_block = []  # clean for next block
+            start_reading = True
+            continue
+
+        if start_reading and line:
+            if "Sens_de_rotation" in line:
+                rotation = line[len(suffix_center):-4].lower() + 'e'  # cyclone or anticyclone
+                if rotation == 'cyclone':
+                    eddy_type.append(-1)
+                elif rotation == 'anticyclone':
+                    eddy_type.append(1)
+            elif "Centre(lon/lat)" in line:
+                center = line[len(suffix_center):]
+                center_lon.append(float(center[:center.find('/')]))
+                center_lat.append(float(center[center.find('/') + 1:]))
+            elif "Surface(km2)" in line:
+                surfaces.append(float(line[len(suffix_surface):]))
+            else:
+                try:
+                    lon, lat = map(float, line.split('/'))
+                    current_block.append([lon, lat])
+                except ValueError:
+                    pass
+
+    if current_block:  # make sure everything is saved
+        all_points.append(np.array(current_block))
+
+    if not all_points:  # empty = no eddies detected
+        logger.info('No eddies detected in file(s).')
+    else:
+        max_length = max(len(block) for block in all_points)
+
+        # Create matrices of same dimension for every set of coordinates
+        lats = np.full((len(all_points), max_length), np.nan)  # (obs, nb_sample)
+        lons = np.full((len(all_points), max_length), np.nan)  # (obs, nb_sample)
+
+        for i, block in enumerate(all_points):
+            lons[i, :len(block)] = block[:, 0]
+            lats[i, :len(block)] = block[:, 1]
+
+        ds = xr.Dataset(
+            {
+                "contour_lat": (["obs", "nb_sample"], lats),
+                "contour_lon": (["obs", "nb_sample"], lons),
+                "center_lat": (["obs"], np.array(center_lat)),
+                "center_lon": (["obs"], np.array(center_lon)),
+                "eddy_type": (
+                    ["obs"],
+                    np.array(eddy_type),
+                    {'comment': '-1 if cyclone, +1 if anticyclone'
+                     }),
+                "vmax_area": (
+                    ["obs"],
+                    np.array(surfaces),
+                    {'comment': 'Area of the vmax contour',
+                     'units': 'km2'
+                     })
+            },
+            coords={
+                "nb_sample": np.arange(max_length)
+            }
+        ).assign_coords(
+            time=("obs", np.array(dates))
+        )
+        ds['time'].encoding = {
+            'units': 'nanoseconds since 1970-01-01',
+            'dtype': 'float64'
+        }
+        return ds
+
+
+def open_decode_eddy_shoot(path_files):
+    """
+    Open shoot netcdf file(s) and store it in dataset.
+
+    Parameters
+    ----------
+    path_files : str, list of str
+        Path to the netcdf files.
+
+    Returns
+    -------
+    xarray.Dataset
+        dataset
+    """
+    # Open
+    def preprocessing(ds):
+        return ds.set_coords("time")
+
+    da = xr.open_mfdataset(path_files, combine='nested', concat_dim='obs', preprocess=preprocessing)
+
+    # Keep only variables of interest and formatting
+    list_vars = [a for a in da.data_vars if
+                 'vmax_contour' not in a
+                 and 'eddy_type' not in a
+                 and 'x_cen' not in a
+                 and 'y_cen' not in a
+                 and 'vmax_radius' not in a]    # time is already included in coordinates = will be kept
+    da = (
+        da.drop_vars(list_vars)
+          .drop_attrs()
+          .rename({'x_vmax_contour': 'contour_lon', 'y_vmax_contour': 'contour_lat',
+                   'x_cen': 'center_lon', 'y_cen': 'center_lat'})
+          .load()
+          .assign_coords(nb_sample=("nb_sample", da.nb_sample.data))
+    )
+
+    da["eddy_type"] = xr.DataArray(np.where(da["eddy_type"] == 'cyclone', -1, 1), dims='obs').assign_attrs({
+        'comment': '-1 if cyclone, +1 if anticyclone'})
+
+    da["vmax_area"] = np.pi * da.vmax_radius**2 / 1e6
+    da["vmax_area"] = da["vmax_area"].assign_attrs({
+        'comment': 'Area of the vmax contour',
+        'units': 'km2'
+    })
+    da = da.drop_vars('vmax_radius')
+
+    return da
 
 
 ####################### Tools #######################

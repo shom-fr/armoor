@@ -27,8 +27,26 @@ from armoor.data.open_decode import (
     open_decode_cora_insitu,
     open_decode_cmems_insitu,
     open_decode_croco,
+    open_decode_eddy_pet,
+    open_decode_eddy_sacso,
+    open_decode_eddy_shoot,
     get_paths,
-    register_cf
+    register_cf,
+    get_decoder,
+    ArmoorDecoder,
+    ArpegeInstaDecoder,
+    BobyclimDecoder,
+    CmemsInsituDecoder,
+    CmemsModelDecoder,
+    CoraInsituDecoder,
+    CrocoDecoder,
+    EddyPetDecoder,
+    EddySacsoDecoder,
+    EddyShootDecoder,
+    HycomDecoder,
+    SloopDecoder,
+    SstSatelliteDecoder,
+    Woa18Decoder,
 )
 
 # Test data directory
@@ -57,11 +75,11 @@ def setup_test_data():
     test_files = {}
     
     # Create sample NetCDF files for different formats
-    test_files['cmems_model'] = TEST_DATA_DIR / "cmems_glo12.nc"
+    test_files['cmems_model'] = TEST_DATA_DIR / "cmems_glo12_*.nc"
     test_files['hycom'] = TEST_DATA_DIR / "hycom_*.nc"
     test_files['woa18'] = TEST_DATA_DIR / "woa18_*.nc"
-    test_files['cmems_sst_l4'] = TEST_DATA_DIR / "20220310120000-UKMO-L4_GHRSST-SSTfnd-OSTIAanom-GLOB-v02.0-fv02.0.nc"
-    test_files['cmems_sst_l3'] = TEST_DATA_DIR / "20230412080000-OSISAF-L3C_GHRSST-SSTsubskin-SEVIRI_IO_SST-ssteqc_meteosat09_20230412_080000-v02.0-fv01.0.nc"
+    test_files['cmems_sst_l4'] = TEST_DATA_DIR / "cmems_sst_l4.nc"
+    test_files['cmems_sst_l3'] = TEST_DATA_DIR / "cmems_sst_l3.nc"
     test_files['cersat_sst_l3'] = TEST_DATA_DIR / "20210623-IFR-L3C_GHRSST-SSTsubskin-ODYSSEA-GLOB_010_adjusted-v2.0-fv1.0.nc"
     test_files['cmems_insitu_argo'] = TEST_DATA_DIR / "*_PR_PF_*.nc"
     test_files['cmems_insitu_glider'] = TEST_DATA_DIR / "*_PR_GL_*.nc"
@@ -69,7 +87,10 @@ def setup_test_data():
     test_files['cmems_insitu_drifter'] = TEST_DATA_DIR / "*_TS_DB_*.nc"
     test_files['croco'] = TEST_DATA_DIR / "croco_his.nc"
     test_files['croco_v1'] = TEST_DATA_DIR / "croco_v1.3.nc"
-    
+    test_files['eddies_pet'] = TEST_DATA_DIR / "eddy-sample_py-eddy-tracker*"
+    test_files['eddies_sacso'] = TEST_DATA_DIR / "eddy-sample_sacso.txt"
+    test_files['eddies_shoot'] = TEST_DATA_DIR / "eddy-sample_shoot.nc"
+
     yield test_files
     
     # Cleanup is handled by pytest tmpdir fixture if needed
@@ -222,7 +243,7 @@ class TestOpenDecodeCmemsModel:
             Fixture containing test file paths.
         """
         filepath = setup_test_data['cmems_model']
-        result = open_decode_cmems_model([filepath])
+        result = open_decode_cmems_model(get_paths(str(filepath)))
         
         assert isinstance(result, xr.Dataset)
         assert 'x' in result.dims
@@ -240,7 +261,7 @@ class TestOpenDecodeCmemsModel:
             Fixture containing test file paths.
         """
         filepath = setup_test_data['cmems_model']
-        result = open_decode_cmems_model([filepath])
+        result = open_decode_cmems_model(get_paths(str(filepath)))
         
         assert 'lon' in result.coords
         assert 'lat' in result.coords
@@ -260,7 +281,7 @@ class TestOpenDecodeCmemsModel:
             Fixture containing test file paths.
         """
         filepath = setup_test_data['cmems_model']
-        result = open_decode_cmems_model([filepath])
+        result = open_decode_cmems_model(get_paths(str(filepath)))
         
         if 'depth' in result:
             # Depth should be reset to coords
@@ -503,8 +524,10 @@ class TestOpenDecodeCmemsInsitu:
         assert all(np.float32 == ds.lon.dtype for ds in result)
         assert all(np.float32 == ds.lat.dtype for ds in result)
         assert all('depth' in ds.coords for ds in result)
-        assert all(() == ds.lon.dims for ds in result)
-        assert all(() == ds.lat.dims for ds in result)
+        # Real moorings vary: some report a fixed position (scalar lon/lat),
+        # others a slightly drifting one ((time,) lon/lat) -- both are valid.
+        assert all(ds.lon.dims in ((), ('time',)) for ds in result)
+        assert all(ds.lat.dims in ((), ('time',)) for ds in result)
         assert all(('z', ) == ds.depth.dims for ds in result)
         
     def test_open_decode_cmems_insitu_drifter(self, setup_test_data):
@@ -635,6 +658,86 @@ class TestOpenDecodeCroco:
 
 
 # ============================================================================
+# Test open_decode_eddies
+# ============================================================================
+
+class TestOpenDecodeEddies:
+    """Tests for the open_decode_eddy_* functions."""
+
+    def test_open_decode_eddies_pet(self, setup_test_data):
+        """
+        Test open_decode with py-eddy-tracker format.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['eddies_pet']
+        ds = open_decode_eddy_pet(get_paths(str(filepath)))
+
+        assert isinstance(ds, xr.Dataset)
+        assert set(["obs", "nb_sample"]).issubset(ds.dims)
+        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert ds.time.dims == ("obs",)
+        assert ds.nb_sample.dims == ("nb_sample",)
+        assert "eddy_type" in ds.data_vars
+        assert "contour_lon" in ds.data_vars
+        assert "contour_lat" in ds.data_vars
+        assert "center_lon" in ds.data_vars
+        assert "center_lat" in ds.data_vars
+        assert "vmax_area" in ds.data_vars
+
+    def test_open_decode_eddies_sacso(self, setup_test_data):
+        """
+        Test open_decode with sacso format.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['eddies_sacso']
+        ds = open_decode_eddy_sacso(get_paths(str(filepath)))
+
+        assert isinstance(ds, xr.Dataset)
+        assert set(["obs", "nb_sample"]).issubset(ds.dims)
+        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert ds.time.dims == ("obs",)
+        assert ds.nb_sample.dims == ("nb_sample",)
+        assert "eddy_type" in ds.data_vars
+        assert "contour_lon" in ds.data_vars
+        assert "contour_lat" in ds.data_vars
+        assert "center_lon" in ds.data_vars
+        assert "center_lat" in ds.data_vars
+        assert "vmax_area" in ds.data_vars
+
+    def test_open_decode_eddies_shoot(self, setup_test_data):
+        """
+        Test open_decode with shoot format.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['eddies_shoot']
+        ds = open_decode_eddy_shoot(get_paths(str(filepath)))
+
+        assert isinstance(ds, xr.Dataset)
+        assert set(["obs", "nb_sample"]).issubset(ds.dims)
+        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert ds.time.dims == ("obs",)
+        assert ds.nb_sample.dims == ("nb_sample",)
+        assert "eddy_type" in ds.data_vars
+        assert "contour_lon" in ds.data_vars
+        assert "contour_lat" in ds.data_vars
+        assert "center_lon" in ds.data_vars
+        assert "center_lat" in ds.data_vars
+        assert "vmax_area" in ds.data_vars
+
+
+# ============================================================================
 # Test open_decode main dispatcher
 # ============================================================================
 
@@ -681,7 +784,36 @@ class TestOpenDecode:
         filepath = setup_test_data['croco']
         with pytest.raises(Exception):
             open_decode(str(filepath), fmt='unknown_format')
-    
+
+    def test_get_decoder_raises_armoor_error_for_unknown_fmt(self):
+        """get_decoder itself must raise a clear ArmoorError, not the old
+        broken `raise logger.error(...)` (which actually raised a TypeError
+        with no useful message)."""
+        with pytest.raises(ArmoorError, match="unknown_format"):
+            get_decoder("unknown_format")
+
+    @pytest.mark.parametrize("fmt,decoder_cls", [
+        ("cmems_insitu", CmemsInsituDecoder),
+        ("cora_insitu", CoraInsituDecoder),
+        ("cmems_model", CmemsModelDecoder),
+        ("armoor", ArmoorDecoder),
+        ("cmems_sst_l4", SstSatelliteDecoder),
+        ("cmems_sst_l3", SstSatelliteDecoder),
+        ("cersat_sst_l3", SstSatelliteDecoder),
+        ("hycom", HycomDecoder),
+        ("hycom3d", HycomDecoder),
+        ("croco", CrocoDecoder),
+        ("croco_xios", CrocoDecoder),
+        ("sloop", SloopDecoder),
+        ("arpege_insta", ArpegeInstaDecoder),
+        ("woa18", Woa18Decoder),
+        ("bobyclim", BobyclimDecoder),
+    ])
+    def test_get_decoder_registry_completeness(self, fmt, decoder_cls):
+        """Every reachable fmt (including hycom/hycom3d and croco/croco_xios
+        aliases) must resolve to its expected Decoder class."""
+        assert isinstance(get_decoder(fmt), decoder_cls)
+
     @pytest.mark.parametrize("fmt,platform", [
         ('cmems_insitu', 'argo'),
         ('cmems_insitu', 'glider'),

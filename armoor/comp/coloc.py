@@ -13,78 +13,27 @@ import xoa.geo as xgeo
 
 import armoor.base.ranges as ranges
 from armoor.__init__ import ArmoorError
+from armoor.base.dispatch import SubclassingMethodRegistry
 from armoor.base.interp import coarsen as _coarsen, grid2loc, interp_time, regrid, vinterp
 from armoor.base.io import (create_fast_encoding, get_zarr_encoding,
-                            setup_dask_client, _compute_oceanvars)
-from armoor.comp import (COLOCATION_PARAMS_DEFAULT, COLOCATION_PARAMS_USER,
-                         COMP_VARS)
+                            setup_dask_client)
+from armoor.comp import COMP_VARS
+from armoor.comp.comparison import get_comparison
 from armoor.comp.misc import get_colocation_params, validate_colocation
+from armoor.data.datatype import get_data_type_by_name
+from armoor.data.load import StagedDataset
 
 logger = logging.getLogger(__name__)
 
 
-class AbstractColocation:
-    """Abstract class for coloction."""
-    
-    def __init__(self):
-        """Initialize the AbstractColocation instance with an empty dictionary to store methods."""
-        self.methods = {}
+class AbstractColocation(SubclassingMethodRegistry):
+    """Abstract base for colocation strategies (time/horizontal/vertical).
 
-    def register_method(self, func):
-        """Register a method in the methods dictionary.
+    Subclasses register their own methods for dispatch via `call`; see
+    `armoor.base.dispatch.SubclassingMethodRegistry`.
+    """
 
-        Parameters
-        ----------
-        func
-            The method to be registered.
-
-        Returns
-        -------
-        The registered method.
-        """
-        self.methods[func.__name__] = func
-        return func
-
-    def __post_init__(self):
-        """Register all callable methods of the class after initialization.
-        
-        This method is called after the instance is initialized.
-        """
-        for name, method in vars(self.__class__).items():
-            if callable(method) and not name.startswith("__"):
-                self.register_method(method)
-
-    def call(self, method_name, *args, **kwargs):
-        """Call a method by its name.
-
-        Parameters
-        ----------
-        method_name: str
-            The name of the method to call.
-
-        Returns
-        -------
-        The result of the called method.
-
-        Raises
-        ------
-        AttributeError: If the method is not found.
-        """
-        method = self.methods.get(method_name)
-        if method:
-            return method(self, *args, **kwargs)
-        raise ArmoorError(f"Colocation '{method_name}' not found")
-
-    def __init_subclass__(cls):
-        """Initialize the subclass by adding the __post_init__ method to the class.
-        
-        This method is called after the class is defined.
-        """
-        def __post_init__(self):
-            for name, method in vars(cls).items():
-                if callable(method) and not name.startswith("__"):
-                    self.register_method(method)
-        cls.__post_init__ = __post_init__
+    _dispatch_label = "Colocation"
 
 
 class TimeColocation(AbstractColocation):
@@ -148,26 +97,23 @@ class TimeColocation(AbstractColocation):
         )
         return ds_ref_monthly, ds_prod_monthly
 
-    def trange_seq(self, args: [str, str]) -> xr.Dataset:
+    def trange_seq(self, args: dict) -> xr.Dataset:
         """
         Colocate reference and product on the same time axis before ranging.
 
         Parameters
         ----------
-        args: list
-            List of two elements, the first one is the bin period, 
-            the second one is the reference time axis (reference or product).
+        args: dict
+            Dict with a ``tref`` key (the reference time axis, "reference" or
+            "product") and an optional ``method`` key (interpolation method,
+            defaults to "linear").
 
         Returns
         -------
         xarray.Dataset, xarray.Dataset
         """
-        tfreq = args[0]
-        ref = args[1]
-        if len(args) > 2:
-            method = args[2]
-        else:
-            method = "linear"
+        ref = args["tref"]
+        method = args.get("method") or "linear"
         if ref == "reference":
             self.dsprod = interp_time(self.dsprod, self.dsref.time, method=method)
             self.dsprod["time"].encoding = self.dsref.time.encoding
@@ -294,6 +240,13 @@ class HorizontalColocation(AbstractColocation):
                 .rename(rename_dims)
                 .assign_coords(member=prod_data.member)
             )
+        if "npts1" in dist.dims:
+            # A time-independent reference (e.g. a single fixed mooring) has
+            # exactly one point here -- squeeze it out, otherwise it leaks
+            # as a spurious size-1 dim into dsprod via the caller's
+            # `.where(dist < radius)`, breaking the dims-signature match in
+            # `select_vars_by_dims` and silently dropping the whole group.
+            dist = dist.squeeze("npts1", drop=True)
         return dist
     
     def _handle_time_dependent(self, radius_meters: float) -> None:
@@ -415,54 +368,66 @@ class VerticalColocation(AbstractColocation):
         self.methods = {}
         self.logger = logging.getLogger(__name__)
         
-    def vlevel(self, args: (str, list)):
+    def vlevel(self, args: dict):
         """Interpolate datasets to specified vertical levels.
-        
+
         Parameters
         ----------
         args: dict
-            A dictionary with a single key-value pair where the key is the vertical coordinate name
-            and the value is a list of vertical levels to interpolate to.
-        
+            Dict with a ``vname`` key (the vertical coordinate name) and a
+            ``levels`` key (the list of vertical levels to interpolate to).
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
             A tuple containing the verticaly interpolated reference dataset and product dataset.
         """
-        vname = args[0]
-        vlevels = args[1]
+        vname = args["vname"]
+        vlevels = args["levels"]
         vlevels = xr.DataArray(vlevels, dims="z", name=vname)
         prod_attrs = self.dsprod.attrs
         ref_attrs = self.dsref.attrs
-        if "z" in self.dsref.dims:
+        ref_has_z = "z" in self.dsref.dims
+        prod_has_z = "z" in self.dsprod.dims
+        if ref_has_z:
             self.dsref = vinterp(self.dsref, vname, vlevels)
         else:
             logger.warning("No 'z' dim in reference")
-        if "z" in self.dsprod.dims:
+        if prod_has_z:
             self.dsprod = vinterp(self.dsprod, vname, vlevels)
         else:
             self.logger.warning("no 'z' dim in product")
+        # A single selected level with "z" on only one side (e.g. a
+        # full-depth model compared to a surface-only satellite reference)
+        # otherwise leaves a singleton "z" dim there alone, which breaks
+        # select_vars_by_dims's signature match against the other side.
+        if len(vlevels) == 1:
+            if prod_has_z and not ref_has_z and "z" in self.dsprod.dims:
+                self.dsprod = self.dsprod.squeeze("z", drop=True)
+            if ref_has_z and not prod_has_z and "z" in self.dsref.dims:
+                self.dsref = self.dsref.squeeze("z", drop=True)
         self.dsref.attrs.update(ref_attrs)
         self.dsprod.attrs.update(prod_attrs)
         return self.dsref, self.dsprod
     
-    def vrange(self, args: [str, str, list]) -> xr.Dataset:
+    def vrange(self, args: dict) -> xr.Dataset:
         """
         Colocate reference and product on the same vertical axis before ranging.
 
         Parameters
         ----------
-        args: list
-            List of three elements, the first one is the vertical reference (reference or product),
-            the second one is the vertical coodinate,
-            the third one is the list of bounds of the vertical bins.
+        args: dict
+            Dict with a ``vref`` key (the vertical reference, "reference" or
+            "product") and a ``vname`` key (the vertical coordinate name).
+            The bin bounds (``bins_min``/``bins_max``) aren't used here — they
+            only matter for the later output-side range splitting.
 
         Returns
         -------
         xarray.Dataset, xarray.Dataset
         """
-        vref = args[0]
-        vcoord = args[1]
+        vref = args["vref"]
+        vcoord = args["vname"]
         if vref == "reference":
             attrs = self.dsprod.attrs
             self.dsprod = vinterp(
@@ -498,11 +463,12 @@ def validate_and_get_params(metazones, comp_func):
     dict
         Colocation parameters.
     """
-    metazones = validate_colocation(metazones, COLOCATION_PARAMS_USER[comp_func])
+    comparison = get_comparison(comp_func)
+    metazones = validate_colocation(metazones, comparison.colocation_params_user)
     coloc_params = get_colocation_params(
         metazones,
-        COLOCATION_PARAMS_USER[comp_func],
-        COLOCATION_PARAMS_DEFAULT.get(comp_func)
+        comparison.colocation_params_user,
+        comparison.colocation_params_default
         )
     return coloc_params
 
@@ -619,7 +585,7 @@ def _drop_time_cf_attrs_if_not_datetime(ds):
     return ds.assign_coords(time=clean_time)
 
 
-def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
+def save_datasets(dsref, dsprod, dirout, staged=None):
     """Save datasets to NetCDF files.
 
     Parameters
@@ -630,28 +596,19 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
         Product dataset to save.
     dirout: Path
         Directory to save the datasets.
-    ref_name: str
-        Name for the reference dataset file.
-    prod_name: str
-        Name for the product dataset file.
+    staged: StagedDataset, optional
+        Pipeline context (metazone/comp_func) to carry onto the returned
+        paths. When None, plain Path objects are returned (metazone/
+        comp_func-less, e.g. for callers outside the comp_func pipeline).
 
     Returns
     -------
     tuple
-        Paths to the saved reference and product NetCDF files.
+        Paths to the saved reference and product NetCDF files, as
+        StagedDataset instances carrying `staged`'s metazone/comp_func
+        (or plain Path if `staged` is None).
     """
-    attrs = dsref.attrs
-    ncname = ""
-    if "time" in attrs:
-        ncname += f"_{attrs['time']}"
-    elif "trange" in attrs:
-        ncname += f"_{attrs['trange']}"
-
-    if "vlevel" in attrs:
-        ncname += f"_{attrs['vlevel']}"
-    elif "vrange" in attrs:
-        ncname += f"_{attrs['vrange']}"
-
+    ncname = dsref.range.suffix
     ncout_ref = dirout / f"ref{ncname}.zarr"
     ncout_prod = dirout / f"prod{ncname}.zarr"
 
@@ -685,10 +642,18 @@ def save_datasets(dsref, dsprod, dirout, ref_name, prod_name):
     job_prod = dsprod.to_zarr(store=ncout_prod, mode="w", encoding=encoding_prod, compute=False)
 
     dask.compute(job_ref, job_prod)
+
+    if staged is None:
+        result = ncout_ref, ncout_prod
+    else:
+        result = (
+            staged.with_range(dsref, path=str(ncout_ref), stage="coloc"),
+            staged.with_range(dsprod, path=str(ncout_prod), stage="coloc"),
+        )
+
     dsref.close()
     dsprod.close()
-
-    return ncout_ref, ncout_prod
+    return result
 
 
 def _prepare_dataset(ds, comp_func, is_reference=False):
@@ -755,8 +720,13 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
 
     ds = ds.load()
     # Ensure time coordinate is in nanosecond precision to avoid xarray warnings
-    # when the zarr stores times as datetime64[s] or datetime64[ms].
-    if "time" in ds.coords and ds["time"].dtype != np.dtype("datetime64[ns]"):
+    # when the zarr stores times as datetime64[s] or datetime64[ms]. Only
+    # applies to datasets whose time is already a real datetime -- for
+    # climatologies opened with decode_times=False (e.g. WOA18's raw month
+    # index 1-12), "time" isn't a datetime at all, and astype("datetime64[ns]")
+    # would silently reinterpret the month index as a bogus timestamp.
+    if "time" in ds.coords and np.issubdtype(ds["time"].dtype, np.datetime64) \
+            and ds["time"].dtype != np.dtype("datetime64[ns]"):
         ds["time"] = ds["time"].astype("datetime64[ns]")
     return ds
 
@@ -830,10 +800,11 @@ def _apply_time_ranges(dsref, dsprod, params, tbound):
         return ranges.tfreq(dsref), ranges.tfreq(dsprod)
 
     if "trange_seq" in time_coloc[0]:
-        if time_coloc[1][0] != "*":
+        tfreq = time_coloc[1]["tfreq"]
+        if tfreq != "*":
             return (
-                ranges.trange_seq(dsref, *tbound, time_coloc[1][0]),
-                ranges.trange_seq(dsprod, *tbound, time_coloc[1][0])
+                ranges.trange_seq(dsref, *tbound, tfreq),
+                ranges.trange_seq(dsprod, *tbound, tfreq)
             )
 
     return [dsref], [dsprod]
@@ -858,32 +829,10 @@ def _apply_vertical_ranges(dsref_list, dsprod_list, params, comp_func):
     tuple
         Lists of (dsref_list, dsprod_list) after vertical ranging.
     """
-    vertical_coloc = params.get("vertical")
-
-    if vertical_coloc is None:
+    if params.get("vertical") is None:
         return dsref_list, dsprod_list
 
-    if "vlevel" in vertical_coloc[0] or comp_func in ("comp_mooring", "comp_drifter"):
-        if comp_func in ("comp_mooring", "comp_drifter"):
-            vname = "depth"
-        else:
-            vname = vertical_coloc[1][0]
-
-        if comp_func != "comp_sst":
-            return (
-                ranges.vlevels(dsref_list, vname),
-                ranges.vlevels(dsprod_list, vname)
-            )
-
-    elif "vrange" in vertical_coloc[0]:
-        vname = vertical_coloc[1][1]
-        vbins = vertical_coloc[1][2]
-        return (
-            ranges.vrange(dsref_list, vname, vbins),
-            ranges.vrange(dsprod_list, vname, vbins)
-        )
-
-    return dsref_list, dsprod_list
+    return get_comparison(comp_func).apply_vertical_ranges(dsref_list, dsprod_list, params)
 
 
 def _split_by_dims(ds):
@@ -915,7 +864,7 @@ def select_vars_by_dims(prod_groups, sig):
     return None
 
 
-def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, prod_name):
+def _save_colocation_results(dssref, dssprod, staged):
     """Save colocation results to files.
 
     Parameters
@@ -924,14 +873,8 @@ def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, pro
         List of reference datasets.
     dssprod: list
         List of product datasets.
-    comp_func: str
-        Comparison function identifier.
-    metazone: str
-        Metazone name.
-    ref_name: str
-        Reference dataset name.
-    prod_name: str
-        Product dataset name.
+    staged: StagedDataset
+        Pipeline context (comp_func/metazone) for this colocation run.
 
     Returns
     -------
@@ -945,17 +888,14 @@ def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, pro
         dsref = dssref[ids]
         dsprod = dssprod[ids]
 
-        dirout = Path(
-            f"{comp_func}/coloc/{metazone}/"
-            f"{dsref.attrs['data_name']}/{dsprod.attrs['data_name']}"
+        dirout = staged.output_dir(
+            "coloc",
+            ref_name=dsref.attrs['data_name'],
+            prod_name=dsprod.attrs['data_name'],
         )
         dirout.mkdir(parents=True, exist_ok=True)
 
-        ncout_ref, ncout_prod = save_datasets(
-            dsref, dsprod, dirout,
-            dsref.attrs['data_name'],
-            dsprod.attrs['data_name']
-        )
+        ncout_ref, ncout_prod = save_datasets(dsref, dsprod, dirout, staged=staged)
 
         paths.append(ncout_ref)
         paths.append(ncout_prod)
@@ -966,7 +906,7 @@ def _save_colocation_results(dssref, dssprod, comp_func, metazone, ref_name, pro
     return paths
 
 
-def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
+def _process_single_product(dsrefin, ncin, params, tbound, staged):
     """Process colocation for a single product against a reference.
 
     Parameters
@@ -979,16 +919,15 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
         Colocation parameters.
     tbound: tuple
         Time bounds.
-    comp_func: str
-        Comparison function identifier.
-    metazone: str
-        Metazone name.
+    staged: StagedDataset
+        Pipeline context (comp_func/metazone) for this colocation run.
 
     Returns
     -------
     tuple
         (ref_name, prod_name, paths) where paths is a list of output file paths.
     """
+    comp_func = staged.comp_func
     logger.info(f"-- Process {ncin}")
 
     dsprodin = xr.open_dataset(ncin, chunks={})
@@ -1020,8 +959,9 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
     dsref = dsref.assign_attrs(gattrs_ref)
     dsprod = dsprod.assign_attrs(gattrs_prod)
 
-    dsref = _compute_oceanvars(dsref, comp_func)
-    dsprod = _compute_oceanvars(dsprod, comp_func)
+    comparison = get_comparison(comp_func)
+    dsref = comparison.compute_oceanvars(dsref)
+    dsprod = comparison.compute_oceanvars(dsprod)
 
     # Set depth/pres as coordinate if needed
     for vcoord in ["depth", "pres"]:
@@ -1030,37 +970,48 @@ def _process_single_product(dsrefin, ncin, params, tbound, comp_func, metazone):
         if vcoord in dsprod.data_vars:
             dsprod = dsprod.set_coords(vcoord)
 
-    # Split by dimension signature, then apply ranges per group conditionally
-    ref_groups = _split_by_dims(dsref)
-    prod_groups = _split_by_dims(dsprod)
+    if comp_func == "comp_drifter" and not params.get("horizontal"):
+        # No horizontal colocation step is configured for this comp func
+        # (comp_drifter: spatial matching happens later, via OceanParcels in
+        # preproc_comp_drifter). The product legitimately keeps its full
+        # (y, x) grid here, so a dims-signature match against the point-like
+        # reference would always fail -- skip the split/match and range the
+        # whole pair directly instead.
+        dssref, dssprod = [dsref], [dsprod]
+        if "time" in dsref.dims:
+            dssref, dssprod = _apply_time_ranges(dsref, dsprod, params, tbound)
+        if "z" in dsref.dims:
+            dssref, dssprod = _apply_vertical_ranges(dssref, dssprod, params, comp_func)
+    else:
+        # Split by dimension signature, then apply ranges per group conditionally
+        ref_groups = _split_by_dims(dsref)
+        prod_groups = _split_by_dims(dsprod)
 
-    dssref = []
-    dssprod = []
-    for sig, sub_ref in ref_groups.items():
-        sub_prod = select_vars_by_dims(prod_groups, sig)
+        dssref = []
+        dssprod = []
+        for sig, sub_ref in ref_groups.items():
+            sub_prod = select_vars_by_dims(prod_groups, sig)
 
-        if sub_ref is None or sub_prod is None:
-            continue
+            if sub_ref is None or sub_prod is None:
+                continue
 
-        if "time" in sub_ref.dims:
-            sub_ref_list, sub_prod_list = _apply_time_ranges(sub_ref, sub_prod, params, tbound)
-        else:
-            sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]
+            if "time" in sub_ref.dims:
+                sub_ref_list, sub_prod_list = _apply_time_ranges(sub_ref, sub_prod, params, tbound)
+            else:
+                sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]
 
-        if "z" in sub_ref.dims:
-            sub_ref_list, sub_prod_list = _apply_vertical_ranges(sub_ref_list, sub_prod_list, params, comp_func)
+            if "z" in sub_ref.dims:
+                sub_ref_list, sub_prod_list = _apply_vertical_ranges(sub_ref_list, sub_prod_list, params, comp_func)
 
-        dssref.extend(sub_ref_list)
-        dssprod.extend(sub_prod_list)
+            dssref.extend(sub_ref_list)
+            dssprod.extend(sub_prod_list)
 
     # Save results and return paths
-    paths = _save_colocation_results(
-        dssref, dssprod, comp_func, metazone, ref_name, prod_name
-    )
+    paths = _save_colocation_results(dssref, dssprod, staged)
     return ref_name, prod_name, paths
 
 
-def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts):
+def _process_reference(ncref, ncins, params, tbound, staged, ncouts):
     """Process all products for a single reference.
 
     Parameters
@@ -1073,30 +1024,26 @@ def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts
         Colocation parameters.
     tbound: tuple
         Time bounds.
-    comp_func: str
-        Comparison function identifier.
-    metazone: str
-        Metazone name.
+    staged: StagedDataset
+        Pipeline context (comp_func/metazone) for this colocation run.
     ncouts: dict
         Dictionary to store output paths.
     """
+    metazone = staged.metazone
     logger.info(f"Use reference {ncref}")
 
-    _climato_names = {"woa18", "bobyclim"}
     _ds_meta = xr.open_dataset(ncref, engine="zarr", chunks={}, decode_times=False)
-    _is_climato = any(n in _ds_meta.attrs.get("data_name", "") for n in _climato_names)
+    _is_climato = get_data_type_by_name(_ds_meta.attrs.get("data_type")).is_climatology
     _ds_meta.close()
     dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={},
                                decode_times=not _is_climato)
-    dsrefin = _prepare_dataset(dsrefin, comp_func, is_reference=True)
+    dsrefin = _prepare_dataset(dsrefin, staged.comp_func, is_reference=True)
 
     results = []
     for ncin in ncins:
-        result = _process_single_product(
-            dsrefin, ncin, params, tbound, comp_func, metazone
-        )
+        result = _process_single_product(dsrefin, ncin, params, tbound, staged)
         results.append(result)
- 
+
     # Merge results into ncouts
     for ref_name, prod_name, paths in results:
         if ref_name not in ncouts[metazone]:
@@ -1109,24 +1056,23 @@ def _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts
     gc.collect()
 
 
-def _process_metazone(metazone, params, mz_files, metazones, comp_func, ncouts):
+def _process_metazone(staged, params, mz_files, metazones, ncouts):
     """Process colocation for a single metazone.
 
     Parameters
     ----------
-    metazone: str
-        Metazone name.
+    staged: StagedDataset
+        Pipeline context (comp_func/metazone) for this colocation run.
     params: dict
         Colocation parameters for this metazone.
     mz_files: dict
         Pre-filtered file index with keys "ref" and "prod".
     metazones: dict
         Dictionary containing all metazone information.
-    comp_func: str
-        Comparison function identifier.
     ncouts: dict
         Dictionary to store output paths.
     """
+    metazone = staged.metazone
     logger.info(f"Start colocation for {metazone}.")
     logger.info(f"Colocation parameters are: {params}")
 
@@ -1137,7 +1083,7 @@ def _process_metazone(metazone, params, mz_files, metazones, comp_func, ncouts):
     ncins = mz_files["prod"]
 
     for ncref in ncrefs:
-        _process_reference(ncref, ncins, params, tbound, comp_func, metazone, ncouts)
+        _process_reference(ncref, ncins, params, tbound, staged, ncouts)
 
     logger.info(f"End colocation for {metazone}.")
 
@@ -1185,6 +1131,7 @@ def main_coloc(ncs, metazones, comp_func):
     ncouts = {}
     for metazone, params in coloc_params.items():
         mz_files = ncs_index.get(metazone, {"ref": [], "prod": []})
-        _process_metazone(metazone, params, mz_files, metazones, comp_func, ncouts)
+        staged = StagedDataset("", metazone=metazone, comp_func=comp_func, stage="coloc")
+        _process_metazone(staged, params, mz_files, metazones, ncouts)
 
     return ncouts

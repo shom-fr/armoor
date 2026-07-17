@@ -4,6 +4,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import logging
+from armoor import ArmoorError
 from armoor.base.filters import ArmoorFilters  # Replace with actual import
 
 # Fixtures
@@ -65,6 +66,24 @@ def sample_ds_no_time():
         coords={
             "lon": (("y", "x"), lon),
             "lat": (("y", "x"), lat),
+        },
+    )
+    return ds
+
+@pytest.fixture
+def sample_ds_oceanvars():
+    """Create a sample dataset with raw ocean variables (temp/sal), from which
+    derived variables like ptemp can be computed."""
+    ds = xr.Dataset(
+        {
+            "temp": (("time", "z"), 15 + np.random.rand(3, 4)),
+            "sal": (("time", "z"), 35 + np.random.rand(3, 4)),
+            "depth": (("time", "z"), np.tile(np.arange(4) * 10.0, (3, 1))),
+        },
+        coords={
+            "time": pd.date_range("2020-01-01", periods=3, freq="D"),
+            "lon": 10.0,
+            "lat": 40.0,
         },
     )
     return ds
@@ -238,6 +257,25 @@ class TestArmoorFilters:
             result = result.compute()
         assert result is not None
         assert isinstance(result, xr.Dataset)
+
+    def test_oceanvars_filter(self, sample_ds_oceanvars):
+        """oceanvars_filter keeps only the requested (or derived) variables."""
+        result = ArmoorFilters.oceanvars_filter(sample_ds_oceanvars, ["ptemp"])
+        assert list(result.data_vars) == ["ptemp"]
+        assert "depth" in result.coords
+        assert "lon" in result.coords
+        assert "lat" in result.coords
+
+    def test_oceanvars_filter_unknown_name_raises(self, sample_ds_oceanvars):
+        """An unrecognized ocean variable name must raise, not crash on None."""
+        with pytest.raises(ArmoorError, match="depth"):
+            ArmoorFilters.oceanvars_filter(sample_ds_oceanvars, ["depth"])
+
+    def test_oceanvars_filter_missing_dependency_raises(self, sample_ds_oceanvars):
+        """A known variable that can't be derived from what's available must raise."""
+        ds = sample_ds_oceanvars.drop_vars("temp")
+        with pytest.raises(ArmoorError, match="ptemp"):
+            ArmoorFilters.oceanvars_filter(ds, ["ptemp"])
 
     # @patch('armoor.base.filters.open_decode')
     def test_bathy_filter(self, sample_ds_no_time):

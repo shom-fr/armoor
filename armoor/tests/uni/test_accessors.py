@@ -199,6 +199,47 @@ class TestOceanVarsAccessor:
         cdir = ds.oceanvars.sel_current_direction()
         assert float(cdir) == pytest.approx(0.0)
 
+    @pytest.fixture
+    def sample_velocity_field(self):
+        lon = lat = np.array([0, 1])
+        u = np.array([[0, 0],
+                      [111, 111]])
+        v = np.zeros((2, 2))
+        return xr.Dataset(
+            {
+                "u": (["lon", "lat"], u),
+                "v": (["lon", "lat"], v),
+                },
+            coords={
+                "lon": lon,
+                "lat": lat,
+                }
+            )
+
+    # div/okuboweiss/relvort are computed via the optional `shoot` package
+    # (git+https://github.com/shom-fr/shoot.git, see pyproject.toml) --
+    # skip gracefully in environments where it isn't installed.
+    def test_sel_div(self, sample_velocity_field):
+        pytest.importorskip("shoot")
+        div = sample_velocity_field.oceanvars.sel_divergence()
+        assert div.shape == sample_velocity_field.u.shape
+        assert div.dims == ('lon', 'lat')
+        assert np.round(np.mean(div), 3) == pytest.approx(1e-3)
+
+    def test_sel_okuboweiss(self, sample_velocity_field):
+        pytest.importorskip("shoot")
+        OW = sample_velocity_field.oceanvars.sel_okuboweiss()
+        assert OW.shape == sample_velocity_field.u.shape
+        assert OW.dims == ('lon', 'lat')
+        assert np.round(np.mean(OW), 7) == pytest.approx(1e-6)
+
+    def test_sel_relvort(self, sample_velocity_field):
+        pytest.importorskip("shoot")
+        relvort = sample_velocity_field.oceanvars.sel_relvort()
+        assert relvort.shape == sample_velocity_field.u.shape
+        assert relvort.dims == ('lon', 'lat')
+        assert np.mean(relvort) == pytest.approx(0)
+
 
 # ---------------------------------------------------------------------------
 # ds.coloc — ColocSession

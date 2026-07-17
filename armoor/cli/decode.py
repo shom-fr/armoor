@@ -5,21 +5,19 @@ This module provides command-line interfaces for decoding various types of input
 import logging, shutil
 import asyncio
 from argparse import ArgumentParser
-from dask.distributed import Client, LocalCluster
 import dask.config
 import xarray as xr
 
-from armoor.base.io import ArmoorArgumentHelpFormatter, setup_dask_client
+from armoor.base.io import ArmoorArgumentHelpFormatter
 from armoor.base.misc import parse_date, parse_hours, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
-    get_dask_args,
     save_output,
-    check_insitu_platform
-)        
-from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
-from armoor.data.open_decode import open_decode, register_cf
+    armoor_cli_session,
+)
+from armoor.cli.log import add_logging_parser_arguments
+from armoor.data.open_decode import open_decode
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +48,7 @@ def get_parser_decode():
     >>> args = parser.parse_args()
     """
     parser = ArgumentParser(
-        description="Apply time filters over a list of input files.",
+        description="Apply decode over a list of input files.",
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
@@ -72,8 +70,8 @@ def main_decode():
     
     .. code-block:: bash
     
-        armoor-filters-time input.nc output.nc \\
-                            --ifmt hycom --ofmt netcdf
+        armoor-decode --ifmt eddy_sacso --ofmt netcdf \\
+                            "folder/files*.txt" output.nc
     
     Notes
     -----
@@ -85,17 +83,7 @@ def main_decode():
 
     # Parse
     args = parser.parse_args()
-    
-    # Setup logging
-    main_setup_logging(args)
-    
-    register_cf()
-    
-    check_insitu_platform(args.ifmt, args.platform)
-    
-    kw_dask = get_dask_args(args)
-    
-    with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
-        with Client(cluster):
-            ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
+
+    with armoor_cli_session(args, (args.ifmt, args.platform)):
+        ds = open_decode(args.fins, args.ifmt, platform=args.platform)
+        save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")

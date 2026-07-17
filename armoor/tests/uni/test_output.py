@@ -250,6 +250,66 @@ class TestConcatenateDatasets:
         result = self.processor._concatenate_datasets([], ["time"])
         assert result == {}
 
+    def _make_tree(self, vrange_label=None, trange_label=None):
+        ds = xr.Dataset({"temp": (["time"], [1.0])}, coords={"time": [0]})
+        if vrange_label is not None:
+            ds.attrs["vrange"] = vrange_label
+        if trange_label is not None:
+            ds.attrs["trange"] = trange_label
+        return xr.DataTree.from_dict({"mean": ds})
+
+    def test_multiple_vertical_bins_without_fusion_strategy_raises(self):
+        """Regression test for the "Multi-dataset concatenation not
+        implemented" error seen in CI (comp_argo, meta2, "maps" output):
+        a metazone whose vertical range config has several bins (e.g.
+        vrange=[(10,1000), (10,100), (100,500), (500,1000)]) produces one
+        dataset per bin. Output types without a "concat" key (like "maps")
+        have no fusion strategy for more than one dataset, so this must
+        raise rather than silently pick one or drop data.
+        """
+        trees = [
+            self._make_tree(vrange_label=label)
+            for label in ("10-1000", "10-100", "100-500", "500-1000")
+        ]
+
+        with pytest.raises(ArmoorError, match="Multi-dataset concatenation not implemented"):
+            self.processor._concatenate_datasets(trees, concat_dim=None, output="maps")
+
+    def test_multiple_time_bins_without_fusion_strategy_raises(self):
+        """Same gap, but triggered by trange_seq (temporal splitting) alone
+        instead of vrange/vlevel -- _process_single_product applies
+        _apply_time_ranges *then* _apply_vertical_ranges on each result, so
+        a multi-bin trange_seq is an equally valid, independent way to end
+        up with more than one dataset for a non-fusing output type.
+        """
+        trees = [
+            self._make_tree(trange_label=label)
+            for label in ("2026-01-01_2026-01-02", "2026-01-02_2026-01-03")
+        ]
+
+        with pytest.raises(ArmoorError, match="Multi-dataset concatenation not implemented"):
+            self.processor._concatenate_datasets(trees, concat_dim=None, output="maps")
+
+    def test_uvprofiles_keeps_multiple_datasets_unfused(self):
+        """uvprofiles/udiagts are explicitly allowed to keep several
+        per-bin datasets unfused (saved as separate numbered files)
+        instead of hitting the "not implemented" error above."""
+        trees = [self._make_tree(label) for label in ("10-1000", "10-100")]
+
+        result = self.processor._concatenate_datasets(trees, concat_dim=None, output="uvprofiles")
+
+        assert isinstance(result["mean"], list)
+        assert len(result["mean"]) == 2
+
+    def test_time_concat_dim_fuses_multiple_datasets(self):
+        """When the output declares concat=["time"], multiple datasets are
+        fused via _concatenate_time_datasets instead of raising."""
+        trees = [self._make_tree(label) for label in ("10-1000", "10-100")]
+
+        result = self.processor._concatenate_datasets(trees, concat_dim=["time"], output="timeseries")
+
+        assert isinstance(result["mean"], xr.Dataset)
+
 
 # ---------------------------------------------------------------------------
 # Constants
