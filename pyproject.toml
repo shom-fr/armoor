@@ -3,7 +3,6 @@ name = "armoor"
 authors = [
     {name = "Shom", email = "mathieu.morvan@shom.fr"},
 ]
-#license = "mathieu.morvan@shom.fr"
 license-files = ["LICENSE.rst"]
 description = "Analysis of Regional MOdelised and ObseRved ocean"
 dynamic = ["version"]
@@ -44,11 +43,6 @@ doc = [
   "sphinxcontrib-programoutput",
   "sphinxcontrib-qthelp",
   "sphinxcontrib-serializinghtml",
-]
-
-test = [
-   "copernicusmarine",
-   "pytest",
 ]
 
 [project.urls]

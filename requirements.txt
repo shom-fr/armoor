@@ -18,11 +18,11 @@ gsw
 h5netcdf
 ipython
 matplotlib
-nbsphinx
 numba
 numbagg
 parcels
 pip
+pytest
 python=3.11
 scipy
 seaborn
