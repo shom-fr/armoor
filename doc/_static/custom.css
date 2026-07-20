@@ -1,0 +1,26 @@
+/*
+Shom colors:
+- dark blue: #002353
+- light blue: #5BBFE9
+*/
+
+.wy-side-nav-search, .wy-nav-top {
+    /*background: #2980B9;
+    background: #5BBFE9;*/
+    /*background: #8959E9; hue 260 */
+    background: #724AC2; /* hue 260, value: 114 */
+}
+
+
+.rst-content dl:not(.docutils) dt {
+	/*background: #e7f2fa;
+	color: #2980B9;
+	border-top: solid 3px #6ab0de;*/
+	/*background: #E1F7FF;
+	color: #5BBFE9;
+	border-top: solid 3px #51ACD0;*/
+	background: #EBE1FF; /*hue 260 */
+	/*color: #8959E9; hue 260 */
+	color: #724AC2; /* same as top */
+	border-top-color: #724AC2; /*hue 260 */
+}

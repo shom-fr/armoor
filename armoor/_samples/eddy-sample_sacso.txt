@@ -1,0 +1,1741 @@
+NomPV      /local/misc/data/glo12_20230703_MO2tourb26846.txt
+TypePV     PVA
+Nb_Tourb     32
+Nb_Front      0
+Nb_ZE         0
+
+
+Nom                                  A01
+Reference                            1
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-14.3333/29.4167
+-14.2500/29.4167
+-14.1667/29.4167
+-14.0833/29.4167
+-14.0000/29.4167
+-13.9167/29.4167
+-13.8333/29.4167
+-13.7500/29.5000
+-13.6667/29.5833
+-13.6667/29.6667
+-13.5833/29.7500
+-13.5833/29.8333
+-13.6667/29.9167
+-13.7500/30.0000
+-13.8333/30.0833
+-13.9167/30.0833
+-14.0000/30.0833
+-14.0833/30.1667
+-14.1667/30.0833
+-14.2500/30.0833
+-14.3333/30.0833
+-14.4167/30.0000
+-14.5000/30.0000
+-14.5833/29.9167
+-14.6667/29.8333
+-14.6667/29.7500
+-14.6667/29.6667
+-14.5833/29.5833
+-14.5000/29.5000
+-14.4167/29.5000
+Surface(km2)                         4688
+Longueur(km)                         106.2
+Largeur(km)                          56.2
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   8.7
+Centre(lon/lat)                      -14.1667/29.7500
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A02
+Reference                            2
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-15.7500/29.5833
+-15.6667/29.5833
+-15.5833/29.5833
+-15.5000/29.5833
+-15.4167/29.5833
+-15.3333/29.6667
+-15.2500/29.6667
+-15.1667/29.6667
+-15.0833/29.6667
+-15.0000/29.7500
+-15.0000/29.8333
+-14.9167/29.9167
+-14.9167/30.0000
+-14.8333/30.0833
+-14.8333/30.1667
+-14.7500/30.1667
+-14.6667/30.2500
+-14.5833/30.2500
+-14.5000/30.2500
+-14.4167/30.2500
+-14.3333/30.2500
+-14.2500/30.3333
+-14.1667/30.3333
+-14.0833/30.4167
+-14.1667/30.5000
+-14.2500/30.5000
+-14.3333/30.5000
+-14.4167/30.5000
+-14.5000/30.5000
+-14.5833/30.5000
+-14.6667/30.5000
+-14.7500/30.4167
+-14.8333/30.4167
+-14.9167/30.4167
+-15.0000/30.4167
+-15.0833/30.4167
+-15.1667/30.4167
+-15.2500/30.4167
+-15.3333/30.4167
+-15.4167/30.3333
+-15.5000/30.3333
+-15.5833/30.2500
+-15.6667/30.1667
+-15.7500/30.0833
+-15.8333/30.0000
+-15.8333/29.9167
+-15.9167/29.8333
+-15.9167/29.7500
+-15.8333/29.6667
+Surface(km2)                         11716
+Longueur(km)                         191.4
+Largeur(km)                          78.0
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   20.0
+Centre(lon/lat)                      -15.2500/30.0000
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A03
+Reference                            3
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+18.0833/31.5000
+18.1667/31.5000
+18.2500/31.5000
+18.3333/31.5000
+18.4167/31.5833
+18.5000/31.6667
+18.5000/31.7500
+18.5000/31.8333
+18.5000/31.9167
+18.5000/32.0000
+18.4167/32.0833
+18.3333/32.1667
+18.2500/32.2500
+18.1667/32.3333
+18.0833/32.3333
+18.0000/32.3333
+17.9167/32.4167
+17.8333/32.4167
+17.7500/32.4167
+17.6667/32.4167
+17.5833/32.4167
+17.5000/32.4167
+17.4167/32.4167
+17.3333/32.4167
+17.2500/32.3333
+17.1667/32.2500
+17.1667/32.1667
+17.2500/32.0833
+17.3333/32.0000
+17.4167/31.9167
+17.5000/31.9167
+17.5833/31.8333
+17.6667/31.7500
+17.7500/31.6667
+17.8333/31.6667
+17.9167/31.5833
+18.0000/31.5833
+Surface(km2)                         7676
+Longueur(km)                         141.5
+Largeur(km)                          69.0
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   156.4
+Centre(lon/lat)                      17.8333/32.0000
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A04
+Reference                            4
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+28.5000/31.5833
+28.5833/31.5833
+28.6667/31.5833
+28.7500/31.5833
+28.8333/31.5833
+28.9167/31.6667
+29.0000/31.6667
+29.0833/31.7500
+29.0833/31.8333
+29.1667/31.9167
+29.1667/32.0000
+29.0833/32.0833
+29.0000/32.1667
+28.9167/32.2500
+28.8333/32.2500
+28.7500/32.3333
+28.6667/32.3333
+28.5833/32.3333
+28.5000/32.3333
+28.4167/32.3333
+28.3333/32.2500
+28.2500/32.1667
+28.1667/32.0833
+28.1667/32.0000
+28.1667/31.9167
+28.1667/31.8333
+28.2500/31.7500
+28.3333/31.6667
+28.4167/31.6667
+Surface(km2)                         4243
+Longueur(km)                         96.2
+Largeur(km)                          56.2
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   9.5
+Centre(lon/lat)                      28.5833/31.9167
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A05
+Reference                            5
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+26.5000/32.0000
+26.5833/32.0000
+26.6667/32.0000
+26.7500/32.0000
+26.8333/32.0000
+26.9167/32.0000
+27.0000/32.0000
+27.0833/32.0833
+27.1667/32.1667
+27.2500/32.2500
+27.2500/32.3333
+27.1667/32.4167
+27.0833/32.5000
+27.0000/32.5000
+26.9167/32.5000
+26.8333/32.4167
+26.7500/32.3333
+26.6667/32.3333
+26.5833/32.2500
+26.5000/32.2500
+26.4167/32.2500
+26.3333/32.2500
+26.2500/32.1667
+26.3333/32.0833
+26.4167/32.0833
+Surface(km2)                         4228
+Longueur(km)                         95.9
+Largeur(km)                          56.2
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   9.5
+Centre(lon/lat)                      26.8333/32.1667
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A06
+Reference                            6
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+26.2500/32.5833
+26.3333/32.5833
+26.4167/32.5833
+26.5000/32.6667
+26.5000/32.7500
+26.5000/32.8333
+26.5000/32.9167
+26.5833/33.0000
+26.6667/33.0833
+26.7500/33.0833
+26.8333/33.0833
+26.9167/33.1667
+27.0000/33.1667
+27.0833/33.2500
+27.1667/33.2500
+27.2500/33.3333
+27.2500/33.4167
+27.1667/33.5000
+27.0833/33.5833
+27.0833/33.6667
+27.0000/33.7500
+26.9167/33.8333
+26.8333/33.8333
+26.7500/33.8333
+26.6667/33.8333
+26.5833/33.7500
+26.5000/33.6667
+26.4167/33.5833
+26.3333/33.5000
+26.2500/33.5000
+26.1667/33.4167
+26.0833/33.4167
+26.0000/33.4167
+25.9167/33.3333
+25.8333/33.2500
+25.7500/33.2500
+25.6667/33.1667
+25.6667/33.0833
+25.7500/33.0000
+25.8333/32.9167
+25.9167/32.9167
+26.0000/32.8333
+26.0833/32.7500
+26.1667/32.6667
+Surface(km2)                         11207
+Longueur(km)                         151.9
+Largeur(km)                          94.0
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   11.9
+Centre(lon/lat)                      26.4167/33.1667
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A07
+Reference                            7
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+29.3333/32.5833
+29.4167/32.5833
+29.5000/32.5833
+29.5833/32.6667
+29.6667/32.6667
+29.7500/32.7500
+29.7500/32.8333
+29.8333/32.9167
+29.8333/33.0000
+29.7500/33.0833
+29.7500/33.1667
+29.6667/33.2500
+29.5833/33.3333
+29.5000/33.3333
+29.4167/33.3333
+29.3333/33.3333
+29.2500/33.3333
+29.1667/33.3333
+29.0833/33.3333
+29.0000/33.2500
+29.0000/33.1667
+28.9167/33.0833
+28.9167/33.0000
+28.9167/32.9167
+29.0000/32.8333
+29.0833/32.7500
+29.1667/32.6667
+29.2500/32.6667
+Surface(km2)                         3228
+Longueur(km)                         87.5
+Largeur(km)                          47.0
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   169.7
+Centre(lon/lat)                      29.3333/32.9167
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A08
+Reference                            8
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+28.4167/32.8333
+28.5000/32.8333
+28.5833/32.9167
+28.6667/33.0000
+28.6667/33.0833
+28.7500/33.1667
+28.7500/33.2500
+28.7500/33.3333
+28.7500/33.4167
+28.7500/33.5000
+28.6667/33.5833
+28.5833/33.5833
+28.5000/33.5833
+28.4167/33.5833
+28.3333/33.5833
+28.2500/33.5000
+28.1667/33.4167
+28.0833/33.3333
+28.0833/33.2500
+28.0833/33.1667
+28.0833/33.0833
+28.1667/33.0000
+28.2500/32.9167
+28.3333/32.9167
+Surface(km2)                         3413
+Longueur(km)                         86.6
+Largeur(km)                          50.2
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   71.6
+Centre(lon/lat)                      28.4167/33.1667
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A09
+Reference                            9
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+31.6667/32.9167
+31.7500/32.9167
+31.8333/32.9167
+31.9167/32.9167
+32.0000/32.9167
+32.0833/32.9167
+32.1667/33.0000
+32.2500/33.0833
+32.3333/33.0833
+32.4167/33.1667
+32.5000/33.1667
+32.5833/33.2500
+32.6667/33.3333
+32.6667/33.4167
+32.5833/33.5000
+32.5000/33.5833
+32.4167/33.5833
+32.3333/33.5833
+32.2500/33.5833
+32.1667/33.5833
+32.0833/33.5833
+32.0000/33.5833
+31.9167/33.5833
+31.8333/33.5000
+31.7500/33.5000
+31.6667/33.5000
+31.5833/33.4167
+31.5000/33.4167
+31.4167/33.3333
+31.3333/33.2500
+31.3333/33.1667
+31.4167/33.0833
+31.5000/33.0833
+31.5833/33.0000
+Surface(km2)                         4687
+Longueur(km)                         127.0
+Largeur(km)                          47.0
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   10.6
+Centre(lon/lat)                      31.9167/33.2500
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A10
+Reference                            10
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+23.3333/33.1667
+23.4167/33.1667
+23.5000/33.1667
+23.5833/33.1667
+23.6667/33.1667
+23.7500/33.1667
+23.8333/33.1667
+23.9167/33.1667
+24.0000/33.1667
+24.0833/33.1667
+24.1667/33.1667
+24.2500/33.2500
+24.3333/33.3333
+24.2500/33.4167
+24.1667/33.5000
+24.0833/33.5833
+24.0000/33.6667
+23.9167/33.6667
+23.8333/33.6667
+23.7500/33.6667
+23.6667/33.6667
+23.5833/33.5833
+23.5000/33.5833
+23.4167/33.5000
+23.3333/33.5000
+23.2500/33.5833
+23.1667/33.5000
+23.0833/33.4167
+23.1667/33.3333
+23.2500/33.2500
+Surface(km2)                         5135
+Longueur(km)                         116.5
+Largeur(km)                          56.1
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   176.2
+Centre(lon/lat)                      23.6667/33.3333
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A11
+Reference                            11
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+19.9167/33.4167
+20.0000/33.4167
+20.0833/33.4167
+20.1667/33.4167
+20.2500/33.4167
+20.3333/33.5000
+20.4167/33.5000
+20.5000/33.5833
+20.5833/33.6667
+20.6667/33.7500
+20.6667/33.8333
+20.6667/33.9167
+20.6667/34.0000
+20.6667/34.0833
+20.6667/34.1667
+20.6667/34.2500
+20.5833/34.3333
+20.5000/34.4167
+20.4167/34.4167
+20.3333/34.5000
+20.2500/34.5000
+20.1667/34.4167
+20.0833/34.3333
+20.0833/34.2500
+20.0000/34.1667
+20.0000/34.0833
+19.9167/34.0000
+19.8333/33.9167
+19.8333/33.8333
+19.7500/33.7500
+19.6667/33.6667
+19.7500/33.5833
+19.8333/33.5000
+Surface(km2)                         6725
+Longueur(km)                         126.5
+Largeur(km)                          67.7
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   69.0
+Centre(lon/lat)                      20.1667/33.8333
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A12
+Reference                            12
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+29.2500/33.4167
+29.3333/33.4167
+29.4167/33.4167
+29.5000/33.4167
+29.5833/33.4167
+29.6667/33.4167
+29.7500/33.4167
+29.8333/33.4167
+29.9167/33.4167
+30.0000/33.4167
+30.0833/33.5000
+30.0833/33.5833
+30.0833/33.6667
+30.0000/33.7500
+29.9167/33.7500
+29.8333/33.7500
+29.7500/33.8333
+29.6667/33.8333
+29.5833/33.8333
+29.5000/33.8333
+29.4167/33.9167
+29.3333/33.9167
+29.2500/33.9167
+29.1667/33.8333
+29.0833/33.8333
+29.0000/33.7500
+28.9167/33.6667
+28.9167/33.5833
+29.0000/33.5000
+29.0833/33.5000
+29.1667/33.5000
+Surface(km2)                         4835
+Longueur(km)                         109.7
+Largeur(km)                          56.1
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   171.9
+Centre(lon/lat)                      29.5000/33.5833
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A13
+Reference                            13
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-14.1667/34.0833
+-14.0833/34.0833
+-14.0000/34.0833
+-13.9167/34.0833
+-13.8333/34.0833
+-13.7500/34.0833
+-13.6667/34.1667
+-13.5833/34.2500
+-13.5000/34.3333
+-13.4167/34.4167
+-13.4167/34.5000
+-13.4167/34.5833
+-13.4167/34.6667
+-13.4167/34.7500
+-13.5000/34.8333
+-13.5833/34.8333
+-13.6667/34.9167
+-13.7500/34.9167
+-13.8333/34.9167
+-13.9167/34.9167
+-14.0000/34.8333
+-14.0833/34.8333
+-14.1667/34.7500
+-14.2500/34.6667
+-14.3333/34.5833
+-14.3333/34.5000
+-14.3333/34.4167
+-14.4167/34.3333
+-14.3333/34.2500
+-14.2500/34.1667
+Surface(km2)                         5548
+Longueur(km)                         102.7
+Largeur(km)                          68.8
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   22.6
+Centre(lon/lat)                      -13.9167/34.4167
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A14
+Reference                            14
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+33.6667/34.1667
+33.7500/34.1667
+33.8333/34.1667
+33.9167/34.1667
+34.0000/34.1667
+34.0833/34.2500
+34.1667/34.3333
+34.2500/34.3333
+34.3333/34.4167
+34.4167/34.5000
+34.4167/34.5833
+34.3333/34.6667
+34.2500/34.7500
+34.1667/34.7500
+34.0833/34.7500
+34.0000/34.7500
+33.9167/34.7500
+33.8333/34.6667
+33.7500/34.6667
+33.6667/34.5833
+33.5833/34.5833
+33.5000/34.5000
+33.4167/34.4167
+33.4167/34.3333
+33.5000/34.2500
+33.5833/34.2500
+Surface(km2)                         2848
+Longueur(km)                         95.8
+Largeur(km)                          37.8
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   14.0
+Centre(lon/lat)                      33.9167/34.4167
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A15
+Reference                            15
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-15.1667/34.4167
+-15.0833/34.4167
+-15.0000/34.4167
+-14.9167/34.5000
+-14.8333/34.5000
+-14.7500/34.5833
+-14.6667/34.6667
+-14.5833/34.7500
+-14.5000/34.8333
+-14.5000/34.9167
+-14.5000/35.0000
+-14.5000/35.0833
+-14.5833/35.1667
+-14.6667/35.2500
+-14.7500/35.2500
+-14.8333/35.2500
+-14.9167/35.2500
+-15.0000/35.1667
+-15.0833/35.1667
+-15.1667/35.0833
+-15.2500/35.0000
+-15.3333/34.9167
+-15.4167/34.8333
+-15.4167/34.7500
+-15.4167/34.6667
+-15.4167/34.5833
+-15.3333/34.5000
+-15.2500/34.5000
+Surface(km2)                         5655
+Longueur(km)                         100.5
+Largeur(km)                          71.7
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   28.6
+Centre(lon/lat)                      -15.0000/34.8333
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A16
+Reference                            16
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+28.5833/34.4167
+28.6667/34.4167
+28.7500/34.4167
+28.8333/34.4167
+28.9167/34.4167
+29.0000/34.4167
+29.0833/34.4167
+29.1667/34.5000
+29.2500/34.5833
+29.2500/34.6667
+29.2500/34.7500
+29.2500/34.8333
+29.1667/34.9167
+29.0833/35.0000
+29.0000/35.0000
+28.9167/35.0833
+28.8333/35.0833
+28.7500/35.0833
+28.6667/35.0833
+28.5833/35.0000
+28.5000/35.0000
+28.4167/34.9167
+28.4167/34.8333
+28.3333/34.7500
+28.3333/34.6667
+28.4167/34.5833
+28.5000/34.5000
+Surface(km2)                         3785
+Longueur(km)                         85.9
+Largeur(km)                          56.1
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   169.7
+Centre(lon/lat)                      28.7500/34.6667
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A17
+Reference                            17
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-7.7500/34.5000
+-7.6667/34.5000
+-7.5833/34.5000
+-7.5000/34.5833
+-7.4167/34.5833
+-7.3333/34.6667
+-7.3333/34.7500
+-7.2500/34.8333
+-7.3333/34.9167
+-7.4167/35.0000
+-7.5000/35.0833
+-7.5833/35.1667
+-7.6667/35.1667
+-7.7500/35.1667
+-7.8333/35.2500
+-7.9167/35.1667
+-8.0000/35.0833
+-8.0000/35.0000
+-8.0000/34.9167
+-8.0000/34.8333
+-8.0000/34.7500
+-7.9167/34.6667
+-7.8333/34.5833
+Surface(km2)                         1678
+Longueur(km)                         86.5
+Largeur(km)                          24.7
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   108.4
+Centre(lon/lat)                      -7.7500/34.8333
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A18
+Reference                            18
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-9.0833/34.6667
+-9.0000/34.6667
+-8.9167/34.6667
+-8.8333/34.6667
+-8.7500/34.6667
+-8.6667/34.6667
+-8.5833/34.6667
+-8.5000/34.7500
+-8.4167/34.8333
+-8.4167/34.9167
+-8.3333/35.0000
+-8.3333/35.0833
+-8.4167/35.1667
+-8.4167/35.2500
+-8.5000/35.3333
+-8.5833/35.3333
+-8.6667/35.4167
+-8.7500/35.4167
+-8.8333/35.4167
+-8.9167/35.4167
+-9.0000/35.3333
+-9.0833/35.3333
+-9.1667/35.2500
+-9.2500/35.1667
+-9.3333/35.0833
+-9.3333/35.0000
+-9.2500/34.9167
+-9.2500/34.8333
+-9.1667/34.7500
+Surface(km2)                         6020
+Longueur(km)                         91.5
+Largeur(km)                          83.8
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   4.8
+Centre(lon/lat)                      -8.8333/35.0000
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A19
+Reference                            19
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+21.8333/35.1667
+21.9167/35.1667
+22.0000/35.1667
+22.0833/35.1667
+22.1667/35.2500
+22.2500/35.3333
+22.2500/35.4167
+22.1667/35.5000
+22.0833/35.5833
+22.0000/35.6667
+21.9167/35.7500
+21.8333/35.8333
+21.7500/35.9167
+21.6667/35.9167
+21.5833/36.0000
+21.5000/36.0000
+21.4167/36.0833
+21.3333/36.0833
+21.2500/36.1667
+21.1667/36.1667
+21.0833/36.1667
+21.0000/36.1667
+20.9167/36.0833
+20.9167/36.0000
+21.0000/35.9167
+21.0833/35.8333
+21.1667/35.8333
+21.2500/35.7500
+21.3333/35.6667
+21.4167/35.6667
+21.4167/35.5833
+21.5000/35.5000
+21.5833/35.4167
+21.6667/35.3333
+21.7500/35.2500
+Surface(km2)                         5934
+Longueur(km)                         146.5
+Largeur(km)                          51.6
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   150.6
+Centre(lon/lat)                      21.5833/35.6667
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A20
+Reference                            20
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-4.3333/35.2500
+-4.2500/35.2500
+-4.1667/35.2500
+-4.0833/35.2500
+-4.0000/35.3333
+-3.9167/35.4167
+-3.8333/35.5000
+-3.8333/35.5833
+-3.8333/35.6667
+-3.8333/35.7500
+-3.9167/35.8333
+-4.0000/35.9167
+-4.0833/35.9167
+-4.1667/35.9167
+-4.2500/35.9167
+-4.3333/35.8333
+-4.4167/35.7500
+-4.4167/35.6667
+-4.5000/35.5833
+-4.5000/35.5000
+-4.5000/35.4167
+-4.4167/35.3333
+Surface(km2)                         1115
+Longueur(km)                         80.0
+Largeur(km)                          17.7
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   63.4
+Centre(lon/lat)                      -4.1667/35.5000
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A21
+Reference                            21
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-7.3333/35.4167
+-7.2500/35.4167
+-7.1667/35.4167
+-7.0833/35.5000
+-7.0000/35.5833
+-6.9167/35.6667
+-6.9167/35.7500
+-6.8333/35.8333
+-6.8333/35.9167
+-6.8333/36.0000
+-6.8333/36.0833
+-6.8333/36.1667
+-6.9167/36.2500
+-7.0000/36.2500
+-7.0833/36.2500
+-7.1667/36.2500
+-7.2500/36.2500
+-7.3333/36.2500
+-7.4167/36.1667
+-7.4167/36.0833
+-7.4167/36.0000
+-7.5000/35.9167
+-7.5000/35.8333
+-7.5000/35.7500
+-7.5000/35.6667
+-7.5000/35.5833
+-7.4167/35.5000
+Surface(km2)                         1391
+Longueur(km)                         100.0
+Largeur(km)                          17.7
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   63.4
+Centre(lon/lat)                      -7.2500/35.8333
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A22
+Reference                            22
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-4.8333/35.4167
+-4.7500/35.4167
+-4.6667/35.5000
+-4.5833/35.5833
+-4.5000/35.6667
+-4.4167/35.7500
+-4.4167/35.8333
+-4.3333/35.9167
+-4.2500/36.0000
+-4.1667/36.0833
+-4.2500/36.1667
+-4.3333/36.1667
+-4.4167/36.1667
+-4.5000/36.1667
+-4.5833/36.1667
+-4.6667/36.1667
+-4.7500/36.1667
+-4.8333/36.0833
+-4.9167/36.0833
+-5.0000/36.0000
+-5.0833/36.0000
+-5.1667/35.9167
+-5.1667/35.8333
+-5.1667/35.7500
+-5.0833/35.6667
+-5.0000/35.5833
+-4.9167/35.5000
+Surface(km2)                         4407
+Longueur(km)                         97.4
+Largeur(km)                          57.6
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   18.4
+Centre(lon/lat)                      -4.7500/35.8333
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A23
+Reference                            23
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+28.3333/35.4167
+28.4167/35.4167
+28.5000/35.4167
+28.5833/35.4167
+28.6667/35.4167
+28.7500/35.4167
+28.8333/35.4167
+28.9167/35.4167
+29.0000/35.4167
+29.0833/35.4167
+29.1667/35.5000
+29.2500/35.5833
+29.3333/35.6667
+29.4167/35.7500
+29.3333/35.8333
+29.2500/35.9167
+29.1667/36.0000
+29.0833/36.0833
+29.0000/36.0833
+28.9167/36.1667
+28.8333/36.1667
+28.7500/36.1667
+28.6667/36.2500
+28.5833/36.1667
+28.5000/36.1667
+28.4167/36.0833
+28.3333/36.0000
+28.3333/35.9167
+28.3333/35.8333
+28.3333/35.7500
+28.3333/35.6667
+28.2500/35.5833
+28.2500/35.5000
+Surface(km2)                         7260
+Longueur(km)                         109.1
+Largeur(km)                          84.8
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   12.1
+Centre(lon/lat)                      28.7500/35.7500
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A24
+Reference                            24
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-11.1667/35.5000
+-11.0833/35.5000
+-11.0000/35.5000
+-10.9167/35.5833
+-10.8333/35.5833
+-10.7500/35.6667
+-10.6667/35.7500
+-10.6667/35.8333
+-10.5833/35.9167
+-10.5833/36.0000
+-10.5833/36.0833
+-10.5833/36.1667
+-10.6667/36.2500
+-10.7500/36.3333
+-10.8333/36.4167
+-10.9167/36.4167
+-11.0000/36.3333
+-11.0833/36.3333
+-11.1667/36.2500
+-11.2500/36.1667
+-11.3333/36.0833
+-11.4167/36.0000
+-11.4167/35.9167
+-11.5000/35.8333
+-11.5000/35.7500
+-11.4167/35.6667
+-11.3333/35.5833
+-11.2500/35.5833
+Surface(km2)                         5105
+Longueur(km)                         94.6
+Largeur(km)                          68.7
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   24.4
+Centre(lon/lat)                      -11.0833/35.9167
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A25
+Reference                            25
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-3.3333/35.5000
+-3.4167/35.5833
+-3.5000/35.5833
+-3.5833/35.6667
+-3.6667/35.7500
+-3.7500/35.8333
+-3.8333/35.9167
+-3.8333/36.0000
+-3.8333/36.0833
+-3.8333/36.1667
+-3.7500/36.2500
+-3.6667/36.2500
+-3.5833/36.3333
+-3.5000/36.3333
+-3.4167/36.3333
+-3.3333/36.3333
+-3.2500/36.3333
+-3.1667/36.2500
+-3.0833/36.1667
+-3.0000/36.0833
+-3.0000/36.0000
+-3.0000/35.9167
+-3.0000/35.8333
+-3.0833/35.7500
+-3.0833/35.6667
+-3.1667/35.5833
+-3.2500/35.5833
+Surface(km2)                         4344
+Longueur(km)                         87.5
+Largeur(km)                          63.2
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   146.3
+Centre(lon/lat)                      -3.4167/35.9167
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A26
+Reference                            26
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+24.7500/35.5000
+24.8333/35.5000
+24.9167/35.5000
+25.0000/35.5000
+25.0833/35.5833
+25.1667/35.5833
+25.2500/35.5833
+25.3333/35.5833
+25.4167/35.5833
+25.5000/35.5833
+25.5833/35.5833
+25.6667/35.5833
+25.7500/35.6667
+25.6667/35.7500
+25.5833/35.8333
+25.5000/35.9167
+25.4167/36.0000
+25.3333/36.0000
+25.2500/36.0833
+25.1667/36.0833
+25.0833/36.0833
+25.0000/36.1667
+24.9167/36.1667
+24.8333/36.1667
+24.7500/36.1667
+24.6667/36.1667
+24.5833/36.1667
+24.5000/36.0833
+24.4167/36.0833
+24.3333/36.0833
+24.2500/36.0833
+24.1667/36.0833
+24.0833/36.0000
+24.0000/36.0000
+23.9167/35.9167
+23.9167/35.8333
+24.0000/35.7500
+24.0833/35.7500
+24.1667/35.6667
+24.2500/35.6667
+24.3333/35.5833
+24.4167/35.5833
+24.5000/35.5833
+24.5833/35.5833
+24.6667/35.5833
+Surface(km2)                         8602
+Longueur(km)                         167.7
+Largeur(km)                          65.3
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   172.2
+Centre(lon/lat)                      24.7500/35.8333
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A27
+Reference                            27
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-1.5000/35.6667
+-1.4167/35.6667
+-1.3333/35.6667
+-1.2500/35.6667
+-1.1667/35.7500
+-1.0833/35.8333
+-1.0000/35.9167
+-1.0000/36.0000
+-0.9167/36.0833
+-0.9167/36.1667
+-1.0000/36.2500
+-1.0833/36.2500
+-1.1667/36.2500
+-1.2500/36.2500
+-1.3333/36.1667
+-1.4167/36.1667
+-1.5000/36.0833
+-1.5833/36.0000
+-1.6667/35.9167
+-1.6667/35.8333
+-1.5833/35.7500
+Surface(km2)                         2419
+Longueur(km)                         77.0
+Largeur(km)                          40.0
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   24.0
+Centre(lon/lat)                      -1.3333/35.9167
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A28
+Reference                            28
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+17.8333/35.7500
+17.9167/35.7500
+18.0000/35.7500
+18.0833/35.8333
+18.1667/35.9167
+18.2500/36.0000
+18.2500/36.0833
+18.3333/36.1667
+18.3333/36.2500
+18.2500/36.3333
+18.1667/36.4167
+18.0833/36.4167
+18.0000/36.4167
+17.9167/36.4167
+17.8333/36.4167
+17.7500/36.4167
+17.6667/36.4167
+17.5833/36.4167
+17.5000/36.3333
+17.5000/36.2500
+17.5000/36.1667
+17.5833/36.0833
+17.5833/36.0000
+17.6667/35.9167
+17.7500/35.8333
+Surface(km2)                         2839
+Longueur(km)                         77.0
+Largeur(km)                          46.9
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   168.7
+Centre(lon/lat)                      17.8333/36.0833
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A29
+Reference                            29
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-1.7500/35.9167
+-1.8333/36.0000
+-1.9167/36.0833
+-1.9167/36.1667
+-1.9167/36.2500
+-1.8333/36.3333
+-1.7500/36.4167
+-1.6667/36.5000
+-1.5833/36.5000
+-1.5000/36.5833
+-1.4167/36.5833
+-1.3333/36.5833
+-1.2500/36.5833
+-1.1667/36.5000
+-1.0833/36.4167
+-1.0833/36.3333
+-1.1667/36.2500
+-1.2500/36.1667
+-1.3333/36.1667
+-1.4167/36.0833
+-1.5000/36.0833
+-1.5833/36.0000
+-1.6667/36.0000
+Surface(km2)                         3191
+Longueur(km)                         83.4
+Largeur(km)                          48.7
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   21.8
+Centre(lon/lat)                      -1.5833/36.2500
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A30
+Reference                            30
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-2.5000/36.0833
+-2.4167/36.0833
+-2.3333/36.1667
+-2.2500/36.2500
+-2.1667/36.3333
+-2.0833/36.4167
+-2.0000/36.5000
+-1.9167/36.5000
+-1.8333/36.5833
+-1.7500/36.6667
+-1.6667/36.7500
+-1.5833/36.8333
+-1.5833/36.9167
+-1.6667/37.0000
+-1.7500/36.9167
+-1.8333/36.9167
+-1.9167/36.8333
+-2.0000/36.8333
+-2.0833/36.7500
+-2.1667/36.6667
+-2.2500/36.6667
+-2.3333/36.6667
+-2.4167/36.5833
+-2.5000/36.5000
+-2.5833/36.5000
+-2.6667/36.4167
+-2.6667/36.3333
+-2.6667/36.2500
+-2.5833/36.1667
+Surface(km2)                         3022
+Longueur(km)                         121.9
+Largeur(km)                          31.6
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   31.6
+Centre(lon/lat)                      -2.2500/36.5000
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A31
+Reference                            31
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+-0.7500/36.5000
+-0.6667/36.5000
+-0.5833/36.5000
+-0.5000/36.5000
+-0.4167/36.5833
+-0.4167/36.6667
+-0.3333/36.7500
+-0.3333/36.8333
+-0.3333/36.9167
+-0.2500/37.0000
+-0.2500/37.0833
+-0.1667/37.0833
+-0.0833/37.1667
+0.0000/37.2500
+0.0000/37.3333
+0.0833/37.4167
+0.0000/37.5000
+-0.0833/37.5833
+-0.1667/37.5833
+-0.2500/37.5000
+-0.3333/37.4167
+-0.4167/37.3333
+-0.4167/37.2500
+-0.5000/37.1667
+-0.5833/37.1667
+-0.6667/37.0833
+-0.7500/37.0000
+-0.8333/36.9167
+-0.8333/36.8333
+-0.8333/36.7500
+-0.8333/36.6667
+-0.8333/36.5833
+Surface(km2)                         4892
+Longueur(km)                         134.2
+Largeur(km)                          46.4
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   58.4
+Centre(lon/lat)                      -0.5000/37.0000
+Sens_de_rotation                     Cyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+
+Nom                                  A32
+Reference                            32
+Commentaire                          -
+Indice_de_fiabilite                  -
+Antecedents                          -
+Gisements                            /local/misc/data/glo12_20230703.nc
+Origines                             MODELsea_surface_height_above_geoid
+Date                                 2023-07-03/00:00
+Suivi                                -
+Liste_Points(lon/lat) 
+18.5833/36.5833
+18.6667/36.5833
+18.7500/36.5833
+18.8333/36.5833
+18.9167/36.5833
+19.0000/36.5833
+19.0833/36.5833
+19.1667/36.6667
+19.2500/36.6667
+19.3333/36.7500
+19.4167/36.8333
+19.4167/36.9167
+19.3333/37.0000
+19.2500/37.0833
+19.1667/37.1667
+19.0833/37.2500
+19.0000/37.2500
+18.9167/37.2500
+18.8333/37.2500
+18.7500/37.1667
+18.6667/37.1667
+18.5833/37.1667
+18.5000/37.0833
+18.4167/37.0833
+18.3333/37.0833
+18.2500/37.0833
+18.1667/37.0000
+18.0833/36.9167
+18.0833/36.8333
+18.0833/36.7500
+18.1667/36.6667
+18.2500/36.6667
+18.3333/36.6667
+18.4167/36.6667
+18.5000/36.6667
+Surface(km2)                         7030
+Longueur(km)                         120.1
+Largeur(km)                          74.5
+Tendance                             -
+Module_de_vitesse(m/s)               -
+Orientation/E(deg)                   7.1
+Centre(lon/lat)                      18.7500/36.8333
+Sens_de_rotation                     Anticyclonique
+Valeur_pointee_interieure(lon/lat)   -
+Valeur_pointee_exterieure(lon/lat)   -
+Profil_hydro_interieur(lon/lat)      -
+Profil_hydro_exterieur(lon/lat)      -
+
+

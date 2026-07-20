@@ -1,9 +1,9 @@
-image: continuumio/miniconda3:latest
+image: condaforge/miniforge3:latest
 
 stages:
   - setup
-  - doc
   - tests
+  - doc
 
 variables:
   MPLBACKEND: agg
@@ -18,7 +18,7 @@ setup:
   script:
     - conda config --set always_yes yes --set changeps1 no
     - conda info -a
-    - test -d armoor_env || conda env create -f environment.yml -p armoor_env
+    - test -d armoor_env || (conda create -p armoor_env python=3.11; source activate ./armoor_env; conda install -c conda-forge mamba; mamba install -c conda-forge --file requirements.txt; pip install .; conda deactivate)
     - source activate ./armoor_env
   cache:
     paths:
@@ -28,11 +28,9 @@ tests:
   stage: tests
   script:
     - source activate ./armoor_env
-    - export PATH=$PWD/bin:$PATH
     - export PYTHONPATH=$PWD
-    - conda install pytest
-    - cd armoor/tests/uni
-    - pytest 
+    - pytest -v -s armoor/tests/uni
+    - pytest -v -s armoor/tests/integration/test_armoor_woom.py
   cache:
     paths:
       - armoor_env/
@@ -42,13 +40,13 @@ pages:
   stage: doc
   script:
     - source activate ./armoor_env
-    - export PATH=$PWD/bin:$PATH
     - export PYTHONPATH=$PWD
-    - cd docs
+    - pip install ".[doc]"
+    - cd doc
     - make html
     - cd ..
     - rm -rf public
-    - cp -r docs/_build/html public
+    - cp -r doc/_build/html public
   artifacts:
     paths:
       - public
