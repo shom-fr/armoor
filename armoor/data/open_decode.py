@@ -36,6 +36,12 @@ from armoor.base.misc import optimize_for_low_swap
 
 logger = logging.getLogger(__name__)
 
+# argopy is an unused transitive dependency (pulled in by the "shoot" eddy
+# decoder) that registers an xarray backend; xarray imports it eagerly to
+# build its plugin registry on the first open_dataset/open_mfdataset call,
+# which logs noise even though the backend then fails to load.
+logging.getLogger("argopy").setLevel(logging.WARNING)
+
 xoa.register_accessors(meta=True, decode_sigma=True)
 xr.set_options(keep_attrs=True)
 
@@ -354,7 +360,7 @@ class ArmoorDecoder(Decoder):
             variable if it was a coordinate.
         """
         logger.info("Opening armoor files")
-        ds = xr.open_mfdataset(path_files, chunks={})
+        ds = xr.open_mfdataset(path_files, engine="netcdf4", chunks={})
         if "depth" in ds:
             ds = ds.reset_coords("depth")
         return ds
