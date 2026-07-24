@@ -5,7 +5,7 @@ required by armoor-data + the data task itself), then runs the full woom
 execution loop.
 
 Exercises armoor-data against every metazone shape used by the comp_*
-integration tests, plus a fully unconfigured one, via two tasks:
+integration tests, plus a fully unconfigured one, via three tasks:
 
 - ``data`` (meta1, meta2): reuses the comp_* metazones.cfg entries, so
   vlevel (meta1) and vrange+trange_seq (meta2) are exercised too — one
@@ -15,6 +15,15 @@ integration tests, plus a fully unconfigured one, via two tasks:
   today's downloaded data; ``--tbound`` is passed here for the same reason.
 - ``data_native`` (meta3): no vlevel/vrange/tbound at all, so armoor-data
   must fall back to the data's own native vertical levels and time steps.
+- ``data_mapseries`` (meta3): dedicated ``data_mapseries.cfg`` for the
+  ``mapseries`` otype — a model source (cmems_glo12, ptemp/sal/curr), a
+  second "obs" source with the same ptemp (cmems_sst_l4, a satellite SST
+  product -- armoor.data.datatype.DataSstSatellite/PlotSstSatellite, both
+  thin DataOceanModel/PlotOceanModel subclasses), and a woa18 climatology
+  referenced via "clim". Exercises the climatology self-plotting guard,
+  the "clim" min/max table row, and "cbar_group" pooling the color scale
+  between the obs and model ptemp series, all against real (sample) data
+  end to end.
 
 Data downloads use ``--skip-existing`` so they are performed only once across
 the session, even when this test runs alongside the comp_* integration tests.
@@ -38,6 +47,12 @@ REGION = {"lon_min": -14.0, "lon_max": -7.0, "lat_min": 45.0, "lat_max": 49.0}
 # ---------------------------------------------------------------------------
 DATA_GET_DATA = "get_cmems_glo12_temp,get_cmems_glo12_sal,get_cmems_glo12_curr"
 
+# Data dependencies for data_mapseries.cfg (model + obs + climatology)
+DATA_MAPSERIES_GET_DATA = (
+    "get_cmems_glo12_temp,get_cmems_glo12_sal,get_cmems_glo12_curr,"
+    "get_cmems_sst_l4,get_woa18"
+)
+
 
 def _write_workflow_cfg(woomtmpdir):
     """Write a minimal workflow cfg for armoor-data into *woomtmpdir*."""
@@ -58,6 +73,30 @@ lat_max={REGION['lat_max']}
     get_data={DATA_GET_DATA}
     data=data
     #,data_native
+"""
+    with open(cfg_path, "w") as f:
+        f.write(content)
+    return cfg_path
+
+
+def _write_mapseries_workflow_cfg(woomtmpdir):
+    """Write a minimal workflow cfg for the mapseries otype into *woomtmpdir*."""
+    cfg_path = os.path.join(woomtmpdir, "workflow_data_mapseries.cfg")
+    content = f"""\
+[app]
+name=TEST_DATA_MAPSERIES
+
+[params]
+rundate=2026-07-08
+lon_min={REGION['lon_min']}
+lon_max={REGION['lon_max']}
+lat_min={REGION['lat_min']}
+lat_max={REGION['lat_max']}
+
+[stages]
+    [[prolog]]
+    get_data={DATA_MAPSERIES_GET_DATA}
+    data_mapseries=data_mapseries
 """
     with open(cfg_path, "w") as f:
         f.write(content)
@@ -118,6 +157,16 @@ def test_data(woom_env):
     taskmanager, woomtmpdir = woom_env
 
     cfg_path = _write_workflow_cfg(woomtmpdir)
+
+    workflow = wworkflow.Workflow(cfg_path, taskmanager)
+    _run_and_assert(workflow)
+
+
+def test_data_mapseries(woom_env):
+    """Run the mapseries otype (model + obs + climatology) and assert success."""
+    taskmanager, woomtmpdir = woom_env
+
+    cfg_path = _write_mapseries_workflow_cfg(woomtmpdir)
 
     workflow = wworkflow.Workflow(cfg_path, taskmanager)
     _run_and_assert(workflow)

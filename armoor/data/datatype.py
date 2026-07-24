@@ -177,6 +177,18 @@ class DataOceanModel(DataType):
                 "vertical": ["vlevel"],
                 }
             },
+        "mapseries": {
+            # One zarr per (time-bin, z) -- same "sort" as "maps", deliberately
+            # *not* concat=["time"]: one output file per plot keeps main_plot's
+            # one-task-per-zarr parallelism, instead of forcing an entire
+            # series' worth of frames through a single worker. No "stat" key
+            # -> every timestep gets its own frame, never aggregated. The
+            # color scale is still fixed once over the whole series -- see
+            # OutputProcessor._resolve_series_ranges, which pools it via a
+            # pre-pass and attaches it as attrs, since a single zarr here no
+            # longer holds the full series to compute it from directly.
+            "sort": ["time", "z"],
+            },
         }
 
 
@@ -194,6 +206,50 @@ class DataBobyclim(DataOceanModel):
     name = "bobyclim"
     fmts = ("bobyclim",)
     is_climatology = True
+
+
+class DataSstSatellite(DataOceanModel):
+    """Satellite SST products (cmems_sst_l4, cmems_sst_l3, cersat_sst_l3) --
+    ocean-model-shaped output (ptemp only, see
+    armoor.data.open_decode.open_decode_sst_satellite), same
+    outputs_params/plotter_cls as DataOceanModel. Surface-only (no depth/z
+    at all, unlike model output, which can have several vertical levels) --
+    vlevel/vrange configured on a metazone shared with a depth-resolved
+    source are silently ignored for this one rather than rejected (see
+    OutputProcessor._apply_interpolations/_apply_range_processing's "z"
+    dimension guards)."""
+
+    name = "sst_satellite"
+    fmts = ("cmems_sst_l4", "cmems_sst_l3", "cersat_sst_l3")
+
+
+class DataMeteo(DataOceanModel):
+    """Atmospheric forcing (Arpège instantaneous GRIB2 -- wind u10/v10,
+    2m fields, ...), ocean-model-shaped output (see
+    armoor.data.open_decode.open_decode_arpege_insta and cf_meteofrance.cfg,
+    which maps u10/v10 to the canonical "u"/"v" names) -- but restricted to
+    the otypes that make sense for a surface-only, non-oceanographic
+    source: "timeseries" and the map family ("maps", "mapseries").
+    mapseries's vector rendering (quiver/barbs) is variable-name-driven,
+    so wind gets it for free exactly like ocean current does. The
+    vertical-profile/theta-saln otypes (vprofiles_sel, mvprofiles,
+    uvprofiles, diagts_sel, mdiagts, udiagts) are meaningless here (no
+    ptemp/sal) and are deliberately absent, not just discouraged --
+    _validate_output_compatibility already treats any otype missing from
+    outputs_params as unsupported.
+
+    Like DataSstSatellite, vlevel/vfreq/vrange configured on a metazone
+    shared with a depth-resolved sibling (e.g. the ocean model this data
+    forces) are silently ignored for this source rather than rejected --
+    same "z" dimension guards in OutputProcessor._apply_interpolations/
+    _apply_range_processing."""
+
+    name = "meteo"
+    fmts = ("arpege_insta",)
+    outputs_params = {
+        otype: params for otype, params in DataOceanModel.outputs_params.items()
+        if otype in ("timeseries", "maps", "mapseries")
+    }
 
 
 class DataEddies(DataType):

@@ -5,12 +5,19 @@ the functions that actually need them so that CLI startup is fast even on
 slow HPC parallel file-systems.
 """
 import os
-# Limit OpenMP/BLAS to 1 thread per process. Must happen before numpy is
-# imported anywhere so that libgomp picks it up during initialisation.
+# Limit OpenMP/BLAS/numba to 1 thread per process. Must happen before
+# numpy/numba are imported anywhere: numba's threading layer in particular
+# is a lazily-initialized, process-wide singleton sized by NUMBA_NUM_THREADS
+# (default os.cpu_count()) at first use, not by later numba.set_num_threads()
+# calls -- unset, concurrent dask worker threads racing into the first call
+# to a parallel=True numba kernel (e.g. gsw/xoa.regrid.regrid1d, see
+# armoor.base.interp.vinterp) can each try to spin up a pool sized to every
+# CPU on the node, exhausting the job's thread/process limit.
 # Parallelism is achieved via multiple processes (dask workers), not threads.
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("NUMBA_NUM_THREADS", "1")
 
 import json
 import logging
@@ -44,7 +51,7 @@ def _init_heavy():
         return
     _heavy_done = True
     import os
-    for var in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS'):
+    for var in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMBA_NUM_THREADS'):
          os.environ.setdefault(var, '1')
 
     logging.getLogger('distributed').setLevel(logging.ERROR)
@@ -257,26 +264,22 @@ def get_parser_data():
 
 def main_data():
     """Process data over metazones."""
-    import dask
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs
     from armoor.base.misc import dict_to_list
-    from armoor.cli.io import get_dask_args
+    from armoor.cli.io import get_dask_args, configure_dask_scheduler
     from armoor.data.load import load_datasets
     from armoor.data.output import main_output as output_data
     _init_heavy()
-
-    dask.config.set({
-        'scheduler': 'threads',
-        'array.slicing.split_large_chunks': True,
-        'optimization.fuse.active': True,
-    })
 
     # Get parser
     parser = get_parser_data()
 
     # Parse
     args = parser.parse_args()
+
+    kw_dask = get_dask_args(args)
+    configure_dask_scheduler(kw_dask)
 
     # Setup logging
     main_setup_logging(args)
@@ -297,8 +300,6 @@ def main_data():
        )
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
-
-    kw_dask = get_dask_args(args)
 
     zarrs = load_datasets(cfg["data"], metazones, "data")
 
@@ -481,20 +482,15 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
         Results are written to `jsonfile` (and to zarr/netcdf/png files on
         disk); nothing is returned.
     """
-    import dask
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs
     from armoor.base.misc import dict_to_list
+    from armoor.cli.io import configure_dask_scheduler
     from armoor.comp.comparison import get_comparison
     from armoor.comp.coloc import main_coloc
     from armoor.data.load import load_datasets, StagedDataset
 
-    dask.config.set({
-        'scheduler': 'threads',
-        'num_workers': kw_dask[0],
-        'array.slicing.split_large_chunks': True,
-        'optimization.fuse.active': True,
-    })
+    configure_dask_scheduler(kw_dask)
 
     logger.info("Initial diagnostic:")
     monitor_performance()

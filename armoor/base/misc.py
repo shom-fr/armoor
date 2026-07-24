@@ -139,6 +139,23 @@ def comma_separated(sarg):
     """Parse a string of comma-separated list."""
     return [a.strip() for a in sarg.split(",")]
 
+def str2bool(sarg):
+    """Parse an argparse `--flag True/False`-style boolean argument.
+
+    `type=bool` is a common argparse footgun: `bool("False")` is `True`
+    (any non-empty string is truthy), so a plain `type=bool` argument
+    silently ignores the actual value typed on the command line.
+    """
+    if isinstance(sarg, bool):
+        return sarg
+    if sarg.strip().lower() in ("true", "1", "yes"):
+        return True
+    if sarg.strip().lower() in ("false", "0", "no"):
+        return False
+    # argparse's type= callables must raise ValueError/TypeError (not
+    # ArmoorError) for its own "invalid X value" CLI error message to fire.
+    raise ValueError(f"Expected True/False, got {sarg!r}")
+
 def blanck_separated(sarg):
     """Parse a string of blanck-separated list."""
     return [a.strip() for a in sarg.split(" ")]

@@ -26,7 +26,105 @@ from armoor.data.interp import (
     )
 
 logger = logging.getLogger(__name__)
-   
+
+
+def _pooled_mean_std(n, s, ss):
+    """Mean/std from pooled (count, sum, sum-of-squares)."""
+    mean = s / n
+    var = max(ss / n - mean ** 2, 0.0)
+    return mean, var ** 0.5
+
+
+def _merge_minmax_dicts(a, b):
+    """Merge two {var: (min, max)} dicts into a new one."""
+    merged = dict(a)
+    for var, (vmin, vmax) in b.items():
+        if var in merged:
+            pmin, pmax = merged[var]
+            vmin, vmax = min(vmin, pmin), max(vmax, pmax)
+        merged[var] = (vmin, vmax)
+    return merged
+
+
+def _merge_nss_dicts(a, b):
+    """Merge two {var: (n, sum, sumsq)} dicts into a new one."""
+    merged = dict(a)
+    for var, (n, s, ss) in b.items():
+        if var in merged:
+            n0, s0, ss0 = merged[var]
+            n, s, ss = n0 + n, s0 + s, ss0 + ss
+        merged[var] = (n, s, ss)
+    return merged
+
+
+def _level_key(attrs):
+    """Vertical-level key for clim/cbar_group/series pooling: vlevel if
+    set, else vrange, else None (no "z" at all, e.g. satellite SST) --
+    keeps e.g. a model's 500m level from being pooled together with its
+    own (or a sibling source's) surface level."""
+    if "vlevel" in attrs:
+        return ("vlevel", attrs["vlevel"])
+    if "vrange" in attrs:
+        return ("vrange", attrs["vrange"])
+    return None
+
+
+def _level_depth(level_key):
+    """Sort key approximating depth for a `_level_key` result -- the
+    vlevel value itself, or a vrange bin's lower bound."""
+    kind, val = level_key
+    if kind == "vlevel":
+        return float(val)
+    return float(val.split("-")[0])
+
+
+def _merge_zless_into_shallowest(pooled, merge_fn):
+    """Fold a z-less group (level_key=None, e.g. satellite SST -- no
+    vertical structure at all) into its shallowest depth-resolved
+    sibling's bucket within the same (metazone, name) pooling prefix, in
+    place.
+
+    Without this, a z-less source configured with "cbar_group"/"clim"
+    alongside a depth-split one (e.g. a model with several vlevels) would
+    never pool with any of it: its own bucket's key (None) never equals
+    any of the sibling's ("vlevel", ...)/("vrange", ...) keys, even though
+    the intent (e.g. comparing SST against a model's own surface) is that
+    they should share one color scale. Both the z-less key and the
+    shallowest sibling key are left pointing at the same merged value, so
+    either can look it up.
+
+    Parameters
+    ----------
+    pooled : dict
+        Mapping of (metazone, name, level_key) to a per-var accumulator
+        dict, modified in place.
+    merge_fn : callable
+        ``merge_fn(a, b) -> merged`` combining two per-var accumulator
+        dicts of the same shape (e.g. {var: (min, max)} or
+        {var: (n, sum, sumsq)}).
+
+    Returns
+    -------
+    None
+    """
+    prefixes: Dict[Any, List[Any]] = {}
+    for metazone, name, level_key in pooled:
+        prefixes.setdefault((metazone, name), []).append(level_key)
+
+    for (metazone, name), level_keys in prefixes.items():
+        if None not in level_keys:
+            continue
+        depth_keys = [lk for lk in level_keys if lk is not None]
+        if not depth_keys:
+            continue
+        shallowest = min(depth_keys, key=_level_depth)
+        orphan_key = (metazone, name, None)
+        target_key = (metazone, name, shallowest)
+        merged = merge_fn(pooled[target_key], pooled[orphan_key])
+        pooled[target_key] = merged
+        pooled[orphan_key] = merged
+
+
 def get_dim_stats(dsin, dim, mparams):
     if dim:
         dim_stats = dim.copy()
@@ -230,8 +328,11 @@ class OutputProcessor:
             Target chunk size in MB for memory optimization
         """
         self.target_chunk_mb = target_chunk_mb
-    
-    def process_datasets(self, ncs: List[str], metazones: Dict[str, Any], 
+        self._clim_ranges: Dict[Any, Dict[str, tuple]] = {}
+        self._cbar_ranges: Dict[Any, Dict[str, tuple]] = {}
+        self._series_stats: Dict[Any, Dict[str, tuple]] = {}
+
+    def process_datasets(self, ncs: List[str], metazones: Dict[str, Any],
                         outputs: Dict[str, Any]) -> Dict[str, Dict[str, List[Path]]]:
         """
         Main processing function for NetCDF datasets.
@@ -264,6 +365,19 @@ class OutputProcessor:
         interp_params = self._prepare_interpolation_params(metazones)
         ncouts = {}
 
+        # Pre-passes for mapseries: resolve clim/cbar_group/series ranges
+        # before the main loop, since ncs mixes every [data] source in no
+        # particular order.
+        self._clim_ranges = self._resolve_clim_ranges(
+            ncs, metazones, outputs, interp_params
+        )
+        self._cbar_ranges = self._resolve_cbar_ranges(
+            ncs, metazones, outputs, interp_params
+        )
+        self._series_stats = self._resolve_series_ranges(
+            ncs, metazones, outputs, interp_params
+        )
+
         # Process each NetCDF file
         for nc_file in ncs:
             logger.info(f"Processing {nc_file}")
@@ -295,9 +409,315 @@ class OutputProcessor:
                 interp_params[metazone] = None
             else:
                 interp_params[metazone] = params
-                
+
         return interp_params
-    
+
+    def _resolve_clim_ranges(self, ncs: List[str], metazones: Dict[str, Any],
+                            outputs: Dict[str, Any],
+                            interp_params: Dict[str, Optional[Dict]]
+                            ) -> Dict[Any, Dict[str, tuple]]:
+        """
+        Resolve per-variable (min, max) for every climatology referenced by
+        an output's "clim" setting, interpolated onto each metazone exactly
+        like a normal source would be.
+
+        Used by `mapseries` to draw a "clim" row in its min/max table (see
+        `_process_sorted_group`), sourced generically from a `[data]` entry
+        rather than a hardcoded climatology path/format.
+
+        Parameters
+        ----------
+        ncs
+            List of NetCDF file paths to process (every [data] source, not
+            just climatologies).
+        metazones
+            Dictionary containing metazone configurations
+        outputs
+            Output configurations (mapping of oname to its config dict)
+        interp_params
+            Interpolation parameters per metazone, as returned by
+            `_prepare_interpolation_params`
+
+        Returns
+        -------
+        Dictionary mapping (metazone, clim_name, level_key) to a dict of
+        {var: (min, max)} -- see `_level_key`. Empty if no output
+        configures "clim".
+        """
+        clim_names = {
+            o["clim"] for o in outputs.values()
+            if isinstance(o, dict) and o.get("clim")
+        }
+        if not clim_names:
+            return {}
+
+        clim_ranges: Dict[Any, Dict[str, tuple]] = {}
+        for nc_file in ncs:
+            dsin = self._load_and_prepare_dataset(nc_file)
+            try:
+                data_name = dsin.attrs.get("data_name")
+                if data_name not in clim_names:
+                    continue
+                is_climatology = get_data_type_by_name(dsin.attrs.get("data_type")).is_climatology
+                for metazone, params in interp_params.items():
+                    fouts = self._process_metazone(
+                        dsin, metazone, metazones[metazone], params,
+                        dsin.attrs, [], is_climatology
+                    )
+                    for fout in fouts:
+                        dsf = xr.open_dataset(fout)
+                        try:
+                            key = (metazone, data_name, _level_key(dsf.attrs))
+                            ranges_mz = clim_ranges.setdefault(key, {})
+                            for var in dsf.data_vars:
+                                vmin = float(dsf[var].min())
+                                vmax = float(dsf[var].max())
+                                if var in ranges_mz:
+                                    pmin, pmax = ranges_mz[var]
+                                    vmin, vmax = min(vmin, pmin), max(vmax, pmax)
+                                ranges_mz[var] = (vmin, vmax)
+                        finally:
+                            dsf.close()
+            finally:
+                dsin.close()
+        _merge_zless_into_shallowest(clim_ranges, _merge_minmax_dicts)
+        return clim_ranges
+
+    def _resolve_cbar_ranges(self, ncs: List[str], metazones: Dict[str, Any],
+                            outputs: Dict[str, Any],
+                            interp_params: Dict[str, Optional[Dict]]
+                            ) -> Dict[Any, Dict[str, tuple]]:
+        """
+        Pool a shared min/max envelope, per (metazone, cbar_group) pair,
+        across every non-climatology [data] source -- used by mapseries()
+        to put e.g. an obs and a model series of the same variable on the
+        same color scale, instead of each computing its own from its own
+        series alone.
+
+        mapseries's outputs_params has no mparams_pro/mparams_con, so
+        (climatology aside) every ocean-model-shaped source is eligible
+        for any mapseries output regardless of its metazone config --
+        pooling therefore doesn't need to re-run the full compatibility
+        check, only the is_climatology exclusion also enforced in
+        `_validate_output_compatibility`.
+
+        Parameters
+        ----------
+        ncs
+            List of NetCDF file paths to process (every [data] source).
+        metazones
+            Dictionary containing metazone configurations
+        outputs
+            Output configurations (mapping of oname to its config dict)
+        interp_params
+            Interpolation parameters per metazone, as returned by
+            `_prepare_interpolation_params`
+
+        Returns
+        -------
+        Dictionary mapping (metazone, cbar_group, level_key) to a dict of
+        {var: (min, max)} -- see `_level_key`. Empty if no mapseries
+        output configures "cbar_group".
+        """
+        cbar_groups = {
+            o["cbar_group"] for o in outputs.values()
+            if isinstance(o, dict) and o.get("otype") == "mapseries" and o.get("cbar_group")
+        }
+        if not cbar_groups:
+            return {}
+
+        cbar_ranges: Dict[Any, Dict[str, tuple]] = {}
+        for nc_file in ncs:
+            dsin = self._load_and_prepare_dataset(nc_file)
+            try:
+                if get_data_type_by_name(dsin.attrs.get("data_type")).is_climatology:
+                    continue
+                for metazone, params in interp_params.items():
+                    fouts = self._process_metazone(
+                        dsin, metazone, metazones[metazone], params,
+                        dsin.attrs, []
+                    )
+                    for fout in fouts:
+                        dsf = xr.open_dataset(fout)
+                        try:
+                            level_key = _level_key(dsf.attrs)
+                            for cbar_group in cbar_groups:
+                                ranges_mz = cbar_ranges.setdefault(
+                                    (metazone, cbar_group, level_key), {}
+                                )
+                                for var in dsf.data_vars:
+                                    vmin = float(dsf[var].min())
+                                    vmax = float(dsf[var].max())
+                                    if var in ranges_mz:
+                                        pmin, pmax = ranges_mz[var]
+                                        vmin, vmax = min(vmin, pmin), max(vmax, pmax)
+                                    ranges_mz[var] = (vmin, vmax)
+                        finally:
+                            dsf.close()
+            finally:
+                dsin.close()
+        _merge_zless_into_shallowest(cbar_ranges, _merge_minmax_dicts)
+        return cbar_ranges
+
+    def _resolve_series_ranges(self, ncs: List[str], metazones: Dict[str, Any],
+                              outputs: Dict[str, Any],
+                              interp_params: Dict[str, Optional[Dict]]
+                              ) -> Dict[Any, Dict[str, tuple]]:
+        """
+        Pool each non-climatology source's own mean/std, per (metazone,
+        data_name), across its whole series -- mapseries saves one zarr
+        per (time, z) group rather than one holding the full series, so
+        the color scale can no longer be computed from a single zarr
+        alone (see armoor.data.plot._cbar_range's series_mean/series_std).
+
+        "cspeed" (sqrt(u**2+v**2)) is pooled too when u/v are present,
+        since it's non-linear and can't be derived from u's/v's stats.
+
+        Returns
+        -------
+        Dictionary mapping (metazone, data_name, level_key) to
+        {var: (mean, std)} -- see `_level_key`. Empty if no output has
+        otype "mapseries".
+        """
+        if not any(
+            isinstance(o, dict) and o.get("otype") == "mapseries"
+            for o in outputs.values()
+        ):
+            return {}
+
+        accum: Dict[Any, Dict[str, tuple]] = {}
+        for nc_file in ncs:
+            dsin = self._load_and_prepare_dataset(nc_file)
+            try:
+                if get_data_type_by_name(dsin.attrs.get("data_type")).is_climatology:
+                    continue
+                data_name = dsin.attrs.get("data_name")
+                for metazone, params in interp_params.items():
+                    fouts = self._process_metazone(
+                        dsin, metazone, metazones[metazone], params,
+                        dsin.attrs, []
+                    )
+                    for fout in fouts:
+                        dsf = xr.open_dataset(fout)
+                        try:
+                            acc = accum.setdefault(
+                                (metazone, data_name, _level_key(dsf.attrs)), {}
+                            )
+                            das = dict(dsf.data_vars)
+                            if "u" in das and "v" in das:
+                                das["cspeed"] = np.sqrt(dsf["u"] ** 2 + dsf["v"] ** 2)
+                            for var, da in das.items():
+                                arr = np.asarray(da.values, dtype="float64").ravel()
+                                arr = arr[~np.isnan(arr)]
+                                if arr.size == 0:
+                                    continue
+                                n, s, ss = arr.size, float(arr.sum()), float((arr ** 2).sum())
+                                if var in acc:
+                                    n0, s0, ss0 = acc[var]
+                                    n, s, ss = n0 + n, s0 + s, ss0 + ss
+                                acc[var] = (n, s, ss)
+                        finally:
+                            dsf.close()
+            finally:
+                dsin.close()
+
+        _merge_zless_into_shallowest(accum, _merge_nss_dicts)
+        return {
+            key: {
+                var: _pooled_mean_std(n, s, ss)
+                for var, (n, s, ss) in acc.items()
+            }
+            for key, acc in accum.items()
+        }
+
+    def _attach_clim_range(self, ds: xr.Dataset, metazone: str,
+                          output: Dict[str, Any]) -> None:
+        """
+        Inject clim_min_<var>/clim_max_<var> attrs on `ds`, in place, from
+        the ranges resolved by `_resolve_clim_ranges` -- no-op unless this
+        output's config sets "clim".
+
+        Parameters
+        ----------
+        ds
+            Dataset about to be saved (already carries the output's other
+            config keys as attrs, via `_process_tree_dataset`).
+        metazone
+            Metazone name.
+        output
+            Output configuration (otype plus any optional output params).
+
+        Returns
+        -------
+        None
+        """
+        clim_name = output.get("clim")
+        if not clim_name:
+            return
+        key = (metazone, clim_name, _level_key(ds.attrs))
+        clim_range = self._clim_ranges.get(key, {})
+        if not clim_range:
+            logger.warning(
+                f"clim={clim_name!r} configured but not resolved for {metazone} ({key[2]})"
+            )
+        for var, (cmin, cmax) in clim_range.items():
+            if var in ds.data_vars:
+                ds.attrs[f"clim_min_{var}"] = cmin
+                ds.attrs[f"clim_max_{var}"] = cmax
+
+    def _attach_cbar_range(self, ds: xr.Dataset, metazone: str,
+                          output: Dict[str, Any]) -> None:
+        """
+        Inject cbar_min_<var>/cbar_max_<var> attrs on `ds`, in place, from
+        the pooled ranges resolved by `_resolve_cbar_ranges` -- no-op
+        unless this output's config sets "cbar_group".
+
+        Parameters
+        ----------
+        ds
+            Dataset about to be saved (already carries the output's other
+            config keys as attrs, via `_process_tree_dataset`).
+        metazone
+            Metazone name.
+        output
+            Output configuration (otype plus any optional output params).
+
+        Returns
+        -------
+        None
+        """
+        cbar_group = output.get("cbar_group")
+        if not cbar_group:
+            return
+        key = (metazone, cbar_group, _level_key(ds.attrs))
+        cbar_range = self._cbar_ranges.get(key, {})
+        if not cbar_range:
+            logger.warning(
+                f"cbar_group={cbar_group!r} configured but not resolved for {metazone} ({key[2]})"
+            )
+        for var, (cmin, cmax) in cbar_range.items():
+            if var in ds.data_vars:
+                ds.attrs[f"cbar_min_{var}"] = cmin
+                ds.attrs[f"cbar_max_{var}"] = cmax
+
+    def _attach_series_range(self, ds: xr.Dataset, metazone: str,
+                            prod_name: str, output: Dict[str, Any]) -> None:
+        """
+        Inject series_mean_<var>/series_std_<var> attrs on `ds`, in place,
+        from `_resolve_series_ranges` -- no-op unless `output`'s otype is
+        "mapseries".
+        """
+        if output.get("otype") != "mapseries":
+            return
+        key = (metazone, prod_name, _level_key(ds.attrs))
+        stats = self._series_stats.get(key, {})
+        if not stats:
+            logger.warning(f"No series stats resolved for {prod_name!r} ({metazone}, {key[2]})")
+        for var, (mean, std) in stats.items():
+            if var == "cspeed" or var in ds.data_vars:
+                ds.attrs[f"series_mean_{var}"] = mean
+                ds.attrs[f"series_std_{var}"] = std
+
     def _process_single_netcdf(self, nc_file: str, metazones: Dict[str, Any],
                               interp_params: Dict[str, Optional[Dict]],
                               outputs: Dict[str, Any],
@@ -330,19 +750,22 @@ class OutputProcessor:
         dsin = self._load_and_prepare_dataset(nc_file)
         attrs_in = dsin.attrs
         prod_name = attrs_in.get("data_name")
-        outputs_params = get_data_type_by_name(attrs_in.get("data_type")).outputs_params
+        data_type = get_data_type_by_name(attrs_in.get("data_type"))
+        outputs_params = data_type.outputs_params
+        is_climatology = data_type.is_climatology
 
         try:
             # Process each metazone
             for metazone, params in interp_params.items():
                 fouts = self._process_metazone(
-                    dsin, metazone, metazones[metazone], params, attrs_in, ofmt
+                    dsin, metazone, metazones[metazone], params, attrs_in, ofmt,
+                    is_climatology
                 )
 
                 # Generate outputs for this metazone
                 ncouts = self._generate_outputs(
                     fouts, metazone, metazones[metazone], outputs,
-                    prod_name, ncouts, outputs_params
+                    prod_name, ncouts, outputs_params, is_climatology
                 )
 
         finally:
@@ -376,7 +799,8 @@ class OutputProcessor:
     
     def _process_metazone(self, dsin: xr.Dataset, metazone: str,
                          mparams: Dict[str, Any], params: Optional[Dict],
-                         attrs_in: Dict[str, Any], ofmt: List[str]) -> List[Path]:
+                         attrs_in: Dict[str, Any], ofmt: List[str],
+                         is_climatology: bool = False) -> List[Path]:
         """
         Process a dataset for a specific metazone.
 
@@ -394,6 +818,10 @@ class OutputProcessor:
             Original dataset attributes
         ofmt
             Formats to save intermediate interpolated outputs
+        is_climatology
+            Whether this dataset's DataType is flagged as a climatology --
+            forwarded to skip time interpolation/range-splitting, which
+            don't apply to its month-of-year "time" axis.
 
         Returns
         -------
@@ -403,7 +831,7 @@ class OutputProcessor:
 
         # Apply interpolations if needed
         if params:
-            ds = self._apply_interpolations(ds, params, mparams)
+            ds = self._apply_interpolations(ds, params, mparams, is_climatology)
             if not isinstance(ds, xr.Dataset):
                 ds.close()
                 return []
@@ -417,7 +845,7 @@ class OutputProcessor:
         # Compute and process ranges
         # with setup_dask_client():
         ds = ds.compute()
-        dss = self._apply_range_processing(ds, mparams)
+        dss = self._apply_range_processing(ds, mparams, is_climatology)
 
         # Save processed datasets
         fouts = self._save_processed_datasets(dss, metazone, ofmt)
@@ -425,10 +853,11 @@ class OutputProcessor:
         return fouts
     
     def _apply_interpolations(self, ds: xr.Dataset, params: Dict[str, Any],
-                             mparams: Dict[str, Any]) -> xr.Dataset:
+                             mparams: Dict[str, Any],
+                             is_climatology: bool = False) -> xr.Dataset:
         """
         Apply various interpolations to the dataset.
-        
+
         Parameters
         ----------
         ds
@@ -437,15 +866,20 @@ class OutputProcessor:
             Interpolation parameters
         mparams
             Metazone parameters
-            
+        is_climatology
+            Whether this dataset's DataType is flagged as a climatology --
+            its "time" isn't a real calendar date, so time interpolation
+            is skipped for it regardless of the metazone's configuration.
+
         Returns
         -------
         Interpolated dataset
         """
         logger.info("Start interpolation")
-        
-        # Time interpolation
-        if params.get("time"):
+
+        # Time interpolation -- ignored (not rejected) for a climatology
+        # (see _apply_range_processing's identical guard).
+        if params.get("time") and not is_climatology:
             ds = process_time_interpolation(
                 ds, params.get("time"), mparams.get("tbound")
             )
@@ -456,8 +890,10 @@ class OutputProcessor:
             ds = process_horizontal_interpolation(ds, params.get("horizontal"))
             gc.collect()
         
-        # Vertical interpolation
-        if params.get("vertical"):
+        # Vertical interpolation -- ignored for a dataset with no "z" at
+        # all (e.g. satellite SST), even if the metazone configures it
+        # for the sake of another, depth-resolved source.
+        if params.get("vertical") and "z" in ds.dims:
             ds = process_vertical_interpolation(ds, params.get("vertical"))
             gc.collect()
         
@@ -483,26 +919,33 @@ class OutputProcessor:
         
         return ds.drop_vars(vars_to_drop, errors='ignore')
     
-    def _apply_range_processing(self, ds: xr.Dataset, 
-                               mparams: Dict[str, Any]) -> List[xr.Dataset]:
+    def _apply_range_processing(self, ds: xr.Dataset,
+                               mparams: Dict[str, Any],
+                               is_climatology: bool = False) -> List[xr.Dataset]:
         """
         Apply time and vertical range processing to dataset.
-        
+
         Parameters
         ----------
         ds
             Dataset to process
         mparams
             Metazone parameters
-            
+        is_climatology
+            Whether this dataset's DataType is flagged as a climatology --
+            its "time" isn't a real calendar date, so tfreq/trange_seq are
+            skipped for it regardless of the metazone's configuration.
+
         Returns
         -------
         List of processed datasets
         """
-        # Time range processing
-        if "tfreq" in mparams:
+        # Time range processing -- ignored (not rejected) for a
+        # climatology: its "time" is a month-of-year index, not a real
+        # calendar date, so it can't be meaningfully split by day/range.
+        if "tfreq" in mparams and not is_climatology:
             dss = ranges.tfreq(ds)
-        elif "trange_seq" in mparams:
+        elif "trange_seq" in mparams and not is_climatology:
             logger.info('Applying trange_seq...')
             try:
                 dss = ranges.trange_seq(
@@ -514,15 +957,19 @@ class OutputProcessor:
         else:
             dss = [ds]
 
-        # Vertical level processing
-        if "vlevel" in mparams:
+        # Vertical level processing -- ignored (not rejected) for a
+        # dataset with no "z" at all (e.g. satellite SST), even if the
+        # metazone configures vlevel/vrange for another, depth-resolved
+        # source.
+        has_z = any("z" in ds0.dims for ds0 in dss)
+        if "vlevel" in mparams and has_z:
             vname = mparams["vlevel"]["vname"]
             dss = ranges.vlevels(dss, vname)
-        elif "vrange" in mparams:
+        elif "vrange" in mparams and has_z:
             vname = mparams["vrange"]["vname"]
             vbins = list(zip(mparams["vrange"]["bins_min"], mparams["vrange"]["bins_max"]))
             dss = ranges.vrange(dss, vname, vbins)
-        elif any("z" in ds0.dims for ds0 in dss):
+        elif has_z:
             # Neither vlevel nor vrange configured: fall back to the
             # dataset's own native vertical levels (still one dataset per
             # level, like ranges.vlevels), so plots get one figure per
@@ -576,7 +1023,8 @@ class OutputProcessor:
                          mparams: Dict[str, Any], outputs: Dict[str, Any],
                          prod_name: str,
                          ncouts: Dict[str, Dict[str, List[Path]]],
-                         outputs_params: Dict[str, Any]) -> Dict[str, Dict[str, List[Path]]]:
+                         outputs_params: Dict[str, Any],
+                         is_climatology: bool = False) -> Dict[str, Dict[str, List[Path]]]:
         """
         Generate output files for a metazone.
 
@@ -597,6 +1045,11 @@ class OutputProcessor:
         outputs_params
             Per-otype processing params for this dataset's data type
             (DataType.outputs_params -- see armoor.data.datatype)
+        is_climatology
+            Whether this dataset's DataType is flagged as a climatology
+            (DataType.is_climatology) -- excludes it from otypes that
+            shouldn't render a climatology's own series (see
+            `_validate_output_compatibility`).
 
         Returns
         -------
@@ -606,7 +1059,9 @@ class OutputProcessor:
             logger.info(f"Processing output: {oname}")
 
             # Check if output type is allowed and compatible
-            if not self._validate_output_compatibility(output, mparams, metazone, outputs_params):
+            if not self._validate_output_compatibility(
+                output, mparams, metazone, outputs_params, is_climatology
+            ):
                 continue
 
             # Process this output type
@@ -627,7 +1082,8 @@ class OutputProcessor:
     def _validate_output_compatibility(self, output: Dict[str, Any],
                                      mparams: Dict[str, Any],
                                      metazone: str,
-                                     outputs_params: Dict[str, Any]) -> bool:
+                                     outputs_params: Dict[str, Any],
+                                     is_climatology: bool = False) -> bool:
         """
         Validate if an output type is compatible with the metazone parameters.
 
@@ -641,6 +1097,8 @@ class OutputProcessor:
             Metazone name
         outputs_params
             Per-otype processing params for this dataset's data type
+        is_climatology
+            Whether this dataset's DataType is flagged as a climatology.
 
         Returns
         -------
@@ -650,7 +1108,16 @@ class OutputProcessor:
         if not oparams:
             logger.warning(f"Skip {output.get('otype')}: forbidden")
             return False
-        
+
+        # A climatology is meant to be referenced by name (see "clim" in
+        # data.ini) as a reference for other sources' mapseries, not to
+        # render its own per-timestep series -- DataWoa18/DataBobyclim
+        # deliberately don't fork outputs_params for this (see
+        # test_datatype.py), so the exclusion lives here instead.
+        if is_climatology and output.get("otype") == "mapseries":
+            logger.info(f"Skip mapseries for climatology source ({metazone})")
+            return False
+
         # Check required parameters
         if oparams.get("mparams_pro"):
             for dim, param in oparams.get("mparams_pro").items():
@@ -771,6 +1238,9 @@ class OutputProcessor:
                 ds = self._process_tree_dataset(
                     dts0, ds_name, concat_dim, output
                 )
+                self._attach_clim_range(ds, metazone, output)
+                self._attach_cbar_range(ds, metazone, output)
+                self._attach_series_range(ds, metazone, prod_name, output)
                 dsouts[ds_name] = ds
 
             del dts0

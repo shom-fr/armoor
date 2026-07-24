@@ -736,6 +736,12 @@ def open_decode_arpege_insta(path_files):
         {"longitude": "lon", "latitude": "lat", "valid_time": "time"}
     )
     ds_insta = ds_insta.swap_dims({"lon": "x", "lat": "y"})
+    # matches open_decode_sst_satellite's broadcast -- downstream plotting assumes 2D lon/lat
+    lat, lon = xr.broadcast(ds_insta["lat"], ds_insta["lon"])
+    ds_insta = ds_insta.drop_vars(["lon", "lat"])
+    ds_insta["lon"] = lon
+    ds_insta["lat"] = lat
+    ds_insta = ds_insta.set_coords(["lon", "lat"])
     ds_insta = cfspecs.decode(ds_insta.sortby("time"))
     logger.info(ds_insta)
     return ds_insta
@@ -757,7 +763,7 @@ def open_decode_sst_satellite(path_files, fmt):
     # Open
     # path = os.path.join(ROOTDIR, "config", f"{fmt}.cfg")
     cfspecs = xmeta.get_meta_specs(f"{fmt}")
-    ds = cfspecs.decode(xr.open_mfdataset(path_files).chunk(chunks={}))
+    ds = cfspecs.decode(xr.open_mfdataset(path_files, decode_timedelta=True).chunk(chunks={}))
     for var in ds.coords:
         if "or_" in var:
             ds = ds.drop_vars(var)
@@ -833,7 +839,7 @@ def open_decode_cmems_model(path_files):
     if n_files == 1:
         ds = _processed[0]
     else:
-        ds = xr.merge(_processed)
+        ds = xr.merge(_processed, compat="no_conflicts")
     if "depth" in ds.data_vars:
         ds = ds.set_coords("depth")
     return ds
@@ -956,12 +962,12 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
                     _ds0 = xr.open_dataset(p, **_open_kw)
                     _ds0 = preprocess_hycom(_ds0)
                     _parts.append(_ds0)
-                _ds = xr.merge(_parts, join="inner", combine_attrs="override")
+                _ds = xr.merge(_parts, join="inner", compat="no_conflicts", combine_attrs="override")
             _group_ds.append(_ds)
         if len(_group_ds) == 1:
             ds = _group_ds[0]
         else:
-            ds = xr.concat(_group_ds, dim="time")
+            ds = xr.concat(_group_ds, dim="time", data_vars="all")
     logger.info(f"  [timing] open_mfdataset: {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
     cfspecs = xmeta.get_meta_specs("hycom")
@@ -990,7 +996,7 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
         ds = ds.assign_coords(depth=depth).drop_vars(["dz", "z"])
     logger.info(f"  [timing] dz2depth:       {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
-    ds = ds.sel(time=~ds.get_index("time").duplicated())
+    ds = ds.sel(time=~ds.get_index("time").duplicated()).sortby("time")
     logger.info(f"  [timing] dedup time:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
 
     good_var = None
@@ -1073,7 +1079,9 @@ def open_decode_woa18(path_files):
     woa18 = xr.open_mfdataset(
         path_files,
         decode_times=False,
-        combine_attrs="drop_conflicts"
+        combine_attrs="drop_conflicts",
+        compat="no_conflicts",
+        data_vars="all",
     )
     # Decode
     vars_to_drop = ["_dd", "_gp", "_oa", "_sd", "_se", "_ma", "bnds", "bounds", "crs"]
@@ -1111,6 +1119,20 @@ def open_decode_woa18(path_files):
         np.ceil(woa18["time"]) / 12.0
     )
     woa18["time"] = woa18.time.where(woa18.time != 0., 12.)
+    # The original "months since ..." units/calendar attrs survive the
+    # arithmetic above even though the values no longer mean that -- left
+    # in place, they mislead xarray into writing them back out verbatim
+    # (and then failing to CF-decode them) the next time this dataset is
+    # saved and reopened (e.g. armoor.data.output's intermediate files).
+    woa18["time"].attrs = {}
+    woa18["time"].encoding = {}
+    if "temp" in woa18 and "sal" in woa18:
+        # Derive canonical "ptemp" (potential temp) from in-situ "temp" --
+        # .compute() avoids chaining it lazily onto the raw open_mfdataset
+        # graph, which corrupted dask's task graph downstream once wrapped
+        # in further dask.delayed/compute calls with fusion enabled.
+        woa18["ptemp"] = woa18.oceanvars.sel_ptemp().compute()
+        woa18 = woa18.drop_vars("pres", errors="ignore")
     return woa18
 
 
@@ -1279,7 +1301,7 @@ def open_decode_cmems_insitu(path_files, platform):
                         dssi.append(dsi)
                 if len(dssi) == 0:
                     continue
-                ds = xr.combine_nested(dssi, "time")
+                ds = xr.combine_nested(dssi, "time", data_vars="all")
                 ds["depth"] = -1 * ds["depth"]
             if platform == "glider":
                 if ds["depth"].dims == ("z",):

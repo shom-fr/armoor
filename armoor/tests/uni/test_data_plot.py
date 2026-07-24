@@ -8,6 +8,7 @@ do nothing -- this is the "for free" behavior the hierarchy is meant to
 provide until eddy plotting is actually designed.
 """
 import numpy as np
+import pandas as pd
 import pytest
 import xarray as xr
 
@@ -17,7 +18,10 @@ import xarray as xr
 from unittest.mock import MagicMock, patch
 
 from armoor.__init__ import ArmoorError
-from armoor.data.plot import PlotEddies, PlotOceanModel, get_plotter, _plot_task, main_plot
+from armoor.data.plot import (
+    PlotEddies, PlotMeteo, PlotOceanModel, PlotSstSatellite, get_plotter,
+    _plot_task, main_plot, _cbar_range,
+)
 
 
 class _FakePool:
@@ -92,6 +96,24 @@ class TestGetPlotter:
         finally:
             plotter.clean()
 
+    def test_sst_satellite_data_type(self, tmp_path):
+        nc = _write_datatree(tmp_path, "sst_satellite")
+        plotter = get_plotter(nc, "mz1")
+        try:
+            assert isinstance(plotter, PlotSstSatellite)
+            assert isinstance(plotter, PlotOceanModel)
+        finally:
+            plotter.clean()
+
+    def test_meteo_data_type(self, tmp_path):
+        nc = _write_datatree(tmp_path, "meteo")
+        plotter = get_plotter(nc, "mz1")
+        try:
+            assert isinstance(plotter, PlotMeteo)
+            assert isinstance(plotter, PlotOceanModel)
+        finally:
+            plotter.clean()
+
 
 class TestPlotEddiesNotImplemented:
 
@@ -111,7 +133,32 @@ class TestPlotOceanModelRegistersMethods:
         nc = _write_datatree(tmp_path, "ocean_model")
         plotter = get_plotter(nc, "mz1")
         try:
-            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "timeseries", "maps"):
+            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "timeseries", "maps", "mapseries"):
+                assert method_name in plotter.methods
+        finally:
+            plotter.clean()
+
+    def test_sst_satellite_inherits_ocean_model_methods(self, tmp_path):
+        """Regression test: PlotSstSatellite defines no methods of its own
+        (reuses PlotOceanModel's as-is) -- SubclassingMethodRegistry's
+        generated __post_init__ used to only scan the exact subclass's own
+        vars(), so an empty-bodied subclass like this one registered
+        nothing at all and every call() raised "not found"."""
+        nc = _write_datatree(tmp_path, "sst_satellite")
+        plotter = get_plotter(nc, "mz1")
+        try:
+            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "timeseries", "maps", "mapseries"):
+                assert method_name in plotter.methods
+        finally:
+            plotter.clean()
+
+    def test_meteo_inherits_ocean_model_methods(self, tmp_path):
+        """Same regression coverage as PlotSstSatellite's -- PlotMeteo also
+        defines no methods of its own."""
+        nc = _write_datatree(tmp_path, "meteo")
+        plotter = get_plotter(nc, "mz1")
+        try:
+            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "timeseries", "maps", "mapseries"):
                 assert method_name in plotter.methods
         finally:
             plotter.clean()
@@ -378,5 +425,219 @@ class TestCurrentMap:
         try:
             plotter.maps()
             assert len(plotter.saved_files) == 1
+        finally:
+            plotter.clean()
+
+
+class TestCbarRange:
+    """Pure-function color-scale computation used by mapseries -- fixed
+    once over a whole series (unlike maps(), recomputed per call) and kept
+    free of cartopy/matplotlib so it's testable in isolation."""
+
+    def test_explicit_vminmax_takes_priority(self):
+        da = xr.DataArray(np.array([1.0, 2.0, 3.0]))
+        assert _cbar_range(da, "ptemp", {"ptemp": (0.0, 100.0)}, nstd=2.5) == (0.0, 100.0)
+
+    def test_pos_convention_uses_mean_and_std(self):
+        da = xr.DataArray(np.array([10.0, 12.0, 14.0]))
+        mean, std = float(da.mean()), float(da.std())
+        vmin, vmax = _cbar_range(da, "ptemp", {}, nstd=2.0)
+        assert vmin == pytest.approx(mean - 2.0 * std)
+        assert vmax == pytest.approx(mean + 2.0 * std)
+
+    def test_rel_convention_is_centered_on_zero(self):
+        da = xr.DataArray(np.array([-1.0, 0.0, 1.0, 5.0]))
+        std = float(da.std())
+        vmin, vmax = _cbar_range(da, "ssh", {}, nstd=1.75)
+        assert vmin == pytest.approx(-1.75 * std)
+        assert vmax == pytest.approx(1.75 * std)
+
+    def test_unknown_var_defaults_to_pos_like(self):
+        """Vars absent from MINMAX_VARS aren't excluded from mapseries
+        (mapseries() itself filters by CMAP_VARS membership) --
+        MINMAX_VARS.get returns None, which isn't "rel", so the
+        mean±nstd*std branch applies."""
+        da = xr.DataArray(np.array([1.0, 2.0, 3.0]))
+        mean, std = float(da.mean()), float(da.std())
+        vmin, vmax = _cbar_range(da, "some_future_var", None, nstd=2.5)
+        assert vmin == pytest.approx(mean - 2.5 * std)
+        assert vmax == pytest.approx(mean + 2.5 * std)
+
+    def test_group_range_used_when_no_explicit_vminmax(self):
+        """cbar_group's pooled bounds (armoor.data.output._resolve_cbar_ranges)
+        take priority over the local per-series automatic computation."""
+        da = xr.DataArray(np.array([1.0, 2.0, 3.0]))
+        assert _cbar_range(da, "ptemp", {}, nstd=2.5, group_range=(8.0, 15.0)) == (8.0, 15.0)
+
+    def test_explicit_vminmax_beats_group_range(self):
+        da = xr.DataArray(np.array([1.0, 2.0, 3.0]))
+        result = _cbar_range(
+            da, "ptemp", {"ptemp": (0.0, 100.0)}, nstd=2.5, group_range=(8.0, 15.0)
+        )
+        assert result == (0.0, 100.0)
+
+    def test_series_mean_std_used_over_local_computation(self):
+        """series_mean/series_std (armoor.data.output._resolve_series_ranges)
+        take priority over da_all's own mean/std -- required now that a
+        single zarr only holds one (time, z) group, not the whole series."""
+        da = xr.DataArray(np.array([1.0, 2.0, 3.0]))
+        vmin, vmax = _cbar_range(
+            da, "ptemp", {}, nstd=2.0, series_mean=11.0, series_std=1.0
+        )
+        assert vmin == pytest.approx(9.0)
+        assert vmax == pytest.approx(13.0)
+
+    def test_group_range_beats_series_mean_std(self):
+        da = xr.DataArray(np.array([1.0, 2.0, 3.0]))
+        result = _cbar_range(
+            da, "ptemp", {}, nstd=2.0,
+            group_range=(8.0, 15.0), series_mean=11.0, series_std=1.0,
+        )
+        assert result == (8.0, 15.0)
+
+
+def _write_mapseries_datatree(tmp_path, name="model", ntime=3, with_clim=False,
+                               with_vector=False, extra_attrs=None):
+    """Datatree with only a "data" child (mapseries never has "mean"/"std",
+    see armoor.data.datatype.DataOceanModel.outputs_params)."""
+    y, x = 3, 4
+    lat = np.linspace(40, 45, y)
+    lon = np.linspace(-10, -5, x)
+    lon2d, lat2d = np.meshgrid(lon, lat)
+    time = pd.date_range("2024-01-01", periods=ntime)
+    data_vars = {
+        "ptemp": (["time", "y", "x"], np.random.rand(ntime, y, x) + 10.0),
+    }
+    if with_vector:
+        data_vars["u"] = (["time", "y", "x"], np.random.rand(ntime, y, x))
+        data_vars["v"] = (["time", "y", "x"], np.random.rand(ntime, y, x))
+    attrs = {"data_name": name, "data_type": "ocean_model"}
+    if with_clim:
+        attrs["clim_min_ptemp"] = 5.0
+        attrs["clim_max_ptemp"] = 20.0
+    if extra_attrs:
+        attrs.update(extra_attrs)
+    ds = xr.Dataset(
+        data_vars,
+        coords={
+            "time": time,
+            "lon": (["y", "x"], lon2d),
+            "lat": (["y", "x"], lat2d),
+        },
+        attrs=attrs,
+    )
+    dt = xr.DataTree.from_dict({"data": ds})
+    path = tmp_path / f"{name}.zarr"
+    dt.to_zarr(path, mode="w")
+    return str(path)
+
+
+class TestMapseriesScalar:
+    """mapseries() must render one map per native time step for every
+    scalar variable, with a color scale fixed once over the whole series
+    (see TestCbarRange) and a min/max table (data always, clim only when
+    the clim_min_<var>/clim_max_<var> attrs are present)."""
+
+    def test_one_file_per_time_step(self, tmp_path):
+        nc = _write_mapseries_datatree(tmp_path, ntime=3)
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.mapseries()
+            assert len(plotter.saved_files) == 3
+            assert all("mapseries_ptemp_" in f for f in plotter.saved_files)
+        finally:
+            plotter.clean()
+
+    def test_with_clim_attrs_does_not_crash(self, tmp_path):
+        nc = _write_mapseries_datatree(tmp_path, ntime=1, with_clim=True)
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.mapseries()
+            assert len(plotter.saved_files) == 1
+        finally:
+            plotter.clean()
+
+    def test_explicit_vminmax_used(self, tmp_path):
+        nc = _write_mapseries_datatree(tmp_path, ntime=1)
+        plotter = get_plotter(nc, "mz1", vminmax={"ptemp": (0.0, 50.0)})
+        try:
+            plotter.mapseries()
+            assert len(plotter.saved_files) == 1
+        finally:
+            plotter.clean()
+
+    def test_with_cbar_group_attrs_does_not_crash(self, tmp_path):
+        """cbar_min_<var>/cbar_max_<var> attrs (set by
+        armoor.data.output.OutputProcessor._attach_cbar_range when
+        cbar_group is configured) drive the color scale instead of the
+        local per-series computation -- see TestCbarRange.
+        test_group_range_used_when_no_explicit_vminmax for the pure-function
+        version of this precedence."""
+        nc = _write_mapseries_datatree(
+            tmp_path, ntime=1,
+            extra_attrs={"cbar_min_ptemp": 8.0, "cbar_max_ptemp": 15.0},
+        )
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.mapseries()
+            assert len(plotter.saved_files) == 1
+        finally:
+            plotter.clean()
+
+    def test_with_series_mean_std_attrs_does_not_crash(self, tmp_path):
+        """series_mean_<var>/series_std_<var> attrs (set by
+        armoor.data.output.OutputProcessor._attach_series_range) drive the
+        color scale for a single-timestep zarr, since mapseries now saves
+        one zarr per (time, z) group -- there's no longer a whole series
+        in a single zarr to compute mean/std from directly."""
+        nc = _write_mapseries_datatree(
+            tmp_path, ntime=1,
+            extra_attrs={"series_mean_ptemp": 11.0, "series_std_ptemp": 1.0},
+        )
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.mapseries()
+            assert len(plotter.saved_files) == 1
+        finally:
+            plotter.clean()
+
+
+class TestMapseriesVector:
+    """u/v is rendered separately from scalar variables, one current map
+    per native time step, magnitude bounds fixed over the whole series."""
+
+    def test_one_current_file_per_time_step_no_scalar_table(self, tmp_path):
+        nc = _write_mapseries_datatree(tmp_path, ntime=2, with_vector=True)
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.mapseries()
+            current_files = [f for f in plotter.saved_files if "mapseries_current_" in f]
+            scalar_files = [f for f in plotter.saved_files if "mapseries_ptemp_" in f]
+            assert len(current_files) == 2
+            assert len(scalar_files) == 2
+        finally:
+            plotter.clean()
+
+    def test_barbs_vector_style(self, tmp_path):
+        nc = _write_mapseries_datatree(
+            tmp_path, ntime=1, with_vector=True,
+            extra_attrs={"vector_style": "barbs"},
+        )
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.mapseries()
+            assert any("mapseries_current_" in f for f in plotter.saved_files)
+        finally:
+            plotter.clean()
+
+    def test_series_mean_std_cspeed_attrs_does_not_crash(self, tmp_path):
+        nc = _write_mapseries_datatree(
+            tmp_path, ntime=1, with_vector=True,
+            extra_attrs={"series_mean_cspeed": 5.0, "series_std_cspeed": 0.5},
+        )
+        plotter = get_plotter(nc, "mz1", vminmax={})
+        try:
+            plotter.mapseries()
+            assert any("mapseries_current_" in f for f in plotter.saved_files)
         finally:
             plotter.clean()
