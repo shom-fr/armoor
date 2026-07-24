@@ -23,7 +23,8 @@ dependencies = [
     # xoa now comes from conda-forge (see requirements.txt/environment.yml,
     # pinned to 2026.7.0) -- woom/shoot have no conda-forge package, stay git-based.
     "woom @ git+https://github.com/shom-fr/woom.git",
-    "shoot @ git+https://github.com/shom-fr/shoot.git@develop"
+    "shoot @ git+https://github.com/shom-fr/shoot.git@develop",
+    "python-gitlab",
 ]
 [project.optional-dependencies]
 
@@ -75,6 +76,11 @@ armoor-interp-horizontal = "armoor.cli.interp:main_interp_horizontal"
 armoor-interp-vertical = "armoor.cli.interp:main_interp_vertical"
 armoor-range-time = "armoor.cli.range:main_range_time"
 armoor-range-vertical = "armoor.cli.range:main_range_vertical"
+armoor-tick-authentication = "armoor.cli.tick:main_tick_authentication"
+armoor-tick-authentication-info = "armoor.cli.tick:main_tick_authentication_info"
+armoor-tick-create = "armoor.cli.tick:main_tick_create"
+armoor-tick-description = "armoor.cli.tick:main_tick_description"
+armoor-tick-search = "armoor.cli.tick:main_tick_search"
 armoor-viewer = "armoor.viewer.app:main"
 
 [build-system]
@@ -84,7 +90,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = [
     "armoor", "armoor.accessors", "armoor.algo", "armoor.base",
-    "armoor.cli", "armoor.comp", "armoor.data", "armoor.diags",
+    "armoor.cli", "armoor.comp", "armoor.data", "armoor.diags", "armoor.tick",
     "armoor.viewer", "armoor.viewer.api", "armoor.viewer.rendering", "armoor.viewer.bridge",
 ]
 include-package-data = true

@@ -15,6 +15,7 @@
 
    accessors
    cli
+   tick
    viewer
    examples/index
 

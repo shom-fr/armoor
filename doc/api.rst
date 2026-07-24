@@ -28,6 +28,7 @@ Package API
     armoor.cli.filters
     armoor.cli.interp
     armoor.cli.range
+    armoor.cli.tick
     armoor.cli.io
     armoor.cli.main
     armoor.cli.log
@@ -44,3 +45,6 @@ Package API
     armoor.data.output
     armoor.data.plot
     armoor.data.range
+    armoor.tick
+    armoor.tick.ticket
+    armoor.tick.misc
