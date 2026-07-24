@@ -7,6 +7,21 @@ Develop
 New features
 ------------
 
+- Added a ``mapseries`` otype to ``armoor-data``: renders one map per native
+  time step (instead of a single aggregated map), with the color scale fixed
+  once over the whole series, current/wind vectors overlaid via quiver or
+  barbs, and an optional climatology min/max reference row. New ``[outputs]``
+  options: ``nstd``, ``vector_style``, ``vector_scale``, ``rarification``,
+  ``barbs_length``, ``barbs_linewidth``, ``quiver_scale``, ``clim`` and
+  ``cbar_group``. ``armoor-data`` also now accepts ``woa18``, ``bobyclim``,
+  ``cmems_sst_l4``, ``cmems_sst_l3``, ``cersat_sst_l3`` and ``arpege_insta``
+  input formats.
+
+- Re-added ``armoor-tick`` (dropped during the ``cli/main.py`` refactor):
+  ``armoor-tick-create``/``search``/``description``/``authentication``/
+  ``authentication-info`` manage GitLab issues used to report and track
+  anomalies, ported onto the current ``get_parser_X``/``main_X`` CLI pattern.
+
 Breaking changes
 ----------------
 
@@ -16,8 +31,17 @@ Deprecations
 Bug fixes
 ---------
 
+- Fixed ``update_auth_cfg`` (``armoor-tick-authentication``) writing empty
+  nested sections (e.g. ``proxies``) as a bare string, which made the
+  resulting ``auth.cfg`` fail re-validation on the very next run.
+
 Documentation
 -------------
+
+- Added the ``nbsphinx`` dependency to the ``doc`` extra: ``doc/conf.py`` has
+  used the extension for a while, but ``make html`` failed with
+  ``Could not import extension nbsphinx`` on any environment that only
+  installs ``.[doc]`` (e.g. CI).
 
 2026.7.0
 ========
