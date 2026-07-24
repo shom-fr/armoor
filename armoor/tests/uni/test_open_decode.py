@@ -344,6 +344,32 @@ class TestOpenDecodeHycom:
         # Check no duplicate times
         assert len(result.time) == len(np.unique(result.time))
 
+    def test_open_decode_hycom_sorts_time_across_groups(self, tmp_path):
+        """Regression test: per-variable files are grouped by their exact
+        time range (_time_key) and concatenated group-by-group in
+        `_groups` insertion order, which follows `sorted_paths` (alphabetical
+        filename order) -- not chronological order. Naming the
+        chronologically later group's files so they sort first (a real
+        pattern seen on an actual HYCOM run) used to produce a
+        non-monotonic "time" axis, since the post-merge dedup
+        (`ds.sel(time=~...duplicated())`) preserves this pre-existing
+        order instead of sorting it."""
+        src_dir = TEST_DATA_DIR
+        n_first = 30
+        for var in ("h", "saln", "temp", "u", "v"):
+            ds = xr.open_dataset(src_dir / f"hycom_{var}_3D.nc", decode_times=False)
+            # Alphabetically-first prefix ("aaa_") gets the chronologically
+            # LATER half of the time series; alphabetically-last ("zzz_")
+            # gets the EARLIER half -- inverted on purpose.
+            ds.isel(time=slice(n_first, None)).to_netcdf(tmp_path / f"aaa_hycom_{var}_3D.nc")
+            ds.isel(time=slice(0, n_first)).to_netcdf(tmp_path / f"zzz_hycom_{var}_3D.nc")
+            ds.close()
+
+        result = open_decode_hycom(get_paths(str(tmp_path / "*_hycom_*_3D.nc")))
+
+        time_index = pd.DatetimeIndex(result["time"].values)
+        assert time_index.is_monotonic_increasing
+
     def test_open_decode_hycom_model_coordinates(self, setup_test_data):
         """
         Test coordinate swapping in open_decode_hycom.
@@ -456,6 +482,36 @@ class TestOpenDecodeWoa18:
         if 'lon' in result.coords:
             assert result.lon.min() >= -180
             assert result.lon.max() <= 180
+
+    def test_open_decode_woa18_time_survives_netcdf_roundtrip(self, setup_test_data, tmp_path):
+        """Regression test: the raw "months since 1955-01-01" units/calendar
+        attrs used to survive the ceil/trunc arithmetic that turns "time"
+        into a plain 1-12 month index, so saving this dataset to netcdf
+        and reopening it (as armoor.data.output does for every
+        intermediate file) crashed with "'months since' units only
+        allowed for '360_day' calendar" -- the stale attrs must be
+        cleared so a plain numeric roundtrip works."""
+        filepath = setup_test_data['woa18']
+        result = open_decode_woa18(get_paths(str(filepath)))
+
+        assert result["time"].attrs == {}
+
+        nc_path = tmp_path / "woa18_roundtrip.nc"
+        result.to_netcdf(nc_path)
+        reopened = xr.open_dataset(nc_path)
+        assert reopened["time"].values.tolist() == result["time"].values.tolist()
+
+    def test_open_decode_woa18_derives_materialized_ptemp(self, setup_test_data):
+        """ptemp must be derived (not left as "temp") and materialized
+        (not dask-backed) -- deriving it lazily previously corrupted the
+        dask graph once this dataset was later wrapped in further
+        dask.delayed/compute calls downstream."""
+        filepath = setup_test_data['woa18']
+        result = open_decode_woa18(get_paths(str(filepath)))
+
+        assert "ptemp" in result
+        assert not result["ptemp"].chunks
+        assert "pres" not in result
 
 
 # ============================================================================

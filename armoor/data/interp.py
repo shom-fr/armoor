@@ -301,9 +301,9 @@ def process_time_interpolation(ds, param, tbound):
     ds: xr.Dataset
         Product dataset.
     param: list
-        Parameters for time colocation.
+        Parameters for time interpolation.
     tbound: list
-        Time bounds for colocation.
+        Time bounds for interpolation.
     
     Returns
     -------
@@ -311,9 +311,9 @@ def process_time_interpolation(ds, param, tbound):
         Interpolated product dataset.
     """
     logger.info("---- Time interpolation")
-    coloc = TimeInterpolation(ds, tbound)
-    coloc.__post_init__()
-    ds = coloc.call(*param)
+    interp = TimeInterpolation(ds, tbound)
+    interp.__post_init__()
+    ds = interp.call(*param)
     return ds
     
 def process_horizontal_interpolation(ds, param):
@@ -324,7 +324,7 @@ def process_horizontal_interpolation(ds, param):
     ds: xr.Dataset
         Product dataset.
     param: list
-        Parameters for horizontal colocation.
+        Parameters for horizontal interpolation.
     
     Returns
     -------
@@ -332,9 +332,9 @@ def process_horizontal_interpolation(ds, param):
         Interpolated product dataset.
     """
     logger.info("---- Horizontal interpolation")
-    coloc = HorizontalInterpolation(ds)
-    coloc.__post_init__()
-    ds = coloc.call(*param)
+    interp = HorizontalInterpolation(ds)
+    interp.__post_init__()
+    ds = interp.call(*param)
     return ds
 
 def process_vertical_interpolation(ds, param):
@@ -345,15 +345,15 @@ def process_vertical_interpolation(ds, param):
     ds: xr.Dataset
         Product dataset.
     param: list
-        Parameters for vertical colocation.
+        Parameters for vertical interpolation.
     
     Returns
     -------
     tuple
         Interpolated product datasets.
     """
-    logger.info("---- Vertical colocation")    
-    coloc = VerticalInterpolation(ds)
-    coloc.__post_init__()
-    ds = coloc.call(*param)
+    logger.info("---- Vertical interpolation")
+    interp = VerticalInterpolation(ds)
+    interp.__post_init__()
+    ds = interp.call(*param)
     return ds

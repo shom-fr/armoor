@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from armoor import ArmoorError
-from armoor.base.misc import comma_separated
+from armoor.base.misc import comma_separated, str2bool
 from armoor.cli.log import main_setup_logging
 
 logger = logging.getLogger(__name__)
@@ -378,7 +378,7 @@ def add_dask_processes_parser_arguments(parser):
     """
     parser.add_argument(
         "--dask-processes",
-        type=bool,
+        type=str2bool,
         default=False,
         help="Use dask processes: True/False",
         )
@@ -615,7 +615,7 @@ def to_zarr(ds, fout):
         del var_ds
 
 def get_dask_args(args):
-    
+
     dask_dashboardaddress = args.dask_dashboardaddress
     if dask_dashboardaddress == "None":
         dask_dashboardaddress = None
@@ -626,7 +626,27 @@ def get_dask_args(args):
         dask_dashboardaddress,
         args.dask_localdirectory
         )
-    
+
+
+def configure_dask_scheduler(kw_dask):
+    """Configure dask's local (non-distributed) scheduler from parsed
+    --dask-* CLI args -- shared by armoor-data and armoor-comp-* so both
+    stay in sync.
+
+    "processes" gives each worker its own independent process (and its
+    own independent numba/OpenMP runtime instance, with nothing shared to
+    race on); "threads" runs every worker in this one process, sharing a
+    single numba threading-layer instance across them.
+    """
+    import dask
+    dask.config.set({
+        'scheduler': 'processes' if kw_dask[1] else 'threads',
+        'num_workers': kw_dask[0],
+        'array.slicing.split_large_chunks': True,
+        'optimization.fuse.active': True,
+    })
+
+
 def check_insitu_platform(fmt, platform):
     if (fmt == "cmems_insitu") and not platform:
         raise ArmoorError("`--platform` option is mandatory is case of specifying `cmems_insitu` format.")

@@ -90,32 +90,24 @@ class MethodRegistry:
 
 class SubclassingMethodRegistry(MethodRegistry):
     """Method-registry dispatch for a genuine abstract base meant to be
-    subclassed (e.g. AbstractColocation, AbstractInterpolation).
+    subclassed (e.g. AbstractColocation, AbstractInterpolation), including
+    a further subclass meant to inherit another subclass's methods as-is
+    (e.g. PlotSstSatellite(PlotOceanModel), which defines none of its own).
 
-    Wires a ``__post_init__`` onto every subclass so each subclass registers
-    its own methods (rather than the base's), mirroring the codebase's
-    existing ``__init_subclass__`` idiom.
+    Wires a ``__post_init__`` onto every subclass so each instance
+    registers every callable, non-dunder attribute of its actual runtime
+    class -- inherited or overridden, resolved through the normal MRO via
+    ``dir()``/``getattr`` -- not just what the subclass itself defines.
     """
 
     def __init_subclass__(cls, **kwargs):
-        """Attach a `__post_init__` to `cls` that registers `cls`'s own
-        callable, non-dunder attributes.
-
-        Parameters
-        ----------
-        cls : type
-            The subclass being created.
-        **kwargs
-            Forwarded to `super().__init_subclass__`.
-
-        Returns
-        -------
-        None
-        """
         super().__init_subclass__(**kwargs)
 
         def __post_init__(self):
-            for name, method in vars(cls).items():
-                if callable(method) and not name.startswith("__"):
+            for name in dir(type(self)):
+                if name.startswith("__"):
+                    continue
+                method = getattr(type(self), name)
+                if callable(method):
                     self.register_method(method)
         cls.__post_init__ = __post_init__
