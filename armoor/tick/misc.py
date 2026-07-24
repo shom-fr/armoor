@@ -86,9 +86,7 @@ def update_auth_cfg(cfg_auth_lines, depth=1) -> list:
     Parameters
     ----------
     cfg_auth_lines :
-    depth : nesting level of the section being formatted, used to pick the
-        matching number of `[`/`]` brackets and the indentation. Nested
-        sections (e.g. `[[proxies]]`) recurse with `depth + 1`.
+    depth : nesting level of the section being formatted (picks the matching number of ``[``/``]`` brackets); nested sections (e.g. ``proxies``) recurse with ``depth + 1``.
 
     Returns
     -------

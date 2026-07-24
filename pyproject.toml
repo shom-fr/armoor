@@ -30,6 +30,7 @@ dependencies = [
 
 doc = [
   "sphinx",
+  "nbsphinx",
   "sphinx-argparse",
   "sphinx-book-theme",
   "sphinx-gallery",
