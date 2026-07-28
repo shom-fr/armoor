@@ -17,6 +17,14 @@ New features
   ``cmems_sst_l4``, ``cmems_sst_l3``, ``cersat_sst_l3`` and ``arpege_insta``
   input formats.
 
+- Added a ``vsections`` otype to ``armoor-data``: extracts and plots vertical
+  sections (distance vs depth) along a broken-line transect, using the same
+  geodesic, multi-segment interpolation as ``armoor-interp-horizontal
+  --section``. Metazones now accept a ``[[section]]`` subsection, mutually
+  exclusive with ``cloud``, with a shared ``dx`` and one or more named
+  ``[[[transect_name]]]`` subsections (each with its own ``coords``) to
+  extract several sections from the same metazone.
+
 - Re-added ``armoor-tick`` (dropped during the ``cli/main.py`` refactor):
   ``armoor-tick-create``/``search``/``description``/``authentication``/
   ``authentication-info`` manage GitLab issues used to report and track
@@ -30,6 +38,11 @@ Deprecations
 
 Bug fixes
 ---------
+
+- Fixed ``armoor-data`` output dispatch using the user-chosen ``[outputs]``
+  section name instead of ``otype`` to select the plot method, which made
+  plotting fail (e.g. ``Data plot 'vsection' not found``) unless a section
+  happened to be named exactly like its ``otype``.
 
 - Fixed ``update_auth_cfg`` (``armoor-tick-authentication``) writing empty
   nested sections (e.g. ``proxies``) as a bare string, which made the

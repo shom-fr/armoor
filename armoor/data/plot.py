@@ -635,6 +635,89 @@ class PlotOceanModel(_PlotDataBase):
                     figname.format(**locals())
                     )
 
+    def vsections(self):
+        """Plot vertical sections (distance vs depth) along a broken-line transect."""
+        dsprod = self.dt.children["data"].to_dataset()
+        dsprod = dsprod.reset_coords("depth")
+        data_name = dsprod.attrs.get("data_name")
+        section_name = dsprod.attrs.get("section_name")
+        distance = dsprod["distance"] / 1000.0
+
+        vars2plot = [
+            var for var in dsprod.data_vars
+            if var != "depth" and "z" in dsprod[var].dims
+            ]
+        times = dsprod["time"].values if "time" in dsprod.dims else [None]
+
+        for var in vars2plot:
+            da_all = dsprod[var]
+            units = da_all.attrs.get("units")
+
+            if var in self.vminmax:
+                vmin, vmax = self.vminmax[var]
+            else:
+                vmin, vmax = float(da_all.min()), float(da_all.max())
+                if MINMAX_VARS.get(var) == "rel":
+                    bound = max(abs(vmin), abs(vmax))
+                    vmin, vmax = -bound, bound
+
+            for time_val in times:
+                da = da_all.sel(time=time_val) if time_val is not None else da_all
+                depth = dsprod["depth"]
+                if time_val is not None and "time" in depth.dims:
+                    depth = depth.sel(time=time_val)
+
+                distance2d, depth2d = xr.broadcast(distance, depth)
+                da, distance2d, depth2d = xr.broadcast(da, distance2d, depth2d)
+                da = da.transpose("z", "npts")
+                distance2d = distance2d.transpose("z", "npts")
+                depth2d = depth2d.transpose("z", "npts")
+
+                time_str = (
+                    pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
+                    if time_val is not None else ""
+                    )
+                title_lines = [data_name, self.metazone]
+                if section_name:
+                    title_lines.append(section_name)
+                if time_str:
+                    title_lines.append(time_str)
+                title_lines.append(f"{var}, {units}")
+                figtitle = "\n".join(title_lines)
+
+                fig, axes = create_subplots(nrows=1, figsize=(9, 5))
+                ax = axes[0]
+                m = ax.pcolormesh(
+                    distance2d, -depth2d, da,
+                    vmin=vmin, vmax=vmax, cmap=CMAP_VARS[var],
+                    )
+                fig.colorbar(
+                    m, ax=ax, orientation="vertical", label=f"{var}, {units}",
+                    fraction=0.05, shrink=0.8,
+                    )
+                ax.set_xlabel("Distance, km")
+                ax.set_ylabel("Depth, m")
+
+                kw = dict(
+                    plot_coords="lines",
+                    coords_linewidth=2,
+                    gridlines_draw_labels=True,
+                    gridlines_xlabel_style={'size': 6},
+                    gridlines_ylabel_style={'size': 6},
+                    )
+                plot_minimap(dsprod, ax=self.ax_minimap, **kw)
+
+                fig.suptitle(figtitle, y=1.01)
+                fig.subplots_adjust(top=0.85)
+
+                figname = (
+                    f"data/plot/{self.metazone}/"
+                    f"vsections_{var}_{data_name}"
+                    f"{'_' + section_name if section_name else ''}"
+                    f"{'_' + time_str if time_str else ''}.png"
+                    )
+                self.save_figure(fig, figname)
+
     def _timeseries_raw(self, ds_data):
         """Plot the raw per-point (and, when depth-resolved, per-native-
         level) series directly, one figure per variable/point/level.

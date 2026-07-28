@@ -133,7 +133,7 @@ class TestPlotOceanModelRegistersMethods:
         nc = _write_datatree(tmp_path, "ocean_model")
         plotter = get_plotter(nc, "mz1")
         try:
-            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "timeseries", "maps", "mapseries"):
+            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "vsections", "timeseries", "maps", "mapseries"):
                 assert method_name in plotter.methods
         finally:
             plotter.clean()
@@ -147,7 +147,7 @@ class TestPlotOceanModelRegistersMethods:
         nc = _write_datatree(tmp_path, "sst_satellite")
         plotter = get_plotter(nc, "mz1")
         try:
-            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "timeseries", "maps", "mapseries"):
+            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "vsections", "timeseries", "maps", "mapseries"):
                 assert method_name in plotter.methods
         finally:
             plotter.clean()
@@ -158,7 +158,7 @@ class TestPlotOceanModelRegistersMethods:
         nc = _write_datatree(tmp_path, "meteo")
         plotter = get_plotter(nc, "mz1")
         try:
-            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "timeseries", "maps", "mapseries"):
+            for method_name in ("mdiagts", "udiagts", "mvprofiles", "uvprofiles", "vsections", "timeseries", "maps", "mapseries"):
                 assert method_name in plotter.methods
         finally:
             plotter.clean()

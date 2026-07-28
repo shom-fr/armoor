@@ -175,7 +175,9 @@ class InterpAccessor:
         xr.Dataset
             Dataset with a ``distance`` coordinate (metres from start).
         """
-        return process_horizontal_interpolation(self._obj, ("section", coords, dx))
+        return process_horizontal_interpolation(
+            self._obj, ("section", {"coords": coords, "dx": dx})
+        )
 
     def regrid_from_latlon(self, lon_grid, lat_grid):
         """Horizontal regrid onto a regular lon/lat grid (requires xesmf).

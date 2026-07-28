@@ -177,6 +177,16 @@ class DataOceanModel(DataType):
                 "vertical": ["vlevel"],
                 }
             },
+        "vsections": {
+            "concat": ["time", "z"],
+            "output": "merge",
+            "mparams_pro": {
+                "horizontal": ["section"],
+                },
+            "mparams_con": {
+                "vertical": ["vlevel"],
+                }
+            },
         "mapseries": {
             # One zarr per (time-bin, z) -- same "sort" as "maps", deliberately
             # *not* concat=["time"]: one output file per plot keeps main_plot's

@@ -66,6 +66,7 @@ _SUBSECTION_PRIMARY_KEY = {
     "vrange": "vname",
     "vfreq": "vname",
     "bathy": "path",
+    "section": "dx",
 }
 
 

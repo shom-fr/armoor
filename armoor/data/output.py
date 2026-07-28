@@ -3,7 +3,7 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 
 import numpy as np
 import pandas as pd
@@ -412,6 +412,18 @@ class OutputProcessor:
 
         return interp_params
 
+    def _flatten_fouts(
+        self, fouts: Union[List[Path], Dict[str, List[Path]]]
+        ) -> List[Path]:
+        """Flatten a `_process_metazone` result into a single list of
+        paths, regardless of which section (if any) each came from --
+        used by the clim/cbar/series pre-passes, which pool statistics
+        across every file for a metazone without caring about section
+        identity."""
+        if isinstance(fouts, dict):
+            return [fout for section_fouts in fouts.values() for fout in section_fouts]
+        return fouts
+
     def _resolve_clim_ranges(self, ncs: List[str], metazones: Dict[str, Any],
                             outputs: Dict[str, Any],
                             interp_params: Dict[str, Optional[Dict]]
@@ -464,7 +476,7 @@ class OutputProcessor:
                         dsin, metazone, metazones[metazone], params,
                         dsin.attrs, [], is_climatology
                     )
-                    for fout in fouts:
+                    for fout in self._flatten_fouts(fouts):
                         dsf = xr.open_dataset(fout)
                         try:
                             key = (metazone, data_name, _level_key(dsf.attrs))
@@ -537,7 +549,7 @@ class OutputProcessor:
                         dsin, metazone, metazones[metazone], params,
                         dsin.attrs, []
                     )
-                    for fout in fouts:
+                    for fout in self._flatten_fouts(fouts):
                         dsf = xr.open_dataset(fout)
                         try:
                             level_key = _level_key(dsf.attrs)
@@ -597,7 +609,7 @@ class OutputProcessor:
                         dsin, metazone, metazones[metazone], params,
                         dsin.attrs, []
                     )
-                    for fout in fouts:
+                    for fout in self._flatten_fouts(fouts):
                         dsf = xr.open_dataset(fout)
                         try:
                             acc = accum.setdefault(
@@ -762,11 +774,19 @@ class OutputProcessor:
                     is_climatology
                 )
 
-                # Generate outputs for this metazone
-                ncouts = self._generate_outputs(
-                    fouts, metazone, metazones[metazone], outputs,
-                    prod_name, ncouts, outputs_params, is_climatology
-                )
+                if isinstance(fouts, dict):
+                    for section_name, section_fouts in fouts.items():
+                        ncouts = self._generate_outputs(
+                            section_fouts, metazone, metazones[metazone], outputs,
+                            prod_name, ncouts, outputs_params, is_climatology,
+                            section_name=section_name,
+                        )
+                else:
+                    # Generate outputs for this metazone
+                    ncouts = self._generate_outputs(
+                        fouts, metazone, metazones[metazone], outputs,
+                        prod_name, ncouts, outputs_params, is_climatology
+                    )
 
         finally:
             dsin.close()
@@ -800,7 +820,8 @@ class OutputProcessor:
     def _process_metazone(self, dsin: xr.Dataset, metazone: str,
                          mparams: Dict[str, Any], params: Optional[Dict],
                          attrs_in: Dict[str, Any], ofmt: List[str],
-                         is_climatology: bool = False) -> List[Path]:
+                         is_climatology: bool = False
+                         ) -> Union[List[Path], Dict[str, List[Path]]]:
         """
         Process a dataset for a specific metazone.
 
@@ -825,20 +846,65 @@ class OutputProcessor:
 
         Returns
         -------
-        List of output file paths
+        List of output file paths, or a dict of {section_name: paths}
+        when this metazone's horizontal interpolation is a multi-section
+        ``section`` (see `_apply_interpolations`).
         """
         ds = dsin.copy()
 
         # Apply interpolations if needed
         if params:
             ds = self._apply_interpolations(ds, params, mparams, is_climatology)
-            if not isinstance(ds, xr.Dataset):
-                ds.close()
-                return []
         else:
             logger.info("No interpolation required")
 
-        # Restore attributes and clean up dataset
+        if isinstance(ds, dict):
+            return {
+                section_name: self._finalize_metazone_dataset(
+                    ds_section, metazone, mparams, attrs_in, ofmt,
+                    is_climatology, section_name=section_name,
+                )
+                for section_name, ds_section in ds.items()
+                }
+
+        return self._finalize_metazone_dataset(
+            ds, metazone, mparams, attrs_in, ofmt, is_climatology
+        )
+
+    def _finalize_metazone_dataset(self, ds: xr.Dataset, metazone: str,
+                                  mparams: Dict[str, Any],
+                                  attrs_in: Dict[str, Any], ofmt: List[str],
+                                  is_climatology: bool = False,
+                                  section_name: Optional[str] = None) -> List[Path]:
+        """
+        Restore attributes, clean up, range-process and save one metazone's
+        interpolated dataset.
+
+        Parameters
+        ----------
+        ds
+            Interpolated dataset (a single metazone's, or one of a
+            ``section`` horizontal interpolation's named datasets).
+        metazone
+            Name of the metazone
+        mparams
+            Metazone parameters
+        attrs_in
+            Original dataset attributes
+        ofmt
+            Formats to save intermediate interpolated outputs
+        is_climatology
+            Whether this dataset's DataType is flagged as a climatology
+        section_name
+            Name of the section this dataset was interpolated onto, if
+            any -- forwarded to `_save_processed_datasets` as its own
+            path segment, so multiple sections of the same metazone don't
+            overwrite each other's output.
+
+        Returns
+        -------
+        List of output file paths
+        """
         ds.attrs.update(attrs_in)
         ds = self._cleanup_dataset(ds)
 
@@ -848,10 +914,10 @@ class OutputProcessor:
         dss = self._apply_range_processing(ds, mparams, is_climatology)
 
         # Save processed datasets
-        fouts = self._save_processed_datasets(dss, metazone, ofmt)
+        return self._save_processed_datasets(
+            dss, metazone, ofmt, section_name=section_name
+        )
 
-        return fouts
-    
     def _apply_interpolations(self, ds: xr.Dataset, params: Dict[str, Any],
                              mparams: Dict[str, Any],
                              is_climatology: bool = False) -> xr.Dataset:
@@ -889,16 +955,39 @@ class OutputProcessor:
         if params.get("horizontal"):
             ds = process_horizontal_interpolation(ds, params.get("horizontal"))
             gc.collect()
-        
-        # Vertical interpolation -- ignored for a dataset with no "z" at
-        # all (e.g. satellite SST), even if the metazone configures it
-        # for the sake of another, depth-resolved source.
+
+        if isinstance(ds, dict):
+            return {
+                name: self._apply_vertical_interpolation(ds_section, params)
+                for name, ds_section in ds.items()
+                }
+
+        return self._apply_vertical_interpolation(ds, params)
+
+    def _apply_vertical_interpolation(self, ds: xr.Dataset,
+                                     params: Dict[str, Any]) -> xr.Dataset:
+        """
+        Apply vertical interpolation to a single dataset, if configured.
+
+        Parameters
+        ----------
+        ds
+            Dataset to interpolate
+        params
+            Interpolation parameters
+
+        Returns
+        -------
+        Interpolated dataset
+        """
+        # Ignored for a dataset with no "z" at all (e.g. satellite SST),
+        # even if the metazone configures it for the sake of another,
+        # depth-resolved source.
         if params.get("vertical") and "z" in ds.dims:
             ds = process_vertical_interpolation(ds, params.get("vertical"))
             gc.collect()
-        
         return ds
-    
+
     def _cleanup_dataset(self, ds: xr.Dataset) -> xr.Dataset:
         """
         Remove unnecessary variables from dataset.
@@ -984,7 +1073,8 @@ class OutputProcessor:
         return dss
     
     def _save_processed_datasets(self, dss: List[xr.Dataset],
-                                metazone: str, ofmt: List[str]) -> List[Path]:
+                                metazone: str, ofmt: List[str],
+                                section_name: Optional[str] = None) -> List[Path]:
         """
         Save processed datasets to disk.
 
@@ -996,6 +1086,11 @@ class OutputProcessor:
             Metazone name for directory structure
         ofmt
             Formats to save intermediate interpolated outputs
+        section_name
+            Name of the section these datasets were interpolated onto, if
+            any -- inserted as its own path segment (``data_name`` is left
+            untouched) so multiple sections of the same metazone land in
+            separate directories instead of overwriting one another.
 
         Returns
         -------
@@ -1006,7 +1101,12 @@ class OutputProcessor:
 
         try:
             for ids, dsprod in enumerate(dss):
-                dirout = Path(f"data/interp/{metazone}/{dsprod.attrs['data_name']}")
+                if section_name is not None:
+                    dirout = Path(
+                        f"data/interp/{metazone}/{section_name}/{dsprod.attrs['data_name']}"
+                        )
+                else:
+                    dirout = Path(f"data/interp/{metazone}/{dsprod.attrs['data_name']}")
                 dirout.mkdir(parents=True, exist_ok=True)
 
                 fout_prod = save_datasets(
@@ -1024,7 +1124,9 @@ class OutputProcessor:
                          prod_name: str,
                          ncouts: Dict[str, Dict[str, List[Path]]],
                          outputs_params: Dict[str, Any],
-                         is_climatology: bool = False) -> Dict[str, Dict[str, List[Path]]]:
+                         is_climatology: bool = False,
+                         section_name: Optional[str] = None
+                         ) -> Dict[str, Dict[str, List[Path]]]:
         """
         Generate output files for a metazone.
 
@@ -1050,6 +1152,9 @@ class OutputProcessor:
             (DataType.is_climatology) -- excludes it from otypes that
             shouldn't render a climatology's own series (see
             `_validate_output_compatibility`).
+        section_name
+            Name of the section `fouts` was interpolated onto, if any --
+            forwarded to `_process_output_type` as its own path segment.
 
         Returns
         -------
@@ -1066,16 +1171,18 @@ class OutputProcessor:
 
             # Process this output type
             output_files = self._process_output_type(
-                fouts, output, metazone, mparams, prod_name, oname, outputs_params
+                fouts, output, metazone, mparams, prod_name, oname, outputs_params,
+                section_name=section_name,
             )
-            
+
             # Add to results
+            otype = output.get("otype")
             if output_files:
-                if oname not in ncouts:
-                    ncouts[oname] = {}
-                if metazone not in ncouts[oname]:
-                    ncouts[oname][metazone] = []
-                ncouts[oname][metazone].extend(output_files)
+                if otype not in ncouts:
+                    ncouts[otype] = {}
+                if metazone not in ncouts[otype]:
+                    ncouts[otype][metazone] = []
+                ncouts[otype][metazone].extend(output_files)
         
         return ncouts
     
@@ -1143,7 +1250,8 @@ class OutputProcessor:
     def _process_output_type(self, fouts: List[Path], output: Dict[str, Any],
                            metazone: str, mparams: Dict[str, Any],
                            prod_name: str, oname: str,
-                           outputs_params: Dict[str, Any]) -> List[Path]:
+                           outputs_params: Dict[str, Any],
+                           section_name: Optional[str] = None) -> List[Path]:
         """
         Process a specific output type.
 
@@ -1163,6 +1271,9 @@ class OutputProcessor:
             Output name
         outputs_params
             Per-otype processing params for this dataset's data type
+        section_name
+            Name of the section `fouts` was interpolated onto, if any --
+            forwarded to `_process_sorted_group` as its own path segment.
 
         Returns
         -------
@@ -1170,31 +1281,32 @@ class OutputProcessor:
         """
         oparams = outputs_params.get(output.get("otype"))
         logger.info(f"Output parameters: {oparams}")
-        
+
         sort_dim = oparams.get("sort")
         concat_dim = oparams.get("concat")
-        
+
         fins_dict_sorted = sort_ncs_by_suffix(fouts, sort_dim=sort_dim)
         output_files = []
-        
+
         for name_sort, fins_sorted in fins_dict_sorted.items():
             logger.info(f"Processing sorted group: {name_sort}")
-            
+
             output_file = self._process_sorted_group(
                 fins_sorted, oparams, mparams, output, metazone, oname,
-                name_sort, prod_name, concat_dim
+                name_sort, prod_name, concat_dim, section_name=section_name,
             )
-            
+
             if output_file:
                 output_files.append(output_file)
-        
+
         return output_files
-    
+
     def _process_sorted_group(self, fins_sorted: List[Path],
                              oparams: Dict[str, Any], mparams: Dict[str, Any],
                              output: Dict[str, Any],
                              metazone: str, oname: str, name_sort: str,
-                             prod_name: str, concat_dim: List[str]) -> Optional[Path]:
+                             prod_name: str, concat_dim: List[str],
+                             section_name: Optional[str] = None) -> Optional[Path]:
         """
         Process a sorted group of files to create a single output.
 
@@ -1219,6 +1331,10 @@ class OutputProcessor:
             Product name
         concat_dim
             Concatenation dimensions
+        section_name
+            Name of the section these files were interpolated onto, if
+            any -- forwarded to `_save_datatree_output` as its own path
+            segment.
 
         Returns
         -------
@@ -1247,9 +1363,10 @@ class OutputProcessor:
 
             # Save as zarr
             return self._save_datatree_output(
-                dsouts, metazone, oname, name_sort, prod_name
+                dsouts, metazone, oname, name_sort, prod_name,
+                section_name=section_name,
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to process sorted group {name_sort}: {e}")
             return None
@@ -1471,10 +1588,11 @@ class OutputProcessor:
     
     def _save_datatree_output(self, dsouts: Dict[str, xr.Dataset],
                              metazone: str, oname: str, name_sort: str,
-                             prod_name: str) -> Path:
+                             prod_name: str,
+                             section_name: Optional[str] = None) -> Path:
         """
         Save processed datasets as a DataTree zarr file.
-        
+
         Parameters
         ----------
         dsouts
@@ -1487,18 +1605,30 @@ class OutputProcessor:
             Sorted group name
         prod_name
             Product name
-            
+        section_name
+            Name of the section these datasets were interpolated onto, if
+            any -- inserted as its own path segment (so multiple sections
+            of the same metazone don't overwrite each other's output) and
+            recorded as a ``section_name`` attr on each dataset (read back
+            by `armoor.data.plot.PlotOceanModel.vsections` for the title
+            and filename).
+
         Returns
         -------
         Path to saved file
         """
-        dirout = Path(f"data/output/{metazone}/{oname}/{name_sort}/")
+        if section_name is not None:
+            dirout = Path(f"data/output/{metazone}/{oname}/{section_name}/{name_sort}/")
+            for ds_out in dsouts.values():
+                ds_out.attrs["section_name"] = section_name
+        else:
+            dirout = Path(f"data/output/{metazone}/{oname}/{name_sort}/")
         dirout.mkdir(parents=True, exist_ok=True)
-        
+
         # Create DataTree and save
         dt = xr.DataTree()
         dt.update(xr.DataTree.from_dict(dsouts))
-        
+
         ncout = dirout / f"{prod_name}.zarr"
         encoding = get_zarr_encoding(dt)
         
@@ -1549,7 +1679,7 @@ def main_output(ncs: List[str], metazones: Dict[str, Any],
     >>> outputs = {'monthly': {'otype': 'timeseries'}}
     >>> result = main_output(ncs, metazones, outputs)
     >>> print(result)
-    {'monthly': {'zone1': [Path('data/output/zone1/monthly/...')], ...}}
+    {'timeseries': {'zone1': [Path('data/output/zone1/monthly/...')], ...}}
     """
     processor = OutputProcessor()
     return processor.process_datasets(ncs, metazones, outputs)
