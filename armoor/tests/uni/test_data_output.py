@@ -7,6 +7,7 @@ dataset's type. For an eddies dataset, whose outputs_params only defines
 valid (ocean model's own entry), letting eddy data reach stats code that
 assumes ptemp/depth. Now it must be skipped (logged forbidden, no crash).
 """
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -50,7 +51,7 @@ class TestValidateOutputCompatibilityPerType:
         processor = OutputProcessor()
         outputs_params = DataMeteo().outputs_params
         for otype in ("vprofiles_sel", "mvprofiles", "uvprofiles",
-                      "diagts_sel", "mdiagts", "udiagts"):
+                      "diagts_sel", "mdiagts", "udiagts", "vsections"):
             assert not processor._validate_output_compatibility(
                 {"otype": otype}, {}, "mz1", outputs_params
             )
@@ -821,3 +822,151 @@ class TestAttachCbarRange:
         processor._attach_cbar_range(ds, "mz1", {"otype": "mapseries"})
 
         assert "cbar_min_ptemp" not in ds.attrs
+
+
+class TestFlattenFouts:
+    """_flatten_fouts is what lets the clim/cbar/series pre-passes keep
+    treating a `_process_metazone` result as a flat list of paths even
+    when it's really a {section_name: paths} dict (multi-section
+    horizontal interpolation) -- section identity doesn't matter for
+    pooling statistics across every file."""
+
+    def test_plain_list_passes_through(self):
+        processor = OutputProcessor()
+        assert processor._flatten_fouts(["a", "b"]) == ["a", "b"]
+
+    def test_dict_is_flattened(self):
+        processor = OutputProcessor()
+        result = processor._flatten_fouts({"sectiona": ["a1", "a2"], "sectionb": ["b1"]})
+        assert sorted(result) == ["a1", "a2", "b1"]
+
+
+class TestSaveProcessedDatasetsSectionPath:
+    """Regression test for the case where a metazone's [[section]] config
+    names several transects: HorizontalInterpolation.section returns one
+    dataset per named section, each with its own (possibly different)
+    "npts" size, so they must land under separate directories instead of
+    overwriting each other."""
+
+    def _ds(self, data_name):
+        return xr.Dataset(
+            {"temp": (["npts"], np.zeros(3))},
+            attrs={"data_name": data_name},
+        )
+
+    def test_section_name_becomes_its_own_directory(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        processor = OutputProcessor()
+
+        fouts = processor._save_processed_datasets(
+            [self._ds("model")], "mz1", [], section_name="sectiona"
+        )
+
+        assert Path("data/interp/mz1/sectiona/model") in fouts[0].parents
+
+    def test_different_sections_use_different_directories(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        processor = OutputProcessor()
+
+        fout_a = processor._save_processed_datasets(
+            [self._ds("model")], "mz1", [], section_name="sectiona"
+        )[0]
+        fout_b = processor._save_processed_datasets(
+            [self._ds("model")], "mz1", [], section_name="sectionb"
+        )[0]
+
+        assert fout_a != fout_b
+        assert fout_a.exists() and fout_b.exists()
+
+    def test_no_section_name_keeps_previous_layout(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        processor = OutputProcessor()
+
+        fouts = processor._save_processed_datasets([self._ds("model")], "mz1", [])
+
+        assert Path("data/interp/mz1/model") in fouts[0].parents
+
+
+class TestSaveDatatreeOutputSectionPath:
+    """Same regression, at the final output-zarr stage: without a
+    section-aware path, two sections' merged outputs would both write to
+    data/output/{metazone}/{oname}/{name_sort}/{prod_name}.zarr."""
+
+    def _dsouts(self):
+        return {"data": xr.Dataset({"temp": (["npts"], np.zeros(3))})}
+
+    def test_section_name_becomes_its_own_directory(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        processor = OutputProcessor()
+
+        ncout = processor._save_datatree_output(
+            self._dsouts(), "mz1", "vsection", "None", "model",
+            section_name="sectiona",
+        )
+
+        assert Path("data/output/mz1/vsection/sectiona/None") in ncout.parents
+
+    def test_section_name_attached_to_saved_datasets(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        processor = OutputProcessor()
+        dsouts = self._dsouts()
+
+        processor._save_datatree_output(
+            dsouts, "mz1", "vsection", "None", "model", section_name="sectiona"
+        )
+
+        assert dsouts["data"].attrs["section_name"] == "sectiona"
+
+    def test_different_sections_produce_different_files(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        processor = OutputProcessor()
+
+        ncout_a = processor._save_datatree_output(
+            self._dsouts(), "mz1", "vsection", "None", "model",
+            section_name="sectiona",
+        )
+        ncout_b = processor._save_datatree_output(
+            self._dsouts(), "mz1", "vsection", "None", "model",
+            section_name="sectionb",
+        )
+
+        assert ncout_a != ncout_b
+
+
+class TestProcessSingleNetcdfSplitsSections:
+    """Wiring regression test: when _process_metazone returns a
+    {section_name: fouts} dict (multi-section horizontal interpolation),
+    _process_single_netcdf must call _generate_outputs once per section
+    -- passing only that section's own files -- instead of merging every
+    section's files into one _generate_outputs call (which crashed with
+    "cannot reindex or align along dimension 'npts'" when two sections
+    had different point counts)."""
+
+    def test_generate_outputs_called_once_per_section(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        processor = OutputProcessor()
+
+        dsin = xr.Dataset(
+            {"temp": (["npts"], np.zeros(3))},
+            attrs={"data_name": "model", "data_type": "ocean_model"},
+        )
+
+        with patch.object(
+            processor, "_load_and_prepare_dataset", return_value=dsin,
+        ), patch.object(
+            processor, "_process_metazone",
+            return_value={"sectiona": ["a1", "a2"], "sectionb": ["b1"]},
+        ), patch.object(
+            processor, "_generate_outputs", side_effect=lambda *a, **k: {}
+        ) as mock_generate:
+            processor._process_single_netcdf(
+                "in.nc", {"mz1": {}}, {"mz1": {}},
+                {"o1": {"otype": "vsections"}}, {}, [],
+            )
+
+        assert mock_generate.call_count == 2
+        calls_by_section = {
+            call.kwargs["section_name"]: call.args[0]
+            for call in mock_generate.call_args_list
+        }
+        assert calls_by_section == {"sectiona": ["a1", "a2"], "sectionb": ["b1"]}

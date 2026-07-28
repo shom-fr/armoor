@@ -61,7 +61,7 @@ class HorizontalInterpolation(AbstractInterpolation):
     :func:`process_horizontal_interpolation`):
 
     * ``"cloud"`` — bilinear interpolation at scattered (lat, lon) points.
-    * ``"section"`` — interpolation along a geodesic section.
+    * ``"section"`` — interpolation along a geodesic, broken-line section.
     * ``"regrid_from_latlon"`` — bilinear regrid onto a regular lon/lat grid.
     * ``"regrid_from_nc"`` — bilinear regrid onto a grid defined in a NetCDF
       file.
@@ -93,20 +93,37 @@ class HorizontalInterpolation(AbstractInterpolation):
         """
         return grid2loc(self.ds, coords)
     
-    def section(self, coords: [(float, float)], dx: float):
-        """Interpolate datasets over section.
+    def section(self, args: dict):
+        """Interpolate datasets over one or more named broken-line sections.
 
         Parameters
         ----------
-        coordinates : list of 2 tuples
-            Two points coordinates (lon, lat) defining the bounds of the section.
+        args: dict
+            Either a single unnamed section -- a ``coords`` key (list of
+            (lat, lon) tuples defining the section's waypoints, at least
+            two -- more than two makes a broken line/polyline) and a
+            ``dx`` key (the along-section step in km) -- or several named
+            sections sharing one ``dx``: a ``dx`` key plus one nested dict
+            per named section, each with its own ``coords`` key.
 
         Returns
         -------
-        xarray.Dataset, xarray.Dataset
-            Dataset interpolated over the section.
+        xarray.Dataset or dict
+            A single unnamed section's ``xarray.Dataset``, or a mapping of
+            section name to its ``xarray.Dataset``, each with a
+            ``distance`` coordinate (metres from the first waypoint).
         """
-        return grid2section(self.ds, coords, dx)
+        named_sections = {
+            name: subargs for name, subargs in args.items()
+            if isinstance(subargs, dict)
+            }
+        if not named_sections:
+            return grid2section(self.ds, args["coords"], args["dx"])
+        dx = args["dx"]
+        return {
+            name: grid2section(self.ds, subargs["coords"], dx)
+            for name, subargs in named_sections.items()
+            }
     
     def regrid_from_latlon(self, lon_grid: (float, float, float), lat_grid: (float, float, float)):
         """Regrid dataset on extra grid specified via lat/lon coordinates.

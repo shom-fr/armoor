@@ -5,6 +5,7 @@
 import logging
 from contextlib import contextmanager
 import re
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -184,6 +185,41 @@ def interp_time(
 
     return dso
 
+def _crop_to_bbox(ds, coords, margin_deg=1.0):
+    """Crop a gridded dataset to the (lat, lon) bounding box of `coords`.
+
+    Parameters
+    ----------
+    ds: xr.Dataset
+        Gridded dataset with ``lat``/``lon`` coordinates.
+    coords: list of (float, float)
+        (lat, lon) points the crop must contain.
+    margin_deg: float
+        Degrees of padding added around the points' bounding box.
+
+    Returns
+    -------
+    xr.Dataset
+        `ds` restricted to the grid rows/columns overlapping the padded
+        bounding box (unchanged if nothing overlaps).
+    """
+    lats = np.array([c[0] for c in coords])
+    lons = np.array([c[1] for c in coords])
+    mask = (
+        (ds.lat >= lats.min() - margin_deg) & (ds.lat <= lats.max() + margin_deg)
+        & (ds.lon >= lons.min() - margin_deg) & (ds.lon <= lons.max() + margin_deg)
+        )
+    if not bool(mask.any()):
+        return ds
+
+    slices = {}
+    for dim in mask.dims:
+        other_dims = [d for d in mask.dims if d != dim]
+        touched = mask.any(dim=other_dims).values if other_dims else mask.values
+        idx = np.flatnonzero(touched)
+        slices[dim] = slice(max(idx[0] - 1, 0), idx[-1] + 2)
+    return ds.isel(**slices)
+
 def grid2loc(ds, coords: [(float, float)]):
     """Interpolate a dataset at specific coordinates.
 
@@ -312,7 +348,9 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
             )
         )
     # ds = grid2loc(ds, list(zip(r.lats, r.lons)))
-    ds = grid2loc(ds, list(zip(all_lats, all_lons)))
+    section_points = list(zip(all_lats, all_lons))
+    ds = _crop_to_bbox(ds, section_points)
+    ds = grid2loc(ds, section_points)
     ds = xr.merge([ds, dist])
     return ds
 

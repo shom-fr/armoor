@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from armoor.base.interp import coarsen, grid2loc, interp_time, regrid, vinterp, grid2section
+from armoor.base.interp import coarsen, grid2loc, interp_time, regrid, vinterp, grid2section, _crop_to_bbox
 
 
 class TestInterpTime:
@@ -399,6 +399,56 @@ class TestGrid2Section:
         
         # Should have many points with fine spacing
         assert len(result.npts) > 10
+
+
+class TestCropToBbox:
+    """Test suite for the _crop_to_bbox helper (grid2section's spatial
+    prefilter, shrinking the grid closest2d/grid2relloc has to
+    brute-force-search over before extracting section points)."""
+
+    def setup_method(self):
+        """Create a large gridded test dataset, covering far more area
+        than any single section's bounding box needs."""
+        lon = np.linspace(-20, 10, 200)
+        lat = np.linspace(30, 60, 200)
+        lon_grid, lat_grid = np.meshgrid(lon, lat)
+        self.ds = xr.Dataset({
+            'temp': (['y', 'x'], np.random.rand(200, 200))
+        }, coords={
+            'lat': (['y', 'x'], lat_grid),
+            'lon': (['y', 'x'], lon_grid),
+        })
+
+    def test_crop_shrinks_grid(self):
+        coords = [(45.0, -8.0), (46.0, -2.0)]
+        result = _crop_to_bbox(self.ds, coords, margin_deg=1.0)
+
+        assert result.sizes["y"] < self.ds.sizes["y"]
+        assert result.sizes["x"] < self.ds.sizes["x"]
+
+    def test_crop_still_contains_points(self):
+        coords = [(45.0, -8.0), (46.0, -2.0)]
+        result = _crop_to_bbox(self.ds, coords, margin_deg=1.0)
+
+        assert float(result.lat.min()) <= 45.0
+        assert float(result.lat.max()) >= 46.0
+        assert float(result.lon.min()) <= -8.0
+        assert float(result.lon.max()) >= -2.0
+
+    def test_points_outside_grid_returns_unchanged(self):
+        coords = [(80.0, 80.0)]
+        result = _crop_to_bbox(self.ds, coords, margin_deg=1.0)
+
+        assert result.sizes == self.ds.sizes
+
+    def test_grid2section_matches_uncropped_result(self):
+        """The crop must not change the interpolated values -- only which
+        subset of the grid the search runs over."""
+        coords = [(45.0, -8.0), (46.0, -2.0)]
+        cropped = grid2section(self.ds, coords, dx=10)
+        uncropped = grid2loc(self.ds, list(zip(cropped.lat.values, cropped.lon.values)))
+
+        np.testing.assert_allclose(cropped.temp.values, uncropped.temp.values)
 
 
 class TestRegrid:
