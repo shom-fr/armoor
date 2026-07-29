@@ -26,6 +26,7 @@ from armoor.data.open_decode import (
     open_decode_bobyclim,
     open_decode_cora_insitu,
     open_decode_cmems_insitu,
+    open_decode_odar,
     open_decode_croco,
     open_decode_eddy_pet,
     open_decode_eddy_sacso,
@@ -44,6 +45,7 @@ from armoor.data.open_decode import (
     EddySacsoDecoder,
     EddyShootDecoder,
     HycomDecoder,
+    OdarDecoder,
     SloopDecoder,
     SstSatelliteDecoder,
     Woa18Decoder,
@@ -85,6 +87,7 @@ def setup_test_data():
     test_files['cmems_insitu_glider'] = TEST_DATA_DIR / "*_PR_GL_*.nc"
     test_files['cmems_insitu_mooring'] = TEST_DATA_DIR / "*_TS_MO_*.nc"
     test_files['cmems_insitu_drifter'] = TEST_DATA_DIR / "*_TS_DB_*.nc"
+    test_files['odar_seasoar'] = TEST_DATA_DIR / "seasoar.nc"
     test_files['croco'] = TEST_DATA_DIR / "croco_his.nc"
     test_files['croco_v1'] = TEST_DATA_DIR / "croco_v1.3.nc"
     test_files['eddies_pet'] = TEST_DATA_DIR / "eddy-sample_py-eddy-tracker*"
@@ -607,7 +610,46 @@ class TestOpenDecodeCmemsInsitu:
         assert all(('time',) == ds.lon.dims for ds in result)
         assert all(('time',) == ds.lat.dims for ds in result)
         assert all(('z', ) == ds.depth.dims for ds in result)
-    
+
+
+# ============================================================================
+# Test open_decode_odar
+# ============================================================================
+
+class TestOpenDecodeOdar:
+    """Tests for open_decode_odar function, against the real seasoar.nc
+    sample (an ODAR-processed towed-CTD section, no CMEMS/CORA involved)."""
+
+    def test_open_decode_odar_seasoar(self, setup_test_data):
+        """
+        Test open_decode_odar against a real seasoar section.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['odar_seasoar']
+        result = open_decode_odar(get_paths(str(filepath)))
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        ds = result[0]
+        assert isinstance(ds, xr.Dataset)
+        assert 'time' in ds.dims
+        assert 'z' in ds.dims
+        assert 'depth' not in ds.dims  # renamed to "z", kept as a coordinate
+        assert ('time',) == ds.lon.dims
+        assert ('time',) == ds.lat.dims
+        assert 'depth' in ds.coords
+        assert ('z',) == ds.depth.dims
+        # Raw sensor output, not yet derived -- oceanvars.sel_sal() does that
+        # lazily downstream (see TestOceanVars in test_oceanvars.py).
+        assert 'conduct' in ds.data_vars
+        assert 'sal' not in ds.data_vars
+        assert np.issubdtype(ds.time.dtype, np.datetime64)
+        assert ds.attrs.get('ODAR_DATASET_TYPE') == 'seasoar'
+
 
 # ============================================================================
 # Test open_decode_croco
@@ -828,6 +870,21 @@ class TestOpenDecode:
         
         assert isinstance(result, xr.Dataset)
     
+    def test_open_decode_odar(self, setup_test_data):
+        """
+        Test open_decode with odar format.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['odar_seasoar']
+        result = open_decode(str(filepath), fmt='odar')
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+
     def test_open_decode_unknown_format(self, setup_test_data):
         """
         Test open_decode raises error for unknown format.
@@ -864,6 +921,7 @@ class TestOpenDecode:
         ("arpege_insta", ArpegeInstaDecoder),
         ("woa18", Woa18Decoder),
         ("bobyclim", BobyclimDecoder),
+        ("odar", OdarDecoder),
     ])
     def test_get_decoder_registry_completeness(self, fmt, decoder_cls):
         """Every reachable fmt (including hycom/hycom3d and croco/croco_xios

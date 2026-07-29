@@ -22,6 +22,7 @@ CMAP_VARS = {
     "ssh": "cmo.delta",
     "u": "cmo.delta",
     "v": "cmo.delta",
+    "cgeo": "cmo.delta",
     "cspeed": "cmo.speed",
     }
 
@@ -36,5 +37,6 @@ MINMAX_VARS = {
     "ssh": "rel",
     "u": "rel",
     "v": "rel",
+    "cgeo": "rel",
     "cspeed": "pos",
     }

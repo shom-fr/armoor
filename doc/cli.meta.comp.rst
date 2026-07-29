@@ -113,11 +113,18 @@ ouputs
             .. grid-item-card:: current maps for drifters (``maps_current``)
 
                 Maps of currents of a drifter and the model ones interpolated along the drifter trajectory.
-                
+
                 .. image:: images/comp_map_current.png
-                
+
                 :download:`Download <images/comp_map_current.png>`
-   
+
+            .. grid-item-card:: hydrological sections (``sections``, ``armoor-comp-hydrosection`` only)
+
+                Distance-vs-depth ref/product/diff panels per depth-resolved
+                variable, and ref/product/diff line curves per 2D variable
+                (e.g. ``mld``), along the reference's own along-track
+                distance.
+
 
 Workflow
 --------
@@ -134,6 +141,7 @@ Workflow
    cli.meta.comp.argo
    cli.meta.comp.clim
    cli.meta.comp.drifter
+   cli.meta.comp.hydrosection
    cli.meta.comp.models
    cli.meta.comp.mooring
    cli.meta.comp.sst

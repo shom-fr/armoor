@@ -14,7 +14,7 @@ import xoa.geo as xgeo
 import armoor.base.ranges as ranges
 from armoor.__init__ import ArmoorError
 from armoor.base.dispatch import SubclassingMethodRegistry
-from armoor.base.interp import coarsen as _coarsen, grid2loc, interp_time, regrid, vinterp
+from armoor.base.interp import coarsen as _coarsen, grid2loc, grid2track, interp_time, regrid, vinterp
 from armoor.base.io import (create_fast_encoding, get_zarr_encoding,
                             setup_dask_client)
 from armoor.comp import COMP_VARS
@@ -162,6 +162,25 @@ class HorizontalColocation(AbstractColocation):
         else:
             return grid2loc(self.dsref, coords), grid2loc(self.dsprod, coords)
         
+    def track(self) -> Tuple[xr.Dataset, xr.Dataset]:
+        """Interpolate the product onto the reference's own moving track.
+
+        Unlike `cloud` (a fixed list of points), this pairs each product
+        interpolation with the reference's own (time, lon, lat) -- e.g. one
+        point per profile along a glider mission -- so the product keeps a
+        single "time" dim matching the reference's, instead of a
+        "time" x "npts" cross product. Relies on `dsprod`'s "time" already
+        being aligned (same values/order) with `dsref`'s, which the time
+        colocation step (run first, see `_apply_colocations`) guarantees.
+
+        Returns
+        -------
+        tuple[xarray.Dataset, xarray.Dataset]
+            The reference dataset (unchanged) and the product dataset
+            interpolated onto its track.
+        """
+        return self.dsref, grid2track(self.dsprod, self.dsref)
+
     def href(self, ref: str):
         """Regrid dataset on 'ref' grid.
 
@@ -689,6 +708,7 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
     _OCEANVAR_INPUTS = {
         "ptemp": {"temp", "sal", "pres"},
         "temp":  {"ptemp", "sal", "pres"},
+        "sal":   {"conduct", "temp", "pres"},
         "pdens": {"ptemp", "temp", "sal", "pres"},
         "sndspeed": {"ptemp", "temp", "sal", "pres"},
         "u":     {"cdir", "cspeed"},
@@ -906,7 +926,7 @@ def _save_colocation_results(dssref, dssprod, staged):
     return paths
 
 
-def _process_single_product(dsrefin, ncin, params, tbound, staged):
+def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None):
     """Process colocation for a single product against a reference.
 
     Parameters
@@ -921,6 +941,9 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged):
         Time bounds.
     staged: StagedDataset
         Pipeline context (comp_func/metazone) for this colocation run.
+    mparams: dict, optional
+        Full metazone parameter dict (e.g. carrying a CLI-supplied
+        ``cgeo_ref``), forwarded to `Comparison.compute_oceanvars`.
 
     Returns
     -------
@@ -960,8 +983,8 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged):
     dsprod = dsprod.assign_attrs(gattrs_prod)
 
     comparison = get_comparison(comp_func)
-    dsref = comparison.compute_oceanvars(dsref)
-    dsprod = comparison.compute_oceanvars(dsprod)
+    dsref = comparison.compute_oceanvars(dsref, mparams)
+    dsprod = comparison.compute_oceanvars(dsprod, mparams)
 
     # Set depth/pres as coordinate if needed
     for vcoord in ["depth", "pres"]:
@@ -1011,7 +1034,7 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged):
     return ref_name, prod_name, paths
 
 
-def _process_reference(ncref, ncins, params, tbound, staged, ncouts):
+def _process_reference(ncref, ncins, params, tbound, staged, ncouts, mparams=None):
     """Process all products for a single reference.
 
     Parameters
@@ -1028,6 +1051,8 @@ def _process_reference(ncref, ncins, params, tbound, staged, ncouts):
         Pipeline context (comp_func/metazone) for this colocation run.
     ncouts: dict
         Dictionary to store output paths.
+    mparams: dict, optional
+        Full metazone parameter dict, forwarded to `_process_single_product`.
     """
     metazone = staged.metazone
     logger.info(f"Use reference {ncref}")
@@ -1041,7 +1066,7 @@ def _process_reference(ncref, ncins, params, tbound, staged, ncouts):
 
     results = []
     for ncin in ncins:
-        result = _process_single_product(dsrefin, ncin, params, tbound, staged)
+        result = _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=mparams)
         results.append(result)
 
     # Merge results into ncouts
@@ -1077,13 +1102,14 @@ def _process_metazone(staged, params, mz_files, metazones, ncouts):
     logger.info(f"Colocation parameters are: {params}")
 
     tbound = metazones[metazone].get("tbound")
+    mparams = metazones[metazone]
     ncouts[metazone] = {}
 
     ncrefs = mz_files["ref"]
     ncins = mz_files["prod"]
 
     for ncref in ncrefs:
-        _process_reference(ncref, ncins, params, tbound, staged, ncouts)
+        _process_reference(ncref, ncins, params, tbound, staged, ncouts, mparams=mparams)
 
     logger.info(f"End colocation for {metazone}.")
 

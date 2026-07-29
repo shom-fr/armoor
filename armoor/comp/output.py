@@ -679,12 +679,14 @@ class OutputProcessor:
                 concatenated_dataset = self._concatenate_time_datasets(datasets)
             elif len(datasets) == 1:
                 concatenated_dataset = datasets[0]
-            elif output in ("uvprofiles", "udiagts"):
-                # No fusion requested: keep one dataset per vrange-bin file
-                # sharing this sort_key, instead of merging them into a
-                # single object along a fake "time" axis. `_save_combined_
-                # output` fans this list out into numbered children of
-                # `ds_name`.
+            elif output in ("uvprofiles", "udiagts", "sections"):
+                # No fusion requested: keep one dataset per dims-signature
+                # group sharing this sort_key (e.g. sections always splits
+                # a "mld"-only group -- no "z" dim -- from the depth-
+                # resolved ptemp/sal/... group) instead of merging them
+                # into a single object along a fake "time" axis.
+                # `_save_combined_output`/`_save_separate_outputs` fan this
+                # list out into numbered children of `ds_name`.
                 concatenated_dataset = datasets
             else:
                 logger.info(

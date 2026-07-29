@@ -7,6 +7,70 @@ Develop
 New features
 ------------
 
+- Added ``armoor-comp-hydrosection``: new comparison tool for 3D model
+  outputs against observed hydrological sections. Covers gliders
+  (``fmt=cmems_insitu, platform=glider``) -- a single glider mission file
+  already holds several profiles at their own (time, lon, lat), i.e. a whole
+  section -- and ODAR-processed towed-CTD sections (``fmt=odar``: seasoar
+  today, scanfish/rapidcast/MVP need no new code, just their own bundled
+  sample to confirm against -- see the new ``OdarDecoder``/
+  ``open_decode_odar``, dispatched purely by each file's own
+  ``ODAR_DATASET_TYPE`` attr, no ``platform=`` needed). ODAR sections carry
+  raw conductivity instead of salinity, so ``armoor.base.oceanvars``'
+  ``sel_sal`` now falls back to ``gsw.SP_from_C`` (conductivity in mS/cm,
+  the unit ODAR already reports, no conversion needed) when ``sal`` is
+  absent -- and ``sel_ptemp`` was fixed to call ``sel_sal()`` instead of
+  checking ``"sal" in ds`` directly, a latent ordering bug only exposed by a
+  derived (not raw) salinity: ``comp_vars`` lists ``"ptemp"`` before
+  ``"sal"``, so potential temperature was being computed before the lazily
+  derived salinity had been materialized.
+  Colocation always: time-matches nearest-to-reference, interpolates the
+  product onto the reference's own moving track (new
+  ``HorizontalColocation.track`` / ``armoor.base.interp.grid2track``, a
+  pointwise (time, lon, lat)-paired interpolation -- unlike ``cloud``'s fixed
+  station list, whose "time" x "npts" cross product a moving track can't
+  use), and vinterps the product onto the reference's own per-profile depth
+  levels (forced ``vrange`` vertical colocation, like
+  ``CompMooring``/``CompDrifter``'s depth-based forcing). Comparison
+  variables: ``ptemp``, ``sal``, plus derived ``pdens``, ``temp``,
+  ``sndspeed``, ``mld``. Output: ``sections``, one PNG per variable --
+  distance-vs-depth ref/product/diff panels for depth-resolved variables,
+  ref/product/diff line curves for 2D variables (e.g. mld).
+
+  Also computes the geostrophic current normal to the section (new
+  ``armoor.base.oceanvars.OceanVars.sel_cgeo``, via
+  ``gsw.geo_strf_dyn_height``/``gsw.geostrophic_velocity``), independently
+  for the reference and the product from their own colocated hydrography --
+  not derived from any model current field, so both sides are computed the
+  same way. Unlike every other comparison variable, this collapses N
+  stations into N-1 station-pair values (one per pair of consecutive
+  profiles, oriented perpendicular to the line joining them by
+  construction), so it lands on its own new ``"pair"`` dim -- automatically
+  picked up as a third dims-signature group in the existing ``sections``
+  output/plot machinery (``armoor.comp.plot.PlotComp._sections_2d``/
+  ``_sections_distance`` now take a ``dim=`` argument for this). The
+  reference pressure for the dynamic-height calculation (the depth assumed
+  to have zero velocity) is set via the new ``armoor-comp-hydrosection
+  --cgeo-ref DBAR`` CLI option (default: 0 dbar, i.e. referenced to the
+  sea surface) -- a per-run option, not a metazone.cfg field, per the CCTP.
+
+  Added the ``woom`` integration test (``test_comps_woom.py::test_comp
+  [comp_hydrosection]``), covered by a new bundled sample
+  ``_samples/GL_PR_GL_9999999_20260620.nc``: the real profile shapes
+  (depth/temp/psal) from ``GL_PR_GL_8901067_20240816.nc`` (a genuine glider
+  mission, North Sea, 2024-08-16), repositioned in space/time to fall inside
+  the woom test suite's shared region/time window -- no real glider mission
+  currently overlaps that window (checked against the CMEMS in-situ TAC
+  index). The file is clearly flagged as synthetic in its own attrs
+  (``platform_code=9999999``, a ``comment`` explaining the repositioning);
+  temperature/salinity values are not physically representative of the
+  substitute location/date.
+
+  Added a real, unmodified seasoar sample, ``_samples/seasoar.nc`` (Bay of
+  Biscay, 2026-07-12, 28 profiles), used by ``open_decode_odar``'s unit
+  tests and a second ``comp_hydrosection`` end-to-end test exercising the
+  conductivity-to-salinity path against real sensor data.
+
 - Added a ``mapseries`` otype to ``armoor-data``: renders one map per native
   time step (instead of a single aggregated map), with the color scale fixed
   once over the whole series, current/wind vectors overlaid via quiver or

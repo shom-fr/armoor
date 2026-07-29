@@ -16,6 +16,7 @@ import xarray as xr
 from tqdm import tqdm
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from xoa.geo import haversine
 from xoa.plot import plot_minimap, plot_ts
 
 from armoor.base import LINE_COLORS, CMAP_VARS
@@ -1650,6 +1651,244 @@ class PlotComp(MethodRegistry):
 
         return None
     
+    def _sections_distance(self, dsref, dim="time", lon_name="lon", lat_name="lat"):
+        """Cumulative along-track distance (km) from a reference's own
+        (time-ordered, for `dim="time"`) lon/lat, as a `dim`-indexed
+        DataArray.
+
+        `dim`/`lon_name`/`lat_name` default to the per-station case
+        ("time"/"lon"/"lat"); pass ``dim="pair"``,
+        ``lon_name="lon_pair"``, ``lat_name="lat_pair"`` for the
+        geostrophic-velocity case, where each point is already the
+        midpoint between two consecutive stations (see
+        `armoor.base.oceanvars.OceanVars.sel_cgeo`) -- no further sorting
+        needed there, `sel_cgeo` already sorts by time before differencing.
+        """
+        if dim == "time":
+            order = np.argsort(dsref[dim].values)
+        else:
+            order = np.arange(dsref.sizes[dim])
+        dim_sorted = dsref[dim].values[order] if dim in dsref.coords else None
+        lon = np.atleast_1d(dsref[lon_name].values)[order]
+        lat = np.atleast_1d(dsref[lat_name].values)[order]
+        if len(lon) > 1:
+            seg_km = haversine(lon[:-1], lat[:-1], lon[1:], lat[1:]) / 1e3
+            distance_km = np.concatenate([[0.0], np.cumsum(seg_km)])
+        else:
+            distance_km = np.zeros(len(lon))
+        coords = {dim: dim_sorted} if dim_sorted is not None else None
+        return xr.DataArray(distance_km, dims=dim, coords=coords)
+
+    def _sections_minimap(self, fig, lon, lat, ax=None):
+        """Inset minimap showing the section's own track, as a line
+        (matching `timeseries_drifter`'s trajectory minimap) -- consistent
+        with every other multi-panel comparison plot in this class.
+
+        `ax` defaults to the shared `self.ax_minimap` position, but
+        `_sections_2d`'s ``top_two_bottom_one`` layout (two titled panels
+        immediately below it, see gridspec in `armoor.base.plot.
+        create_subplots`) needs a smaller, higher one instead to avoid
+        the map's own gridline labels bleeding into the "ref" panel's
+        title -- confirmed against a real rendered figure.
+        """
+        plot_minimap(
+            (lon, lat),
+            fig=fig,
+            ax=ax if ax is not None else self.ax_minimap,
+            plot_coords="lines",
+            coords_markersize=4,
+            gridlines_draw_labels=True,
+            gridlines_xlabel_style={'size': 6},
+            gridlines_ylabel_style={'size': 6},
+            )
+
+    def _sections_2d(self, daref, daprod, dacomp, distance, depth, prod_name, ref_name, figtitle, figname, lon, lat, dim="time"):
+        """Plot one ref/prod/diff pcolormesh panel set (distance vs depth)."""
+        var = daref.name
+        units = daref.attrs.get("units")
+
+        # pcolormesh rejects non-finite X/Y: drop along-track points with
+        # no valid depth at all (e.g. a glider's surface-only segments
+        # between dives, which carry no CTD profile).
+        valid = depth.notnull().any("z")
+        if not bool(valid.any()):
+            logger.warning(f"sections: no valid depth for {var}/{prod_name}, skipping")
+            return
+        if not bool(valid.all()):
+            daref = daref.isel({dim: valid.values})
+            daprod = daprod.isel({dim: valid.values})
+            dacomp = dacomp.isel({dim: valid.values})
+            distance = distance.isel({dim: valid.values})
+            depth = depth.isel({dim: valid.values})
+        # pcolormesh needs fully finite X/Y even where the data itself (C)
+        # is legitimately NaN (a missing sensor reading at that depth) --
+        # fill any remaining scattered NaN depths (not full along-track
+        # points, already dropped above) from neighboring levels; the data
+        # stays NaN there regardless, so the mesh cell just renders blank.
+        depth = depth.ffill("z").bfill("z")
+
+        vmin = np.nanmin([daref.values, daprod.values])
+        vmax = np.nanmax([daref.values, daprod.values])
+        if self.vminmax and var in self.vminmax:
+            vmin, vmax = self.vminmax[var]
+        if np.isnan(vmin) or np.isnan(vmax):
+            logger.warning(f"sections: all-NaN {var} for {prod_name}, skipping")
+            return
+
+        cmean = np.nanmean(np.abs(dacomp.values))
+        cstd = cmean + 1.75 * np.nanstd(dacomp.values)
+        cmin, cmax = -cstd, cstd
+
+        distance2d, depth2d = xr.broadcast(distance, depth)
+        distance2d = distance2d.transpose("z", dim)
+        depth2d = depth2d.transpose("z", dim)
+        daref2d = daref.transpose("z", dim)
+        daprod2d = daprod.transpose("z", dim)
+        dacomp2d = dacomp.transpose("z", dim)
+
+        fig, axes = create_subplots(
+            layout_type='top_two_bottom_one',
+            figsize=(9, 8), x_label="Distance, km", y_label="Depth, m",
+            sharex=True,
+            )
+
+        axes[0].pcolormesh(distance2d, -depth2d, daprod2d, vmin=vmin, vmax=vmax, cmap=CMAP_VARS.get(var, "cmo.thermal"))
+        axes[0].set_title(prod_name)
+        m1 = axes[1].pcolormesh(distance2d, -depth2d, daref2d, vmin=vmin, vmax=vmax, cmap=CMAP_VARS.get(var, "cmo.thermal"))
+        axes[1].set_title(ref_name)
+        m2 = axes[2].pcolormesh(distance2d, -depth2d, dacomp2d, vmin=cmin, vmax=cmax, cmap="cmo.diff")
+        axes[2].set_title(f"{prod_name} - {ref_name}")
+
+        cbar1 = fig.colorbar(m1, ax=axes[1], orientation='vertical', fraction=0.046, pad=0.04)
+        cbar1.set_label(f"{var}, {units}")
+        cbar2 = fig.colorbar(m2, ax=axes[2], orientation='vertical', fraction=0.046, pad=0.04)
+        cbar2.set_label(METRIC_LABELS["diff"])
+
+        axes[0].set_ylabel("Depth, m")
+        # Only axes[2] (the bottom "diff" panel) owns the x-axis label --
+        # `top_two_bottom_one`'s gridspec (armoor.base.plot.create_subplots)
+        # stacks it directly under axes[0]/axes[1] with no row gap, so
+        # labelling the top row too made its own "Distance, km" text run
+        # into axes[2]'s title right below it.
+        axes[2].set_xlabel("Distance, km")
+
+        # Free a top margin for the suptitle and minimap, and open up the
+        # zero-gap row0/row1 gridspec so row0's x tick labels don't crowd
+        # axes[2]'s title -- same lever `maps()` uses for this layout.
+        fig.subplots_adjust(top=0.80, hspace=0.5, wspace=0.25)
+
+        self._sections_minimap(fig, lon, lat, ax=[0.72, 0.86, 0.13])
+
+        fig.suptitle(figtitle, y=0.98)
+        self.save_figure(fig, figname)
+
+    def _sections_curve(self, daref, daprod, dacomp, distance, prod_name, ref_name, figtitle, figname, lon, lat):
+        """Plot one ref/prod/diff line-curve panel set (no depth axis, e.g. mld)."""
+        var = daref.name
+        units = daref.attrs.get("units")
+
+        fig, axes = create_subplots(
+            nrows=2, figsize=(9, 6), x_label="Distance, km", y_label=None, sharex=True,
+            )
+        axes[0].plot(distance, daref, color="k", linewidth=2, label=ref_name)
+        axes[0].plot(distance, daprod, color=LINE_COLORS[0], linewidth=2, label=prod_name)
+        axes[0].set_ylabel(f"{var}, {units}")
+        axes[0].legend(fontsize=9, frameon=True, fancybox=True)
+
+        axes[1].plot(distance, dacomp, color=LINE_COLORS[0], linewidth=2)
+        axes[1].axhline(0, color="gray", linewidth=1, linestyle="--")
+        axes[1].set_ylabel(f"{METRIC_LABELS['diff']}, {units}")
+
+        self._sections_minimap(fig, lon, lat)
+
+        fig.suptitle(figtitle, y=1.02)
+        self.save_figure(fig, figname)
+
+    def sections(self):
+        """Plot hydrological-section comparisons (ref/prod/diff) per product.
+
+        3D variables (with a "z" dim, e.g. ptemp/sal) are rendered as
+        distance-vs-depth pcolormesh panels; 2D variables (no "z", e.g.
+        mld) as line curves -- both against the reference's own cumulative
+        along-track distance.
+        """
+        for prod, node_prod in self.dt.children.items():
+            # comp_vars mixes depth-resolved vars (ptemp/sal/...) with "mld"
+            # (no "z" dim); the coloc dims-signature split always separates
+            # them into their own coloc file sharing this sort_key, so
+            # ref/prod/comp each hold a *list* of 1-2 groups here (numbered
+            # children, see `armoor.comp.comparison.CompHydrosection`'s
+            # `outputs_params` comment) -- same mechanism as uvprofiles'
+            # vrange-bin groups, reusing the same `_bin_datasets` helper.
+            ref_groups = _bin_datasets(node_prod["ref"]["data"])
+            prod_groups = _bin_datasets(node_prod["prod"]["data"])
+            comp_groups = _bin_datasets(node_prod["comp"]["diff"])
+
+            prod_name = prod_groups[0].attrs.get("data_name")
+            ref_name = ref_groups[0].attrs.get("data_name")
+
+            for dsref_all, dsprod_all, dscomp_all in zip(ref_groups, prod_groups, comp_groups):
+                if "member" in dsprod_all.dims:
+                    if "member" in dsprod_all.lon.dims:
+                        dsprod_all = dsprod_all.reset_coords(["lon", "lat"])
+                    dsprod_all = dsprod_all.mean(dim="member", keep_attrs=True)
+                if "member" in dscomp_all.dims:
+                    dscomp_all = dscomp_all.mean(dim="member", keep_attrs=True)
+
+                # "cgeo" (geostrophic velocity normal to the section, see
+                # armoor.base.oceanvars.OceanVars.sel_cgeo) lives on its own
+                # "pair" dim -- one value per pair of consecutive stations
+                # -- instead of "time", with its own lon_pair/lat_pair/
+                # depth_pair coordinates (armoor.comp.comparison.
+                # CompHydrosection.compute_oceanvars renames them to avoid
+                # colliding with the per-station lon/lat/depth on merge).
+                along_dim = "pair" if "pair" in dsref_all.dims else "time"
+                if along_dim == "pair":
+                    distance = self._sections_distance(
+                        dsref_all, dim="pair", lon_name="lon_pair", lat_name="lat_pair"
+                        )
+                    depth = dsref_all["depth_pair"] if "depth_pair" in dsref_all.coords else None
+                    lon, lat = dsref_all["lon_pair"], dsref_all["lat_pair"]
+                else:
+                    distance = self._sections_distance(dsref_all)
+                    depth = dsref_all["depth"] if "depth" in dsref_all.coords else None
+                    lon, lat = dsref_all["lon"], dsref_all["lat"]
+
+                for var in dscomp_all.data_vars:
+                    if var not in dsref_all.data_vars or var not in dsprod_all.data_vars:
+                        continue
+                    daref = _drop_group_suffix(dsref_all[[var]])[var]
+                    daprod = _drop_group_suffix(dsprod_all[[var]])[var]
+                    dacomp = _drop_group_suffix(dscomp_all[[var]])[var]
+
+                    units = daref.attrs.get("units")
+                    figtitle = (
+                        f"{self.plot_title}\n{self.metazone}\n"
+                        f"{prod_name} vs {ref_name}\n{var}, {units}"
+                        )
+                    figname = (
+                        f"{self.staged.output_dir('plot', ref_name=ref_name)}/"
+                        f"sections_{var}_{prod_name}.png"
+                        )
+
+                    if "z" in dacomp.dims and depth is not None:
+                        self._sections_2d(
+                            daref, daprod, dacomp, distance, depth,
+                            prod_name, ref_name, figtitle, figname,
+                            lon, lat, dim=along_dim,
+                            )
+                    elif "z" not in dacomp.dims:
+                        self._sections_curve(
+                            daref, daprod, dacomp, distance,
+                            prod_name, ref_name, figtitle, figname,
+                            lon, lat,
+                            )
+
+                dsref_all.close()
+                dsprod_all.close()
+                dscomp_all.close()
+        return None
+
     def save_figure(self, fig, filename):
         """Save figure."""
         filename = Path(filename)

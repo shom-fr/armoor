@@ -103,7 +103,7 @@ class Comparison:
 
     # -- output -----------------------------------------------------------
 
-    def compute_oceanvars(self, ds):
+    def compute_oceanvars(self, ds, mparams=None):
         """Compute derived oceanographic variables on a colocated dataset.
 
         For every variable in `comp_vars` missing from `ds`, attempt to
@@ -113,6 +113,11 @@ class Comparison:
         ----------
         ds : xarray.Dataset
             Colocated dataset to augment in place.
+        mparams : dict, optional
+            Full metazone parameter dict (e.g. carrying CLI-supplied
+            extras). Unused by the generic implementation; accepted for a
+            uniform hook signature with subclasses that do use it (e.g.
+            CompHydrosection's ``cgeo_ref``).
 
         Returns
         -------
@@ -682,6 +687,146 @@ class CompClim(Comparison):
         },
     }
     comp_vars = ["ptemp", "sal"]
+
+
+class CompHydrosection(Comparison):
+    """Comparison of 3D model outputs against observed hydrological sections.
+
+    This iteration only covers gliders (already decodable via
+    ``fmt=cmems_insitu, platform=glider``): a single glider mission file
+    holds several profiles at their own (time, lon, lat), i.e. a whole
+    hydrological section. Other towed-instrument radiales (seasoar,
+    scanfish, rapidcast, MVP) only differ by decoding and are not covered
+    here.
+    """
+
+    name = "comp_hydrosection"
+    title = "Hydrological sections"
+    # "cgeo_ref" isn't a real metazone.cfg field -- it only ends up here
+    # because check_metazones_in merges every comp_args entry (including
+    # the --cgeo-ref CLI option) into each metazone's own param dict, and
+    # this list is what keeps that merge from being silently stripped back
+    # out again.
+    metazone_params = ["tbound", "polygon", "oceanvars", "bathy", "cgeo_ref"]
+    colocation_params_user = {}
+    # comp_hydrosection always time-matches nearest-to-reference, always
+    # tracks the reference's own (lon, lat) path, and always vinterps the
+    # product onto the reference's own (per-profile) depth levels -- none
+    # of the three is user configurable (same rationale as CompClim forcing
+    # "tmonth", and CompMooring/CompDrifter forcing a depth-based vertical
+    # colocation via `_ForcedDepthVLevelMixin`). Forcing the vertical step
+    # is not optional here: without it, the product keeps its own native
+    # "z" grid (e.g. a handful of model levels) while the reference keeps
+    # its own per-profile depth count (e.g. 29 glider bins, sometimes with
+    # all-NaN profiles for surface-only segments) -- two differently-sized,
+    # uncorrelated "z" axes that a pointwise diff cannot combine. Verified
+    # end-to-end against a real glider sample (`GL_PR_GL_8901067_*.nc`).
+    colocation_params_default = {
+        "time": ("trange_seq", {"tfreq": "*", "tref": "reference", "method": "nearest"}),
+        "horizontal": ("track",),
+        "vertical": ("vrange", {"vref": "reference", "vname": "depth"}),
+    }
+    # "output": "merge" routes through `_save_combined_output`, which fans
+    # out an unfused list of datasets into numbered children of `ds_name`
+    # (`_save_separate_outputs` cannot: it assumes one dataset per
+    # ds_name). A list shows up here because `comp_vars` includes "mld"
+    # (no "z" dim) alongside depth-resolved vars (with "z"): the coloc
+    # step's dims-signature split (`armoor.comp.coloc._split_by_dims`)
+    # always produces two groups sharing the same sort_key, same as
+    # CompArgo's uvprofiles/udiagts -- see the matching allowlist entry in
+    # `armoor.comp.output._concatenate_datasets`.
+    outputs_params = {
+        "sections": {"output": "merge"},
+    }
+    comp_vars = ["ptemp", "sal", "pdens", "temp", "sndspeed", "mld"]
+
+    def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
+        """Tag depth-resolved datasets with a vlevel sentinel unique to
+        their variable set.
+
+        No real vertical range-splitting happens: comp_hydrosection keeps
+        the whole depth profile as a single section (the product was
+        already vinterp'd onto the reference's own depth levels during
+        colocation, see `colocation_params_default["vertical"]` above).
+
+        The tag itself only exists to make `armoor.base.io.output_suffix`
+        give each "z"-having dims-signature group's coloc file a
+        *different* filename -- comp_vars now splits into three such
+        groups sharing the same sort_key: {ptemp, sal, pdens, temp,
+        sndspeed} (dims time, z), {mld} (dims time -- never reaches this
+        hook, see the caller's `if "z" in sub_ref.dims` guard, so it keeps
+        its own untagged, empty suffix) and {cgeo} (dims pair, z). A fixed
+        tag (e.g. a hardcoded "profile") would collide between the first
+        and third groups -- both have "z" -- so the tag is derived from
+        each group's own sorted variable names instead, guaranteed
+        distinct per group and identical between a group's ref and prod
+        side (verified against a real glider sample: with a fixed tag,
+        the second "z"-having group's write silently clobbered the
+        first's).
+
+        Parameters
+        ----------
+        dsref_list : list of xarray.Dataset
+            Reference datasets, one per product.
+        dsprod_list : list of xarray.Dataset
+            Product datasets, matching `dsref_list`.
+        params : dict
+            Colocation parameters for the metazone (unused).
+
+        Returns
+        -------
+        tuple of (list of xarray.Dataset, list of xarray.Dataset)
+            `dsref_list` and `dsprod_list`, each dataset tagged with
+            ``attrs["vlevel"]`` set from its own sorted variable names.
+        """
+        for ds in (*dsref_list, *dsprod_list):
+            ds.attrs["vlevel"] = "-".join(sorted(ds.data_vars))[:60]
+        return dsref_list, dsprod_list
+
+    def compute_oceanvars(self, ds, mparams=None):
+        """Compute pointwise oceanvars, then add the geostrophic velocity
+        normal to the section.
+
+        Geostrophic velocity (see
+        `armoor.base.oceanvars.OceanVars.sel_cgeo`) collapses N stations
+        into N-1 station-pair values -- it can't be assigned back onto the
+        dataset's own "time" dim the way the base class's per-point loop
+        assumes, so it's merged in separately here as a new "cgeo"
+        variable on a new "pair" dim. Its own ``lon``/``lat`` (station-pair
+        midpoints) and ``depth`` (station-pair mean, when the reference
+        has one) are renamed to ``lon_pair``/``lat_pair``/``depth_pair``
+        first, since `xr.Dataset.merge` can't hold two different-dims
+        variables under the same name as the existing per-station
+        ``lon``/``lat``/``depth``.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Colocated dataset to augment in place.
+        mparams : dict, optional
+            Full metazone parameter dict. ``mparams["cgeo_ref"]`` (from
+            the ``--cgeo-ref`` CLI option, see
+            `armoor.cli.main.get_parser_comp_hydrosection`) is the
+            reference pressure (dbar) for the dynamic height calculation;
+            defaults to 0 dbar (surface reference) when absent/None.
+
+        Returns
+        -------
+        xarray.Dataset
+            `ds`, with any missing `comp_vars` added, plus "cgeo" when
+            derivable.
+        """
+        ds = super().compute_oceanvars(ds, mparams)
+        if "cgeo" not in ds.data_vars:
+            p_ref = (mparams or {}).get("cgeo_ref")
+            cgeo = ds.oceanvars.sel_cgeo(p_ref=p_ref if p_ref is not None else 0.0)
+            if isinstance(cgeo, xr.DataArray):
+                renames = {"lon": "lon_pair", "lat": "lat_pair"}
+                if "depth" in cgeo.coords:
+                    renames["depth"] = "depth_pair"
+                cgeo = cgeo.rename(renames)
+                ds = ds.merge({"cgeo": cgeo})
+        return ds
 
 
 def get_comparison(func_comp: str) -> Comparison:
