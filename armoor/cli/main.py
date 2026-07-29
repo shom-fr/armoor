@@ -698,6 +698,34 @@ def main_comp_clim():
     _dispatch_comp("comp_clim", get_parser_comp_clim(),
                    lambda args: {"tbound": args.tbound})
 
+def get_parser_comp_hydrosection():
+    """Get parser for hydrological-section comparison."""
+    parser = ArgumentParser(
+        description="Compare 3D model outputs with observed hydrological sections (gliders, ODAR radiales).",
+        formatter_class=ArmoorArgumentHelpFormatter,
+    )
+    add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
+    add_comp_parser_arguments(parser)
+    parser.add_argument(
+        '--cgeo-ref',
+        type=float,
+        default=None,
+        help=(
+            "Reference sea pressure (dbar) for the geostrophic current "
+            "normal to the section, i.e. the depth at which the "
+            "geostrophic velocity is assumed to be zero. "
+            "Default: 0 dbar (referenced to the sea surface)."
+        )
+        )
+    return parser
+
+
+def main_comp_hydrosection():
+    """Compare model outputs with observed hydrological sections (gliders)."""
+    _dispatch_comp("comp_hydrosection", get_parser_comp_hydrosection(),
+                   lambda args: {"tbound": args.tbound, "cgeo_ref": args.cgeo_ref})
+
 def get_parser_comp_sst():
     """Get parser for sst comparison."""
     # Setup argument parser

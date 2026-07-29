@@ -288,7 +288,66 @@ def grid2loc(ds, coords: [(float, float)]):
         dso = dso.set_coords("depth")
     return dso
 
-def grid2section(ds, coords: [(float, float), (float, float)], dx: float): 
+def grid2track(ds, ds_ref):
+    """Interpolate a gridded dataset onto another dataset's own moving track.
+
+    Unlike `grid2loc` (which selects a fixed cloud of points and, when `ds`
+    has a "time" dim, cross-products it against every one of those points),
+    this pairs each `ds_ref` observation with its own (time, lon, lat) --
+    e.g. one point per glider profile along a mission track -- so the
+    output keeps a single "time" dim of the same length as `ds_ref.time`,
+    not a "time" x "npts" grid.
+
+    The pairing relies on `xoa.regrid.grid2loc` detecting a "time"
+    coordinate on `loc` that shares `ds`'s own "time" dim name: it then
+    interpolates in space *and* time together, point by point, instead of
+    broadcasting space across every time step.
+
+    Parameters
+    ----------
+    ds: xr.Dataset
+        Gridded dataset to interpolate (must have a "time" dim already
+        aligned in length/order with `ds_ref.time`, e.g. via `interp_time`).
+    ds_ref: xr.Dataset
+        Dataset whose own "time"-indexed lon/lat defines the track.
+
+    Returns
+    -------
+    xarray.Dataset
+        `ds` interpolated at each of `ds_ref`'s (time, lon, lat) points,
+        indexed by "time" (and "z" when present).
+    """
+    import xoa.regrid as xregrid
+    loc = xr.Dataset(
+        coords={
+            "lon": ("time", np.atleast_1d(ds_ref.lon.values), {"axis": "X", "standard_name": "longitude", "units": "degrees_east"}),
+            "lat": ("time", np.atleast_1d(ds_ref.lat.values), {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"}),
+            "time": ("time", np.atleast_1d(ds_ref.time.values)),
+            }
+        )
+    dsi = ds.copy()
+    if "depth" in dsi.coords and "time" in dsi.depth.dims:
+        dsi = dsi.reset_coords("depth")
+    dss = []
+    vars_grid2track = [
+        var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)
+        ]
+    for var in vars_grid2track:
+        da = xregrid.grid2loc(ds[var], loc)
+        if "z" in da.dims:
+            da = da.transpose("time", "z")
+        else:
+            da = da.transpose("time")
+        dsvar = xr.Dataset(data_vars={var: (da.dims, da.data)}, coords=loc.coords)
+        dsvar[var] = dsvar[var].assign_attrs(**dsi[var].attrs)
+        dss.append(dsvar)
+    dso = xr.merge(dss)
+    if "depth" in dsi.coords and "time" not in dsi["depth"].dims:
+        dso["depth"] = dsi.depth
+        dso = dso.set_coords("depth")
+    return dso
+
+def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     """Interpolate a dataset on section.
 
     Parameters

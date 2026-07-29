@@ -407,6 +407,19 @@ class TestHorizontalColocation:
 
         assert mock_grid2loc.call_count >= 1
 
+    @patch("armoor.comp.coloc.grid2track")
+    def test_track_calls_grid2track(self, mock_grid2track):
+        """Test that track() interpolates dsprod onto dsref's own track,
+        leaving dsref unchanged."""
+        mock_grid2track.return_value = self.dsprod
+        coloc = HorizontalColocation(self.dsref, self.dsprod)
+
+        dsref_out, dsprod_out = coloc.track()
+
+        mock_grid2track.assert_called_once_with(self.dsprod, self.dsref)
+        assert dsref_out is self.dsref
+        assert dsprod_out is self.dsprod
+
     @patch("armoor.comp.coloc.regrid")
     def test_href_reference(self, mock_regrid):
         """Test href with 'reference' as target grid."""
@@ -1502,7 +1515,7 @@ class TestProcessSingleProductSplitBehavior:
         dsprod = self._make_ds({"temp": ("z",)}, {"data_name": "prod"})
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
-        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds: ds
+        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
         mock_coloc.return_value = (dsref, dsprod)
         mock_vrange.return_value = ([dsref], [dsprod])
         mock_save.return_value = []
@@ -1530,7 +1543,7 @@ class TestProcessSingleProductSplitBehavior:
         dsprod = self._make_ds({"sst": ("time",)}, {"data_name": "prod"})
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
-        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds: ds
+        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_save.return_value = []
@@ -1558,7 +1571,7 @@ class TestProcessSingleProductSplitBehavior:
         dsprod = self._make_ds({"temp": ("time", "z")}, {"data_name": "prod"})
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
-        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds: ds
+        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_vrange.return_value = ([dsref], [dsprod])
@@ -1605,7 +1618,7 @@ class TestProcessSingleProductSplitBehavior:
         )
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
-        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds: ds
+        mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_vrange.return_value = ([dsref], [dsprod])

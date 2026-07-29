@@ -96,14 +96,12 @@ class OceanVars(MethodRegistry):
         if "ptemp" in self.ds:
             return self.ds["ptemp"]
         elif "temp" in self.ds:
-            if "sal" in self.ds:
-                if "pres" not in self.ds:
-                    pres = self.ds.oceanvars.sel_pres()
-                else:
-                    pres = self.ds["pres"]
+            sal = self.sel_sal()
+            if isinstance(sal, xr.DataArray):
+                pres = self.sel_pres()
                 ptemp = _gsw_ufunc(
                     gsw.conversions.pt0_from_t,
-                    self.ds.sal, self.ds.temp, pres,
+                    sal, self.ds.temp, pres,
                 )
                 ptemp.attrs["standard_name"] = (
                     "sea_water_potential_temperature"
@@ -144,17 +142,33 @@ class OceanVars(MethodRegistry):
     
     def sel_sal(self):
         """
-        Select salinity from the dataset.
+        Select or compute salinity from the dataset.
+
+        Falls back to computing practical salinity from raw conductivity
+        (``conduct``, in mS/cm -- the unit `gsw.SP_from_C` expects
+        directly, no conversion needed) when ``sal`` isn't already
+        present, e.g. for ODAR-decoded towed-CTD sections (seasoar,
+        scanfish, ...), which only carry the raw sensor conductivity.
 
         Returns
         -------
-        xarray.DataArray
-            Data array containing salinity.
+        xarray.DataArray or None
+            Data array containing salinity, or None if neither salinity
+            nor conductivity (plus temperature and pressure) is available.
         """
         if "sal" in self.ds:
             return self.ds["sal"]
-        else:
-            return None
+        if "conduct" in self.ds and "temp" in self.ds:
+            pres = self.sel_pres()
+            if not isinstance(pres, xr.DataArray):
+                logger.warning("No pressure found, salinity cannot be computed from conductivity.")
+                return None
+            sal = _gsw_ufunc(gsw.SP_from_C, self.ds.conduct, self.ds.temp, pres)
+            sal.attrs["standard_name"] = "sea_water_salinity"
+            sal.attrs["long_name"] = "Practical salinity"
+            sal.attrs["units"] = "1e-3"
+            return sal
+        return None
     
     def sel_pres(self):
         if "pres" in self.ds:
@@ -306,6 +320,94 @@ class OceanVars(MethodRegistry):
             self.ds["mld"] = mld
 
         return self.ds["mld"]
+
+    def sel_cgeo(self, p_ref=0.0):
+        """
+        Compute the geostrophic current normal to a hydrological section,
+        via dynamic height (`gsw.geo_strf_dyn_height` +
+        `gsw.geostrophic_velocity`).
+
+        Not dispatched through `sel`/`_VARNAME_METHODS` like every other
+        variable here: it collapses the along-track dimension from N
+        stations to N-1 station *pairs* (one velocity between each pair of
+        consecutive profiles, by construction oriented perpendicular to the
+        line joining them), so it can't be assigned back onto `self.ds`'s
+        own "time" dim the way `compute_oceanvars`'s generic loop assumes.
+        Called directly by `armoor.comp.comparison.CompHydrosection`, which
+        merges the result (dims ``("pair", "z")``) into the dataset as a
+        new variable on a new dim instead.
+
+        Parameters
+        ----------
+        p_ref : float, optional
+            Reference sea pressure (dbar) for the dynamic height
+            calculation -- the depth at which the geostrophic velocity is
+            assumed to be zero. Defaults to 0 dbar (referenced to the sea
+            surface).
+
+        Returns
+        -------
+        xarray.DataArray or None
+            Geostrophic velocity (m/s), dims ``("pair", "z")``, with
+            ``lon``/``lat`` coordinates on ``"pair"`` at the midpoint of
+            each consecutive station pair. None if there are fewer than 2
+            stations or salinity/temperature/pressure/position aren't all
+            available.
+        """
+        if "time" not in self.ds.dims or self.ds.sizes["time"] < 2:
+            logger.warning("Fewer than 2 stations, geostrophic velocity cannot be computed.")
+            return None
+        sal = self.sel_sal()
+        ptemp = self.sel_ptemp()
+        pres = self.sel_pres()
+        if not all(isinstance(x, xr.DataArray) for x in (sal, ptemp, pres)):
+            logger.warning(
+                "Missing salinity, potential temperature or pressure, "
+                "geostrophic velocity cannot be computed."
+            )
+            return None
+        if "lon" not in self.ds.coords or "lat" not in self.ds.coords:
+            logger.warning("No lon/lat found, geostrophic velocity cannot be computed.")
+            return None
+
+        # pres/depth (unlike sal/ptemp) can be "z"-only -- e.g. a gridded
+        # model product's own depth grid doesn't vary per time step, so
+        # sel_pres()'s p_from_z fallback never gains a "time" dim. Broadcast
+        # everything (including depth, if present, for the mid-pair depth
+        # coordinate below) onto a shared (time, z) shape before handing
+        # plain numpy arrays to gsw, which does no dim-aware broadcasting.
+        has_depth = "depth" in self.ds.coords
+        depth = self.ds["depth"] if has_depth else xr.zeros_like(pres)
+        sal, ptemp, pres, depth = xr.broadcast(sal, ptemp, pres, depth)
+
+        # Station pairs must follow the track in chronological order --
+        # not guaranteed by storage order.
+        order = np.argsort(self.ds["time"].values)
+        lon = np.atleast_1d(self.ds.lon.values)[order]
+        lat = np.atleast_1d(self.ds.lat.values)[order]
+        sal_vals = sal.transpose("z", "time").values[:, order]
+        ptemp_vals = ptemp.transpose("z", "time").values[:, order]
+        pres_vals = pres.transpose("z", "time").values[:, order]
+        depth_vals = depth.transpose("z", "time").values[:, order]
+
+        sa = gsw.SA_from_SP(sal_vals, pres_vals, lon[np.newaxis, :], lat[np.newaxis, :])
+        ct = gsw.CT_from_pt(sa, ptemp_vals)
+        geo_strf = gsw.geo_strf_dyn_height(sa, ct, pres_vals, p_ref=p_ref, axis=0)
+        vel, mid_lon, mid_lat = gsw.geostrophic_velocity(geo_strf, lon, lat, p=pres_vals)
+        depth_pair = 0.5 * (depth_vals[:, :-1] + depth_vals[:, 1:])
+
+        coords = {"lon": ("pair", mid_lon), "lat": ("pair", mid_lat)}
+        if has_depth:
+            coords["depth"] = (("z", "pair"), depth_pair)
+        cgeo = xr.DataArray(
+            vel.astype(np.float32),
+            dims=("z", "pair"),
+            coords=coords,
+        ).transpose("pair", "z")
+        cgeo.attrs["standard_name"] = "normal_geostrophic_current"
+        cgeo.attrs["long_name"] = "Geostrophic current normal to the section"
+        cgeo.attrs["units"] = "m s-1"
+        return cgeo
 
     def sel_divergence(self):
         """

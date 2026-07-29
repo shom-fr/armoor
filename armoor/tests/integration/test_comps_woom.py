@@ -42,6 +42,12 @@ COMP_DATA_DEPS = {
     "comp_clim":    "get_woa18,get_cmems_glo12_temp,get_cmems_glo12_sal",
     "comp_sst":     "get_cmems_sst_l4,get_cmems_sst_l3,get_cmems_glo12_temp",
     "comp_drifter": "get_cmems_insitu,get_cmems_glo12_temp,get_cmems_glo12_sal,get_cmems_glo12_curr",
+    # Same generic in-situ download as comp_argo/comp_mooring/comp_drifter --
+    # get_cmems_insitu fetches every CMEMS in-situ platform for REGION, and
+    # comp_hydrosection's own [data] section filters it down to
+    # platform=glider (see armoor/tests/integration/woom/comp_argo.cfg for
+    # the equivalent argo-filtered pattern this should mirror).
+    "comp_hydrosection": "get_cmems_insitu,get_cmems_glo12_temp,get_cmems_glo12_sal",
 }
 
 # comp_* tasks that make_bull (tasks.cfg) links artifacts from — comp_clim is

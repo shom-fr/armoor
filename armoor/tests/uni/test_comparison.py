@@ -18,6 +18,7 @@ from armoor.comp.comparison import (
     CompArgo,
     CompClim,
     CompDrifter,
+    CompHydrosection,
     CompModels,
     CompMooring,
     CompSst,
@@ -32,10 +33,11 @@ SUBCLASSES = {
     "comp_drifter": CompDrifter,
     "comp_models": CompModels,
     "comp_clim": CompClim,
+    "comp_hydrosection": CompHydrosection,
 }
 
 
-def test_registry_has_all_six():
+def test_registry_has_all_expected():
     assert set(_REGISTRY.keys()) == set(SUBCLASSES.keys())
 
 

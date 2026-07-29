@@ -308,6 +308,36 @@ class CoraInsituDecoder(Decoder):
         return open_decode_cora_insitu(path_files, platform=platform)
 
 
+class OdarDecoder(Decoder):
+    """ODAR-processed towed/glider CTD sections (seasoar, scanfish,
+    rapidcast, MVP -- distinguished by each file's own
+    ``ODAR_DATASET_TYPE`` attr, not by `platform`)."""
+
+    name = "odar"
+    fmts = ("odar",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode ODAR section files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused: the instrument type is read from each file's own
+            ``ODAR_DATASET_TYPE`` attr, not asserted externally.
+
+        Returns
+        -------
+        list of xarray.Dataset
+            See `open_decode_odar`.
+        """
+        logger.info("Opening/decoding ODAR files")
+        return open_decode_odar(path_files)
+
+
 class CmemsModelDecoder(Decoder):
     """CMEMS gridded model output."""
 
@@ -1360,6 +1390,66 @@ def open_decode_cmems_insitu(path_files, platform):
             ds.attrs["name"] = f"{ds.attrs['platform_code']}"
             dss.append(ds)
         return dss
+
+
+def open_decode_odar(path_files):
+    """Open ODAR-processed towed/glider CTD section file(s).
+
+    ODAR (the in-house processing tool behind ``odar-seasoar``/``odar-
+    scanfish``/etc.) already emits armoor-friendly variable names (``temp``,
+    ``pres``, ``conduct``, ``depth``, ``lon``, ``lat``, ``time``) matching
+    the generic CF meta specs, so -- unlike `open_decode_cmems_insitu` --
+    no per-platform variable reshaping is needed. Two things still need
+    fixing by hand:
+
+    - ``time`` is encoded as ``"nanoseconds since <reference>"``, a unit
+      `cftime`/xarray's CF decoder rejects outright (it only accepts
+      seconds/minutes/hours/days) -- decoded manually here instead.
+    - Practical salinity isn't in the file, only raw ``conduct`` (mS/cm) --
+      kept as-is here and derived later, lazily, by
+      `armoor.base.oceanvars.OceanVarsAccessor.sel_sal` (on the tiny
+      colocated subset, not eagerly on the full section: computing it here
+      on the still dask-backed decode output corrupted the task graph --
+      ``ValueError: Missing dependency ('open_dataset-conduct-...')`` --
+      confirmed against the real ``seasoar.nc`` sample; deferring the
+      computation is also the established pattern for every other derived
+      oceanvar, see `armoor.comp.coloc._prepare_dataset`'s docstring).
+
+    Parameters
+    ----------
+    path_files : list of str
+        Absolute paths to the input files. Each file is one section (one
+        towed-instrument transect or glider mission), like
+        `open_decode_cmems_insitu`'s glider/mooring/drifter platforms --
+        not grouped further.
+
+    Returns
+    -------
+    list of xarray.Dataset
+        One dataset per input file, with ``z`` as the vertical dim
+        (``depth`` demoted to a coordinate along it), ``lon``/``lat``/
+        ``depth`` as coordinates, and ``sal`` added when derivable.
+    """
+    cfspecs = xmeta.get_meta_specs("generic")
+    dss = []
+    for path in path_files:
+        ds = cfspecs.decode(xr.open_dataset(path, chunks={}, decode_times=False))
+
+        units = ds["time"].attrs.get("units", "")
+        if "nanoseconds since" in units:
+            ref = pd.Timestamp(units.split("nanoseconds since", 1)[1].strip())
+            ds = ds.assign_coords(
+                time=("time", (ref + pd.to_timedelta(ds["time"].values, unit="ns")).values)
+            )
+
+        if "depth" in ds.dims:
+            ds = ds.swap_dims({"depth": "z"})
+
+        ds = ds.set_coords([c for c in ("lon", "lat", "depth") if c in ds.variables])
+        ds.attrs.setdefault("name", Path(path).stem)
+        dss.append(ds)
+    return dss
+
 
 def open_decode_croco(path_file, fmt="croco"):
     """

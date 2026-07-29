@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from armoor.base.interp import coarsen, grid2loc, interp_time, regrid, vinterp, grid2section, _crop_to_bbox
+from armoor.base.interp import coarsen, grid2loc, grid2track, interp_time, regrid, vinterp, grid2section, _crop_to_bbox
 
 
 class TestInterpTime:
@@ -338,6 +338,72 @@ class TestGrid2Loc:
         
         assert 'lon' in result.coords
         assert 'lat' in result.coords
+
+
+class TestGrid2Track:
+    """Test suite for grid2track: pointwise (time, lon, lat)-paired
+    interpolation onto a moving track, as opposed to grid2loc's fixed-cloud
+    x-time cross product.
+    """
+
+    def setup_method(self):
+        """Gridded product (2D and 3D vars) plus a 3-point moving track."""
+        lon = np.array([0., 1., 2., 3.])
+        lat = np.array([40., 41., 42.])
+        z = np.array([0., 10., 20.])
+        time = np.array(
+            ['2024-01-01', '2024-01-02', '2024-01-03'], dtype='datetime64[ns]'
+            )
+        data3d = np.zeros((3, 3, 3, 4))
+        data2d = np.zeros((3, 3, 4))
+        for it in range(3):
+            for iz in range(3):
+                for iy in range(3):
+                    for ix in range(4):
+                        data3d[it, iz, iy, ix] = it * 1000 + iz * 100 + lat[iy] + lon[ix]
+            for iy in range(3):
+                for ix in range(4):
+                    data2d[it, iy, ix] = it * 1000 + lat[iy] + lon[ix]
+        self.ds = xr.Dataset(
+            {
+                'ptemp': (('time', 'z', 'lat', 'lon'), data3d),
+                'mld': (('time', 'lat', 'lon'), data2d),
+            },
+            coords=dict(time=time, z=z, lat=lat, lon=lon),
+        )
+        self.track_lon = np.array([0.5, 1.5, 2.5])
+        self.track_lat = np.array([40.5, 41.5, 40.2])
+        self.ds_ref = xr.Dataset(coords=dict(
+            time=('time', time),
+            lon=('time', self.track_lon),
+            lat=('time', self.track_lat),
+        ))
+
+    def test_no_cross_product(self):
+        """Output keeps a single "time" dim sized like the track, not a
+        "time" x "npts" grid like grid2loc would produce."""
+        result = grid2track(self.ds, self.ds_ref)
+        assert result.mld.dims == ('time',)
+        assert result.mld.shape == (3,)
+        assert 'npts' not in result.dims
+
+    def test_3d_var_keeps_full_depth_per_point(self):
+        """A depth-resolved var keeps its full "z" profile at each paired
+        (time, lon, lat) point."""
+        result = grid2track(self.ds, self.ds_ref)
+        assert set(result.ptemp.dims) == {'time', 'z'}
+        assert result.ptemp.shape == (3, 3)
+
+    def test_values_match_pointwise_bilinear_interpolation(self):
+        """Regression check against hand-verified expected values (bilinear
+        interpolation of `data3d`/`data2d` at each track point)."""
+        result = grid2track(self.ds, self.ds_ref)
+        expected_mld = np.array([41., 1043., 2042.7])
+        np.testing.assert_allclose(result.mld.values, expected_mld, rtol=1e-5)
+        expected_ptemp_t0 = np.array([41., 141., 241.])
+        np.testing.assert_allclose(
+            result.ptemp.isel(time=0).values, expected_ptemp_t0, rtol=1e-5
+            )
 
 
 class TestGrid2Section:
