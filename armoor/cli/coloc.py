@@ -1,7 +1,7 @@
-"""Command-line interface for armoor-coloc-*.
+"""Command-line interface for armoor-coloc-\*.
 
 This module provides command-line interfaces for applying various types of interpolation
-(temporal, horizontal, vertical) to oceanographic and meteorological data files.
+(temporal, horizontal, vertical) to oceanographic data files.
 The interpolation operations are optimized for large datasets using Dask distributed computing.
 """
 import logging

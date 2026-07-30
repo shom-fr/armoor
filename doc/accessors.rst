@@ -362,7 +362,7 @@ are inherited unchanged.
 
    The batch, DataTree-based plots (cartopy maps with minimap, T-S diagrams,
    multi vertical profiles, …) are produced by
-   :class:`armoor.data.plot.PlotData`, which operates on the full pipeline
+   :class:`armoor.data.plot.PlotOceanModel`, which operates on the full pipeline
    DataTree, and are **not** exposed through this accessor.
 
 .. list-table::

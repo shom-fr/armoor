@@ -1,8 +1,7 @@
-"""Command-line interface for armoor-interp-*.
+"""Command-line interface for armoor-range-\*.
 
-This module provides command-line interfaces for applying various types of interpolation
-(temporal, horizontal, vertical) to oceanographic and meteorological data files.
-The interpolation operations are optimized for large datasets using Dask distributed computing.
+This module provides command-line interfaces for computing time and vertical
+ranges/bins over oceanographic data files.
 """
 import logging
 from argparse import ArgumentParser

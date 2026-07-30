@@ -25,6 +25,7 @@ Package API
     armoor.cli
     armoor.cli.coloc
     armoor.cli.comp
+    armoor.cli.decode
     armoor.cli.filters
     armoor.cli.interp
     armoor.cli.range

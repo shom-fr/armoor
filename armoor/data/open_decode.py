@@ -50,8 +50,8 @@ def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
     """Generate absolute paths from a pattern string with wildcard and list expansion.
     
     Supports patterns like :
-    - '/path/to/files/*.txt' (standard glob)
-    - '/path/to/files/*[option1,option2].txt' (list expansion)
+    - '/path/to/files/\*.txt' (standard glob)
+    - '/path/to/files/\*[option1,option2].txt' (list expansion)
     
     Parameters
     ----------

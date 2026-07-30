@@ -1,7 +1,7 @@
-"""Command-line interface for armoor-filters-*.
+"""Command-line interface for armoor-filters-\*.
 
 This module provides command-line interfaces for applying various types of filters
-(time, horizontal, quality) to oceanographic and meteorological data files.
+(time, horizontal, quality) to oceanographic data files.
 """
 import logging
 import asyncio
@@ -47,7 +47,7 @@ def process_filters(args, filters_config):
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed CLI arguments (fins, ifmt, platform, fout, ofmt, dask-*).
+        Parsed CLI arguments (fins, ifmt, platform, fout, ofmt, dask-\*).
     filters_config : dict
         Dictionary containing filter configurations. Each key represents
         a filter type with its corresponding parameters.
@@ -408,8 +408,8 @@ def main_filters_quality():
     Notes
     -----
     - Quality control filtering removes data points where the specified quality
-    control variable falls outside the acceptable threshold range. This is
-    commonly used to remove poor quality observations from oceanographic datasets.
+      control variable falls outside the acceptable threshold range. This is
+      commonly used to remove poor quality observations from oceanographic datasets.
     - Leverages Dask for memory-efficient processing of large datasets
     - Supports all input/output formats available in the ARMOOR ecosystem
     

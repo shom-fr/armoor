@@ -120,12 +120,14 @@ latex_elements = {
 }
 latex_show_urls = 'footnote'
 # %% Intersphinx
-# intersphinx_mapping = {
-#     'xarray': ('https://xarray.pydata.org', None),
-#     'xoa': ('https://xoa.readthedocs.io/', None),
-#     'cmocean': ('https://matplotlib.org/cmocean/', None),
-#     'configobj': ('https://configobj.readthedocs.io', None)
-#     }
+intersphinx_mapping = {
+    'matplotlib': ('https://matplotlib.org/stable/', None),
+    'pandas': ('https://pandas.pydata.org/docs/', None),
+    }
+# 'xarray': ('https://xarray.pydata.org', None),
+# 'xoa': ('https://xoa.readthedocs.io/', None),
+# 'cmocean': ('https://matplotlib.org/cmocean/', None),
+# 'configobj': ('https://configobj.readthedocs.io', None)
 
 
 # %% Napoleon

@@ -439,8 +439,8 @@ def write_dataset_to_zarr(
     Computes the zarr write and valid_min/valid_max in a single dask pass
     so that data chunks are read only once.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     ds : xr.Dataset
         Dataset à sauvegarder
     path : str

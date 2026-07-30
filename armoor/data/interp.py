@@ -42,7 +42,7 @@ class TimeInterpolation(AbstractInterpolation):
         Parameters
         ----------
         freq : str
-            See :ref:`here <timeseries.offset_aliases>` for a list of
+            See :ref:`here <pandas:timeseries.offset_aliases>` for a list of
             frequency aliases.
             
         Returns

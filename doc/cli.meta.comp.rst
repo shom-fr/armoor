@@ -23,11 +23,21 @@ data
     
 ouputs
 ======
-    
+
         Multiple outputs can be configured. The available outputs depend on the executed comparison.
         For instance, a vertical profile of salinity is not possible with ``armoor-comp-sst``.
         See the possible outputs in the dedicated section of the documentation.
-        
+
+        - ``fmt``: (top-level, applies to every configured output) which
+          artifacts to write -- any combination of ``zarr``/``netcdf`` (the
+          colocated dataset itself) and ``png`` (rendered plots).
+        - ``otype``: the kind of output to compute -- see the cards below.
+        - ``vminmax``: (optional, nested under each output block) set
+          colorbar/axis limits for each variable, overriding the automatic
+          mean/std-based scaling. Format is a dictionnary such as
+          ``vminmax = {'ptemp': (15,25), 'sal': (33,36)}``. Variable names
+          are those of the Armoor pivot format (see :ref:`Armoor conventions <varconventions>`).
+
         .. grid:: 3
 
             .. grid-item-card:: Maps of statistics (``maps``)
