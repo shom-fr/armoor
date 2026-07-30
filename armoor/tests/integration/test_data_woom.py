@@ -31,6 +31,7 @@ The shared data lives in ``scratch_dir`` (``$HOME/armoor_tests``) regardless
 of which workflow file triggered the download.
 """
 
+import glob
 import os
 import time
 
@@ -152,21 +153,33 @@ def _run_and_assert(workflow):
         assert failures.empty
 
 
+def _assert_nonempty_plots(run_dir, task):
+    """A SUCCESS status doesn't mean the plots are real; catch empty/corrupt files too."""
+    pngs = glob.glob(os.path.join(run_dir, task, "plot", "**", "*.png"), recursive=True)
+    assert pngs, f"no plot output found under {run_dir}/{task}/plot"
+    for f in pngs:
+        assert os.path.getsize(f) > 0, f"empty output file: {f}"
+
+
 def test_data(woom_env):
-    """Run a minimal woom workflow for armoor-data and assert all tasks succeed."""
+    """Run a minimal woom workflow for armoor-data and assert all tasks
+    succeed and produce non-empty plots."""
     taskmanager, woomtmpdir = woom_env
 
     cfg_path = _write_workflow_cfg(woomtmpdir)
 
     workflow = wworkflow.Workflow(cfg_path, taskmanager)
     _run_and_assert(workflow)
+    _assert_nonempty_plots(workflow.get_task_run_dir("data"), "data")
 
 
 def test_data_mapseries(woom_env):
-    """Run the mapseries otype (model + obs + climatology) and assert success."""
+    """Run the mapseries otype (model + obs + climatology) and assert
+    success and non-empty plots."""
     taskmanager, woomtmpdir = woom_env
 
     cfg_path = _write_mapseries_workflow_cfg(woomtmpdir)
 
     workflow = wworkflow.Workflow(cfg_path, taskmanager)
     _run_and_assert(workflow)
+    _assert_nonempty_plots(workflow.get_task_run_dir("data_mapseries"), "data_mapseries")
