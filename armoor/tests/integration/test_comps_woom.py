@@ -9,6 +9,9 @@ the session, even when several comp tests run sequentially.  The shared data
 lives in ``scratch_dir`` (``$HOME/armoor_tests``) regardless of which
 workflow file triggered the download.
 
+``test_comp_hydrosection_sections_output`` reuses the ``comp_hydrosection``
+run from ``test_comp`` to check actual output content, not just task status.
+
 ``test_bull`` (defined last) exercises ``make_bull`` on its own, relying on
 the ``comp_sst``/``comp_argo``/``comp_mooring``/``comp_drifter`` run
 directories left in ``scratch_dir`` by the parametrized ``test_comp`` tests
@@ -20,11 +23,13 @@ which workflow/app triggered them — they don't need to be declared in the
 same workflow.cfg that runs make_bull.
 """
 
+import glob
 import os
 import time
 
 import pytest
 import woom.workflow as wworkflow
+import xarray as xr
 
 
 # ---------------------------------------------------------------------------
@@ -128,9 +133,18 @@ def _run_and_assert(workflow):
         assert failures.empty
 
 
+def _assert_nonempty_plots(run_dir, comp):
+    """A SUCCESS status doesn't mean the plots are real; catch empty/corrupt files too."""
+    pngs = glob.glob(os.path.join(run_dir, comp, "plot", "**", "*.png"), recursive=True)
+    assert pngs, f"no plot output found under {run_dir}/{comp}/plot"
+    for f in pngs:
+        assert os.path.getsize(f) > 0, f"empty output file: {f}"
+
+
 @pytest.mark.parametrize("comp", COMP_DATA_DEPS.keys())
 def test_comp(comp, woom_env):
-    """Run a minimal woom workflow for *comp* and assert all tasks succeed."""
+    """Run a minimal woom workflow for *comp* and assert all tasks succeed
+    and produce non-empty plots."""
     taskmanager, woomtmpdir = woom_env
 
     get_data = COMP_DATA_DEPS[comp]
@@ -138,6 +152,39 @@ def test_comp(comp, woom_env):
 
     workflow = wworkflow.Workflow(cfg_path, taskmanager)
     _run_and_assert(workflow)
+    _assert_nonempty_plots(workflow.get_task_run_dir(comp), comp)
+
+
+def test_comp_hydrosection_sections_output(woom_env):
+    """Open the sections zarr from test_comp[comp_hydrosection] and check
+    the three signature groups + all plot PNGs, mirroring
+    tests/uni/test_comp_hydrosection.py's own assertions against this real,
+    woom-orchestrated run. Depends on test_comp[comp_hydrosection] having
+    already run in this session (same pattern as test_bull below)."""
+    taskmanager, woomtmpdir = woom_env
+    cfg_path = _write_workflow_cfg(
+        woomtmpdir, "comp_hydrosection", COMP_DATA_DEPS["comp_hydrosection"]
+    )
+    workflow = wworkflow.Workflow(cfg_path, taskmanager)
+
+    out_root = os.path.join(workflow.get_task_run_dir("comp_hydrosection"), "comp_hydrosection")
+    assert os.path.isdir(out_root), "run test_comp[comp_hydrosection] before this test"
+
+    zarr_paths = glob.glob(os.path.join(out_root, "output", "*", "*", "sections", "*", "all.zarr"))
+    assert len(zarr_paths) == 1
+    dt = xr.open_datatree(zarr_paths[0])
+    ref_data = dt[list(dt.children)[0]]["ref"]["data"]
+    groups = {frozenset(ref_data[c].to_dataset().data_vars) for c in ref_data.children}
+    assert frozenset({"ptemp", "sal", "pdens", "temp", "sndspeed"}) in groups
+    assert frozenset({"mld"}) in groups
+    assert frozenset({"cgeo"}) in groups
+    dt.close()
+
+    pngs = glob.glob(os.path.join(out_root, "plot", "*", "*", "sections_*.png"))
+    saved_vars = {os.path.basename(f).split("_")[1] for f in pngs}
+    assert saved_vars == {"ptemp", "sal", "pdens", "temp", "sndspeed", "mld", "cgeo"}
+    for f in pngs:
+        assert os.path.getsize(f) > 0
 
 
 def _write_bull_workflow_cfg(woomtmpdir):
