@@ -86,4 +86,10 @@ def main_decode():
 
     with armoor_cli_session(args, (args.ifmt, args.platform)):
         ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-        save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
+        # "threads" deadlocks intermittently: xarray's netCDF4 write lock is
+        # a CombinedLock over several process-global locks, and multiple
+        # dask worker threads doing netCDF I/O concurrently can block on
+        # each other acquiring them (confirmed via py-spy on stuck
+        # armoor-decode processes; "synchronous" -- single thread, no lock
+        # contention possible -- doesn't).
+        save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")

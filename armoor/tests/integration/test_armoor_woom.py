@@ -1,5 +1,6 @@
 import logging, os
 import time, shutil
+import threading
 
 import woom.ext as wext
 import woom.tasks as wtasks
@@ -61,9 +62,27 @@ def test():
                                 skip_tasks.append(task_name)
         if skip_tasks:
             print(f"Skipping tasks with existing artifacts: {skip_tasks}")
+        # A stuck task must not hang the test forever. woom.run() can block
+        # synchronously inside a dependency wait (job.wait() in
+        # BackgroundJobManager.submit), so the watchdog has to run
+        # concurrently with run() itself, not just around the polling loop
+        # that follows it -- killing the stuck job's process is what unblocks
+        # that wait() from another thread.
+        MAX_WAIT = int(os.environ.get("WOOM_TEST_MAX_WAIT", 1800))  # seconds
+        timed_out = threading.Event()
+
+        def _watchdog():
+            if not timed_out.wait(MAX_WAIT):
+                print(f"Timed out after {MAX_WAIT}s, killing still-running tasks")
+                workflow.kill()
+                timed_out.set()
+
+        watchdog_thread = threading.Thread(target=_watchdog, daemon=True)
+        watchdog_thread.start()
         try:
             workflow.run(skip=skip_tasks or None)
-        finally:  
+        finally:
+            timed_out.set()  # tell the watchdog we're done, no need to kill anything more
             isend = False
             while isend == False:
                 time.sleep(2.0)

@@ -63,7 +63,13 @@ def process_filters(args, filters_config):
     with armoor_cli_session(args, (args.ifmt, args.platform)):
         with open_decode_materialized(args.fins, args.ifmt, platform=args.platform) as ds:
             ds = ds.filters.combined(filters_config)
-            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
+            # "threads" deadlocks intermittently: xarray's netCDF4 write lock
+            # is a CombinedLock over several process-global locks, and
+            # multiple dask worker threads doing netCDF I/O concurrently can
+            # block on each other acquiring them (confirmed via py-spy on
+            # stuck armoor-filters-* processes; "synchronous" -- single
+            # thread, no lock contention possible -- doesn't).
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")
 
 
 def get_parser_filters_time():
