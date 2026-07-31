@@ -17,7 +17,8 @@ from armoor.cli.log import main_setup_logging
 logger = logging.getLogger(__name__)
 
 
-def add_comp_parser_arguments(parser, default_level="info"):
+def add_comp_parser_arguments(parser, default_level="info", has_coloc=True,
+                               default_jsonfile='ncs_{func_comp}.json'):
     parser.add_argument(
         'metazones',
         type=comma_separated,
@@ -39,22 +40,24 @@ def add_comp_parser_arguments(parser, default_level="info"):
         '--jsonfile',
         type=Path,
         help="Path of the output json file.",
-        default='ncs_{func_comp}.json'
+        default=default_jsonfile
         )
     parser.add_argument(
         '--filters-only',
         action='store_true',
         help="Use for exiting after filters processes.",
         )
-    parser.add_argument(
-        '--coloc-only',
-        action='store_true',
-        help="Use for exiting after colocation processes.",
-        )
+    if has_coloc:
+        parser.add_argument(
+            '--coloc-only',
+            action='store_true',
+            help="Use for exiting after colocation processes.",
+            )
+    stages = "filter+colocation+output" if has_coloc else "filter+output"
     parser.add_argument(
         '--no-plot',
         action='store_true',
-        help="Run filter+colocation+output but skip the plot stage.",
+        help=f"Run {stages} but skip the plot stage.",
         )
     parser.add_argument(
         '--plot-only',

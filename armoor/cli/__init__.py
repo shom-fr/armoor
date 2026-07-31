@@ -13,6 +13,7 @@ HPC_DEFAULTS = {
     "time_orch"     : "12:00:00",
     "time_load"     : "02:00:00",
     "time_comp"     : "02:00:00",
+    "time_output"   : "02:00:00",
     "time_plot"     : "01:00:00",
     "time_merge"    : "00:05:00",
     "ncpus"         : 1,

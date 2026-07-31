@@ -232,114 +232,220 @@ def get_parser_data():
         )
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
-    parser.add_argument(
-        'metazones',
-        type=comma_separated,
-        help="List of metazone to be processed."
-        )
-    parser.add_argument(
-        'cfgfile',
-        type=Path,
-        help="Path of the configuration file."
-        )
-    parser.add_argument(
-        '-m', '--metazonesfile',
-        type=Path,
-        help="Path of the configuration file dedicated to the description of metazones.",
-        default="metazones.cfg"
-        )
-    add_tbound_parser_arguments(parser)
-    parser.add_argument(
-        '--jsonfile',
-        type=Path,
-        help="Path of the output json file.",
-        default='ncs_filter.json'
-        )
-    parser.add_argument(
-        '--filters-only',
-        action='store_true',
-        help="Use for exiting after filters processes.",
-        )
+    add_comp_parser_arguments(parser, has_coloc=False, default_jsonfile='ncs_filter.json')
 
     return parser
 
-def main_data():
-    """Process data over metazones."""
+
+def main_data_pipeline(cfgfile, metafile, metazones, jsonfile,
+                        ofilter, no_plot, plot_only, input_json,
+                        kw_dask, data_args={}, load_only=None, input_zarrs=None):
+    """Run (a stage of) the armoor-data pipeline: load, output, plot.
+
+    Also serves as the per-wave worker entry point for the HPC pipeline
+    (`armoor.cli.hpc.run_hpc`) via the `load_only`/`input_zarrs`/`no_plot`/
+    `plot_only` arguments — same contract as `main_comp`, minus the
+    colocation stage (armoor-data has no coloc step; any interpolation
+    happens inside `load_datasets` itself, same as outside HPC mode).
+
+    Parameters
+    ----------
+    cfgfile : Path
+        Path to the data.ini-schema data/outputs configuration file.
+    metafile : Path
+        Path to the metazones.ini-schema metazone configuration file.
+    metazones : list of str
+        Metazone names to process.
+    jsonfile : Path
+        Output path for the final JSON listing generated files.
+    ofilter : bool
+        If True, stop after loading and write netcdf outputs.
+    no_plot : bool
+        If True, skip plotting (HPC Wave-1 mode: compute outputs only).
+    plot_only : str or None
+        If set, skip load/output and only plot this otype from
+        `input_json` (HPC Wave-3 mode).
+    input_json : Path or None
+        Zarr-outputs JSON to read from when `plot_only` is set.
+    kw_dask : tuple
+        Dask configuration arguments (n_workers, ...).
+    data_args : dict, optional
+        Extra arguments (currently just ``tbound``).
+    load_only : str or None, optional
+        If set, only load this dataset key for all metazones and write its
+        zarr paths JSON (HPC Wave-0 mode).
+    input_zarrs : list of str or None, optional
+        Pre-loaded dataset JSONs to read from instead of calling
+        `load_datasets` (HPC Wave-1 mode).
+
+    Returns
+    -------
+    None
+        Results are written to `jsonfile` (and to zarr/netcdf/png files on
+        disk); nothing is returned.
+    """
     from xoa.cfgm import ConfigManager
     from armoor.base.io import zarrs2netcdfs
     from armoor.base.misc import dict_to_list
-    from armoor.cli.io import get_dask_args, configure_dask_scheduler
-    from armoor.data.load import load_datasets
-    from armoor.data.output import main_output as output_data
-    _init_heavy()
+    from armoor.cli.io import configure_dask_scheduler
+    from armoor.data.load import load_datasets, StagedDataset
 
-    # Get parser
-    parser = get_parser_data()
-
-    # Parse
-    args = parser.parse_args()
-
-    kw_dask = get_dask_args(args)
     configure_dask_scheduler(kw_dask)
 
-    # Setup logging
-    main_setup_logging(args)
+    start_time = time.time()
 
-    # Load configuration
-    if not args.cfgfile.exists():
-        raise ArmoorError(
-            f"File not found: {args.cfgfile}."
+    cfg = ConfigManager(DATA_INI).load(str(cfgfile))
+
+    if not cfg:
+        raise ArmoorError("Data section empty: Check [data] in your cfgfile.")
+
+    ofmt = cfg["outputs"].get("fmt", [])
+    jsonfile = str(jsonfile).format(func_comp="data")
+
+    # --- plot-only mode: skip the full pipeline, read outputs from JSON ---
+    if plot_only is not None:
+        if input_json is None:
+            raise ArmoorError("--plot-only requires --input-json.")
+        if "png" not in ofmt:
+            logger.warning("--plot-only requested but 'png' not in outputs fmt — nothing to do.")
+            return
+        from armoor.data.plot import main_plot as plot_data
+        metas = ConfigManager(METAZONES_INI).load(str(metafile))
+        metazones = check_metazones_in(metazones, metas, **data_args)
+        with open(input_json) as f:
+            zarr_outputs = json.load(f)
+        if plot_only not in zarr_outputs:
+            logger.warning(f"otype '{plot_only}' not found in {input_json} — skipping.")
+            return
+        png_paths = plot_data(
+            {plot_only: zarr_outputs[plot_only]}, metazones, cfg.get("outputs"), kw_dask=kw_dask
             )
+        if png_paths:
+            _write_json(jsonfile, png_paths)
+            logger.info(f"Find the list of generated files in: {jsonfile}")
+        elapsed = time.time() - start_time
+        logger.info(f"Execution time: {elapsed:.1f} seconds")
+        return
 
-    cfg = ConfigManager(DATA_INI).load(str(args.cfgfile))
-    metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
+    # --- Normal pipeline ---
+    metas = ConfigManager(METAZONES_INI).load(str(metafile))
+    metazones = check_metazones_in(metazones, metas, **data_args)
 
-    metazones = check_metazones_in(
-       args.metazones,
-       metazones,
-       tbound=args.tbound
-       )
+    if load_only is not None:
+        # Wave 0 mode: load a single dataset for all metazones.
+        dataset_cfg = {load_only: cfg["data"][load_only]}
+        logger.info(f"Wave 0: loading dataset '{load_only}' × {len(metazones)} metazone(s)")
+        ncouts = load_datasets(dataset_cfg, metazones, "data")
+        mz_paths = {}
+        for nc in (ncouts or []):
+            if nc is None:
+                continue
+            mz_name = getattr(nc, "metazone", None) or Path(nc).parts[2]
+            mz_paths.setdefault(mz_name, []).append(str(Path(nc).resolve()))
+        _write_json(jsonfile, mz_paths)
+        return
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
 
-    zarrs = load_datasets(cfg["data"], metazones, "data")
-
-    if args.filters_only:
-
-        ncs = zarrs2netcdfs(zarrs)
-
-        with open(args.jsonfile, 'w') as f:
-            json.dump(ncs, f, indent=4)
-
-        logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
-
+    if input_zarrs is not None:
+        # Wave 1 mode: read pre-loaded zarrs, skip load_datasets
+        mz_name = list(metazones.keys())[0]
+        zarr = []
+        for zarr_json in input_zarrs:
+            try:
+                with open(zarr_json) as f:
+                    paths = json.load(f)
+                zarr.extend(
+                    StagedDataset(p, metazone=mz_name, comp_func="data", stage="load")
+                    for p in paths.get(mz_name, [])
+                    )
+            except FileNotFoundError:
+                logger.warning(f"Input zarr JSON not found (skipping): {zarr_json}")
     else:
+        zarr = load_datasets(cfg["data"], metazones, "data")
 
-        outputs_cfg = cfg.get("outputs", {})
-        zarr_outputs = output_data(zarrs, metazones, outputs_cfg.copy())
+    if ofilter:
+        zarr = [str(z) for z in zarr]
+        ncs_outputs = zarrs2netcdfs(zarr)
+        _write_json(jsonfile, ncs_outputs)
+        return
 
-        ofmt = outputs_cfg.get("fmt", [])
+    from armoor.data.output import main_output as output_data
+    zarr_outputs = output_data(zarr, metazones, cfg.get("outputs", {}).copy())
 
-        if not zarr_outputs:
-            logger.info(
-                "No output sub-section defined. "
-                "Interpolated data is available in data/interp/"
-            )
-        else:
-            if "png" in ofmt:
-                from armoor.data.plot import main_plot as plot_data
-                plot_data(zarr_outputs, metazones, outputs_cfg, kw_dask=kw_dask)
+    if not zarr_outputs:
+        logger.info(
+            "No output sub-section defined. "
+            "Interpolated data is available in data/interp/"
+        )
+        return
 
-            zarr_outputs = dict_to_list(zarr_outputs)
+    if no_plot:
+        # HPC sub-job: save nested dict {otype: {mz: [paths]}} for merge step
+        _write_json(jsonfile, zarr_outputs)
+    else:
+        png_paths = []
+        if "png" in ofmt:
+            from armoor.data.plot import main_plot as plot_data
+            png_paths = plot_data(
+                zarr_outputs, metazones, cfg.get("outputs"), kw_dask=kw_dask
+                )
 
-            if "zarr" in ofmt:
-                with open(args.jsonfile, 'w') as f:
-                    json.dump(zarr_outputs, f, indent=4)
+        zarr_outputs = dict_to_list(zarr_outputs)
+        if "png" in ofmt and png_paths:
+            _write_json(jsonfile, png_paths)
+        elif "netcdf" in ofmt:
+            ncs_outputs = zarrs2netcdfs(zarr_outputs)
+            _write_json(jsonfile, ncs_outputs)
+        elif "zarr" in ofmt:
+            _write_json(jsonfile, zarr_outputs)
 
-            if "netcdf" in ofmt:
-                ncs_outputs = zarrs2netcdfs(zarr_outputs)
-                with open(args.jsonfile, 'w') as f:
-                    json.dump(ncs_outputs, f, indent=4)
+    logger.info(f"Find the list of generated files in: {jsonfile}")
+
+    elapsed = time.time() - start_time
+    logger.info(f"Execution time: {elapsed:.1f} seconds")
+
+
+def _dispatch_data(parser):
+    """Common dispatch logic for the armoor-data entry point."""
+    _init_heavy()
+    args = parser.parse_args()
+    main_setup_logging(args)
+
+    if not args.cfgfile.exists():
+        raise ArmoorError(f"File not found: {args.cfgfile}.")
+
+    kw_dask = get_dask_args(args)
+    data_args = {"tbound": args.tbound}
+
+    hosts_cfg = getattr(args, "hosts_cfg", None)
+    scheduler, host = _detect_scheduler(hosts_cfg)
+    if scheduler != "background" \
+            and not args.filters_only \
+            and not args.no_plot \
+            and args.plot_only is None \
+            and getattr(args, "load_only", None) is None:
+        from armoor.cli.hpc import run_hpc
+        import sys
+        run_hpc(host, scheduler, args.cfgfile, args.metazonesfile, args.metazones,
+                "data", args.jsonfile, args.filters_only, False,
+                data_args, kw_dask, sys.argv, ini_schema=DATA_INI, stage1_label="output")
+        return
+
+    main_data_pipeline(
+        args.cfgfile, args.metazonesfile, args.metazones, args.jsonfile,
+        args.filters_only, args.no_plot, args.plot_only, args.input_json,
+        kw_dask, data_args=data_args,
+        load_only=getattr(args, "load_only", None),
+        input_zarrs=getattr(args, "input_zarrs", None),
+        )
+
+
+def main_data():
+    """Process data over metazones."""
+    _init_heavy()
+    _dispatch_data(get_parser_data())
+
 
 def _write_json(path, data):
     """Serialize data to JSON, converting Path objects to strings."""
@@ -649,7 +755,7 @@ def _dispatch_comp(func_comp, parser, kw_comp_factory):
         import sys
         run_hpc(host, scheduler, args.cfgfile, args.metazonesfile, args.metazones,
                 func_comp, args.jsonfile, args.filters_only, args.coloc_only,
-                kw_comp, kw_dask, sys.argv)
+                kw_comp, kw_dask, sys.argv, ini_schema=COMP_INI, stage1_label="comp")
         return
 
     main_comp(

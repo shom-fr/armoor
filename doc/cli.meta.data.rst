@@ -150,6 +150,47 @@ Workflow
     3. Compute outputs --> Zarr files stored at ``./data/output/{metazone.name}/{data.name}/{otype}/``.
     4. (if png format is given) Plots --> png files stored at ``./data/plot/{metazone.name}/``.
 
+Pipeline control
+-----------------
+
+By default all stages run in sequence: *load (+ interpolation) → output →
+plot*. ``armoor-data`` has no colocation stage (unlike ``armoor-comp-*``).
+Each flag short-circuits the pipeline after the named stage:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Flag
+     - Effect
+   * - ``--filters-only``
+     - Stop after loading (and interpolating).  Zarr files are written to
+       ``data/interp/{metazone}/{data.name}/``.
+   * - ``--no-plot``
+     - Run load + output but skip the plot stage.
+   * - ``--plot-only OTYPE``
+     - Regenerate plots for a single output type from existing zarr files.
+       Requires ``--input-json``.
+
+HPC options
+-----------
+
+``--hosts-cfg PATH``
+    Path to a *woom* ``hosts.cfg`` file.  When provided, armoor submits
+    pipeline stages as Slurm/PBS jobs (Wave 0 → Wave 3) instead of running
+    them in the foreground -- same mechanism as ``armoor-comp-*``, minus the
+    colocation wave.  Walltimes/queue/cpu counts are configured via the
+    ``[hpc]`` section of ``data.ini`` above.
+
+``--load-only DATASET_KEY``
+    *Internal — used by HPC Wave 0 jobs.*  Load (and interpolate) a single
+    dataset for all metazones and write zarr paths to ``--jsonfile``.
+
+``--input-zarrs JSON,...``
+    *Internal — used by HPC Wave 1 jobs.*  Comma-separated list of
+    zarr-paths JSON files produced by Wave 0.  When provided, the load
+    stage is skipped.
+
 
 .. argparse::
     :module: armoor.cli.main
