@@ -539,7 +539,12 @@ def open_decode_materialized(fins, ifmt, platform=None):
 
     ds = open_decode(fins, ifmt, platform=platform)
     if ifmt != 'armoor':
-        save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="threads")
+        # "threads" deadlocks intermittently: xarray's netCDF4/zarr write
+        # lock is a CombinedLock over several process-global locks, and
+        # multiple dask worker threads doing I/O concurrently can block on
+        # each other acquiring them; "synchronous" (single thread, no lock
+        # contention possible) doesn't.
+        save_output(ds, "tmp.zarr", ofmt="zarr", scheduler="synchronous")
         ds.close()
         ds = xr.open_dataset("tmp.zarr")
     try:
@@ -672,6 +677,7 @@ def armoor_cli_session(args, *ifmt_platform_pairs):
         `(args.ifmt, args.platform)` or, for ref/prod pipelines,
         `(args.ref_ifmt, args.ref_platform), (args.ifmt, args.platform)`.
     """
+    import dask.config
     from dask.distributed import Client, LocalCluster
     from armoor.base.io import setup_dask_client
     from armoor.data.open_decode import register_cf
@@ -684,4 +690,24 @@ def armoor_cli_session(args, *ifmt_platform_pairs):
     kw_dask = get_dask_args(args)
     with LocalCluster(**setup_dask_client(*kw_dask)) as cluster:
         with Client(cluster):
-            yield
+            # A live distributed.Client makes itself dask's ambient default
+            # scheduler (dask.config['scheduler'] == 'dask.distributed') for
+            # as long as it exists -- confirmed empirically, it overwrites
+            # any 'scheduler' config value set before entering this `with`.
+            # armoor.base.io.compute() nonetheless always runs its actual
+            # write graphs through the plain local scheduler (bare
+            # dask.compute(), no scheduler= reaching xarray). Left as-is,
+            # xarray.backends.locks.get_write_lock() ambiently detects the
+            # Client and hands a dask.distributed.Lock to a netCDF critical
+            # section that the local scheduler executes; that lock's
+            # acquire() then waits forever on a distributed semaphore that
+            # nothing will ever release (no local worker holds the matching
+            # distributed lease to release it) -- the exact deadlock seen in
+            # test_armoor_woom.py hangs (diagnosed via py-spy on the stuck
+            # armoor-filters-oceanvars process). Re-asserting the local
+            # scheduler *inside* the Client context, for the whole command,
+            # makes get_write_lock()'s resolution match how the graph is
+            # actually executed.
+            scheduler_name = "processes" if kw_dask[1] else "threads"
+            with dask.config.set({"scheduler": scheduler_name}):
+                yield

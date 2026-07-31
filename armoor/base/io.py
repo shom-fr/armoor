@@ -600,7 +600,15 @@ def zarrs2netcdfs(fins):
 
     delayed_results = [dask.delayed(_convert_single)(fin) for fin in fins if fin]
     if delayed_results:
-        fouts = list(dask.compute(*delayed_results))
+        # "threads" (the ambient default set by configure_dask_scheduler())
+        # deadlocks intermittently here: to_netcdf() takes xarray's netCDF4
+        # write lock, a CombinedLock over several process-global locks, and
+        # concurrent dask worker threads each writing a different file can
+        # block on each other acquiring them (same failure mode fixed in
+        # save_output(), see armoor/cli/{filters,interp,decode}.py).
+        # "synchronous" -- single thread, no lock contention possible --
+        # doesn't have this problem.
+        fouts = list(dask.compute(*delayed_results, scheduler="synchronous"))
     else:
         fouts = []
     return fouts

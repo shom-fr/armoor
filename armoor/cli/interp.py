@@ -121,7 +121,13 @@ def main_interp_time():
             if ("depth" in ds.coords) and ("time" in ds["depth"].dims):
                 ds = ds.reset_coords("depth")
             ds = ds.interp.tfreq(args.tfreq)
-            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
+            # "threads" deadlocks intermittently: xarray's netCDF4 write lock
+            # is a CombinedLock over several process-global locks, and
+            # multiple dask worker threads doing netCDF I/O concurrently can
+            # block on each other acquiring them (confirmed via py-spy on
+            # stuck armoor-interp-* processes; "synchronous" -- single
+            # thread, no lock contention possible -- doesn't).
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")
 
 
 def get_parser_interp_horizontal():
@@ -333,7 +339,13 @@ def main_interp_horizontal():
                     boundary=args.coarsen_boundary,
                     method=args.coarsen_method,
                 )
-            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
+            # "threads" deadlocks intermittently: xarray's netCDF4 write lock
+            # is a CombinedLock over several process-global locks, and
+            # multiple dask worker threads doing netCDF I/O concurrently can
+            # block on each other acquiring them (confirmed via py-spy on
+            # stuck armoor-interp-* processes; "synchronous" -- single
+            # thread, no lock contention possible -- doesn't).
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")
 
 
 def get_parser_interp_vertical():
@@ -460,4 +472,10 @@ def main_interp_vertical():
                 ds = ds_chunked.interp.vertical(vname, vlevel)
             elif vfreq:
                 ds = ds_chunked.interp.vfreq(vname, vfreq)
-            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
+            # "threads" deadlocks intermittently: xarray's netCDF4 write lock
+            # is a CombinedLock over several process-global locks, and
+            # multiple dask worker threads doing netCDF I/O concurrently can
+            # block on each other acquiring them (confirmed via py-spy on
+            # stuck armoor-interp-* processes; "synchronous" -- single
+            # thread, no lock contention possible -- doesn't).
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")
