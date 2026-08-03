@@ -24,6 +24,10 @@ CMAP_VARS = {
     "v": "cmo.delta",
     "cgeo": "cmo.delta",
     "cspeed": "cmo.speed",
+    "t2m": "cmo.thermal",
+    "si10": "cmo.speed",
+    "r2": "cmo.rain",
+    "prmsl": "cmo.dense",
     }
 
 MINMAX_VARS = {
@@ -39,4 +43,8 @@ MINMAX_VARS = {
     "v": "rel",
     "cgeo": "rel",
     "cspeed": "pos",
+    "t2m": "pos",
+    "si10": "pos",
+    "r2": "pos",
+    "prmsl": "pos",
     }
