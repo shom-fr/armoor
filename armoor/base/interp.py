@@ -3,6 +3,7 @@
 # them) to avoid the significant NFS stat overhead on HPC cluster filesystems
 # when the whole armoor package is imported at startup.
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import re
 import numpy as np
@@ -220,6 +221,44 @@ def _crop_to_bbox(ds, coords, margin_deg=1.0):
         slices[dim] = slice(max(idx[0] - 1, 0), idx[-1] + 2)
     return ds.isel(**slices)
 
+def _grid2loc_var(var, ds, dsi, loc):
+    """Interpolate one variable at `loc`'s scattered points.
+
+    Split out from grid2loc() so each variable's (materialize + interpolate)
+    work -- the actual cost of grid2loc(), see xoa.interp.grid2loc's
+    ``da_tmp.values`` -- can run concurrently across variables instead of
+    blocking one after another (that serial loop was leaving allocated
+    CPUs idle: dask's own scheduler only parallelizes within one
+    variable's chunks, and xoa's interpolation core runs single-threaded
+    on already-materialized numpy).
+    """
+    import xoa.regrid as xregrid
+    da = ds[var]
+    if ("time" in da.dims) and ("z" in da.dims):
+        da = xregrid.grid2loc(da, loc)
+        dims = ["time", "z", "npts"]
+        da = da.transpose(*dims)
+        arr = da.data
+        del da
+        coords = dict(time=dsi.time, **loc.coords)
+    elif ("time" in da.dims) and ("z" not in da.dims):
+        da = xregrid.grid2loc(da, loc)
+        dims = ["time", "npts"]
+        da = da.transpose(*dims)
+        arr = da.data
+        del da
+        coords = dict(time=dsi.time, **loc.coords)
+    else:
+        arr = xregrid.grid2loc(dsi[var], loc)
+        dims = ["npts"]
+        coords = dict(**loc.coords)
+        if isinstance(arr, xr.DataArray):
+            arr = arr.data
+    dsvar = xr.Dataset(data_vars={var: (dims, arr)}, coords=coords)
+    dsvar[var] = dsvar[var].assign_attrs(**dsi[var].attrs)
+    return dsvar
+
+
 def grid2loc(ds, coords: [(float, float)]):
     """Interpolate a dataset at specific coordinates.
 
@@ -235,7 +274,7 @@ def grid2loc(ds, coords: [(float, float)]):
     xarray.Dataset, xarray.Dataset
         Dataset with elements located at specific coordinates.
     """
-    import xoa.regrid as xregrid
+    import dask
     lat, lon = zip(*coords)
     loc = xr.Dataset(
         coords={
@@ -251,35 +290,24 @@ def grid2loc(ds, coords: [(float, float)]):
     if "depth" in dsi.coords:
         if "time" in dsi.depth.dims:
             dsi = dsi.reset_coords("depth")
-    dss = []
     vars_grid2loc = [
         var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)
         ]
-    for var in vars_grid2loc:
-        da = ds[var]
-        if ("time" in da.dims) and ("z" in da.dims):
-            da = xregrid.grid2loc(da, loc)
-            dims = ["time", "z", "npts"]
-            da = da.transpose(*dims)
-            arr = da.data
-            del da
-            coords = dict(time=dsi.time, **loc.coords)
-        elif ("time" in da.dims) and ("z" not in da.dims):
-            da = xregrid.grid2loc(da, loc)
-            dims = ["time", "npts"]
-            da = da.transpose(*dims)
-            arr = da.data
-            del da
-            coords = dict(time=dsi.time, **loc.coords)
-        else:
-            arr = xregrid.grid2loc(dsi[var], loc)
-            dims = ["npts"]
-            coords = dict(**loc.coords)
-            if isinstance(arr, xr.DataArray):
-                arr = arr.data
-        dsvar = xr.Dataset(data_vars={var: (dims, arr)}, coords=coords)
-        dsvar[var] = dsvar[var].assign_attrs(**dsi[var].attrs)
-        dss.append(dsvar)
+    # One thread per variable, capped at the --dask-nworkers the caller
+    # already configured (armoor.cli.io.configure_dask_scheduler) -- reuses
+    # the existing knob instead of adding a new one. Threads, not
+    # processes: each variable's work is dominated by dask chunk
+    # computation and numpy/compiled interpolation, both of which release
+    # the GIL, and threads avoid having to pickle `ds`/`dsi` across
+    # processes.
+    n_workers = max(dask.config.get('num_workers', default=1), 1)
+    logger.debug(
+        f"grid2loc: {len(vars_grid2loc)} variable(s), n_workers={n_workers}"
+        )
+    with ThreadPoolExecutor(max_workers=n_workers) as pool:
+        dss = list(pool.map(
+            lambda var: _grid2loc_var(var, ds, dsi, loc), vars_grid2loc
+            ))
     dso = xr.merge(dss)
     if "depth" in dso:
         dso = dso.set_coords("depth")
