@@ -2,6 +2,8 @@ import gc
 import logging
 import re
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 
@@ -1097,23 +1099,40 @@ class OutputProcessor:
         List of saved file paths
         """
         logger.info("Save interpolated data")
-        fouts = []
+
+        # One thread per dataset-to-save, capped at --dask-nworkers and at
+        # the number of datasets (same pattern as grid2loc()/
+        # process_datasets()). With no vlevel/vrange configured,
+        # _apply_range_processing() falls back to one dataset per native z
+        # level -- dozens for a source like WOA18 (~57 levels) -- and each
+        # was being written to its own zarr file one at a time: small,
+        # independent, I/O-bound writes that used to run fully serially.
+        import dask
+        n_workers = max(min(dask.config.get('num_workers', default=1), len(dss)), 1)
+
+        def _save_one(dsprod):
+            if section_name is not None:
+                dirout = Path(
+                    f"data/interp/{metazone}/{section_name}/{dsprod.attrs['data_name']}"
+                    )
+            else:
+                dirout = Path(f"data/interp/{metazone}/{dsprod.attrs['data_name']}")
+            dirout.mkdir(parents=True, exist_ok=True)
+
+            t0 = time.perf_counter()
+            fout_prod = save_datasets(
+                dsprod, dirout, dsprod.attrs['data_name'], ofmt
+            )
+            logger.debug(
+                f"save_datasets({dsprod.attrs['data_name']!r}) took "
+                f"{time.perf_counter() - t0:.1f}s"
+                )
+            dsprod.close()
+            return fout_prod
 
         try:
-            for ids, dsprod in enumerate(dss):
-                if section_name is not None:
-                    dirout = Path(
-                        f"data/interp/{metazone}/{section_name}/{dsprod.attrs['data_name']}"
-                        )
-                else:
-                    dirout = Path(f"data/interp/{metazone}/{dsprod.attrs['data_name']}")
-                dirout.mkdir(parents=True, exist_ok=True)
-
-                fout_prod = save_datasets(
-                    dsprod, dirout, dsprod.attrs['data_name'], ofmt
-                )
-                fouts.append(fout_prod)
-                dsprod.close()
+            with ThreadPoolExecutor(max_workers=n_workers) as pool:
+                fouts = list(pool.map(_save_one, dss))
         finally:
             del dss
 
@@ -1286,18 +1305,31 @@ class OutputProcessor:
         concat_dim = oparams.get("concat")
 
         fins_dict_sorted = sort_ncs_by_suffix(fouts, sort_dim=sort_dim)
-        output_files = []
 
-        for name_sort, fins_sorted in fins_dict_sorted.items():
+        # One thread per sorted group, capped at --dask-nworkers and at the
+        # number of groups (same pattern as grid2loc()/process_datasets()/
+        # _save_processed_datasets()). A metazone with e.g. one otype
+        # output per native z level (see _apply_range_processing) can have
+        # dozens of independent groups here, each reading its own input
+        # files and writing its own output path -- these used to run one
+        # at a time.
+        import dask
+        n_workers = max(
+            min(dask.config.get('num_workers', default=1), len(fins_dict_sorted)), 1
+            )
+
+        def _process_one(item):
+            name_sort, fins_sorted = item
             logger.info(f"Processing sorted group: {name_sort}")
-
-            output_file = self._process_sorted_group(
+            return self._process_sorted_group(
                 fins_sorted, oparams, mparams, output, metazone, oname,
                 name_sort, prod_name, concat_dim, section_name=section_name,
             )
 
-            if output_file:
-                output_files.append(output_file)
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            output_files = [
+                f for f in pool.map(_process_one, fins_dict_sorted.items()) if f
+                ]
 
         return output_files
 
