@@ -47,6 +47,7 @@ class OceanVars(MethodRegistry):
         "div": "sel_divergence",
         "okuboweiss": "sel_okuboweiss",
         "relvort": "sel_relvort",
+        "bathy": "sel_bathy",
     }
 
     def __init__(self, ds):
@@ -59,6 +60,12 @@ class OceanVars(MethodRegistry):
         if method_name is None:
             raise ArmoorError(f"Unknown ocean variable '{varname}'")
         return self.call(method_name)
+
+    def sel_bathy(self):
+        if "bathy" in self.ds:
+            return self.ds["bathy"]
+        else:
+            logger.warning("bathy not in dataset")
 
     def sel_current_direction(self):
         if "cdir" in self.ds:
