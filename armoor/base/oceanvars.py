@@ -48,6 +48,7 @@ class OceanVars(MethodRegistry):
         "okuboweiss": "sel_okuboweiss",
         "relvort": "sel_relvort",
         "bathy": "sel_bathy",
+        "ssh": "sel_ssh",
     }
 
     def __init__(self, ds):
@@ -60,6 +61,13 @@ class OceanVars(MethodRegistry):
         if method_name is None:
             raise ArmoorError(f"Unknown ocean variable '{varname}'")
         return self.call(method_name)
+
+    def sel_ssh(self):
+        if "ssh" in self.ds:
+            return self.ds["ssh"]
+        else:
+            logger.warning("ssh not in dataset")
+
 
     def sel_bathy(self):
         if "bathy" in self.ds:
