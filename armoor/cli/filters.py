@@ -11,6 +11,7 @@ import dask.config
 import armoor  # noqa: F401 — registers ds.filters accessor
 from armoor.base.io import ArmoorArgumentHelpFormatter
 from armoor.base.misc import parse_date, parse_hours, is_dict_empty, parse_coords
+from armoor.base.oceanvars import OceanVars
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
@@ -450,7 +451,8 @@ def get_parser_filters_oceanvars():
     >>> args = parser.parse_args(['ptemp', 'sal'])
     """
     parser = ArgumentParser(
-        description="Apply ocean variables filters over a list of input files.",
+        description="Apply ocean variables filters over a list of input files. \n"
+        f"Available varnames are : {list(OceanVars._VARNAME_METHODS.keys())}",
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)

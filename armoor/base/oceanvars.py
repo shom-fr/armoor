@@ -33,22 +33,24 @@ class OceanVars(MethodRegistry):
     _dispatch_label = "Ocean variable"
 
     #: varname (as used in comp_vars/oceanvars filters) -> sel_* method name.
+    # Note that not all functions defined hereafter are stored in _VARNAME_METHODS (ex: cgeo)
     _VARNAME_METHODS = {
+        "ssh": "sel_ssh",
+        "bathy": "sel_bathy",
+        "cdir": "sel_current_direction",
+        "cspeed": "sel_current_speed",
+        "u": "sel_current_zonal",
+        "v": "sel_current_meridional",
         "ptemp": "sel_ptemp",
         "temp": "sel_temp",
         "sal": "sel_sal",
-        "sndspeed": "sel_sndspeed",
+        "pres": "sel_pres",
         "pdens": "sel_pdens",
-        "u": "sel_current_zonal",
-        "v": "sel_current_meridional",
-        "cdir": "sel_current_direction",
-        "cspeed": "sel_current_speed",
+        "sndspeed": "sel_sndspeed",
         "mld": "sel_mld",
         "div": "sel_divergence",
         "okuboweiss": "sel_okuboweiss",
         "relvort": "sel_relvort",
-        "bathy": "sel_bathy",
-        "ssh": "sel_ssh",
     }
 
     def __init__(self, ds):
