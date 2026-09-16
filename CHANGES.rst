@@ -105,6 +105,14 @@ New features
 - Added ``bathy`` and ``ssh`` ocean variables
   (``OceanVars.sel_bathy``/``sel_ssh``).
 
+- Added three ``armoor-data`` eddy-detection plot types: ``map_eddies``
+  (eddy contours per timestep), ``map_occurence_eddies`` (detection
+  occurrence over a grid box) and ``histogram_eddies``.
+
+- Exposed ``pres`` (pressure) as a selectable ``oceanvars`` variable
+  (``OceanVars.sel_pres``), previously internal-only.
+  ``armoor-filters-oceanvars --help`` now lists all available varnames.
+
 Breaking changes
 ----------------
 
