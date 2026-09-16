@@ -94,11 +94,34 @@ New features
   ``authentication-info`` manage GitLab issues used to report and track
   anomalies, ported onto the current ``get_parser_X``/``main_X`` CLI pattern.
 
+- Added HPC job submission support to ``armoor-data`` (``--hosts-cfg``),
+  mirroring ``armoor-comp-*``'s wave-based Slurm/PBS pipeline but without a
+  colocation wave. New ``data.ini`` ``[hpc]`` section.
+
+- Registered ``t2m``, ``si10``, ``r2`` and ``prmsl`` in
+  ``armoor.base.CMAP_VARS``/``MINMAX_VARS`` for sensible default colormap
+  and min/max scaling in plots.
+
+- Added ``bathy`` and ``ssh`` ocean variables
+  (``OceanVars.sel_bathy``/``sel_ssh``).
+
 Breaking changes
 ----------------
 
 Deprecations
 ------------
+
+Refactoring
+-----------
+
+- ``armoor.base.interp.grid2loc`` now interpolates variables in parallel
+  (one thread each, capped at ``--dask-nworkers``) instead of serially,
+  since xoa's interpolation core runs single-threaded on already-
+  materialized numpy.
+
+- ``armoor.data.output.OutputProcessor`` similarly parallelizes saving
+  interpolated datasets and processing sorted output groups, previously
+  done one at a time.
 
 Bug fixes
 ---------
@@ -112,6 +135,13 @@ Bug fixes
   nested sections (e.g. ``proxies``) as a bare string, which made the
   resulting ``auth.cfg`` fail re-validation on the very next run.
 
+- Fixed two intermittent deadlocks in the ``woom`` integration test suite
+  (``test_armoor_woom.py``), both caused by contention on xarray's netCDF4
+  write lock. ``save_output``/``zarrs2netcdfs`` now use the ``synchronous``
+  dask scheduler for netCDF I/O, and ``armoor_cli_session`` re-asserts the
+  local scheduler for the whole command. Also adds a test watchdog thread
+  so a stuck job can't hang the suite forever.
+
 Documentation
 -------------
 
@@ -119,6 +149,10 @@ Documentation
   used the extension for a while, but ``make html`` failed with
   ``Could not import extension nbsphinx`` on any environment that only
   installs ``.[doc]`` (e.g. CI).
+
+- Fixed remaining Sphinx build warnings and added missing modules to
+  ``doc/api.rst``. Documented the ``[outputs]`` section of
+  ``armoor-comp-*``/``armoor-data`` config files.
 
 2026.7.0
 ========
