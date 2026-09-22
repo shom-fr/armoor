@@ -305,6 +305,52 @@ class CompSst(Comparison):
         return dsref_list, dsprod_list
 
 
+class CompAlti(Comparison):
+    """Comparison of satellite altimetry against products."""
+
+    name = "comp_alti"
+    title = "altimetry"
+    metazone_params = [
+        "tbound", "thours", "trange_seq", "tfreq", "polygon", "href",
+        "cloud", "oceanvars", "qc", "bathy",
+    ]
+    colocation_params_user = {
+        "time": ("trange_seq", "tfreq"),
+        "horizontal": ("href", "cloud"),
+    }
+    colocation_params_default = {
+        "vertical": ("vlevel", {"vname": "depth", "levels": [0.0]}),
+    }
+    outputs_params = {
+        "diagdisp_glob": {"concat": ["time"]},
+        "diagdisp_sel": {"sort": ["time"], "concat": ["time"]},
+        "timeseries": {"concat": ["time"], "stat": ["time", "x", "y"], "output": "merge"},
+        "maps": {"sort": ["time"], "stat": ["time"]},
+    }
+    comp_vars = ["sla", "eke"]
+
+    def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
+        """Return the dataset lists unchanged.
+
+        SSH is a surface-only product, so no vertical ranging applies.
+
+        Parameters
+        ----------
+        dsref_list : list of xarray.Dataset
+            Reference datasets, one per product.
+        dsprod_list : list of xarray.Dataset
+            Product datasets, matching `dsref_list`.
+        params : dict
+            Colocation parameters for the metazone (unused).
+
+        Returns
+        -------
+        tuple of (list of xarray.Dataset, list of xarray.Dataset)
+            `dsref_list` and `dsprod_list`, unchanged.
+        """
+        return dsref_list, dsprod_list
+
+
 class CompArgo(Comparison):
     """Comparison of Argo hydrological profiles against products."""
 

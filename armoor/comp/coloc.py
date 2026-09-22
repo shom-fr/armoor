@@ -712,6 +712,8 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
         "cdir": {"u", "v"},
         "cspeed": {"u", "v"},
         "mld": {"ptemp", "temp", "sal", "pres"},
+        "sla": {"sla", "ssh"},
+        "eke": {"sla"},
     }
     needed = set(COMP_VARS[comp_func])
     vars_to_keep = needed & set(ds.data_vars)
