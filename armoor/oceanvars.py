@@ -53,6 +53,8 @@ class OceanVars(MethodRegistry):
         "div": "sel_divergence",
         "okuboweiss": "sel_okuboweiss",
         "relvort": "sel_relvort",
+        "sla": "sel_sla",
+        "eke": "sel_eke",
     }
 
     def __init__(self, ds):
@@ -524,3 +526,93 @@ class OceanVars(MethodRegistry):
             return get_relvort(self.ds.u, self.ds.v)
         else:
             logger.warning("Relative vorticity cannot be infered or computed")
+
+
+    def sel_sla(self):
+        """
+        Select sla from the dataset.
+
+        Returns
+        -------
+        xarray.DataArray
+            Data array containing temperature.
+        """
+
+        if "sla" in self.ds.data_vars:
+            logger.warning("SLA ALREADY EXISTS")
+            return self.ds["sla"]
+        if "ssh" in self.ds.data_vars:
+            logger.warning("sla computed from ssh")
+            self.ds["sla"] = self.ds["ssh"] - self.ds["ssh"].mean("time")
+ 
+        return self.ds["sla"] 
+           
+    
+    def sel_eke(self):
+        """
+        Compute Eddy Kinetic Energy (EKE) from SSH in a CMEMS-like xarray Dataset.
+        
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Dataset containing ssh(time,y,x), lon(y,x), lat(y,x)
+        ssh_var : str
+            Name of SSH variable
+        
+        Returns
+        -------
+        xr.DataArray
+            EKE(time,y,x)
+        """
+        
+        if "eke" in self.ds.data_vars:
+            logger.warning("EKE ALREADY COMPUTED")
+            return self.ds["eke"]
+        else:
+            logger.warning("EKE COMPUTING")
+
+        
+        g = 9.81
+        omega = 7.2921e-5
+        R = 6371000
+        
+        sla = self.ds["sla"]
+
+        lat = np.deg2rad(self.ds["lat"])
+        lon = np.deg2rad(self.ds["lon"])
+        
+        # Coriolis parameter
+        f = 2 * omega * np.sin(lat)
+        
+        # grid spacing (meters)
+        dlon = lon.diff("x")
+        dlat = lat.diff("y")
+        
+        dx = dlon * R * np.cos(lat[:, :-1])
+        dy = dlat * R
+        
+        dx = dx.pad(x=(0,1), mode="edge")
+        dy = dy.pad(y=(0,1), mode="edge")
+        
+        # SSH gradients
+        deta_dx = sla.differentiate("x") / dx
+        deta_dy = sla.differentiate("y") / dy
+
+        # geostrophic velocities
+        u = -g/f * deta_dy
+        v =  g/f * deta_dx
+
+        # anomalies
+        u_prime = u #- u.mean("time")
+        v_prime = v #- v.mean("time")
+
+        # print (" ")
+        # EKE
+        eke = 0.5 * (u_prime**2 + v_prime**2)
+        
+        eke.name = "EKE"
+        eke.attrs["units"] = "m2 s-2"
+
+        self.ds["eke"] = eke
+        
+        return self.ds["eke"]
