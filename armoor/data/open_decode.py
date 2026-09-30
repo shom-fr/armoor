@@ -1323,6 +1323,19 @@ def open_decode_cmems_insitu(path_files, platform):
                 ds["lat"] = lat_ds
                 ds["lon"] = lon_ds
         ds.set_coords(["lon", "lat"])
+        if "institution_country" in ds.attrs:
+            ds["country"] = xr.DataArray(
+            np.full(ds["lat"].shape, ds.institution_country),
+            dims=ds["lat"].dims,
+            coords=ds["lat"].coords
+            )
+        if "wmo_platform_code" in ds.attrs:
+            ds["wmo"] = xr.DataArray(
+            np.full(ds["lat"].shape, ds.wmo_platform_code),
+            dims=ds["lat"].dims,
+            coords=ds["lat"].coords
+            )
+     
         for coord in ds.coords:
             if coord not in cmems_coords:
                 ds = ds.reset_coords(coord)
