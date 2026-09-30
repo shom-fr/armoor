@@ -581,7 +581,7 @@ class SshSatelliteDecoder(Decoder):
         xarray.Dataset
             See `open_decode_sst_satellite`.
         """
-        logger.info("Opening/decoding sst satellite files")
+        logger.info("Opening/decoding altimetry satellite files")
         return open_decode_cmems_alti(path_files, fmt)
 
 class HycomDecoder(Decoder):
