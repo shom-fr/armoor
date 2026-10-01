@@ -175,6 +175,16 @@
             display: block;
             margin-top: 20px;
         }
+        /* No JavaScript in print/PDF (WeasyPrint): show collapsed content */
+        @media print {
+            .zone-block .gallery-grid {
+                display: grid;
+            }
+            .zone-block .feature-content {
+                display: block;
+                margin-top: 20px;
+            }
+        }
         .image-container {
             position: relative;
             border-radius: 10px;
@@ -452,14 +462,14 @@
 
         <!-- Table of Contents -->
         <div class="toc">
-            <h2 style="border: none; margin: 0 0 20px 0; padding: 0;">Sommaire</h2>
+            <h2 style="border: none; margin: 0 0 20px 0; padding: 0;">Table of Contents</h2>
             <ul>
                 {% if summary %}
-                <li><a href="#summary">Résumé</a></li>
+                <li><a href="#summary">Summary</a></li>
                 {% endif %}
-                <li><a href="#descriptions">Descriptions & Methodologie</a></li>
-                {% if hydro_features %}
-                <li><a href="#hydro-features">Caractéristiques hydrographiques de la zone MANCHE-GASCOGNE</a></li>
+                <li><a href="#descriptions">Descriptions & Methodology</a></li>
+                {% if ocean_features %}
+                <li><a href="#ocean-features">{{ ocean_features_title }}</a></li>
                 {% endif %}
                 {% for comp_type, comp_data in images.items() %}
                 <li>
@@ -473,8 +483,9 @@
 
         {% if summary %}
         <div id="summary" class="section">
-            <h2>Résumé</h2>
+            <h2>Summary</h2>
             {% for name, description in summary.items() %}
+            {% if description %}
              <div class="description-item">
                  <h4>{{ name.replace("_", " ") }}</h4>
                  {% if description is string %}
@@ -483,6 +494,7 @@
                  <p>{{ description|join(", ") }}</p>
                  {% endif %}
              </div>
+            {% endif %}
             {% endfor %}
         </div>
         {% endif %}
@@ -490,9 +502,9 @@
 
         <!-- Descriptions Section -->
         <div id="descriptions" class="section">
-            <h2>Descriptions & Methodologie</h2>
+            <h2>Descriptions & Methodology</h2>
             
-            <h3>Types de comparaison</h3>
+            <h3>Comparison Types</h3>
             {% for name, description in comparison_types.items() %}
             <div class="description-item">
                 <h4>{{ name.replace("_"," ") }}</h4>
@@ -500,19 +512,19 @@
             </div>
             {% endfor %}
 
-            <h3>Zones d'intérêt</h3>
+            <h3>Zones of Interest</h3>
             {% for name, description in zones.items() %}
             <div class="description-item">
-                <h4>{{ name }}</h4>
+                <h4>{{ description['label'] or name }}</h4>
                 <p>{{ description['description'] }}</p>
             </div>
             {% endfor %}
         </div>
 
-        {% if hydro_features %}
-        <div id="hydro-features" class="section">
-            <h2>Caractéristiques hydrographiques de la zone MANCHE-GASCOGNE</h2>
-            {% for zone, zone_data in hydro_features.items() %}
+        {% if ocean_features %}
+        <div id="ocean-features" class="section">
+            <h2>{{ ocean_features_title }}</h2>
+            {% for zone, zone_data in ocean_features.items() %}
             <div class="zone-block">
                 <div class="zone-title">{{ zone_data.label if zone_data.label else zone.replace("_", " ") }}</div>
                 <div class="feature-content">
