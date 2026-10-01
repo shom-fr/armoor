@@ -213,10 +213,16 @@ class Decoder:
 
     Subclasses register themselves under every fmt string listed in
     ``fmts`` (several fmt values can share one decoder, e.g. hycom/hycom3d).
+
+    ``fixed_levels`` tells whether each native "z" index sits at one fixed
+    depth everywhere (z-level models, observations) or not (terrain-
+    following/hybrid grids, e.g. CROCO sigma or HYCOM layers) -- copied
+    into ``ds.attrs["fixed_levels"]`` at load time.
     """
 
     name = None
     fmts = ()
+    fixed_levels = True
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -430,6 +436,7 @@ class HycomDecoder(Decoder):
 
     name = "hycom"
     fmts = ("hycom", "hycom3d")
+    fixed_levels = False
 
     def decode(self, path_files, fmt, platform=None):
         """Decode HYCOM files.
@@ -458,6 +465,7 @@ class CrocoDecoder(Decoder):
 
     name = "croco"
     fmts = ("croco", "croco_xios")
+    fixed_levels = False
 
     def decode(self, path_files, fmt, platform=None):
         """Decode CROCO files.

@@ -374,10 +374,17 @@ def main_data_pipeline(cfgfile, metafile, metazones, jsonfile,
     zarr_outputs = output_data(zarr, metazones, cfg.get("outputs", {}).copy())
 
     if not zarr_outputs:
-        logger.info(
-            "No output sub-section defined. "
-            "Interpolated data is available in data/interp/"
-        )
+        if any(isinstance(v, dict) for v in cfg.get("outputs", {}).values()):
+            logger.info(
+                "No output produced: every output sub-section was rejected "
+                "(see messages above). "
+                "Interpolated data is available in data/interp/"
+            )
+        else:
+            logger.info(
+                "No output sub-section defined. "
+                "Interpolated data is available in data/interp/"
+            )
         return
 
     if no_plot:

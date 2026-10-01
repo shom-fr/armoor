@@ -1069,7 +1069,17 @@ class OutputProcessor:
                 (c for c in ("depth", "pres") if c in dss[0].coords or c in dss[0].data_vars),
                 None,
             )
-            if vname:
+            if vname and not dss[0].attrs.get("fixed_levels", 1):
+                # Terrain-following/hybrid grid (e.g. CROCO, HYCOM -- see
+                # Decoder.fixed_levels): a native "z" index is not a depth
+                # level, so splitting by it would flatten the real 3D depth
+                # into one arbitrary value per index -- keep it whole.
+                logger.info(
+                    "Not splitting by native vertical levels: they are not "
+                    "at fixed depths for this format. "
+                    "Configure vlevel or vrange to select depths."
+                    )
+            elif vname:
                 dss = ranges.vlevels(dss, vname)
 
         return dss
@@ -1110,13 +1120,28 @@ class OutputProcessor:
         import dask
         n_workers = max(min(dask.config.get('num_workers', default=1), len(dss)), 1)
 
-        def _save_one(dsprod):
+        def _dirout(dsprod):
             if section_name is not None:
-                dirout = Path(
+                return Path(
                     f"data/interp/{metazone}/{section_name}/{dsprod.attrs['data_name']}"
                     )
-            else:
-                dirout = Path(f"data/interp/{metazone}/{dsprod.attrs['data_name']}")
+            return Path(f"data/interp/{metazone}/{dsprod.attrs['data_name']}")
+
+        # Every dataset is written in parallel with mode="w": two of them
+        # mapping to the same file would wipe each other's zarr chunks
+        # mid-write (surfacing as an obscure FileNotFoundError on a chunk
+        # name like '0.0') -- fail early and clearly instead.
+        targets = [_dirout(d) / f"prod{d.range.suffix}" for d in dss]
+        dups = sorted({str(t) for t in targets if targets.count(t) > 1})
+        if dups:
+            raise ArmoorError(
+                f"Several interpolated datasets would be saved to the same "
+                f"file(s) {dups} for metazone {metazone!r}: their "
+                "time/vlevel/vrange labels are not distinct."
+                )
+
+        def _save_one(dsprod):
+            dirout = _dirout(dsprod)
             dirout.mkdir(parents=True, exist_ok=True)
 
             t0 = time.perf_counter()

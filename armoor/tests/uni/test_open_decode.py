@@ -1114,3 +1114,19 @@ def test_get_paths_sorting(tmp_path, sort_results):
     assert len(result) == 3
     if sort_results:
         assert result == sorted(result)
+
+
+class TestDecoderFixedLevels:
+    """Decoder.fixed_levels declares whether a format's native "z"
+    indices are at fixed depths -- used by armoor-data's native-level
+    fallback instead of inspecting the depth field."""
+
+    @pytest.mark.parametrize("fmt", ["croco", "croco_xios", "hycom", "hycom3d"])
+    def test_terrain_following_formats(self, fmt):
+        from armoor.data.open_decode import get_decoder
+        assert get_decoder(fmt).fixed_levels is False
+
+    @pytest.mark.parametrize("fmt", ["cmems_model", "cmems_insitu", "armoor"])
+    def test_fixed_level_formats(self, fmt):
+        from armoor.data.open_decode import get_decoder
+        assert get_decoder(fmt).fixed_levels is True

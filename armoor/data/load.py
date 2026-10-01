@@ -18,7 +18,7 @@ from armoor.base.io import (setup_dask_client, create_fast_encoding,
                             write_dataset_to_zarr, compute_bundled_zarr_writes)
 from armoor.base.misc import optimize_for_low_swap
 from armoor.data.datatype import get_data_type
-from armoor.data.open_decode import open_decode, register_cf
+from armoor.data.open_decode import get_decoder, open_decode, register_cf
 
 
 logger = logging.getLogger(__name__)
@@ -928,6 +928,8 @@ def load_datasets(data_cfg, metazones, dirout):
 
         data_type = get_data_type(cfg_data["fmt"])
         data_type.validate_load_params(cfg_data["fmt"], metazones)
+        # int, not bool: netCDF attrs can't store booleans
+        fixed_levels = int(get_decoder(cfg_data["fmt"]).fixed_levels)
 
         try:
             dss = open_decode(
@@ -950,6 +952,7 @@ def load_datasets(data_cfg, metazones, dirout):
                 ds.attrs["data_name"] = f"{cfg_data['name']}_{ds.attrs['name']}"
             ds.attrs["data_ref"] = str(cfg_data.get("ref"))
             ds.attrs["data_type"] = data_type.name
+            ds.attrs["fixed_levels"] = fixed_levels
 
         # Apply union prefilter FIRST so the size decision is made on
         # the actual data volume, not the full global domain.

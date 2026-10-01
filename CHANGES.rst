@@ -150,6 +150,21 @@ Bug fixes
   local scheduler for the whole command. Also adds a test watchdog thread
   so a stuck job can't hang the suite forever.
 
+- Fixed ``armoor-data`` on terrain-following (sigma) models such as CROCO
+  when a metazone configures neither ``vlevel`` nor ``vrange``: the native
+  vertical-level fallback labelled every level after the first grid point
+  (``nan`` on land), so all levels were written concurrently to the same
+  ``prod_nan.zarr`` and failed with ``FileNotFoundError: '0.0'``. The
+  fallback no longer splits formats whose native levels are not at fixed
+  depths (new ``Decoder.fixed_levels`` class attribute, ``False`` for
+  ``croco`` and ``hycom``, copied into ``ds.attrs["fixed_levels"]`` at
+  load time), ``ranges.vlevels`` labels levels with the first finite value, and saving
+  now fails early with a clear error if two datasets share a file name.
+
+- ``mdiagts`` now accepts ``vrange`` (like ``mvprofiles``); only ``vlevel``
+  is still rejected. ``armoor-data`` also no longer reports "No output
+  sub-section defined" when sub-sections exist but were all rejected.
+
 Documentation
 -------------
 

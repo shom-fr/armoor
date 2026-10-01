@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
+from armoor.__init__ import ArmoorError
 from armoor.data.datatype import DataEddies, DataMeteo, DataOceanModel
 from armoor.data.output import (
     OutputProcessor, get_datatrees, get_dim_stats,
@@ -260,6 +261,76 @@ class TestApplyRangeProcessingNativeVerticalFallback:
 
         assert len(dss) == 3
         assert sorted(d.attrs["vlevel"] for d in dss) == ["0.0", "10.0", "20.0"]
+
+
+    def test_non_fixed_levels_are_not_split(self):
+        """Regression test (CROCO, OMAN metazone): for a format whose
+        native levels are not at fixed depths (attrs["fixed_levels"]=0,
+        set at load time from Decoder.fixed_levels), the native-level
+        fallback must keep the dataset whole -- splitting it labelled
+        every level after the (land, NaN) first grid point, giving 80
+        datasets all saved concurrently to "prod_nan.zarr"."""
+        processor = OutputProcessor()
+        depth = np.array([[[np.nan, -100.0], [-50.0, -200.0]]] * 3)
+        depth = depth * np.array([1.0, 0.5, 0.1])[:, None, None]
+        ds = xr.Dataset(
+            {"temp": (["z", "y", "x"], np.zeros((3, 2, 2)))},
+            coords={"depth": (["z", "y", "x"], depth)},
+            attrs={"fixed_levels": 0},
+        )
+
+        dss = processor._apply_range_processing(ds, mparams={})
+
+        assert len(dss) == 1
+        assert "vlevel" not in dss[0].attrs
+        assert dss[0]["depth"].dims == ("z", "y", "x")
+
+    def test_broadcast_depth_with_masked_first_point_is_labelled(self):
+        """A z-level "depth" broadcast to (z,y,x) whose first grid point is
+        masked (land) must still be split, labelled with a finite value."""
+        processor = OutputProcessor()
+        depth = np.broadcast_to(
+            np.array([0.0, 10.0, 20.0])[:, None, None], (3, 2, 2)
+        ).copy()
+        depth[:, 0, 0] = np.nan
+        ds = xr.Dataset(
+            {"temp": (["z", "y", "x"], np.zeros((3, 2, 2)))},
+            coords={"depth": (["z", "y", "x"], depth)},
+        )
+
+        dss = processor._apply_range_processing(ds, mparams={})
+
+        assert sorted(d.attrs["vlevel"] for d in dss) == ["0.0", "10.0", "20.0"]
+
+
+class TestSaveProcessedDatasetsDuplicateTargets:
+    def test_duplicate_suffixes_raise_before_writing(self, tmp_path, monkeypatch):
+        """Datasets sharing a filename suffix used to be written in
+        parallel to the same zarr store with mode="w", corrupting it
+        (FileNotFoundError on a chunk name such as '0.0')."""
+        monkeypatch.chdir(tmp_path)
+        ds = xr.Dataset({"temp": ("z", [1.0])}, attrs={"data_name": "prod", "vlevel": "nan"})
+
+        with (
+            patch("armoor.data.output.save_datasets") as mock_save,
+            pytest.raises(ArmoorError, match="same"),
+        ):
+            OutputProcessor()._save_processed_datasets([ds, ds.copy()], "mz1", [])
+        mock_save.assert_not_called()
+
+
+class TestMdiagtsVerticalParams:
+    def test_mdiagts_accepts_vrange(self):
+        assert OutputProcessor()._validate_output_compatibility(
+            {"otype": "mdiagts"}, {"vrange": {"vname": "depth"}}, "mz1",
+            DataOceanModel().outputs_params,
+        )
+
+    def test_mdiagts_still_rejects_vlevel(self):
+        assert not OutputProcessor()._validate_output_compatibility(
+            {"otype": "mdiagts"}, {"vlevel": {"vname": "depth"}}, "mz1",
+            DataOceanModel().outputs_params,
+        )
 
 
 class TestApplyInterpolationsSkipsVerticalWithoutZ:
