@@ -116,8 +116,32 @@ New features
   (``OceanVars.sel_pres``), previously internal-only.
   ``armoor-filters-oceanvars --help`` now lists all available varnames.
 
+- ``armoor-bull``: added an optional ``[ocean-features]`` section describing
+  the main ocean features of each zone (upwelling, river plume, fronts,
+  internal waves, ...), rendered as a collapsible block per zone after the
+  descriptions, with a configurable ``title`` (default: "Main ocean
+  features").
+
+- ``armoor-bull``: comparison types, zones, sections, outputs and image
+  zones now accept an optional ``label`` used for display instead of the
+  raw config key. The header accepts an optional ``logo`` path (png, jpg,
+  svg, gif), and ``[summary]`` declares a ``period`` entry (overridden by
+  ``--period``). Empty summary entries are no longer shown.
+
 Breaking changes
 ----------------
+
+- ``armoor-bull``: ``[images]`` now expects a
+  type / section / output / zone / ``path`` layout, with a new *section*
+  level (e.g. ``sst_l4``, ``argo``) between the comparison type and the
+  output. Configs using the old type / output / zone layout now raise an
+  explicit ``ValueError`` instead of silently producing a bulletin without
+  any picture: add a section level to your bull config (see
+  ``doc/examples/configs/bull.cfg``).
+
+- ``armoor-bull`` no longer ships the Shom logo nor shows it by default: set
+  ``[header] logo`` to display one. The default title is now the neutral
+  "Ocean Forecast Qualification Bulletin".
 
 Deprecations
 ------------
@@ -167,6 +191,16 @@ Bug fixes
 - ``mdiagts`` now accepts ``vrange`` (like ``mvprofiles``); only ``vlevel``
   is still rejected. ``armoor-data`` also no longer reports "No output
   sub-section defined" when sub-sections exist but were all rejected.
+
+- ``armoor-bull``: renamed ``[meta-zones]`` to ``[zones]`` in ``bull.ini``
+  to match the section actually read by ``Bull``, so zones are now
+  validated and their ``label`` is used.
+
+- ``armoor-bull``: collapsed zone blocks (ocean features and image
+  galleries) are now shown in the PDF output, since WeasyPrint runs no
+  JavaScript. Globbed image paths are now sorted, missing images/logo are
+  logged as warnings, and the image modal no longer relies on the
+  deprecated global ``event``.
 
 Documentation
 -------------
