@@ -7,6 +7,9 @@ Develop
 New features
 ------------
 
+- Added ``wmo_platform_code`` and ``institution_country`` (if exist) 
+  in ``open_decode_cmems_insitu``.
+  
 - Added ``armoor-comp-hydrosection``: new comparison tool for 3D model
   outputs against observed hydrological sections. Covers gliders
   (``fmt=cmems_insitu, platform=glider``) -- a single glider mission file
