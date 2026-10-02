@@ -159,11 +159,13 @@ class DataOceanModel(DataType):
             # mdiagts() -- which stacks everything into a single "npt"
             # dim -- draws one figure over the whole dataset, with no
             # splitting and no time/z loop in the plot function itself.
-            # Works with or without cloud.
+            # Works with or without cloud. vrange is allowed (like
+            # mvprofiles): _merge_z_group recombines the NaN-masked bins
+            # with combine_first, so the figure covers the selected depths.
             "concat": ["time", "z"],
             "output": "merge",
             "mparams_con": {
-                "vertical": ["vrange", "vlevel"],
+                "vertical": ["vlevel"],
                 }
             },
         "udiagts": {

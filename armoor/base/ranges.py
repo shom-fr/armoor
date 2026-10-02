@@ -69,8 +69,12 @@ def vlevels(dssi, vname):
             # vname (e.g. "depth") can carry leftover non-"z" dims (e.g. a
             # spurious "time" dim from concatenating multiple native files)
             # even though the actual level is constant along them -- reduce
-            # to a plain scalar so it can be used as a label.
-            vlevel = float(np.asarray(vlevel).reshape(-1)[0])
+            # to a plain scalar so it can be used as a label. Take the first
+            # *finite* value: the first grid point may be masked (land),
+            # which would otherwise label every level "nan".
+            vlevel = np.asarray(vlevel, dtype=float).reshape(-1)
+            finite = vlevel[np.isfinite(vlevel)]
+            vlevel = float(finite[0]) if finite.size else float("nan")
             dso = dsi.isel(z=[ivlevel]).copy()
             data_vars = [v for v in dso.data_vars if v != vname]
             if data_vars and all(bool(dso[v].isnull().all()) for v in data_vars):
