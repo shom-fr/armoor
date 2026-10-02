@@ -238,3 +238,10 @@ def test_bull(woom_env):
     )
 
     _run_and_assert(workflow)
+
+    # A config/schema mismatch in [images] silently yields a bulletin
+    # without any picture: make sure at least one image got embedded.
+    html_path = os.path.join(workflow.get_task_run_dir("make_bull"), "armoor_test.html")
+    assert os.path.isfile(html_path)
+    with open(html_path, encoding="utf-8") as f:
+        assert 'class="image-container"' in f.read(), f"no image embedded in {html_path}"
