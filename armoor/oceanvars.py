@@ -544,15 +544,15 @@ class OceanVars(MethodRegistry):
             return self.ds["sla"]
         elif "ssh" in self.ds.data_vars:
             logger.info("SLA COMPUTED FROM SSH")
-            self.ds["sla"] = self.ds["ssh"] - self.ds["ssh"].mean("time")
+            sla = self.ds["ssh"] - self.ds["ssh"].mean("time")
+            sla.attrs["standard_name"] = "sea_level_anomaly"
+            sla.attrs["long_name"] = "Sea level anomaly computed from adt or ssh"
+            sla.attrs["units"] = "m"
+            self.ds["sla"] = sla
+            
         else:
             logger.warning("sla cannot be infered or computed")
-
-
-#        if "adt" in self.ds.data_vars:
-#            logger.info("sla computed from adt")
-#            self.ds["sla"] = self.ds["adt"] - self.ds["adt"].mean("time")
- 
+             
         return self.ds["sla"] 
            
 

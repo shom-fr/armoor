@@ -13,6 +13,8 @@ class TestOceanVars:
 
     def setup_method(self):
         """Setup test data"""
+        
+        self.time = pd.to_datetime([1, 2, 3], unit="D", origin=pd.Timestamp("2000-01-01"))
         self.lat = np.array([45.0, 46.0])
         self.lon = np.array([2.0, 3.0])
         self.depth = np.array([0, 10, 20])
@@ -25,11 +27,18 @@ class TestOceanVars:
         self.pres = np.array([[[0.0, 0.0], [0.0, 0.0]],
                              [[10.0, 10.0], [10.0, 10.0]],
                              [[20.0, 20.0], [20.0, 20.0]]])
-
+        self.ssh = np.array([[[0.2, 0.15],
+                             [0.05, 0.8]],
+                             [[0.4, 0.9],
+                             [0.5, 0.2]],
+                             [[0.4, 0.5],
+                              [0.2, 0.3]]])
+        
         self.ds = xr.Dataset({
             'temp': (['depth', 'lat', 'lon'], self.temp),
             'sal': (['depth', 'lat', 'lon'], self.sal),
             'pres': (['depth', 'lat', 'lon'], self.pres),
+            'ssh': (['time', 'lat', 'lon'], self.ssh),
             'depth': (['depth'], self.depth),
             'lat': (['lat'], self.lat),
             'lon': (['lon'], self.lon)
@@ -193,6 +202,26 @@ class TestOceanVars:
         ds_no_sal = self.ds.drop_vars('sal')
         result = ds_no_sal.oceanvars.sel_mld()
         assert result is None
+        
+    def test_sel_sla(self):
+        """Test calculation of sla"""
+        result = self.ds.oceanvars.sel_sla()
+        assert result is not None
+        assert 'sla' in self.ds
+        assert self.ds['sla'].attrs['units'] == 'm'
+        
+    def test_sel_eke(self):
+        """Test calculation of eke from sla"""
+        self.ds.oceanvars.sel_sla()
+        result = self.ds.oceanvars.sel_eke()
+        assert result is not None
+        assert 'eke' in self.ds
+      
+    def test_sel_mke(self):
+        """Test calculation of mke from ssh"""
+        result = self.ds.oceanvars.sel_mke()
+        assert result is not None
+        assert 'mke' in self.ds        
 
     def test_sel_method_routing(self):
         """Test routing of the sel method"""

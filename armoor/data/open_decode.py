@@ -452,7 +452,7 @@ class SshSatelliteDecoder(Decoder):
             See `open_decode_sst_satellite`.
         """
         logger.info("Opening/decoding altimetry satellite files")
-        return open_decode_cmems_alti(path_files, fmt)
+        return open_decode_alti_satellite(path_files, fmt)
 
 class HycomDecoder(Decoder):
     """HYCOM ocean-model output (hycom, hycom3d)."""
@@ -842,7 +842,7 @@ def open_decode_sst_satellite(path_files, fmt):
     return ds
 
 
-def open_decode_cmems_alti(path_files, fmt):
+def open_decode_alti_satellite(path_files, fmt):
     """
     Open SST satellite netcdf file(s) and store it into a ready-to-use dataset.
     Parameters
