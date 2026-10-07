@@ -43,6 +43,7 @@ More details about Armoor command-lines can be found in the dedicated sections :
       * armoor-comp-models
       * armoor-comp-mooring
       * armoor-comp-sst
+      * armoor-comp-alti    
       * armoor-data
       * armoor-filters
 
