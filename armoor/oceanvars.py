@@ -528,7 +528,6 @@ class OceanVars(MethodRegistry):
         else:
             logger.warning("Relative vorticity cannot be infered or computed")
 
-
     def sel_sla(self):
         """
         Select sla from the dataset.
@@ -549,45 +548,37 @@ class OceanVars(MethodRegistry):
             sla.attrs["long_name"] = "Sea level anomaly computed from adt or ssh"
             sla.attrs["units"] = "m"
             self.ds["sla"] = sla
-            
+
         else:
             logger.warning("sla cannot be infered or computed")
-             
-        return self.ds["sla"] 
-           
+
+        return self.ds["sla"]
 
 
-    def _compute_kinetic_energy(self, source_var, target_var):
-        """Compute kinetic energy from a velocity-producing variable."""
-        if target_var in self.ds:
-            logger.info("%s EXISTS", target_var.upper())
-            return self.ds[target_var]
+def _compute_kinetic_energy(self, source_var, target_var):
+    """Compute kinetic energy from a velocity-producing variable."""
+    if target_var in self.ds:
+        logger.info(f"{target_var.upper()} EXISTS")
+        return self.ds[target_var]
 
-        if source_var in self.ds.data_vars:
-            logger.info(
-                "%s COMPUTED FROM %s",
-                target_var.upper(),
-                source_var.upper(),
-            )
+    if source_var in self.ds.data_vars:
+        logger.info(f"{target_var.upper()} COMPUTED FROM {source_var.upper()}")
 
-            from shoot.dyn import get_geos
+        from shoot.dyn import get_geos
 
-            u, v = get_geos(self.ds[source_var])
-            ke = 0.5 * (u**2 + v**2)
+        u, v = get_geos(self.ds[source_var])
+        ke = 0.5 * (u**2 + v**2)
 
-            ke.name = target_var
-            ke.attrs["units"] = "m2 s-2"
+        ke.name = target_var
+        ke.attrs["units"] = "m2 s-2"
 
-            self.ds[target_var] = ke
-            return self.ds[target_var]
+        self.ds[target_var] = ke
+        return self.ds[target_var]
 
-        logger.warning(
-            "%s cannot be inferred or computed from %s",
-            target_var.upper(),
-            source_var.upper(),
-        )
-        return None
-
+    logger.warning(
+        f"{target_var.upper()} cannot be inferred or computed from " f"{source_var.upper()}"
+    )
+    return None
 
     def sel_eke(self):
         """
@@ -600,7 +591,6 @@ class OceanVars(MethodRegistry):
         """
         return self._compute_kinetic_energy("sla", "eke")
 
-
     def sel_mke(self):
         """
         Compute Mean Kinetic Energy (MKE) from SSH.
@@ -611,6 +601,3 @@ class OceanVars(MethodRegistry):
             MKE data array.
         """
         return self._compute_kinetic_energy("ssh", "mke")
-
-
- 
