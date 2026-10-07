@@ -312,7 +312,7 @@ class CompAlti(Comparison):
     title = "altimetry"
     metazone_params = [
         "tbound", "thours", "trange_seq", "tfreq", "polygon", "href",
-        "cloud", "oceanvars", "qc", "bathy",
+        "cloud", "oceanvars", "bathy",
     ]
     colocation_params_user = {
         "time": ("trange_seq", "tfreq"),
