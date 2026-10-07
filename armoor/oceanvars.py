@@ -554,31 +554,30 @@ class OceanVars(MethodRegistry):
 
         return self.ds["sla"]
 
+    def _compute_kinetic_energy(self, source_var, target_var):
+        """Compute kinetic energy from a velocity-producing variable."""
+        if target_var in self.ds:
+            logger.info(f"{target_var.upper()} EXISTS")
+            return self.ds[target_var]
 
-def _compute_kinetic_energy(self, source_var, target_var):
-    """Compute kinetic energy from a velocity-producing variable."""
-    if target_var in self.ds:
-        logger.info(f"{target_var.upper()} EXISTS")
-        return self.ds[target_var]
+        if source_var in self.ds.data_vars:
+            logger.info(f"{target_var.upper()} COMPUTED FROM {source_var.upper()}")
 
-    if source_var in self.ds.data_vars:
-        logger.info(f"{target_var.upper()} COMPUTED FROM {source_var.upper()}")
+            from shoot.dyn import get_geos
 
-        from shoot.dyn import get_geos
+            u, v = get_geos(self.ds[source_var])
+            ke = 0.5 * (u**2 + v**2)
 
-        u, v = get_geos(self.ds[source_var])
-        ke = 0.5 * (u**2 + v**2)
+            ke.name = target_var
+            ke.attrs["units"] = "m2 s-2"
 
-        ke.name = target_var
-        ke.attrs["units"] = "m2 s-2"
+            self.ds[target_var] = ke
+            return self.ds[target_var]
 
-        self.ds[target_var] = ke
-        return self.ds[target_var]
-
-    logger.warning(
-        f"{target_var.upper()} cannot be inferred or computed from " f"{source_var.upper()}"
-    )
-    return None
+        logger.warning(
+            f"{target_var.upper()} cannot be inferred or computed from " f"{source_var.upper()}"
+        )
+        return None
 
     def sel_eke(self):
         """
