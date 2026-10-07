@@ -6,6 +6,7 @@ COLOCATION_PARAMS_USER, COLOCATION_PARAMS_DEFAULT, OUTPUTS_PARAMS,
 COMP_VARS, TITLE_PLOTS) so a literal copy mistake is caught immediately,
 before any call site starts relying on the new hierarchy.
 """
+
 from armoor.comp import (
     COLOCATION_PARAMS_DEFAULT,
     COLOCATION_PARAMS_USER,
@@ -22,6 +23,7 @@ from armoor.comp.comparison import (
     CompModels,
     CompMooring,
     CompSst,
+    CompAlti,
     _REGISTRY,
     get_comparison,
 )
@@ -34,6 +36,7 @@ SUBCLASSES = {
     "comp_models": CompModels,
     "comp_clim": CompClim,
     "comp_hydrosection": CompHydrosection,
+    "comp_alti": CompAlti,
 }
 
 
@@ -54,6 +57,7 @@ def test_get_comparison_returns_registered_instance():
 def test_get_comparison_raises_for_unknown():
     from armoor import ArmoorError
     import pytest
+
     with pytest.raises(ArmoorError):
         get_comparison("comp_nonexistent")
 
