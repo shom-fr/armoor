@@ -31,6 +31,7 @@ The list of configuration files used can be found at ``armoor/data/`` :
     - cf_cmems_mooring.cfg
     - cf_cmems_sst_l3.cfg
     - cf_cmems_sst_l4.cfg
+    - cf_cmems_alti_duacs.cfg
     - cf_cora_argo.cfg
     - cf_hycom.cfg
     

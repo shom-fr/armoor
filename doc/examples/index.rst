@@ -41,6 +41,17 @@ See :ref:`guide-configuration` and :ref:`guide-metazones` for how these files ar
 
         :download:`Download comp_sst.cfg <configs/comp_sst.cfg>`
         
+    .. grid-item-card:: Altimetry comparison
+
+        Configuration for running a altimetry comparison over a series of input data.
+
+        .. literalinclude:: configs/comp_alti.cfg
+         :language: ini
+         :caption: comp_alti.cfg
+         :linenos:
+
+        :download:`Download comp_alti.cfg <configs/comp_alti.cfg>`
+                
     .. grid-item-card:: Argo comparison
 
         Configuration for running an Argo comparison over a series of input data.
