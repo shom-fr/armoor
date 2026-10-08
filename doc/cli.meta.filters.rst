@@ -38,5 +38,6 @@ Workflow
     
 .. argparse::
     :module: armoor.cli.main
+    :func: get_parser_filters
     :prog: armoor-filters
     :nosubcommands:

@@ -178,6 +178,9 @@ datasets are never modified.
    * - ``.vertical(param)``
      - Vertical colocation (depth levels or density levels)
 
+.. seealso:: :ref:`guide-colocation` for how these strategies map to
+   metazone parameters in the ``armoor-comp-*`` pipeline.
+
 
 .. _accessor-stats:
 
@@ -347,7 +350,7 @@ are inherited unchanged.
     ds.plot.profiles(var="temp", dim="depth")   # vertical profile
     ds.plot.timeseries(var="temp")              # time-series line
 
-    # From armoor.base.plot
+    # From armoor.plot
     ds.plot.diagdisp("ref_temp", "prod_temp")   # scatter + regression (R²)
     ds.plot.shadow_line("time", "temp",
                         label="temperature")    # line with grey shadow offset
@@ -362,7 +365,7 @@ are inherited unchanged.
 
    The batch, DataTree-based plots (cartopy maps with minimap, T-S diagrams,
    multi vertical profiles, …) are produced by
-   :class:`armoor.data.plot.PlotData`, which operates on the full pipeline
+   :class:`armoor.data.plot.PlotOceanModel`, which operates on the full pipeline
    DataTree, and are **not** exposed through this accessor.
 
 .. list-table::
@@ -378,9 +381,9 @@ are inherited unchanged.
    * - ``.timeseries(var, ax, **kw)``
      - Time-series line via :func:`xarray.DataArray.plot.line`
    * - ``.diagdisp(x_var, y_var, ax, …)``
-     - Scatter + diagonal + regression + R² — delegates to :func:`armoor.base.plot.diagdisp`
+     - Scatter + diagonal + regression + R² — delegates to :func:`armoor.plot.diagdisp`
    * - ``.shadow_line(x_var, y_var, ax, …)``
-     - Line with a grey shadow offset — delegates to :func:`armoor.base.plot.shadow_line`
+     - Line with a grey shadow offset — delegates to :func:`armoor.plot.shadow_line`
 
 
 API Reference

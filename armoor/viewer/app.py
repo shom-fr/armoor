@@ -64,6 +64,7 @@ def create_app(test_config=None, render_mode: str | None = None) -> Flask:
 
     @app.route("/")
     def index():
+        """Serve the viewer's single-page-app entry point."""
         return app.send_static_file("index.html")
 
     return app

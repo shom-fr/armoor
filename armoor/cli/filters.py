@@ -1,16 +1,17 @@
-"""Command-line interface for armoor-filters-*.
+"""Command-line interface for armoor-filters-\*.
 
 This module provides command-line interfaces for applying various types of filters
-(time, horizontal, quality) to oceanographic and meteorological data files.
+(time, horizontal, quality) to oceanographic data files.
 """
 import logging
 import asyncio
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 import dask.config
 
 import armoor  # noqa: F401 — registers ds.filters accessor
-from armoor.base.io import ArmoorArgumentHelpFormatter
-from armoor.base.misc import parse_date, parse_hours, is_dict_empty, parse_coords
+from armoor.io import ArmoorArgumentHelpFormatter
+from armoor.misc import parse_date, parse_hours, is_dict_empty, parse_coords
+from armoor.oceanvars import OceanVars
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
@@ -37,7 +38,7 @@ class FiltersError(Exception):
     pass
 
 
-def process_filters(args, filters_config):
+def process_filters(args: Namespace, filters_config: dict) -> None:
     """Process input files by applying specified filters and saving output.
 
     This function opens input files, applies the configured filters using
@@ -47,7 +48,7 @@ def process_filters(args, filters_config):
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed CLI arguments (fins, ifmt, platform, fout, ofmt, dask-*).
+        Parsed CLI arguments (fins, ifmt, platform, fout, ofmt, dask-\*).
     filters_config : dict
         Dictionary containing filter configurations. Each key represents
         a filter type with its corresponding parameters.
@@ -63,10 +64,16 @@ def process_filters(args, filters_config):
     with armoor_cli_session(args, (args.ifmt, args.platform)):
         with open_decode_materialized(args.fins, args.ifmt, platform=args.platform) as ds:
             ds = ds.filters.combined(filters_config)
-            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
+            # "threads" deadlocks intermittently: xarray's netCDF4 write lock
+            # is a CombinedLock over several process-global locks, and
+            # multiple dask worker threads doing netCDF I/O concurrently can
+            # block on each other acquiring them (confirmed via py-spy on
+            # stuck armoor-filters-* processes; "synchronous" -- single
+            # thread, no lock contention possible -- doesn't).
+            save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")
 
 
-def get_parser_filters_time():
+def get_parser_filters_time() -> ArgumentParser:
     """Create argument parser for time-based filtering operations.
     
     Returns
@@ -119,7 +126,7 @@ def get_parser_filters_time():
     return parser
 
 
-def main_filters_time():
+def main_filters_time() -> None:
     """Apply time-based filters to input files via command line interface.
     
     This function serves as the main entry point for time filtering operations.
@@ -201,7 +208,7 @@ def main_filters_time():
     process_filters(args, filters_config)
 
 
-def get_parser_filters_horizontal():
+def get_parser_filters_horizontal() -> ArgumentParser:
     """Create argument parser for horizontal spatial filtering operations.
     
     Returns
@@ -258,7 +265,7 @@ def get_parser_filters_horizontal():
     return parser
 
 
-def main_filters_horizontal():
+def main_filters_horizontal() -> None:
     """Apply horizontal spatial filters to input files via command line interface.
     
     This function serves as the main entry point for horizontal filtering operations.
@@ -348,7 +355,7 @@ def main_filters_horizontal():
         
     process_filters(args, filters_config)
 
-def get_parser_filters_quality():
+def get_parser_filters_quality() -> ArgumentParser:
     """Create argument parser for quality control filtering operations.
     
     Returns
@@ -382,7 +389,7 @@ def get_parser_filters_quality():
         )
     return parser
 
-def main_filters_quality():
+def main_filters_quality() -> None:
     """Apply quality control filters to input files via command line interface.
     
     This function serves as the main entry point for quality filtering operations.
@@ -408,8 +415,8 @@ def main_filters_quality():
     Notes
     -----
     - Quality control filtering removes data points where the specified quality
-    control variable falls outside the acceptable threshold range. This is
-    commonly used to remove poor quality observations from oceanographic datasets.
+      control variable falls outside the acceptable threshold range. This is
+      commonly used to remove poor quality observations from oceanographic datasets.
     - Leverages Dask for memory-efficient processing of large datasets
     - Supports all input/output formats available in the ARMOOR ecosystem
     
@@ -430,7 +437,7 @@ def main_filters_quality():
 
     process_filters(args, filters_config)
 
-def get_parser_filters_oceanvars():
+def get_parser_filters_oceanvars() -> ArgumentParser:
     """Create argument parser for ocean variables filtering operations.
     
     Returns
@@ -444,7 +451,8 @@ def get_parser_filters_oceanvars():
     >>> args = parser.parse_args(['ptemp', 'sal'])
     """
     parser = ArgumentParser(
-        description="Apply ocean variables filters over a list of input files.",
+        description="Apply ocean variables filters over a list of input files. \n"
+        f"Available varnames are : {list(OceanVars._VARNAME_METHODS.keys())}",
         formatter_class=ArmoorArgumentHelpFormatter,
         )
     add_logging_parser_arguments(parser)
@@ -458,7 +466,7 @@ def get_parser_filters_oceanvars():
         )
     return parser
 
-def main_filters_oceanvars():
+def main_filters_oceanvars() -> None:
     """Apply ocean variables filters to input files via command line interface.
     
     This function serves as the main entry point for ocean variables filtering operations.

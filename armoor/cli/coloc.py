@@ -1,7 +1,7 @@
-"""Command-line interface for armoor-coloc-*.
+"""Command-line interface for armoor-coloc-\*.
 
 This module provides command-line interfaces for applying various types of interpolation
-(temporal, horizontal, vertical) to oceanographic and meteorological data files.
+(temporal, horizontal, vertical) to oceanographic data files.
 The interpolation operations are optimized for large datasets using Dask distributed computing.
 """
 import logging
@@ -9,8 +9,8 @@ from argparse import ArgumentParser
 
 from armoor import ArmoorError
 
-from armoor.base.io import ArmoorArgumentHelpFormatter
-from armoor.base.misc import parse_date, is_dict_empty, parse_coords
+from armoor.io import ArmoorArgumentHelpFormatter
+from armoor.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_comp_io_parser_arguments,
     add_dask_parser_arguments,
@@ -37,7 +37,7 @@ class ColocError(Exception):
     pass
 
 
-def get_parser_coloc():
+def get_parser_coloc() -> ArgumentParser:
     """Create argument parser for temporal colocation operations.
     """
     parser = ArgumentParser(
@@ -50,7 +50,7 @@ def get_parser_coloc():
 
     return parser
 
-def main_coloc_time():
+def main_coloc_time() -> None:
     """Apply temporal colocation to input files via command line interface.
  
     This function processes temporal colocation between reference and product datasets
@@ -126,7 +126,7 @@ def main_coloc_time():
         del dsref, dsprod
         save_output(dsout, args.fout, args.ofmt)
 
-def main_coloc_horizontal():
+def main_coloc_horizontal() -> None:
     """Apply horizontal colocation to input files via command line interface.
  
     This function processes horizontal colocation between reference and product datasets
@@ -205,7 +205,7 @@ def main_coloc_horizontal():
         del dsref, dsprod
         save_output(dsout, args.fout, args.ofmt)
             
-def main_coloc_vertical():
+def main_coloc_vertical() -> None:
     """Apply vertical colocation to input files via command line interface.
  
     This function processes vertical colocation between reference and product datasets

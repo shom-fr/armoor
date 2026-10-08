@@ -24,6 +24,7 @@ parcels
 pip
 pytest
 python=3.11
+python-gitlab
 scipy
 seaborn
 setuptools

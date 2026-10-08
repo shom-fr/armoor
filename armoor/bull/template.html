@@ -168,6 +168,23 @@
         .zone-block.open .gallery-grid {
             display: grid; /* restores your existing grid layout */
         }
+        .zone-block .feature-content {
+            display: none;
+        }
+        .zone-block.open .feature-content {
+            display: block;
+            margin-top: 20px;
+        }
+        /* No JavaScript in print/PDF (WeasyPrint): show collapsed content */
+        @media print {
+            .zone-block .gallery-grid {
+                display: grid;
+            }
+            .zone-block .feature-content {
+                display: block;
+                margin-top: 20px;
+            }
+        }
         .image-container {
             position: relative;
             border-radius: 10px;
@@ -451,10 +468,13 @@
                 <li><a href="#summary">Summary</a></li>
                 {% endif %}
                 <li><a href="#descriptions">Descriptions & Methodology</a></li>
-                {% for comp_type in comparison_types %}
+                {% if ocean_features %}
+                <li><a href="#ocean-features">{{ ocean_features_title }}</a></li>
+                {% endif %}
+                {% for comp_type, comp_data in images.items() %}
                 <li>
                     <a href="#{{ comp_type|lower|replace(' ', '-') }}">
-                        {{ comp_type }}
+                        {{ comp_data.label }}
                     </a>
                 </li>
                 {% endfor %}
@@ -465,6 +485,7 @@
         <div id="summary" class="section">
             <h2>Summary</h2>
             {% for name, description in summary.items() %}
+            {% if description %}
              <div class="description-item">
                  <h4>{{ name.replace("_", " ") }}</h4>
                  {% if description is string %}
@@ -473,10 +494,12 @@
                  <p>{{ description|join(", ") }}</p>
                  {% endif %}
              </div>
+            {% endif %}
             {% endfor %}
         </div>
         {% endif %}
         
+
         <!-- Descriptions Section -->
         <div id="descriptions" class="section">
             <h2>Descriptions & Methodology</h2>
@@ -484,7 +507,7 @@
             <h3>Comparison Types</h3>
             {% for name, description in comparison_types.items() %}
             <div class="description-item">
-                <h4>{{ name }}</h4>
+                <h4>{{ name.replace("_"," ") }}</h4>
                 <p>{{ description['description'] }}</p>
             </div>
             {% endfor %}
@@ -492,37 +515,66 @@
             <h3>Zones of Interest</h3>
             {% for name, description in zones.items() %}
             <div class="description-item">
-                <h4>{{ name }}</h4>
+                <h4>{{ description['label'] or name }}</h4>
                 <p>{{ description['description'] }}</p>
             </div>
             {% endfor %}
         </div>
 
-        <!-- Results Sections with Gallery Layout -->
-        {% for comp_type, outputs_dict in images.items() %}
-        <div id="{{ comp_type|lower|replace(' ', '-') }}" class="section">
-            <h2>{{ comp_type }}</h2>
-            {% for output, zones_dict in outputs_dict.items() %}
-            <h3>{{ output }}</h3>
-                {% for zone, images_info in zones_dict.items() %}
-                <div class="zone-block">
-                    <div class="zone-title">{{ zone }}</div>
-                    <div class="gallery-grid">
-                        {% for image_info in images_info %}
-                            {% if image_info.found and image_info.data %}
-                            <div class="image-container" onclick="openModal(this.querySelector('img'))">
-                                <img src="data:image/png;base64,{{ image_info.data }}"
-                                     alt="{{ comp_type }} - {{ zone }}">
-                                <p class="image-caption">{{ comp_type }} - {{ zone }}</p>
-                            </div>
-                            {% else %}
-                            <div class="error-message">
-                                ⚠️ <strong>Image not found:</strong> {{ image_info.path }}
-                            </div>
-                            {% endif %}
-                        {% endfor %}
+        {% if ocean_features %}
+        <div id="ocean-features" class="section">
+            <h2>{{ ocean_features_title }}</h2>
+            {% for zone, zone_data in ocean_features.items() %}
+            <div class="zone-block">
+                <div class="zone-title">{{ zone_data.label if zone_data.label else zone.replace("_", " ") }}</div>
+                <div class="feature-content">
+                    {% for feature, feature_data in zone_data.features.items() %}
+                    <div class="description-item">
+                        <h4>{{ feature_data.label if feature_data.label else feature.replace("_", " ") }}</h4>
+                        <p>{{ feature_data.description }}</p>
                     </div>
+                    {% endfor %}
                 </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Results Sections with Gallery Layout -->
+        {% for comp_type, comp_data in images.items() %}
+       <!-- <div class="section"> -->
+       <div id="{{ comp_type|lower|replace(' ', '-') }}" class="section"> 
+   
+            <h2>{{ comp_data.label }}</h2>
+
+            {% for section, section_data in comp_data.sections.items() %}
+
+                <h3>{{ section_data.label }}</h3>
+
+                {% for output, output_data in section_data.outputs.items() %}
+                    <h4>{{ output_data.label }}</h4>
+
+                    {% for zone, zone_data in output_data.zones.items() %}
+                    <div class="zone-block">
+                        <div class="zone-title">{{ zone_data.label }}</div>
+                        <div class="gallery-grid">
+                
+                            {% for image_info in zone_data.images %}
+                                {% if image_info.found and image_info.data %}
+                                <div class="image-container" onclick="openModal(event,this.querySelector('img'))">
+                                    <img src="data:image/png;base64,{{ image_info.data }}"
+                                         alt="{{ comp_data.label }} - {{ zone_data.label }}">
+                                    <p class="image-caption">{{ comp_data.label }} - {{ zone_data.label }}</p>
+                                </div> 
+                                {% else %}
+                                <div class="error-message">
+                                    ⚠️ <strong>Image not found:</strong> {{ image_info.path }}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
                 {% endfor %}
             {% endfor %}
         </div>
@@ -553,11 +605,11 @@
             allImages = Array.from(document.querySelectorAll('.image-container img'));
         }
 
-        function openModal(imgElement) {
+        function openModal(event,imgElement) {
+            event.stopPropagation();
             collectImages();
             currentImageIndex = allImages.indexOf(imgElement);
             showImage(currentImageIndex);
-            event.stopPropagation();
         }
 
         function showImage(index) {

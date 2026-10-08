@@ -1,5 +1,5 @@
 armoor-decode
-###########
+#############
 
 
 See :doc:`_api/armoor.cli.decode.main_decode` for more details.

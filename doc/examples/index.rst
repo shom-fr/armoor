@@ -4,6 +4,7 @@ Gallery of examples
 ===================
 
 Hereafter are presented some examples of configuration files for metazone-based Armoor executables.
+See :ref:`guide-configuration` and :ref:`guide-metazones` for how these files are validated and consumed under the hood.
 
 .. grid:: 3
 
@@ -96,6 +97,18 @@ Hereafter are presented some examples of configuration files for metazone-based 
          :linenos:
 
         :download:`Download comp_clim.cfg <configs/comp_clim.cfg>`
+
+    .. grid-item-card:: Hydrological section comparison
+
+        Configuration for comparing 3D model outputs with observed
+        hydrological sections (gliders).
+
+        .. literalinclude:: configs/comp_hydrosection.cfg
+         :language: ini
+         :caption: comp_hydrosection.cfg
+         :linenos:
+
+        :download:`Download comp_hydrosection.cfg <configs/comp_hydrosection.cfg>`
 
     .. grid-item-card:: Bull
 

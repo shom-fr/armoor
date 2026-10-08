@@ -8,8 +8,8 @@ from argparse import ArgumentParser
 import dask.config
 import xarray as xr
 
-from armoor.base.io import ArmoorArgumentHelpFormatter
-from armoor.base.misc import parse_date, parse_hours, is_dict_empty, parse_coords
+from armoor.io import ArmoorArgumentHelpFormatter
+from armoor.misc import parse_date, parse_hours, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
@@ -34,7 +34,7 @@ class DecodeError(Exception):
     pass
 
 
-def get_parser_decode():
+def get_parser_decode() -> ArgumentParser:
     """Create argument parser for decoding operations.
     
     Returns
@@ -57,7 +57,7 @@ def get_parser_decode():
 
     return parser
 
-def main_decode():
+def main_decode() -> None:
     """Apply decode to input files via command line interface.
     
     This function serves as the main entry point for decoding operations.
@@ -86,4 +86,10 @@ def main_decode():
 
     with armoor_cli_session(args, (args.ifmt, args.platform)):
         ds = open_decode(args.fins, args.ifmt, platform=args.platform)
-        save_output(ds, args.fout, ofmt=args.ofmt, scheduler="threads")
+        # "threads" deadlocks intermittently: xarray's netCDF4 write lock is
+        # a CombinedLock over several process-global locks, and multiple
+        # dask worker threads doing netCDF I/O concurrently can block on
+        # each other acquiring them (confirmed via py-spy on stuck
+        # armoor-decode processes; "synchronous" -- single thread, no lock
+        # contention possible -- doesn't).
+        save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")

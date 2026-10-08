@@ -22,14 +22,16 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts, plot_flow
 from xoa import geo as xgeo
 
-from armoor.base import LINE_COLORS, CMAP_VARS
-from armoor.base.dispatch import SubclassingMethodRegistry
-from armoor.base.filters import create_optimized_mask
-from armoor.base.interp import vinterp
-from armoor.base.plot import (create_subplots, diagdisp, format_time_label,
-                              format_vertical_label, get_output_vminmax,
-                              save_figure)
-from armoor.data.datatype import DataEddies, DataOceanModel, get_data_type_by_name
+from armoor import LINE_COLORS, CMAP_VARS, MINMAX_VARS
+from armoor.dispatch import SubclassingMethodRegistry
+from armoor.filters import create_optimized_mask
+from armoor.interp import vinterp
+from armoor.plot import (create_subplots, diagdisp, format_time_label,
+                          format_vertical_label, get_output_vminmax,
+                          save_figure)
+from armoor.data.datatype import (
+    DataEddies, DataMeteo, DataOceanModel, DataSstSatellite, get_data_type_by_name
+)
 # from armoor.comp.stats import StatsComp
 
 logger = logging.getLogger(__name__)
@@ -38,10 +40,39 @@ matplotlib.use('Agg')
 plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({'font.size': 8})
 
+MS_TO_KNOTS = 1.9438444924406046
+
+
+def _cbar_range(da_all, var, vminmax, nstd, group_range=None,
+                series_mean=None, series_std=None):
+    """Compute a scalar variable's color scale, fixed once over a whole
+    mapseries -- not recomputed per frame like maps()/`_maps_raw` do.
+
+    Precedence: explicit `vminmax` > pooled `group_range` (cbar_group) >
+    `series_mean`/`series_std` (the otype's own series-wide stats, from
+    armoor.data.output._resolve_series_ranges) > `da_all`'s own mean/std
+    (fallback, e.g. if series stats weren't resolved for some reason).
+
+    Kept as a plain function (no cartopy/matplotlib) so it's testable on
+    its own -- see tests.uni.test_data_plot.
+    """
+    if vminmax and var in vminmax:
+        return vminmax[var]
+    if group_range is not None:
+        return group_range
+    if series_mean is not None and series_std is not None:
+        mean, std = series_mean, series_std
+    else:
+        mean, std = float(da_all.mean()), float(da_all.std())
+    if MINMAX_VARS.get(var) == "rel":
+        bound = nstd * std
+        return -bound, bound
+    return mean - nstd * std, mean + nstd * std
+
 
 class _PlotDataBase(SubclassingMethodRegistry):
     """Shared plumbing for all data-source plot types: open the datatree,
-    dispatch plot methods by name (see armoor.base.dispatch)."""
+    dispatch plot methods by name (see armoor.dispatch)."""
 
     _dispatch_label = "Data plot"
 
@@ -603,6 +634,89 @@ class PlotOceanModel(_PlotDataBase):
                     fig,
                     figname.format(**locals())
                     )
+
+    def vsections(self):
+        """Plot vertical sections (distance vs depth) along a broken-line transect."""
+        dsprod = self.dt.children["data"].to_dataset()
+        dsprod = dsprod.reset_coords("depth")
+        data_name = dsprod.attrs.get("data_name")
+        section_name = dsprod.attrs.get("section_name")
+        distance = dsprod["distance"] / 1000.0
+
+        vars2plot = [
+            var for var in dsprod.data_vars
+            if var != "depth" and "z" in dsprod[var].dims
+            ]
+        times = dsprod["time"].values if "time" in dsprod.dims else [None]
+
+        for var in vars2plot:
+            da_all = dsprod[var]
+            units = da_all.attrs.get("units")
+
+            if var in self.vminmax:
+                vmin, vmax = self.vminmax[var]
+            else:
+                vmin, vmax = float(da_all.min()), float(da_all.max())
+                if MINMAX_VARS.get(var) == "rel":
+                    bound = max(abs(vmin), abs(vmax))
+                    vmin, vmax = -bound, bound
+
+            for time_val in times:
+                da = da_all.sel(time=time_val) if time_val is not None else da_all
+                depth = dsprod["depth"]
+                if time_val is not None and "time" in depth.dims:
+                    depth = depth.sel(time=time_val)
+
+                distance2d, depth2d = xr.broadcast(distance, depth)
+                da, distance2d, depth2d = xr.broadcast(da, distance2d, depth2d)
+                da = da.transpose("z", "npts")
+                distance2d = distance2d.transpose("z", "npts")
+                depth2d = depth2d.transpose("z", "npts")
+
+                time_str = (
+                    pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
+                    if time_val is not None else ""
+                    )
+                title_lines = [data_name, self.metazone]
+                if section_name:
+                    title_lines.append(section_name)
+                if time_str:
+                    title_lines.append(time_str)
+                title_lines.append(f"{var}, {units}")
+                figtitle = "\n".join(title_lines)
+
+                fig, axes = create_subplots(nrows=1, figsize=(9, 5))
+                ax = axes[0]
+                m = ax.pcolormesh(
+                    distance2d, -depth2d, da,
+                    vmin=vmin, vmax=vmax, cmap=CMAP_VARS[var],
+                    )
+                fig.colorbar(
+                    m, ax=ax, orientation="vertical", label=f"{var}, {units}",
+                    fraction=0.05, shrink=0.8,
+                    )
+                ax.set_xlabel("Distance, km")
+                ax.set_ylabel("Depth, m")
+
+                kw = dict(
+                    plot_coords="lines",
+                    coords_linewidth=2,
+                    gridlines_draw_labels=True,
+                    gridlines_xlabel_style={'size': 6},
+                    gridlines_ylabel_style={'size': 6},
+                    )
+                plot_minimap(dsprod, ax=self.ax_minimap, **kw)
+
+                fig.suptitle(figtitle, y=1.01)
+                fig.subplots_adjust(top=0.85)
+
+                figname = (
+                    f"data/plot/{self.metazone}/"
+                    f"vsections_{var}_{data_name}"
+                    f"{'_' + section_name if section_name else ''}"
+                    f"{'_' + time_str if time_str else ''}.png"
+                    )
+                self.save_figure(fig, figname)
 
     def _timeseries_raw(self, ds_data):
         """Plot the raw per-point (and, when depth-resolved, per-native-
@@ -1274,6 +1388,320 @@ class PlotOceanModel(_PlotDataBase):
 
         return None
 
+    def mapseries(self):
+        """Plot one map per native time step for every scalar variable,
+        plus current/wind vectors when present, with a color scale fixed
+        once over the whole series.
+
+        otype "mapseries" (armoor.data.datatype) never has a "mean"/"std"
+        child -- unlike maps(), this is always the single-panel,
+        per-timestep case, so there's no mean/std branch to check here.
+        """
+        ds_data_all = self.dt.children["data"].to_dataset()
+        attrs = ds_data_all.attrs
+
+        vars2plot = [var for var in ds_data_all.data_vars if var != "depth"]
+        if "u" in vars2plot and "v" in vars2plot:
+            vars2plot = [var for var in vars2plot if var not in ("u", "v")]
+            self._mapseries_vector(ds_data_all, attrs)
+
+        for var in vars2plot:
+            if var not in CMAP_VARS:
+                continue
+            self._mapseries_scalar(ds_data_all, var, attrs)
+
+        return None
+
+    def _style_mapseries_axes(self, ax, date_str):
+        """Shared map styling for mapseries frames: coastlines, dashed
+        gridlines, a small top-left date/level label -- reused by both
+        _mapseries_scalar and _mapseries_vector."""
+        gl = ax.gridlines(
+            crs=ccrs.PlateCarree(),
+            draw_labels=True,
+            linewidth=0.5,
+            color='gray',
+            alpha=0.5,
+            linestyle='--'
+            )
+        gl.top_labels = False
+        gl.right_labels = False
+        ax.coastlines()
+        if date_str:
+            # loc='left' shares the same vertical baseline as the default
+            # (center) title set via ax.set_title(...), unlike a manually
+            # positioned ax.text(), which drifted out of alignment with it.
+            ax.set_title(date_str, loc='left', fontsize=9)
+        # Without this, matplotlib's default top margin (~0.88) leaves a
+        # wide blank band between the title/date row and the map frame --
+        # tighten it to match the compact reference rendering.
+        ax.figure.subplots_adjust(top=0.95)
+
+    def _add_minmax_table(self, ax, rowlabels, celltext):
+        """Compact min/max reference table, top-right of `ax`, matching
+        the reference forecaster rendering (uniform light-cyan cells).
+        Anchored via `ax.transAxes` (like the date/level text) so it sits
+        tight against the axes' top-right corner regardless of the
+        colorbar/title layout."""
+        height = 0.09 * len(rowlabels)
+        taxes = ax.inset_axes([0.8, 1.0, 0.2, height], transform=ax.transAxes)
+        table = taxes.table(
+            cellText=celltext,
+            rowLabels=rowlabels,
+            colLabels=["min", "max"],
+            cellLoc='center',
+            rowLoc='center',
+            loc="upper right",
+            )
+        taxes.set_axis_off()
+        table.set_fontsize(8)
+        for (irow, icol), cell in table.get_celld().items():
+            cell.set_facecolor("lightcyan")
+        return table
+
+    def _mapseries_scalar(self, ds_data_all, var, attrs):
+        """Render one map per native time step for a single scalar
+        variable, with a color scale fixed over the whole series and a
+        min/max reference table (top-right of each frame): a "data" row
+        (this frame's own min/max, always shown) and a "clim" row (a
+        reference climatology's min/max, shown only when
+        `clim_min_<var>`/`clim_max_<var>` attrs are present -- see
+        `armoor.data.output.OutputProcessor._attach_clim_range`).
+        """
+        data_name = attrs.get("data_name")
+        nstd = attrs.get("nstd", 2.5)
+        vlevel = attrs.get("vlevel")
+        if isinstance(vlevel, list):
+            vlevel = vlevel[0]
+        vlevel_str = f"{vlevel}m" if vlevel is not None else ""
+        vlevel_suffix = f"_{vlevel}" if vlevel is not None else ""
+
+        da_full = ds_data_all[var]
+        # Squeeze away size-1 dims (e.g. "z", already split to one native
+        # level per file) but keep "time" as a real dim even when it's
+        # also size-1 -- see PlotOceanModel._maps_raw's identical guard.
+        squeeze_dims = [d for d, s in da_full.sizes.items() if s == 1 and d != "time"]
+        da_all = da_full.squeeze(dim=squeeze_dims) if squeeze_dims else da_full
+        units = da_all.attrs.get("units")
+
+        cbar_min = attrs.get(f"cbar_min_{var}")
+        cbar_max = attrs.get(f"cbar_max_{var}")
+        group_range = (cbar_min, cbar_max) if cbar_min is not None and cbar_max is not None else None
+        series_mean = attrs.get(f"series_mean_{var}")
+        series_std = attrs.get(f"series_std_{var}")
+        vmin, vmax = _cbar_range(
+            da_all, var, self.vminmax, nstd, group_range, series_mean, series_std
+        )
+        clim_min = attrs.get(f"clim_min_{var}")
+        clim_max = attrs.get(f"clim_max_{var}")
+        has_clim = clim_min is not None and clim_max is not None
+
+        times = da_all["time"].values if "time" in da_all.dims else [None]
+        for time_val in times:
+            da = da_all.sel(time=time_val) if time_val is not None else da_all
+            time_str = (
+                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
+                if time_val is not None else ""
+                )
+            date_str = (
+                pd.Timestamp(time_val).strftime("%Y-%m-%d, %H:%M")
+                if time_val is not None else ""
+                )
+            if vlevel_str:
+                date_str = f"{date_str} - {vlevel_str}" if date_str else vlevel_str
+
+            dlat = da.lat.max() - da.lat.min()
+            dlon = da.lon.max() - da.lon.min()
+            aspect_ratio = 3 / 2 * dlat / dlon
+            fig, axes = create_subplots(
+                    nrows=1,
+                    figsize=(8 / aspect_ratio, 8),
+                    x_label='Date', y_label=None,
+                    projection=ccrs.PlateCarree()
+                )
+            ax = axes[0]
+            if ("npts" in da.dims) or (da.lon.dims != ("y", "x")):
+                m0 = ax.scatter(
+                    da.lon, da.lat,
+                    c=da,
+                    vmin=vmin,
+                    vmax=vmax,
+                    cmap=CMAP_VARS[var]
+                    )
+            else:
+                m0 = ax.pcolormesh(
+                    da.lon, da.lat, da,
+                    vmin=vmin,
+                    vmax=vmax,
+                    cmap=CMAP_VARS[var]
+                    )
+
+            fig.colorbar(
+                m0, ax=ax, orientation='vertical', label=f"{var}, {units}",
+                fraction=0.05, shrink=0.5
+                )
+
+            ax.set_title(f"{var} ({data_name})")
+            self._style_mapseries_axes(ax, date_str)
+
+            celltext = [[f"{float(da.min()):.2f}", f"{float(da.max()):.2f}"]]
+            rowlabels = ["data"]
+            if has_clim:
+                celltext.insert(0, [f"{clim_min:.2f}", f"{clim_max:.2f}"])
+                rowlabels.insert(0, "clim")
+            self._add_minmax_table(ax, rowlabels, celltext)
+
+            figname = (
+                f"data/plot/{self.metazone}/"
+                f"mapseries_{var}_{data_name}_{time_str}{vlevel_suffix}.png"
+                )
+            self.save_figure(fig, figname)
+
+        return None
+
+    def _mapseries_vector(self, ds_data_all, attrs):
+        """Render one current/wind map per native time step: magnitude as
+        a pcolormesh/scatter background (color scale fixed over the whole
+        series, like `_mapseries_scalar`), direction overlaid via quiver
+        or barbs depending on `attrs["vector_style"]`. Min/max table
+        (top-right) has a single "data" row only -- no climatology
+        concept for current/wind."""
+        data_name = attrs.get("data_name")
+        nstd = attrs.get("nstd", 2.5)
+        vector_style = attrs.get("vector_style", "quiver")
+        vector_scale = attrs.get("vector_scale", 1.0)
+        rarification = attrs.get("rarification")
+        barbs_length = attrs.get("barbs_length", 4.0)
+        barbs_linewidth = attrs.get("barbs_linewidth", 0.3)
+        quiver_scale = attrs.get("quiver_scale")
+        vlevel = attrs.get("vlevel")
+        if isinstance(vlevel, list):
+            vlevel = vlevel[0]
+        vlevel_str = f"{vlevel}m" if vlevel is not None else ""
+        vlevel_suffix = f"_{vlevel}" if vlevel is not None else ""
+
+        squeeze_dims = [
+            d for d, s in ds_data_all["u"].sizes.items() if s == 1 and d != "time"
+            ]
+        u_all = ds_data_all["u"].squeeze(dim=squeeze_dims) if squeeze_dims else ds_data_all["u"]
+        v_all = ds_data_all["v"].squeeze(dim=squeeze_dims) if squeeze_dims else ds_data_all["v"]
+
+        if rarification is None:
+            # No explicit cfgfile override -- aim for ~30 arrows along the
+            # grid's longer horizontal axis regardless of native
+            # resolution, instead of a fixed spacing that turns into an
+            # unreadable hatch on high-resolution model grids.
+            if "x" in u_all.dims:
+                npts_dim = max(u_all.sizes["x"], u_all.sizes["y"])
+            elif "npts" in u_all.dims:
+                npts_dim = u_all.sizes["npts"]
+            else:
+                npts_dim = 30
+            rarification = max(1, round(npts_dim / 30))
+        else:
+            rarification = int(rarification)
+
+        # Always displayed in knots (forecaster convention for wind/current
+        # speed), independent of vector_scale which only tunes arrow glyphs.
+        speed_all = np.sqrt(u_all ** 2 + v_all ** 2) * MS_TO_KNOTS
+
+        if "cspeed" in self.vminmax:
+            vmin, vmax = self.vminmax["cspeed"]
+        else:
+            series_mean = attrs.get("series_mean_cspeed")
+            series_std = attrs.get("series_std_cspeed")
+            if series_mean is not None and series_std is not None:
+                mean, std = series_mean * MS_TO_KNOTS, series_std * MS_TO_KNOTS
+            else:
+                mean, std = float(speed_all.mean()), float(speed_all.std())
+            vmin = 0.0
+            vmax = mean + nstd * std
+
+        times = u_all["time"].values if "time" in u_all.dims else [None]
+        for time_val in times:
+            u = u_all.sel(time=time_val) if time_val is not None else u_all
+            v = v_all.sel(time=time_val) if time_val is not None else v_all
+            speed = np.sqrt(u ** 2 + v ** 2) * MS_TO_KNOTS
+            time_str = (
+                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
+                if time_val is not None else ""
+                )
+            date_str = (
+                pd.Timestamp(time_val).strftime("%Y-%m-%d, %H:%M")
+                if time_val is not None else ""
+                )
+            if vlevel_str:
+                date_str = f"{date_str} - {vlevel_str}" if date_str else vlevel_str
+
+            dlat = u.lat.max() - u.lat.min()
+            dlon = u.lon.max() - u.lon.min()
+            aspect_ratio = 3 / 2 * dlat / dlon
+            fig, axes = create_subplots(
+                    nrows=1,
+                    figsize=(8 / aspect_ratio, 8),
+                    x_label='Date', y_label=None,
+                    projection=ccrs.PlateCarree()
+                )
+            ax = axes[0]
+            is_cloud = ("npts" in u.dims) or (u.lon.dims != ("y", "x"))
+            if is_cloud:
+                m0 = ax.scatter(
+                    u.lon, u.lat, c=speed,
+                    vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
+                    )
+            else:
+                m0 = ax.pcolormesh(
+                    u.lon, u.lat, speed,
+                    vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
+                    )
+
+            if u.lon.dims == ("y", "x"):
+                u_r = u.isel(y=slice(None, None, rarification), x=slice(None, None, rarification))
+                v_r = v.isel(y=slice(None, None, rarification), x=slice(None, None, rarification))
+            elif "npts" in u.dims:
+                u_r = u.isel(npts=slice(None, None, rarification))
+                v_r = v.isel(npts=slice(None, None, rarification))
+            else:
+                u_r, v_r = u, v
+
+            if vector_style == "barbs":
+                ax.barbs(
+                    u_r.lon, u_r.lat,
+                    u_r * MS_TO_KNOTS * vector_scale, v_r * MS_TO_KNOTS * vector_scale,
+                    length=barbs_length, linewidth=barbs_linewidth,
+                    transform=ccrs.PlateCarree(),
+                    )
+            else:
+                ax.quiver(
+                    u_r.lon, u_r.lat,
+                    u_r * MS_TO_KNOTS * vector_scale, v_r * MS_TO_KNOTS * vector_scale,
+                    scale=quiver_scale, color="black",
+                    transform=ccrs.PlateCarree(),
+                    )
+
+            fig.colorbar(
+                m0, ax=ax, orientation='vertical', label="speed, kt",
+                fraction=0.05, shrink=0.5
+                )
+
+            ax.set_title(f"speed ({data_name})")
+            self._style_mapseries_axes(ax, date_str)
+            self._add_minmax_table(
+                ax, ["data"],
+                [[f"{float(speed.min()):.2f}", f"{float(speed.max()):.2f}"]],
+                )
+
+            figname = self._vector_figname(data_name, time_str, vlevel_suffix)
+            self.save_figure(fig, figname)
+
+        return None
+
+    def _vector_figname(self, data_name, time_str, vlevel_suffix):
+        return (
+            f"data/plot/{self.metazone}/"
+            f"mapseries_current_{data_name}_{time_str}{vlevel_suffix}.png"
+            )
+
 
 class PlotEddies(_PlotDataBase):
     """Plot methods for eddy-detection tool output (contour_lat/contour_lon,
@@ -1285,8 +1713,32 @@ class PlotEddies(_PlotDataBase):
     """
 
 
+class PlotSstSatellite(PlotOceanModel):
+    """Plot methods for satellite SST products -- surface-only (ptemp),
+    reuses every PlotOceanModel method as-is."""
+
+
+class PlotMeteo(PlotOceanModel):
+    """Plot methods for atmospheric forcing (wind u/v, ...) -- reuses
+    every PlotOceanModel method as-is, except mapseries's vector
+    rendering, forced to barbs (meteorological convention for wind)
+    regardless of any configured vector_style, with a plain "wind"
+    figname instead of "current_{data_name}"."""
+
+    def _mapseries_vector(self, ds_data_all, attrs):
+        super()._mapseries_vector(ds_data_all, {**attrs, "vector_style": "barbs"})
+
+    def _vector_figname(self, data_name, time_str, vlevel_suffix):
+        return (
+            f"data/plot/{self.metazone}/"
+            f"mapseries_wind_{time_str}{vlevel_suffix}.png"
+            )
+
+
 DataOceanModel.plotter_cls = PlotOceanModel
 DataEddies.plotter_cls = PlotEddies
+DataSstSatellite.plotter_cls = PlotSstSatellite
+DataMeteo.plotter_cls = PlotMeteo
 
 
 def get_plotter(nc, metazone, vminmax=None):

@@ -3,6 +3,7 @@ name = "armoor"
 authors = [
     {name = "Shom", email = "mathieu.morvan@shom.fr"},
 ]
+license = "Apache-2.0"
 license-files = ["LICENSE.rst"]
 description = "Analysis of Regional MOdelised and ObseRved ocean"
 dynamic = ["version"]
@@ -23,7 +24,8 @@ dependencies = [
     # xoa now comes from conda-forge (see requirements.txt/environment.yml,
     # pinned to 2026.7.0) -- woom/shoot have no conda-forge package, stay git-based.
     "woom @ git+https://github.com/shom-fr/woom.git",
-    "shoot @ git+https://github.com/shom-fr/shoot.git@develop"
+    "shoot @ git+https://github.com/shom-fr/shoot.git@develop",
+    "python-gitlab",
 ]
 [project.optional-dependencies]
 
@@ -46,9 +48,9 @@ doc = [
 ]
 
 [project.urls]
-homepage = "https://gitshom.gitlab.io/STM/armoor/"
-issue-tracker = "https://gitlab.com/GitShom/STM/armoor/-/issues"
-source-code = "https://gitlab.com/GitShom/STM/armoor"
+homepage = "https://shom-fr.github.io/armoor/"
+issue-tracker = "https://github.com/shom-fr/armoor/issues"
+source-code = "https://github.com/shom-fr/armoor"
 
 
 [project.scripts]
@@ -60,6 +62,7 @@ armoor-comp = "armoor.cli.comp:main_comp"
 armoor-comp-argo = "armoor.cli.main:main_comp_argo"
 armoor-comp-clim = "armoor.cli.main:main_comp_clim"
 armoor-comp-drifter = "armoor.cli.main:main_comp_drifter"
+armoor-comp-hydrosection = "armoor.cli.main:main_comp_hydrosection"
 armoor-comp-models = "armoor.cli.main:main_comp_models"
 armoor-comp-mooring = "armoor.cli.main:main_comp_mooring"
 armoor-comp-sst = "armoor.cli.main:main_comp_sst"
@@ -75,16 +78,21 @@ armoor-interp-horizontal = "armoor.cli.interp:main_interp_horizontal"
 armoor-interp-vertical = "armoor.cli.interp:main_interp_vertical"
 armoor-range-time = "armoor.cli.range:main_range_time"
 armoor-range-vertical = "armoor.cli.range:main_range_vertical"
+armoor-tick-authentication = "armoor.cli.tick:main_tick_authentication"
+armoor-tick-authentication-info = "armoor.cli.tick:main_tick_authentication_info"
+armoor-tick-create = "armoor.cli.tick:main_tick_create"
+armoor-tick-description = "armoor.cli.tick:main_tick_description"
+armoor-tick-search = "armoor.cli.tick:main_tick_search"
 armoor-viewer = "armoor.viewer.app:main"
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0.0", "wheel"]  # PEP 639 license = "Apache-2.0" needs >=77
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = [
-    "armoor", "armoor.accessors", "armoor.algo", "armoor.base",
-    "armoor.cli", "armoor.comp", "armoor.data", "armoor.diags",
+    "armoor", "armoor.accessors", "armoor.algo", "armoor.bull",
+    "armoor.cli", "armoor.comp", "armoor.data", "armoor.diags", "armoor.tick",
     "armoor.viewer", "armoor.viewer.api", "armoor.viewer.rendering", "armoor.viewer.bridge",
 ]
 include-package-data = true

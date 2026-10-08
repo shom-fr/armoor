@@ -5,7 +5,7 @@ See `armoor.data.datatype` for the per-data-type hierarchy that now backs
 """
 INTERP_PARAMS_USER = {
     "time": ("tfreq",),
-    "horizontal": ("cloud",),
+    "horizontal": ("cloud", "section"),
     "vertical": ("vlevel","vfreq"),
     }
 

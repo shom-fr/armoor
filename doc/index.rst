@@ -13,10 +13,13 @@
    :maxdepth: 1
    :hidden:
 
+   tutorials/index
    accessors
    cli
+   tick
    viewer
    examples/index
+   guides/index
 
 .. toctree::
    :caption: Reference
@@ -25,9 +28,8 @@
 
    api
    changes
-   roadmap
    appendix
-   Gitlab repository <https://gitlab.com/GitShom/STM/armoor>
+   GitHub repository <https://github.com/shom-fr/armoor>
 
 .. toctree::
    :caption: Contributing

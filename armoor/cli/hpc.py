@@ -1,17 +1,20 @@
-"""HPC job submission for armoor-comp-* pipelines via woom.
+"""HPC job submission for armoor-comp-\* and armoor-data pipelines via woom.
 
 The calling process supervises the full pipeline, waiting for each wave
 before submitting the next:
 
-  Wave 0 LOAD  : 1 job per dataset (loads all metazones, writes zarr paths JSON)
-                  ↓ wait
-  Wave 1 COMP  : N_metazones jobs in parallel (filter+coloc+output, no plot)
-                  ↓ wait
-  Wave 2 MERGE : 1 job (merges per-metazone output JSONs)
-                  ↓ wait
-  Wave 3 PLOT  : N_otypes jobs in parallel (one otype per job)
-                  ↓ wait
-  Wave 4 FINAL : in-process (writes final user-facing JSON directly)
+- Wave 0 (LOAD): 1 job per dataset, loads all metazones, writes zarr
+  paths JSON. For armoor-data this already includes interpolation, done
+  if necessary (see armoor.data.load.load_datasets) -- there is no
+  separate interp wave.
+- Wave 1: N_metazones jobs in parallel, no plot. filter+coloc+output for
+  armoor-comp-\* (stage1_label="comp"); filter+output only for
+  armoor-data (stage1_label="output", no coloc stage).
+- Wave 2 (MERGE): 1 job, merges per-metazone output JSONs.
+- Wave 3 (PLOT): N_otypes jobs in parallel, one otype per job.
+- Wave 4 (FINAL): in-process, writes the final user-facing JSON directly.
+
+Each wave waits for the previous one to finish before submitting the next.
 
 Sub-job logs are consolidated into the main log by _log_completed_jobs()
 after each wave.
@@ -25,6 +28,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Optional
 
 from armoor.cli import HPC_DEFAULTS
 
@@ -35,11 +39,12 @@ logger = logging.getLogger(__name__)
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_hpc(host, scheduler, cfgfile, metafile, metazones_list,
-            func_comp, jsonfile, ofilter, ocoloc,
-            comp_args, kw_dask, original_argv,
-            run_dir=None):
-    """Run the armoor comp pipeline as HPC jobs, supervising all waves.
+def run_hpc(host: Any, scheduler: str, cfgfile: Path, metafile: Path, metazones_list: list[str],
+            func_comp: str, jsonfile: Path, ofilter: bool, ocoloc: bool,
+            comp_args: dict, kw_dask: tuple, original_argv: list[str],
+            run_dir: Optional[Path] = None, ini_schema: Optional[str] = None,
+            stage1_label: str = "comp") -> None:
+    """Run the armoor comp/data pipeline as HPC jobs, supervising all waves.
 
     Parameters
     ----------
@@ -50,17 +55,23 @@ def run_hpc(host, scheduler, cfgfile, metafile, metazones_list,
     func_comp : str
     jsonfile : Path — final output JSON path
     ofilter, ocoloc : bool — stage-only flags from original invocation
+        (ocoloc is unused when stage1_label != "comp"; armoor-data has no
+        colocation stage)
     comp_args : dict — extra args (radius, qc, tbound, …)
     kw_dask : tuple — dask args from original invocation
     original_argv : list — sys.argv of the calling process
     run_dir : Path|None — working directory for job scripts and logs
+    ini_schema : str — path to the .ini schema file (COMP_INI or DATA_INI)
+    stage1_label : str — internal label for Wave 1 ("comp" for
+        armoor-comp-\*, "output" for armoor-data), used for job/log names
+        and to look up time_<label>/ncpus_<label> in the [hpc] section.
     """
     from armoor import ArmoorError
 
     # Resolve template placeholders in jsonfile (e.g. 'ncs_{func_comp}.json').
     jsonfile = Path(str(jsonfile).format(func_comp=func_comp))
 
-    hpc_cfg = _get_hpc_cfg(cfgfile)
+    hpc_cfg = _get_hpc_cfg(cfgfile, ini_schema)
     timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
     workdir = Path.cwd()
     is_hpc = scheduler != "background"
@@ -87,7 +98,7 @@ def run_hpc(host, scheduler, cfgfile, metafile, metazones_list,
     # Wave 0 : load jobs (1 per dataset, covering all metazones)
     # ------------------------------------------------------------------
     mz_str = ",".join(metazones_list)
-    dataset_keys = _get_dataset_keys(cfgfile)
+    dataset_keys = _get_dataset_keys(cfgfile, ini_schema)
     use_wave0 = len(dataset_keys) > 0
 
     load_jsons = {}  # dataset_key → Path(json)
@@ -126,8 +137,9 @@ def run_hpc(host, scheduler, cfgfile, metafile, metazones_list,
         # Wave 1 : comp jobs (filter+coloc+output, no plot), 1 per metazone
         # ------------------------------------------------------------------
         comp_jobs = []
+        wave1_label = f"Wave 1 ({stage1_label})"
         for mz in metazones_list:
-            subdir = run_dir / f"comp_{mz}"
+            subdir = run_dir / f"{stage1_label}_{mz}"
             subdir.mkdir(exist_ok=True)
             output_json = run_dir / f"output_{mz}.json"
             # Each Wave 1 job receives all dataset JSONs; it picks its own
@@ -143,25 +155,25 @@ def run_hpc(host, scheduler, cfgfile, metafile, metazones_list,
                 input_zarrs=extra_zarrs,
             )
             script = _write_script(subdir, cmd, workdir=workdir)
-            job = _submit(script, _opts(hpc_cfg, "comp", mz, host=host, subdir=subdir))
+            job = _submit(script, _opts(hpc_cfg, stage1_label, mz, host=host, subdir=subdir))
             comp_jobs.append(job)
 
         if is_hpc:
-            failed, statuses = _wait_hpc_jobs(comp_jobs, "Wave 1 (comp)")
-            _log_completed_jobs(comp_jobs, "Wave 1 (comp)")
+            failed, statuses = _wait_hpc_jobs(comp_jobs, wave1_label)
+            _log_completed_jobs(comp_jobs, wave1_label)
             for job in comp_jobs:
                 st = statuses.get(job)
-                all_records.append(("Wave 1 (comp)", job.name, st.name if st else "COMPLETED"))
+                all_records.append((wave1_label, job.name, st.name if st else "COMPLETED"))
             if failed:
                 raise ArmoorError(
-                    f"Wave 1 comp job(s) failed — aborting pipeline. "
+                    f"{wave1_label} job(s) failed — aborting pipeline. "
                     f"Check stderr files in {run_dir}."
                 )
         else:
             _wait_for_jobs(comp_jobs)
-            _log_completed_jobs(comp_jobs, "Wave 1 (comp)")
+            _log_completed_jobs(comp_jobs, wave1_label)
             for job in comp_jobs:
-                all_records.append(("Wave 1 (comp)", job.name, "COMPLETED"))
+                all_records.append((wave1_label, job.name, "COMPLETED"))
 
         # ------------------------------------------------------------------
         # Wave 2 : merge — inline JSON merge (no HPC job needed)
@@ -185,7 +197,7 @@ def run_hpc(host, scheduler, cfgfile, metafile, metazones_list,
         # ------------------------------------------------------------------
         # Wave 3 : plot jobs, 1 per otype
         # ------------------------------------------------------------------
-        otypes = _get_otypes_from_cfg(cfgfile)
+        otypes = _get_otypes_from_cfg(cfgfile, ini_schema)
         mz_str = ",".join(metazones_list)
         plot_jobs = []
         plot_output_jsons = []
@@ -232,7 +244,7 @@ def run_hpc(host, scheduler, cfgfile, metafile, metazones_list,
                 with open(pj) as f:
                     png_paths.extend(json.load(f))
 
-        _finalize(merged_json, jsonfile, cfgfile, png_paths=png_paths or None)
+        _finalize(merged_json, jsonfile, cfgfile, ini_schema, png_paths=png_paths or None)
         all_records.append(("Wave 4 (final)", "finalize", "COMPLETED"))
 
         logger.info(f"Pipeline complete — run_dir: {run_dir}")
@@ -577,7 +589,7 @@ def _write_script(subdir, cmd, workdir=None):
 
 
 
-def _finalize(merged_json, jsonfile, cfgfile, png_paths=None):
+def _finalize(merged_json, jsonfile, cfgfile, ini_schema, png_paths=None):
     """Write the final user-facing JSON.
 
     If png_paths is provided (Wave 3 ran), write those directly.
@@ -591,18 +603,17 @@ def _finalize(merged_json, jsonfile, cfgfile, png_paths=None):
         return
 
     from xoa.cfgm import ConfigManager
-    from armoor.cli import COMP_INI
-    from armoor.base.misc import dict_to_list
+    from armoor.misc import dict_to_list
 
     with open(merged_json) as f:
         zarr_outputs = json.load(f)
 
-    cfg = ConfigManager(COMP_INI).load(str(cfgfile))
+    cfg = ConfigManager(ini_schema).load(str(cfgfile))
     ofmt = cfg['outputs'].get('fmt', 'zarr')
     flat = dict_to_list(zarr_outputs)
 
     if 'netcdf' in ofmt:
-        from armoor.base.io import zarrs2netcdfs
+        from armoor.io import zarrs2netcdfs
         outputs = zarrs2netcdfs([str(p) for p in flat])
     else:
         outputs = [str(p) for p in flat]
@@ -740,12 +751,11 @@ def _wait_for_jobs(jobs):
         job.wait()
 
 
-def _get_hpc_cfg(cfgfile):
-    """Read the [hpc] section from comp.cfg, falling back to HPC_DEFAULTS."""
+def _get_hpc_cfg(cfgfile, ini_schema):
+    """Read the [hpc] section from cfgfile, falling back to HPC_DEFAULTS."""
     try:
         from xoa.cfgm import ConfigManager
-        from armoor.cli import COMP_INI
-        cfg = ConfigManager(COMP_INI).load(str(cfgfile))
+        cfg = ConfigManager(ini_schema).load(str(cfgfile))
         hpc = cfg.get("hpc")
         if hpc:
             merged = dict(HPC_DEFAULTS)
@@ -756,20 +766,18 @@ def _get_hpc_cfg(cfgfile):
     return dict(HPC_DEFAULTS)
 
 
-def _get_dataset_keys(cfgfile):
-    """Return the list of dataset keys from the [data] section of comp.cfg."""
+def _get_dataset_keys(cfgfile, ini_schema):
+    """Return the list of dataset keys from the [data] section of cfgfile."""
     from xoa.cfgm import ConfigManager
-    from armoor.cli import COMP_INI
-    cfg = ConfigManager(COMP_INI).load(str(cfgfile))
+    cfg = ConfigManager(ini_schema).load(str(cfgfile))
     return list(cfg["data"].keys())
 
 
-def _get_otypes_from_cfg(cfgfile):
-    """Return the list of otypes defined in the [outputs] section of comp.cfg."""
+def _get_otypes_from_cfg(cfgfile, ini_schema):
+    """Return the list of otypes defined in the [outputs] section of cfgfile."""
     try:
         from xoa.cfgm import ConfigManager
-        from armoor.cli import COMP_INI
-        cfg = ConfigManager(COMP_INI).load(str(cfgfile))
+        cfg = ConfigManager(ini_schema).load(str(cfgfile))
         outputs = cfg.get("outputs", {})
         otypes = []
         for key, section in outputs.items():

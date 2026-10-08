@@ -7,7 +7,7 @@ that importing ``armoor.accessors`` is the single authoritative trigger.
 
 import xarray as xr
 
-from armoor.base.oceanvars import OceanVars
+from armoor.oceanvars import OceanVars
 
 # Register OceanVars directly — keeps all internal self.ds.oceanvars.* calls
 # working without any wrapper layer.

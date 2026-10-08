@@ -7,6 +7,10 @@ stages:
 
 variables:
   MPLBACKEND: agg
+  # Redirects cartopy's (and other XDG-aware tools') download cache into
+  # armoor_env/, so it rides along the existing armoor_env/ cache and
+  # doesn't need re-downloading (from Natural Earth) in every job/pipeline.
+  XDG_DATA_HOME: $CI_PROJECT_DIR/armoor_env/share
 
 before_script:
   - apt-get update > /dev/null
@@ -20,6 +24,10 @@ setup:
     - conda info -a
     - test -d armoor_env || (conda create -p armoor_env python=3.11; source activate ./armoor_env; conda install -c conda-forge mamba; mamba install -c conda-forge --file requirements.txt; pip install .; conda deactivate)
     - source activate ./armoor_env
+    # Force cartopy's Natural Earth shapefile download now (into
+    # $XDG_DATA_HOME/cartopy, i.e. inside the cached armoor_env/) rather
+    # than lazily the first time a doc-build notebook plots a map.
+    - python -c "import cartopy.feature as cfeature; list(cfeature.LAND.geometries())"
   cache:
     paths:
       - armoor_env/
@@ -29,8 +37,8 @@ tests:
   script:
     - source activate ./armoor_env
     - export PYTHONPATH=$PWD
-    - pytest -v -s armoor/tests/uni
-    - pytest -v -s armoor/tests/integration/test_armoor_woom.py
+    - pytest -v -s tests/uni
+    - pytest -v -s tests/integration/test_armoor_woom.py
   cache:
     paths:
       - armoor_env/

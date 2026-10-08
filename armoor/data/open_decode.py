@@ -31,8 +31,8 @@ from pyproj import Geod
 from xoa.grid import dz2depth, shift, to_rect
 
 from armoor import ROOTDIR, ArmoorError
-from armoor.base.interp import regrid
-from armoor.base.misc import optimize_for_low_swap
+from armoor.interp import regrid
+from armoor.misc import optimize_for_low_swap
 
 logger = logging.getLogger(__name__)
 
@@ -48,23 +48,23 @@ xr.set_options(keep_attrs=True)
 
 def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
     """Generate absolute paths from a pattern string with wildcard and list expansion.
-    
+
     Supports patterns like :
-    - '/path/to/files/*.txt' (standard glob)
-    - '/path/to/files/*[option1,option2].txt' (list expansion)
-    
+    - '/path/to/files/\*.txt' (standard glob)
+    - '/path/to/files/\*[option1,option2].txt' (list expansion)
+
     Parameters
     ----------
     pattern : str
         Path pattern with wildcards (*) and optional list expansions [item1,item2,...]
     sort_results : bool, default True
         Whether to sort the resulting paths alphabetically
-        
+
     Returns
     -------
     List[str]
         List of absolute paths matching the pattern
-        
+
     Raises
     ------
     ValueError
@@ -77,19 +77,19 @@ def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
     if "*" in path_files or "[" in path_files:
         # Convert to Path object and resolve to absolute
         pattern_path = Path(path_files).expanduser()
-        
+
         # Check for list expansion syntax [item1,item2,...]
         list_pattern = re.compile(r'\[([^\]]+)\]')
         matches = list_pattern.findall(path_files)
-        
+
         if not matches:
             # Simple glob pattern without list expansion
             files = _glob_and_resolve(str(pattern_path), sort_results)
-            if len(files) > 0 :
+            if len(files) > 0:
                 return files
             else:
                 raise ArmoorError(f"{path_files} not found.")
-        
+
         # Handle list expansion
         expanded_patterns = _expand_list_patterns(str(pattern_path), matches)
     elif "*" not in path_files and "," in path_files:
@@ -112,27 +112,27 @@ def get_paths(path_files: str, sort_results: bool = True) -> List[str]:
 def _expand_list_patterns(pattern: str, matches: List[str]) -> List[str]:
     """
     Expand list patterns like [item1,item2] into multiple pattern strings.
-    
+
     Parameters
     ----------
     pattern : str
         Original pattern with list syntax
     matches : List[str]
         List of matched content inside brackets
-        
+
     Returns
     -------
     List[str]
         List of expanded patterns
     """
     expanded_patterns = [pattern]
-    
+
     for match in matches:
         # Split items and clean whitespace
         items = [item.strip() for item in match.split(',')]
         if not items or any(not item for item in items):
             raise ValueError(f"Invalid list syntax in pattern: [{match}]")
-        
+
         # Expand current patterns with each item
         new_patterns = []
         for current_pattern in expanded_patterns:
@@ -140,7 +140,7 @@ def _expand_list_patterns(pattern: str, matches: List[str]) -> List[str]:
                 # Replace first occurrence of [match] with item
                 new_pattern = current_pattern.replace(f'[{match}]', item, 1)
                 new_patterns.append(new_pattern)
-        
+
         expanded_patterns = new_patterns
 
     return expanded_patterns
@@ -149,14 +149,14 @@ def _expand_list_patterns(pattern: str, matches: List[str]) -> List[str]:
 def _glob_and_resolve(pattern: str, sort_results: bool = True) -> List[str]:
     """
     Apply glob pattern matching and resolve to absolute paths.
-    
+
     Parameters
     ----------
     pattern : str
         Glob pattern
     sort_results : bool
         Whether to sort results
-        
+
     Returns
     -------
     List[str]
@@ -165,32 +165,38 @@ def _glob_and_resolve(pattern: str, sort_results: bool = True) -> List[str]:
     try:
         # Use glob to find matching files
         matched_paths = glob.glob(pattern, recursive=True)
-        
+
         # Convert to absolute paths
         absolute_paths = [str(Path(path).resolve()) for path in matched_paths]
-        
+
         return sorted(absolute_paths) if sort_results else absolute_paths
-    
+
     except Exception as e:
         # Check if base directory exists for better error messages
         base_dir = Path(pattern).parent
         while '*' in str(base_dir) or '[' in str(base_dir):
             base_dir = base_dir.parent
-        
+
         if not base_dir.exists():
             raise FileNotFoundError(f"Base directory does not exist: {base_dir}")
-        
+
         raise e
 
+
 def register_cf():
-    cfg_files = glob.glob(
-        os.path.join(ROOTDIR, "data", "cf_*.cfg")
-    )
+    """Register every armoor CF spec (``armoor/data/cf_*.cfg``) into xoa.
+
+    Must be called once before decoding any format-specific dataset (e.g.
+    cmems_model, cmems_argo) so `xoa.meta` recognizes its variable/coordinate
+    naming conventions.
+    """
+    cfg_files = glob.glob(os.path.join(ROOTDIR, "data", "cf_*.cfg"))
     for cfg_file in cfg_files:
         logger.info(f"register {cfg_file}")
         mycfspecs = MetaSpecs(cfg_file, default=True, user=False)
         xmeta.register_meta_specs(mycfspecs)
-    
+
+
 def _normalize_geo_coords(ds):
     """Ensure lon/lat coordinates carry standard_name so xoa can locate them."""
     if isinstance(ds, list):
@@ -213,10 +219,16 @@ class Decoder:
 
     Subclasses register themselves under every fmt string listed in
     ``fmts`` (several fmt values can share one decoder, e.g. hycom/hycom3d).
+
+    ``fixed_levels`` tells whether each native "z" index sits at one fixed
+    depth everywhere (z-level models, observations) or not (terrain-
+    following/hybrid grids, e.g. CROCO sigma or HYCOM layers) -- copied
+    into ``ds.attrs["fixed_levels"]`` at load time.
     """
 
     name = None
     fmts = ()
+    fixed_levels = True
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -306,6 +318,36 @@ class CoraInsituDecoder(Decoder):
         """
         logger.info("Opening/decoding insitu cmems files")
         return open_decode_cora_insitu(path_files, platform=platform)
+
+
+class OdarDecoder(Decoder):
+    """ODAR-processed towed/glider CTD sections (seasoar, scanfish,
+    rapidcast, MVP -- distinguished by each file's own
+    ``ODAR_DATASET_TYPE`` attr, not by `platform`)."""
+
+    name = "odar"
+    fmts = ("odar",)
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode ODAR section files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            Unused (kept for a uniform `Decoder.decode` signature).
+        platform : str, optional
+            Unused: the instrument type is read from each file's own
+            ``ODAR_DATASET_TYPE`` attr, not asserted externally.
+
+        Returns
+        -------
+        list of xarray.Dataset
+            See `open_decode_odar`.
+        """
+        logger.info("Opening/decoding ODAR files")
+        return open_decode_odar(path_files)
 
 
 class CmemsModelDecoder(Decoder):
@@ -400,6 +442,7 @@ class HycomDecoder(Decoder):
 
     name = "hycom"
     fmts = ("hycom", "hycom3d")
+    fixed_levels = False
 
     def decode(self, path_files, fmt, platform=None):
         """Decode HYCOM files.
@@ -428,6 +471,7 @@ class CrocoDecoder(Decoder):
 
     name = "croco"
     fmts = ("croco", "croco_xios")
+    fixed_levels = False
 
     def decode(self, path_files, fmt, platform=None):
         """Decode CROCO files.
@@ -732,13 +776,18 @@ def open_decode_arpege_insta(path_files):
         dss.append(xr.merge(ds, combine_attrs="override"))
     ds_insta = xr.concat(dss, dim="valid_time")
     ds_insta = ds_insta.drop_vars(["step", "time"])
-    ds_insta = ds_insta.rename(
-        {"longitude": "lon", "latitude": "lat", "valid_time": "time"}
-    )
+    ds_insta = ds_insta.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
     ds_insta = ds_insta.swap_dims({"lon": "x", "lat": "y"})
+    # matches open_decode_sst_satellite's broadcast -- downstream plotting assumes 2D lon/lat
+    lat, lon = xr.broadcast(ds_insta["lat"], ds_insta["lon"])
+    ds_insta = ds_insta.drop_vars(["lon", "lat"])
+    ds_insta["lon"] = lon
+    ds_insta["lat"] = lat
+    ds_insta = ds_insta.set_coords(["lon", "lat"])
     ds_insta = cfspecs.decode(ds_insta.sortby("time"))
     logger.info(ds_insta)
     return ds_insta
+
 
 def open_decode_sst_satellite(path_files, fmt):
     """
@@ -757,7 +806,7 @@ def open_decode_sst_satellite(path_files, fmt):
     # Open
     # path = os.path.join(ROOTDIR, "config", f"{fmt}.cfg")
     cfspecs = xmeta.get_meta_specs(f"{fmt}")
-    ds = cfspecs.decode(xr.open_mfdataset(path_files).chunk(chunks={}))
+    ds = cfspecs.decode(xr.open_mfdataset(path_files, decode_timedelta=True).chunk(chunks={}))
     for var in ds.coords:
         if "or_" in var:
             ds = ds.drop_vars(var)
@@ -775,6 +824,7 @@ def open_decode_sst_satellite(path_files, fmt):
         ds = ds[["ptemp", "lon", "lat"]]
     return ds
 
+
 def open_decode_cmems_model(path_files):
     """
     Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
@@ -789,7 +839,9 @@ def open_decode_cmems_model(path_files):
     xarray.Dataset
         CMEMS dataset.
     """
+
     def preprocess_cmems_model(ds):
+        """Decode CF specs, rename dims to x/y/z and broadcast lon/lat/depth."""
         ds = cfspecs.decode(ds)
         if "bathy" in ds.data_vars:
             ds = ds[["bathy"]]
@@ -807,16 +859,14 @@ def open_decode_cmems_model(path_files):
             if ref_vars:
                 ds = ds.assign_coords(depth=ds["depth"].broadcast_like(ds[ref_vars[0]]))
         return ds
+
     # Open
     cfspecs = xmeta.get_meta_specs("cmems_model")
     sorted_paths = sorted(map(str, path_files))
     n_files = len(sorted_paths)
     open_kw = dict(
         engine="netcdf4",
-        chunks={"time": 30,
-                "depth": 100, "z": 100,
-                "lat": 1024, "lon": 1024,
-                "y": 1024, "x": 1024},
+        chunks={"time": 30, "depth": 100, "z": 100, "lat": 1024, "lon": 1024, "y": 1024, "x": 1024},
         cache=False,
         decode_times=True,
         decode_coords=True,
@@ -833,12 +883,13 @@ def open_decode_cmems_model(path_files):
     if n_files == 1:
         ds = _processed[0]
     else:
-        ds = xr.merge(_processed)
+        ds = xr.merge(_processed, compat="no_conflicts")
     if "depth" in ds.data_vars:
         ds = ds.set_coords("depth")
     return ds
 
-def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
+
+def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
     """
     Fast and memory-efficient HyCOM NetCDF reader.
 
@@ -856,8 +907,9 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
     xarray.Dataset
         Merged and decoded HyCOM dataset.
     """
-    
+
     def preprocess_hycom(ds):
+        """Clean a single HYCOM file before merging (density coord, u/v lon/lat, bathy)."""
         # Clean density coord if present
         if "dens" in ds.coords:
             ds = ds.reset_coords("dens")
@@ -873,11 +925,13 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
             ds = ds.drop_vars("bathy")
 
         return ds
-    
+
     def shift_u_block(d):
+        """Shift a HYCOM "u" block from its staggered grid onto the T-grid."""
         return shift(d["u"], {"x": "right"}).xoa.reloc(u=False)
 
     def shift_v_block(d):
+        """Shift a HYCOM "v" block from its staggered grid onto the T-grid."""
         return shift(d["v"], {"y": "top"}).xoa.reloc(v=False)
 
     sorted_paths = sorted(map(str, path_files))
@@ -897,6 +951,7 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
         """Return (n, t0, t1) identifying the time axis of a NetCDF file."""
         try:
             import netCDF4 as _nc4
+
             with _nc4.Dataset(path) as _d:
                 for dimname in list(_d.dimensions):
                     if "time" in dimname.lower():
@@ -921,6 +976,7 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
 
     # Build groups: {time_key: [path, ...]}
     from collections import OrderedDict
+
     _groups: dict = OrderedDict()
     for p in sorted_paths:
         k = _time_key(p)
@@ -956,20 +1012,25 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
                     _ds0 = xr.open_dataset(p, **_open_kw)
                     _ds0 = preprocess_hycom(_ds0)
                     _parts.append(_ds0)
-                _ds = xr.merge(_parts, join="inner", combine_attrs="override")
+                _ds = xr.merge(
+                    _parts, join="inner", compat="no_conflicts", combine_attrs="override"
+                )
             _group_ds.append(_ds)
         if len(_group_ds) == 1:
             ds = _group_ds[0]
         else:
-            ds = xr.concat(_group_ds, dim="time")
-    logger.info(f"  [timing] open_mfdataset: {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+            ds = xr.concat(_group_ds, dim="time", data_vars="all")
+    logger.info(f"  [timing] open_mfdataset: {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     cfspecs = xmeta.get_meta_specs("hycom")
     ds = cfspecs.decode(ds)
-    logger.info(f"  [timing] xoa.decode:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] xoa.decode:     {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     ds = ds.unify_chunks()
-    logger.info(f"  [timing] unify_chunks:   {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] unify_chunks:   {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     if "bathy" in ds:
         bathy = ds["bathy"]
@@ -981,17 +1042,20 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
         ds["u"] = ds.map_blocks(shift_u_block, template=ds["u"])
     if "v" in ds:
         ds["v"] = ds.map_blocks(shift_v_block, template=ds["v"])
-    logger.info(f"  [timing] map_blocks u/v: {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] map_blocks u/v: {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     if bathy is not None:
         ds = xr.merge([ds, bathy.to_dataset(name="bathy")])
     if "dz" in ds:
         depth = dz2depth(ds.dz, centered=True)
         ds = ds.assign_coords(depth=depth).drop_vars(["dz", "z"])
-    logger.info(f"  [timing] dz2depth:       {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] dz2depth:       {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
-    ds = ds.sel(time=~ds.get_index("time").duplicated())
-    logger.info(f"  [timing] dedup time:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    ds = ds.sel(time=~ds.get_index("time").duplicated()).sortby("time")
+    logger.info(f"  [timing] dedup time:     {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     good_var = None
     for var in ["depth", "ssh", "ptemp"]:
@@ -1012,6 +1076,7 @@ def open_decode_hycom(path_files):#, chunk_size_time=1, chunk_size_xy=200):
     ds = ds.chunk(chunk_dict)
     logger.info(f"  [timing] final rechunk:  {time.perf_counter()-_t:.1f}s")
     return ds
+
 
 def open_decode_sloop(path_files):
     """Open and decode Sloop output files.
@@ -1073,7 +1138,9 @@ def open_decode_woa18(path_files):
     woa18 = xr.open_mfdataset(
         path_files,
         decode_times=False,
-        combine_attrs="drop_conflicts"
+        combine_attrs="drop_conflicts",
+        compat="no_conflicts",
+        data_vars="all",
     )
     # Decode
     vars_to_drop = ["_dd", "_gp", "_oa", "_sd", "_se", "_ma", "bnds", "bounds", "crs"]
@@ -1097,20 +1164,28 @@ def open_decode_woa18(path_files):
 
     woa18 = convert_lons(woa18)
 
-    woa18 = woa18.swap_dims({
-        "lon": "x",
-        "lat": "y",
-        "depth": "z"
-    })
+    woa18 = woa18.swap_dims({"lon": "x", "lat": "y", "depth": "z"})
     lon, lat = np.meshgrid(woa18["lon"], woa18["lat"])
     woa18 = woa18.drop_vars(["lon", "lat"])
     woa18["lon"] = xr.DataArray(lon, dims=["y", "x"])
     woa18["lat"] = xr.DataArray(lat, dims=["y", "x"])
     woa18 = woa18.set_coords(["lon", "lat"])
-    woa18["time"] = np.ceil(woa18["time"]) - 12.0 * np.trunc(
-        np.ceil(woa18["time"]) / 12.0
-    )
-    woa18["time"] = woa18.time.where(woa18.time != 0., 12.)
+    woa18["time"] = np.ceil(woa18["time"]) - 12.0 * np.trunc(np.ceil(woa18["time"]) / 12.0)
+    woa18["time"] = woa18.time.where(woa18.time != 0.0, 12.0)
+    # The original "months since ..." units/calendar attrs survive the
+    # arithmetic above even though the values no longer mean that -- left
+    # in place, they mislead xarray into writing them back out verbatim
+    # (and then failing to CF-decode them) the next time this dataset is
+    # saved and reopened (e.g. armoor.data.output's intermediate files).
+    woa18["time"].attrs = {}
+    woa18["time"].encoding = {}
+    if "temp" in woa18 and "sal" in woa18:
+        # Derive canonical "ptemp" (potential temp) from in-situ "temp" --
+        # .compute() avoids chaining it lazily onto the raw open_mfdataset
+        # graph, which corrupted dask's task graph downstream once wrapped
+        # in further dask.delayed/compute calls with fusion enabled.
+        woa18["ptemp"] = woa18.oceanvars.sel_ptemp().compute()
+        woa18 = woa18.drop_vars("pres", errors="ignore")
     return woa18
 
 
@@ -1138,9 +1213,14 @@ def open_decode_bobyclim(path_files):
 
     # Rename variables to canonical names (adjust if source names differ)
     rename_map = {}
-    for src, dst in [("temperature", "temp"), ("salinity", "sal"),
-                     ("TEMP", "temp"), ("SAL", "sal"),
-                     ("votemper", "temp"), ("vosaline", "sal")]:
+    for src, dst in [
+        ("temperature", "temp"),
+        ("salinity", "sal"),
+        ("TEMP", "temp"),
+        ("SAL", "sal"),
+        ("votemper", "temp"),
+        ("vosaline", "sal"),
+    ]:
         if src in ds and dst not in ds:
             rename_map[src] = dst
     if rename_map:
@@ -1160,17 +1240,15 @@ def open_decode_bobyclim(path_files):
     # Normalise time axis to monthly indices 1–12
     if "time" in ds.coords:
         time_vals = ds["time"].values
-        if np.issubdtype(time_vals.dtype, np.floating) or np.issubdtype(time_vals.dtype, np.integer):
+        if np.issubdtype(time_vals.dtype, np.floating) or np.issubdtype(
+            time_vals.dtype, np.integer
+        ):
             # Already numeric — apply same formula as WOA18
-            ds["time"] = np.ceil(ds["time"]) - 12.0 * np.trunc(
-                np.ceil(ds["time"]) / 12.0
-            )
-            ds["time"] = ds["time"].where(ds["time"] != 0., 12.)
+            ds["time"] = np.ceil(ds["time"]) - 12.0 * np.trunc(np.ceil(ds["time"]) / 12.0)
+            ds["time"] = ds["time"].where(ds["time"] != 0.0, 12.0)
         else:
             # datetime-like: extract month number
-            ds["time"] = xr.DataArray(
-                ds["time"].dt.month.values, dims=["time"]
-            )
+            ds["time"] = xr.DataArray(ds["time"].dt.month.values, dims=["time"])
 
     return ds
 
@@ -1212,6 +1290,7 @@ def open_decode_cora_insitu(path_files, platform):
     else:
         return dss
 
+
 def open_decode_cmems_insitu(path_files, platform):
     """
     Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
@@ -1245,16 +1324,12 @@ def open_decode_cmems_insitu(path_files, platform):
             ds = ds.swap_dims({"DEPTH": "z"})
         if "DEPH" in ds.coords:
             ds = ds.rename({"DEPH": "depth"})
-        if (
-            ("lon" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lon"])
-        ) or (("lat" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lat"])):
+        if (("lon" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lon"])) or (
+            ("lat" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lat"])
+        ):
             # ds = ds.drop_dims("POSITION")
-            lon_ds = ds.lon.assign_coords(lon=ds.time.data).rename(
-                {"lon": "time"}
-            )
-            lat_ds = ds.lat.assign_coords(lat=ds.time.data).rename(
-                {"lat": "time"}
-            )
+            lon_ds = ds.lon.assign_coords(lon=ds.time.data).rename({"lon": "time"})
+            lat_ds = ds.lat.assign_coords(lat=ds.time.data).rename({"lat": "time"})
             ds = ds.drop_vars(["lon", "lat"])
             if platform == "mooring":
                 ds["lat"] = lat_ds.isel(time=0)
@@ -1263,6 +1338,19 @@ def open_decode_cmems_insitu(path_files, platform):
                 ds["lat"] = lat_ds
                 ds["lon"] = lon_ds
         ds.set_coords(["lon", "lat"])
+        if "institution_country" in ds.attrs:
+            ds["country"] = xr.DataArray(
+                np.full(ds["lat"].shape, ds.institution_country),
+                dims=ds["lat"].dims,
+                coords=ds["lat"].coords,
+            )
+        if "wmo_platform_code" in ds.attrs:
+            ds["wmo"] = xr.DataArray(
+                np.full(ds["lat"].shape, ds.wmo_platform_code),
+                dims=ds["lat"].dims,
+                coords=ds["lat"].coords,
+            )
+
         for coord in ds.coords:
             if coord not in cmems_coords:
                 ds = ds.reset_coords(coord)
@@ -1279,7 +1367,7 @@ def open_decode_cmems_insitu(path_files, platform):
                         dssi.append(dsi)
                 if len(dssi) == 0:
                     continue
-                ds = xr.combine_nested(dssi, "time")
+                ds = xr.combine_nested(dssi, "time", data_vars="all")
                 ds["depth"] = -1 * ds["depth"]
             if platform == "glider":
                 if ds["depth"].dims == ("z",):
@@ -1307,13 +1395,17 @@ def open_decode_cmems_insitu(path_files, platform):
                 if "u" not in ds.data_vars:
                     ds["u"] = (
                         ds.lon.differentiate("time", datetime_unit="s")
-                        * xgeo.EARTH_RADIUS * np.pi / 180
-                        )
+                        * xgeo.EARTH_RADIUS
+                        * np.pi
+                        / 180
+                    )
                     ds["u"] *= np.cos(np.radians(ds.lat.values))
                     ds["v"] = (
                         ds.lat.differentiate("time", datetime_unit="s")
-                        * xgeo.EARTH_RADIUS * np.pi / 180
-                        )
+                        * xgeo.EARTH_RADIUS
+                        * np.pi
+                        / 180
+                    )
         for var in ds.data_vars:
             if var in cmems_coords:
                 ds = ds.set_coords(var)
@@ -1339,6 +1431,66 @@ def open_decode_cmems_insitu(path_files, platform):
             dss.append(ds)
         return dss
 
+
+def open_decode_odar(path_files):
+    """Open ODAR-processed towed/glider CTD section file(s).
+
+    ODAR (the in-house processing tool behind ``odar-seasoar``/``odar-
+    scanfish``/etc.) already emits armoor-friendly variable names (``temp``,
+    ``pres``, ``conduct``, ``depth``, ``lon``, ``lat``, ``time``) matching
+    the generic CF meta specs, so -- unlike `open_decode_cmems_insitu` --
+    no per-platform variable reshaping is needed. Two things still need
+    fixing by hand:
+
+    - ``time`` is encoded as ``"nanoseconds since <reference>"``, a unit
+      `cftime`/xarray's CF decoder rejects outright (it only accepts
+      seconds/minutes/hours/days) -- decoded manually here instead.
+    - Practical salinity isn't in the file, only raw ``conduct`` (mS/cm) --
+      kept as-is here and derived later, lazily, by
+      `armoor.oceanvars.OceanVarsAccessor.sel_sal` (on the tiny
+      colocated subset, not eagerly on the full section: computing it here
+      on the still dask-backed decode output corrupted the task graph --
+      ``ValueError: Missing dependency ('open_dataset-conduct-...')`` --
+      confirmed against the real ``seasoar.nc`` sample; deferring the
+      computation is also the established pattern for every other derived
+      oceanvar, see `armoor.comp.coloc._prepare_dataset`'s docstring).
+
+    Parameters
+    ----------
+    path_files : list of str
+        Absolute paths to the input files. Each file is one section (one
+        towed-instrument transect or glider mission), like
+        `open_decode_cmems_insitu`'s glider/mooring/drifter platforms --
+        not grouped further.
+
+    Returns
+    -------
+    list of xarray.Dataset
+        One dataset per input file, with ``z`` as the vertical dim
+        (``depth`` demoted to a coordinate along it), ``lon``/``lat``/
+        ``depth`` as coordinates, and ``sal`` added when derivable.
+    """
+    cfspecs = xmeta.get_meta_specs("generic")
+    dss = []
+    for path in path_files:
+        ds = cfspecs.decode(xr.open_dataset(path, chunks={}, decode_times=False))
+
+        units = ds["time"].attrs.get("units", "")
+        if "nanoseconds since" in units:
+            ref = pd.Timestamp(units.split("nanoseconds since", 1)[1].strip())
+            ds = ds.assign_coords(
+                time=("time", (ref + pd.to_timedelta(ds["time"].values, unit="ns")).values)
+            )
+
+        if "depth" in ds.dims:
+            ds = ds.swap_dims({"depth": "z"})
+
+        ds = ds.set_coords([c for c in ("lon", "lat", "depth") if c in ds.variables])
+        ds.attrs.setdefault("name", Path(path).stem)
+        dss.append(ds)
+    return dss
+
+
 def open_decode_croco(path_file, fmt="croco"):
     """
     Open netcdf file from CROCO model.
@@ -1357,6 +1509,7 @@ def open_decode_croco(path_file, fmt="croco"):
     def _find_grid_file(files):
         """Return the first file with grid vars and no time dim (separate grid file)."""
         import netCDF4 as _nc4
+
         required_vars = {"lon_rho", "mask_rho", "h"}
         for f in files:
             try:
@@ -1371,6 +1524,7 @@ def open_decode_croco(path_file, fmt="croco"):
     def _find_grid_source(files):
         """Return the first file containing grid vars (may also have time)."""
         import netCDF4 as _nc4
+
         required_vars = {"lon_rho", "mask_rho", "h"}
         for f in files:
             try:
@@ -1429,26 +1583,39 @@ def open_decode_croco(path_file, fmt="croco"):
         decode_cf=True,
         mask_and_scale=True,
     )
-    logger.info(f"  [timing] open_mfdataset:   {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] open_mfdataset:   {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     if "auxil" in ds.dims:
         ds = ds.drop_dims("auxil")
 
     # Override grid coordinates (handles MPINOLAND and ensures consistent grid)
-    for var in ["xi_rho", "eta_rho", "xi_u", "eta_v", "lon_rho", "lat_rho", "lon_u", "lat_v", "mask_rho"]:
+    for var in [
+        "xi_rho",
+        "eta_rho",
+        "xi_u",
+        "eta_v",
+        "lon_rho",
+        "lat_rho",
+        "lon_u",
+        "lat_v",
+        "mask_rho",
+    ]:
         if var in ds_grid:
             ds[var] = ds_grid[var]
     ds_grid.close()
 
     # Deduplicate time via pandas index (avoids np.unique which forces eager compute)
     ds = ds.sel(time=~ds.get_index("time").duplicated())
-    logger.info(f"  [timing] dedup time:       {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] dedup time:       {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     if 'scrum_time' in ds:
         ds = ds.drop_vars('scrum_time')
 
     ds = cfspecs.decode(ds)
-    logger.info(f"  [timing] xoa.decode:       {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] xoa.decode:       {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     with xmeta.set_meta_specs(cfspecs):
         for sig in ("sig_rho", "sig_w"):
@@ -1457,15 +1624,21 @@ def open_decode_croco(path_file, fmt="croco"):
                 if "hc" not in ds.data_vars:
                     ds["hc"] = float(ds.attrs.get("hc"))
                 if sig == "sig_w":
-                    ds[sig].attrs["formula_terms"] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
+                    ds[sig].attrs[
+                        "formula_terms"
+                    ] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
                 elif sig == "sig_rho":
                     if "cs_r" in ds:
                         cs_rho = "cs_r"
                     elif "cs_rho" in ds:
                         cs_rho = "cs_rho"
                     else:
-                        raise ArmoorError("cs_r and cs_rho are missing. Armoor should find one of them.")
-                    ds[sig].attrs["formula_terms"] = f"s: sig_rho C: {cs_rho} eta: ssh depth: bathy depth_c: hc"
+                        raise ArmoorError(
+                            "cs_r and cs_rho are missing. Armoor should find one of them."
+                        )
+                    ds[sig].attrs[
+                        "formula_terms"
+                    ] = f"s: sig_rho C: {cs_rho} eta: ssh depth: bathy depth_c: hc"
                 if "standard_name" not in ds[sig].attrs:
                     logger.warning(f"No standard_name attributes in {sig}")
                     if sig == "sig_rho":
@@ -1473,10 +1646,12 @@ def open_decode_croco(path_file, fmt="croco"):
                     elif sig == "sig_w":
                         ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
         ds = ds.decode_sigma()
-    logger.info(f"  [timing] decode_sigma:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] decode_sigma:     {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     ds = ds.unify_chunks()
-    logger.info(f"  [timing] unify_chunks:     {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] unify_chunks:     {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     for v in [
         "sig_rho",
@@ -1513,7 +1688,7 @@ def open_decode_croco(path_file, fmt="croco"):
         "cs_rho",
         "sst_skin",
         "hbl",
-        ]:
+    ]:
         if v in ds:
             ds = ds.drop_vars(v)
 
@@ -1544,7 +1719,8 @@ def open_decode_croco(path_file, fmt="croco"):
         v.encoding = ds["v"].encoding.copy()
         dav = shift(v, {"y_v": "top"}).isel(y_v=slice(None, -1)).xoa.reloc(v="rho")
         ds["v"] = dav.assign_coords(**ds.ptemp.coords)
-    logger.info(f"  [timing] u/v shift:        {time.perf_counter()-_t:.1f}s"); _t = time.perf_counter()
+    logger.info(f"  [timing] u/v shift:        {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
 
     if "z" in ds.dims:
         ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat", "depth_rho": "depth"})
@@ -1599,6 +1775,7 @@ def open_decode_croco(path_file, fmt="croco"):
 
     return ds
 
+
 def open_decode_cora(path_files):
     """
     Open CORA netcdf files and store it into a ready-to-use dataset.
@@ -1629,9 +1806,9 @@ def open_decode_cora(path_files):
                     if f"{var}_ADJUSTED_ERROR" in dataset:
                         dataset = dataset.drop_vars(f"{var}_ADJUSTED_ERROR")
             for var in list(dataset.keys()):
-                if "N_PROF" not in list(
+                if "N_PROF" not in list(dataset[var].dims) and "N_LEVELS" not in list(
                     dataset[var].dims
-                ) and "N_LEVELS" not in list(dataset[var].dims):
+                ):
                     dataset = dataset.drop_vars(var)
 
             # Decode
@@ -1661,9 +1838,7 @@ def open_decode_cora(path_files):
                 if f"{var}_ADJUSTED_ERROR" in cora:
                     cora = cora.drop_vars(f"{var}_ADJUSTED_ERROR")
         for var in list(cora.keys()):
-            if "N_PROF" not in list(cora[var].dims) and "N_LEVELS" not in list(
-                cora[var].dims
-            ):
+            if "N_PROF" not in list(cora[var].dims) and "N_LEVELS" not in list(cora[var].dims):
                 cora = cora.drop_vars(var)
 
         # Decode
@@ -1714,18 +1889,17 @@ def open_decode_eddy_pet(path_files):
                 "eddy_type": (
                     ["obs"],
                     np.zeros(cyclones.obs.shape[0]) - 1,
-                    {'comment': '-1 if cyclone, +1 if anticyclone'
-                     }),
+                    {'comment': '-1 if cyclone, +1 if anticyclone'},
+                ),
                 "vmax_area": (
                     ["obs"],
                     np.pi * cyclones.speed_radius.data**2 / 1e6,
-                    {'comment': 'Area of the vmax contour',
-                     'units': 'km2'
-                     }),
+                    {'comment': 'Area of the vmax contour', 'units': 'km2'},
+                ),
             },
             coords={
                 "nb_sample": (["nb_sample"], cyclones.NbSample.data),
-            }
+            },
         )
 
         ds_anticyclones = xr.Dataset(
@@ -1737,18 +1911,17 @@ def open_decode_eddy_pet(path_files):
                 "eddy_type": (
                     ["obs"],
                     np.zeros(anticyclones.obs.shape[0]) + 1,
-                    {'comment': '-1 if cyclone, +1 if anticyclone'
-                     }),
+                    {'comment': '-1 if cyclone, +1 if anticyclone'},
+                ),
                 "vmax_area": (
                     ["obs"],
                     np.pi * anticyclones.speed_radius.data**2 / 1e6,
-                    {'comment': 'Area of the vmax contour',
-                     'units': 'km2'
-                     }),
+                    {'comment': 'Area of the vmax contour', 'units': 'km2'},
+                ),
             },
             coords={
                 "nb_sample": (["nb_sample"], anticyclones.NbSample.data),
-            }
+            },
         )
 
         da = xr.concat([ds_cyclones, ds_anticyclones], dim="obs")
@@ -1779,10 +1952,15 @@ def open_decode_eddy_sacso(path_files):
         dataset
     """
     # Initialize
-    all_points = []; current_block = []; eddy_type = []
-    center_lat = []; center_lon = []; dates = []; surfaces = []
+    all_points = []
+    current_block = []
+    eddy_type = []
+    center_lat = []
+    center_lon = []
+    dates = []
+    surfaces = []
     suffix_date = 'Date' + ' ' * 33
-    suffix_type = 'Sens_de_rotation' + ' ' * 21       # suffix+spaces = 37
+    suffix_type = 'Sens_de_rotation' + ' ' * 21  # suffix+spaces = 37
     suffix_center = 'Centre(lon/lat)' + ' ' * 22
     suffix_surface = 'Surface(km2)' + ' ' * 25
 
@@ -1796,7 +1974,7 @@ def open_decode_eddy_sacso(path_files):
         line = line.strip()  # remove spaces and line breaks
 
         if "Date" in line:
-            dates.append(datetime.datetime.strptime(line[len(suffix_date):], '%Y-%m-%d/%H:%M'))
+            dates.append(datetime.datetime.strptime(line[len(suffix_date) :], '%Y-%m-%d/%H:%M'))
 
         # Check if new list of coordinates
         if line == "Liste_Points(lon/lat)":
@@ -1809,17 +1987,17 @@ def open_decode_eddy_sacso(path_files):
 
         if start_reading and line:
             if "Sens_de_rotation" in line:
-                rotation = line[len(suffix_center):-4].lower() + 'e'  # cyclone or anticyclone
+                rotation = line[len(suffix_center) : -4].lower() + 'e'  # cyclone or anticyclone
                 if rotation == 'cyclone':
                     eddy_type.append(-1)
                 elif rotation == 'anticyclone':
                     eddy_type.append(1)
             elif "Centre(lon/lat)" in line:
-                center = line[len(suffix_center):]
-                center_lon.append(float(center[:center.find('/')]))
-                center_lat.append(float(center[center.find('/') + 1:]))
+                center = line[len(suffix_center) :]
+                center_lon.append(float(center[: center.find('/')]))
+                center_lat.append(float(center[center.find('/') + 1 :]))
             elif "Surface(km2)" in line:
-                surfaces.append(float(line[len(suffix_surface):]))
+                surfaces.append(float(line[len(suffix_surface) :]))
             else:
                 try:
                     lon, lat = map(float, line.split('/'))
@@ -1840,8 +2018,8 @@ def open_decode_eddy_sacso(path_files):
         lons = np.full((len(all_points), max_length), np.nan)  # (obs, nb_sample)
 
         for i, block in enumerate(all_points):
-            lons[i, :len(block)] = block[:, 0]
-            lats[i, :len(block)] = block[:, 1]
+            lons[i, : len(block)] = block[:, 0]
+            lats[i, : len(block)] = block[:, 1]
 
         ds = xr.Dataset(
             {
@@ -1852,25 +2030,17 @@ def open_decode_eddy_sacso(path_files):
                 "eddy_type": (
                     ["obs"],
                     np.array(eddy_type),
-                    {'comment': '-1 if cyclone, +1 if anticyclone'
-                     }),
+                    {'comment': '-1 if cyclone, +1 if anticyclone'},
+                ),
                 "vmax_area": (
                     ["obs"],
                     np.array(surfaces),
-                    {'comment': 'Area of the vmax contour',
-                     'units': 'km2'
-                     })
+                    {'comment': 'Area of the vmax contour', 'units': 'km2'},
+                ),
             },
-            coords={
-                "nb_sample": np.arange(max_length)
-            }
-        ).assign_coords(
-            time=("obs", np.array(dates))
-        )
-        ds['time'].encoding = {
-            'units': 'nanoseconds since 1970-01-01',
-            'dtype': 'float64'
-        }
+            coords={"nb_sample": np.arange(max_length)},
+        ).assign_coords(time=("obs", np.array(dates)))
+        ds['time'].encoding = {'units': 'nanoseconds since 1970-01-01', 'dtype': 'float64'}
         return ds
 
 
@@ -1888,42 +2058,54 @@ def open_decode_eddy_shoot(path_files):
     xarray.Dataset
         dataset
     """
+
     # Open
     def preprocessing(ds):
+        """Set "time" as a coordinate before concatenating along "obs"."""
         return ds.set_coords("time")
 
     da = xr.open_mfdataset(path_files, combine='nested', concat_dim='obs', preprocess=preprocessing)
 
     # Keep only variables of interest and formatting
-    list_vars = [a for a in da.data_vars if
-                 'vmax_contour' not in a
-                 and 'eddy_type' not in a
-                 and 'x_cen' not in a
-                 and 'y_cen' not in a
-                 and 'vmax_radius' not in a]    # time is already included in coordinates = will be kept
+    list_vars = [
+        a
+        for a in da.data_vars
+        if 'vmax_contour' not in a
+        and 'eddy_type' not in a
+        and 'x_cen' not in a
+        and 'y_cen' not in a
+        and 'vmax_radius' not in a
+    ]  # time is already included in coordinates = will be kept
     da = (
         da.drop_vars(list_vars)
-          .drop_attrs()
-          .rename({'x_vmax_contour': 'contour_lon', 'y_vmax_contour': 'contour_lat',
-                   'x_cen': 'center_lon', 'y_cen': 'center_lat'})
-          .load()
-          .assign_coords(nb_sample=("nb_sample", da.nb_sample.data))
+        .drop_attrs()
+        .rename(
+            {
+                'x_vmax_contour': 'contour_lon',
+                'y_vmax_contour': 'contour_lat',
+                'x_cen': 'center_lon',
+                'y_cen': 'center_lat',
+            }
+        )
+        .load()
+        .assign_coords(nb_sample=("nb_sample", da.nb_sample.data))
     )
 
-    da["eddy_type"] = xr.DataArray(np.where(da["eddy_type"] == 'cyclone', -1, 1), dims='obs').assign_attrs({
-        'comment': '-1 if cyclone, +1 if anticyclone'})
+    da["eddy_type"] = xr.DataArray(
+        np.where(da["eddy_type"] == 'cyclone', -1, 1), dims='obs'
+    ).assign_attrs({'comment': '-1 if cyclone, +1 if anticyclone'})
 
     da["vmax_area"] = np.pi * da.vmax_radius**2 / 1e6
-    da["vmax_area"] = da["vmax_area"].assign_attrs({
-        'comment': 'Area of the vmax contour',
-        'units': 'km2'
-    })
+    da["vmax_area"] = da["vmax_area"].assign_attrs(
+        {'comment': 'Area of the vmax contour', 'units': 'km2'}
+    )
     da = da.drop_vars('vmax_radius')
 
     return da
 
 
 ####################### Tools #######################
+
 
 def convert_lons(dataset):
     """
@@ -1934,10 +2116,9 @@ def convert_lons(dataset):
         Dataset with homogeneous longitudes
     """
     if np.nanmax(dataset.lon.where(dataset.lon < 1e30).data) > 180:
-        dataset = dataset.assign_coords(
-            {"lon": (((dataset.lon + 180) % 360) - 180)}
-        )
+        dataset = dataset.assign_coords({"lon": (((dataset.lon + 180) % 360) - 180)})
     return dataset
+
 
 def depth_from_pres(ds):
     """
@@ -1956,15 +2137,33 @@ def depth_from_pres(ds):
     ds["depth"] = adepth
     return ds
 
+
 def concat_cmems(list_ds):
+    """Concatenate several raw CMEMS in-situ datasets into one.
+
+    Concatenates directly along "TIME" when every dataset shares the same
+    depth/time sizes (one instrument, several files); otherwise resamples
+    every dataset onto shared depth/time axes first and concatenates along
+    a new "instr" dim (several instruments).
+
+    Parameters
+    ----------
+    list_ds : list of xarray.Dataset
+        Raw (pre-CF-decode) CMEMS in-situ datasets, each with "TIME"/"DEPTH"
+        dims.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
     times = np.unique([len(ds.TIME.data) for ds in list_ds])
     depths = np.unique([len(ds.DEPTH.data) for ds in list_ds])
 
-    # Cas où on concat plusieurs fichiers d'1 instrument, même nombre de depth et time dans tous les fichiers
+    # Case where we concat several files from 1 instrument, same number of depth and time values in every file
     if len(depths) == 1 and len(times) == 1:
         cmems = xr.concat(list_ds, dim="TIME")
 
-    # Cas où on concat plusieurs instruments
+    # Case where we concat several instruments
     else:
         # Compute same DEPTH
         nb_depth_max = np.nanmax(depths)
@@ -2001,6 +2200,7 @@ def concat_cmems(list_ds):
 
     return cmems
 
+
 def concat_cora(list_ds_cora):
     """
     Concat several Datasets from CORA observations
@@ -2015,11 +2215,11 @@ def concat_cora(list_ds_cora):
     times = np.unique([len(ds.time.data) for ds in list_ds_cora])
     depths = np.unique([len(ds.N_levels.data) for ds in list_ds_cora])
 
-    # Cas où on concat plusieurs fichiers d'1 instrument, même nombre de depth et time dans tous les fichiers
+    # Case where we concat several files from 1 instrument, same number of depth and time values in every file
     if len(depths) == 1 and len(times) == 1:
         cora = xr.concat(list_ds_cora, dim="time")
 
-    # Cas où on concat plusieurs instruments
+    # Case where we concat several instruments
     else:
         # Compute same DEPTH
         nb_depth_max = np.nanmax(depths)
@@ -2057,6 +2257,22 @@ def concat_cora(list_ds_cora):
 
 
 def concat_argo(list_ds):
+    """Concatenate several decoded Argo profile datasets, padding to a
+    shared depth size.
+
+    Each dataset's "z"-dependent variables are NaN-padded up to the
+    largest "z" size across `list_ds` before concatenating along "time",
+    so profiles with fewer levels don't block the merge.
+
+    Parameters
+    ----------
+    list_ds : list of xarray.Dataset
+        Decoded Argo profile datasets, each with a "z" dim.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
     dim_z = np.max([ds.sizes["z"] for ds in list_ds])
     for ids, dsin in enumerate(list_ds):
         dsin = dsin.reset_coords("depth")
