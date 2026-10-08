@@ -28,6 +28,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Optional
 
 from armoor.cli import HPC_DEFAULTS
 
@@ -38,10 +39,11 @@ logger = logging.getLogger(__name__)
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_hpc(host, scheduler, cfgfile, metafile, metazones_list,
-            func_comp, jsonfile, ofilter, ocoloc,
-            comp_args, kw_dask, original_argv,
-            run_dir=None, ini_schema=None, stage1_label="comp"):
+def run_hpc(host: Any, scheduler: str, cfgfile: Path, metafile: Path, metazones_list: list[str],
+            func_comp: str, jsonfile: Path, ofilter: bool, ocoloc: bool,
+            comp_args: dict, kw_dask: tuple, original_argv: list[str],
+            run_dir: Optional[Path] = None, ini_schema: Optional[str] = None,
+            stage1_label: str = "comp") -> None:
     """Run the armoor comp/data pipeline as HPC jobs, supervising all waves.
 
     Parameters
@@ -601,7 +603,7 @@ def _finalize(merged_json, jsonfile, cfgfile, ini_schema, png_paths=None):
         return
 
     from xoa.cfgm import ConfigManager
-    from armoor.base.misc import dict_to_list
+    from armoor.misc import dict_to_list
 
     with open(merged_json) as f:
         zarr_outputs = json.load(f)
@@ -611,7 +613,7 @@ def _finalize(merged_json, jsonfile, cfgfile, ini_schema, png_paths=None):
     flat = dict_to_list(zarr_outputs)
 
     if 'netcdf' in ofmt:
-        from armoor.base.io import zarrs2netcdfs
+        from armoor.io import zarrs2netcdfs
         outputs = zarrs2netcdfs([str(p) for p in flat])
     else:
         outputs = [str(p) for p in flat]

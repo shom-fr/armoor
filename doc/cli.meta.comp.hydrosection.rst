@@ -50,7 +50,7 @@ configurable -- they are always:
 - **Horizontal**: the product is interpolated onto the reference's own
   moving track -- a pointwise (time, lon, lat)-paired interpolation, not a
   fixed cloud of points (see ``HorizontalColocation.track`` /
-  ``armoor.base.interp.grid2track``).
+  ``armoor.interp.grid2track``).
 - **Vertical**: the product is vinterp'd onto the reference's own
   per-profile depth levels (forced ``vrange``, like
   ``CompMooring``/``CompDrifter``'s depth-based forcing) -- this is what

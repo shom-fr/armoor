@@ -14,9 +14,9 @@ import numpy as np
 import xarray as xr
 
 import armoor  # noqa: F401 — registers all xarray accessors (ds.filters, …)
-from armoor.base.io import (setup_dask_client, create_fast_encoding,
-                            write_dataset_to_zarr, compute_bundled_zarr_writes)
-from armoor.base.misc import optimize_for_low_swap
+from armoor.io import (setup_dask_client, create_fast_encoding,
+                        write_dataset_to_zarr, compute_bundled_zarr_writes)
+from armoor.misc import optimize_for_low_swap
 from armoor.data.datatype import get_data_type
 from armoor.data.open_decode import get_decoder, open_decode, register_cf
 
@@ -307,9 +307,9 @@ class StagedDataset(str):
         """Return a new StagedDataset carrying `ds`'s vlevel/vrange/trange/time.
 
         Reads `ds.range.vlevel`/`.vrange_value`/`.trange`/`.time` (set by
-        `armoor.base.ranges`' split functions) so a later stage can recover
+        `armoor.ranges`' split functions) so a later stage can recover
         them from the path alone, without reopening the dataset just for
-        this metadata (e.g. `armoor.base.io.sort_ncs_by_suffix`).
+        this metadata (e.g. `armoor.io.sort_ncs_by_suffix`).
 
         Parameters
         ----------
@@ -367,19 +367,7 @@ def save_result(dsout, mz_name, func_comp):
     nc = Path(parent_dir) / ncpat.format(**locals())
 
     nc.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Encoding optimisé pour la vitesse
-    # encoding = create_fast_encoding(dsout)
-    #encoding = get_zarr_encoding(dsout)
-    # logger.info(nc)
-    #Sauvegarde avec optimisations
-    # write_job = ds_clean.chunk("auto").to_zarr(
-    #     store=nc,
-    #     mode="w",
-    #     compute=False,
-    #     consolidated=True,
-    #     # encoding=encoding
-    #     )
+
     write_job = write_dataset_to_zarr(
         dsout,
         nc,

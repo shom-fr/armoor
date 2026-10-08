@@ -12,7 +12,7 @@ import gitlab
 from xoa import cfgm
 
 import armoor.tick as _tick_pkg
-from armoor.base.io import ArmoorArgumentHelpFormatter
+from armoor.io import ArmoorArgumentHelpFormatter
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
 from armoor.tick.misc import (
     show_create,
@@ -30,7 +30,7 @@ SEARCH_INI = os.path.join(_TICKDIR, "search.ini")
 AUTH_INI = os.path.join(_TICKDIR, "auth.ini")
 
 
-def main_tick_create():
+def main_tick_create() -> None:
     """Create a GitLab ticket from the command line."""
     cfgm_fields = cfgm.ConfigManager(FIELDS_INI)
 
@@ -65,7 +65,7 @@ def main_tick_create():
         print("Ticket aborted")
 
 
-def main_tick_search():
+def main_tick_search() -> None:
     """Search for GitLab tickets from the command line."""
     cfgm_fields = cfgm.ConfigManager(SEARCH_INI)
 
@@ -89,7 +89,7 @@ def main_tick_search():
     show_tickets(ticket.search_tickets(config, request, state))
 
 
-def get_parser_tick_description():
+def get_parser_tick_description() -> ArgumentParser:
     """Get parser for retrieving a ticket description."""
     parser = ArgumentParser(
         description="Retrieve a GitLab ticket description.",
@@ -104,7 +104,7 @@ def get_parser_tick_description():
     return parser
 
 
-def main_tick_description():
+def main_tick_description() -> None:
     """Retrieve a ticket description from GitLab."""
     parser = get_parser_tick_description()
     args = parser.parse_args()
@@ -122,7 +122,7 @@ def main_tick_description():
         logger.error(e)
 
 
-def get_parser_tick_authentication_info():
+def get_parser_tick_authentication_info() -> ArgumentParser:
     """Get parser for displaying the GitLab authentication information."""
     parser = ArgumentParser(
         description="Display the GitLab authentication information.",
@@ -132,7 +132,7 @@ def get_parser_tick_authentication_info():
     return parser
 
 
-def main_tick_authentication_info():
+def main_tick_authentication_info() -> None:
     """Display the GitLab authentication information."""
     parser = get_parser_tick_authentication_info()
     args = parser.parse_args()
@@ -141,7 +141,7 @@ def main_tick_authentication_info():
     Ticket().print_auth_info()
 
 
-def main_tick_authentication():
+def main_tick_authentication() -> None:
     """Update the GitLab authentication information."""
     cfgm_fields = cfgm.ConfigManager(AUTH_INI)
     current_dir = pathlib.Path().resolve()

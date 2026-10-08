@@ -1,10 +1,11 @@
 import numpy as np
+import xarray as xr
 
 from armoor.data.datatype import DataEddies
-from armoor.base.stats import pdf as spdf
+from armoor.stats import pdf as spdf
 
 
-def pdf(ds):
+def pdf(ds: xr.Dataset) -> xr.Dataset:
     """Compute per-variable PDFs for cyclonic and anticyclonic eddies.
 
     Splits `ds` by `eddy_type` (-1 cyclones, +1 anticyclones), computes the
@@ -49,7 +50,7 @@ def pdf(ds):
     return ds
 
 
-def area2radius(ds):
+def area2radius(ds: xr.Dataset) -> xr.Dataset:
     """
     Compute the equivalent radius of the vmax contour.
 
@@ -75,7 +76,7 @@ def area2radius(ds):
     return ds
 
 
-def compute_vars(ds):
+def compute_vars(ds: xr.Dataset) -> xr.Dataset:
     """Add any derivable eddy diagnostic variables missing from `ds`.
 
     A no-op for non-eddy datasets (checks for `vmax_area` presence).

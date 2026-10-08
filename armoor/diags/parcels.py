@@ -18,20 +18,20 @@ class MyParticle(parcels.JITParticle):
 
 
 def check_runtime(particle, fieldset, time):
+        """OceanParcels kernel: activate/deactivate a particle based on its own
+        start_time/end_time window, deleting it once past end_time."""
         if time < particle.start_time:
-            particle.active = 0  # Pas encore actif
+            particle.active = 0  # Not active yet
         elif time >= particle.end_time:
-            particle.active = 0  # Terminé
+            particle.active = 0  # Done
             particle.delete()
         else:
-            particle.active = 1  # Actif
+            particle.active = 1  # Active
 
 def outofbounds(particle, fieldset, time):
+    """OceanParcels kernel: delete a particle once it drifts out of the fieldset's domain."""
     if particle.state == parcels.StatusCode.ErrorOutOfBounds:
         particle.delete()
-
-# def DeleteParticle(particle, fieldset, time):
-#     particle.delete()
 
 class  Parcels(object):
 
@@ -131,8 +131,15 @@ class  Parcels(object):
         shutil.rmtree(TMP_OFILE)
 
     def execute(self):
+        """Run the particle-tracking simulation and post-process its output.
+
+        Builds the particle set, gives each particle its own start/end time
+        window (from `ptc_coords_start["time"]` and `self.runtime`), then
+        advects every particle (`parcels.AdvectionRK4`, gated by
+        `check_runtime`/`outofbounds`) over the full time span, and merges
+        the result back with the drifter's own coordinates via `_post_`.
+        """
         pset = self._particleset_()
-        # runtime = pd.to_timedelta(self.runtime) / pd.to_timedelta(1, "s")
         for i, particle in enumerate(pset):
             particle.start_time = self.ptc_coords_start["time"][i]
             particle.end_time = self.ptc_coords_start["time"][i] + self.runtime

@@ -84,7 +84,7 @@ From sources
 
 \1. Clone the repository::
 
-    $ git clone https://gitlab.com/GitShom/STM/armoor.git
+    $ git clone https://github.com/shom-fr/armoor.git
 
 \2. Run the installation command::
 
@@ -100,6 +100,6 @@ Alternatively, use ``environment.yml``::
 \3. Then, run tests::
 
     $ export PYTHONPATH=$PWD
-    $ cd armoor/tests/uni
+    $ cd tests/uni
     $ pytest
 

@@ -3,22 +3,40 @@
 This module provides utility functions for adding standardized command-line arguments
 related to input/output operations and saving xarray datasets in various formats.
 
-Heavy imports (dask, armoor.base.io) are deferred to the functions that need them
+Heavy imports (dask, armoor.io) are deferred to the functions that need them
 so that importing this module for argument-parser setup is fast.
 """
 import logging
+from argparse import ArgumentParser, Namespace
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator, Optional
+
+import xarray as xr
 
 from armoor import ArmoorError
-from armoor.base.misc import comma_separated, str2bool
+from armoor.misc import comma_separated, str2bool
 from armoor.cli.log import main_setup_logging
 
 logger = logging.getLogger(__name__)
 
 
-def add_comp_parser_arguments(parser, default_level="info", has_coloc=True,
-                               default_jsonfile='ncs_{func_comp}.json'):
+def add_comp_parser_arguments(parser: ArgumentParser, default_level: str = "info", has_coloc: bool = True,
+                               default_jsonfile: str = 'ncs_{func_comp}.json') -> None:
+    """Add the arguments shared by every ``armoor-comp-*`` CLI to `parser`.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+    default_level : str
+        Default ``--log-level``.
+    has_coloc : bool
+        Whether to add ``--coloc-only`` (some comparisons have no separate
+        colocation stage).
+    default_jsonfile : str
+        Default ``--jsonfile`` path template (``{func_comp}`` is filled in
+        by the caller).
+    """
     parser.add_argument(
         'metazones',
         type=comma_separated,
@@ -98,7 +116,7 @@ def add_comp_parser_arguments(parser, default_level="info", has_coloc=True,
              "When provided, load_datasets() is skipped.",
     )
 
-def add_tbound_parser_arguments(parser):
+def add_tbound_parser_arguments(parser: ArgumentParser) -> None:
     """Add tbound argument to argument parser.
     
     Adds a optional argument 'tbound' for specifying time bounds
@@ -115,7 +133,7 @@ def add_tbound_parser_arguments(parser):
         help="Time bounds: begin_date end_date",
     )
 
-def add_input_parser_arguments(parser):
+def add_input_parser_arguments(parser: ArgumentParser) -> None:
     """Add input file pattern argument to argument parser.
     
     Adds a positional argument 'fins' for specifying input file patterns,
@@ -149,7 +167,7 @@ def add_input_parser_arguments(parser):
     )
 
 
-def add_output_parser_arguments(parser):
+def add_output_parser_arguments(parser: ArgumentParser) -> None:
     """Add output file name argument to argument parser.
     
     Adds a positional argument 'fout' for specifying the output file path.
@@ -175,7 +193,7 @@ def add_output_parser_arguments(parser):
     )
 
 
-def add_input_fmt_parser_arguments(parser):
+def add_input_fmt_parser_arguments(parser: ArgumentParser) -> None:
     """Add input file format argument to argument parser.
     
     Adds an optional argument '--ifmt' for specifying the format of input files.
@@ -226,7 +244,7 @@ def add_input_fmt_parser_arguments(parser):
     )
 
 
-def add_output_fmt_parser_arguments(parser):
+def add_output_fmt_parser_arguments(parser: ArgumentParser) -> None:
     """Add output file format argument to argument parser.
     
     Adds an optional argument '--ofmt' for specifying the format of output files.
@@ -271,7 +289,7 @@ def add_output_fmt_parser_arguments(parser):
     )
 
 
-def add_io_parser_arguments(parser):
+def add_io_parser_arguments(parser: ArgumentParser) -> None:
     """Add all input/output related arguments to argument parser.
     
     This is a convenience function that adds input file pattern, input format,
@@ -312,7 +330,7 @@ def add_io_parser_arguments(parser):
     add_output_parser_arguments(parser)
     add_output_fmt_parser_arguments(parser)
 
-def add_refinput_parser_arguments(parser):
+def add_refinput_parser_arguments(parser: ArgumentParser) -> None:
     """Add reference input file pattern argument to argument parser.
     """
     parser.add_argument(
@@ -321,7 +339,7 @@ def add_refinput_parser_arguments(parser):
         help="Pattern of reference input file. Ex: croco_*.zarr",
         )
  
-def add_refinput_fmt_parser_arguments(parser):
+def add_refinput_fmt_parser_arguments(parser: ArgumentParser) -> None:
     """Add reference input file format argument to argument parser.
     """
     parser.add_argument(
@@ -342,7 +360,7 @@ def add_refinput_fmt_parser_arguments(parser):
         help="Type of platform in case of in situ observation",
     )
     
-def add_comp_io_parser_arguments(parser):
+def add_comp_io_parser_arguments(parser: ArgumentParser) -> None:
     """Add all input/output related arguments to argument colocation/comparison parser.
     """
     add_refinput_parser_arguments(parser)
@@ -352,7 +370,7 @@ def add_comp_io_parser_arguments(parser):
     add_output_parser_arguments(parser)
     add_output_fmt_parser_arguments(parser)
 
-def add_dask_nworkers_parser_arguments(parser):
+def add_dask_nworkers_parser_arguments(parser: ArgumentParser) -> None:
     """Add dask argument to argument parser.
     
     Adds an optional argument '--dask-nworkers' for specifying n_workers dask.
@@ -369,7 +387,7 @@ def add_dask_nworkers_parser_arguments(parser):
         help="Number of workers of a Dask LocalCluster",
         )
     
-def add_dask_processes_parser_arguments(parser):
+def add_dask_processes_parser_arguments(parser: ArgumentParser) -> None:
     """Add dask argument to argument parser.
     
     Adds an optional argument '--dask-processes' for specifying n_workers dask.
@@ -386,7 +404,7 @@ def add_dask_processes_parser_arguments(parser):
         help="Use dask processes: True/False",
         )
     
-def add_dask_memorylimit_parser_arguments(parser):
+def add_dask_memorylimit_parser_arguments(parser: ArgumentParser) -> None:
     """Add dask argument to argument parser.
     
     Adds an optional argument '--dask-memorylimit' for specifying n_workers dask.
@@ -403,7 +421,7 @@ def add_dask_memorylimit_parser_arguments(parser):
         help="Memory_limit per worker of a Dask LocalCluster",
         )
 
-def add_dask_dashboardaddress_parser_arguments(parser):
+def add_dask_dashboardaddress_parser_arguments(parser: ArgumentParser) -> None:
     """Add dask argument to argument parser.
     
     Adds an optional argument '--dask-dashboardaddress' for specifying n_workers dask.
@@ -420,7 +438,7 @@ def add_dask_dashboardaddress_parser_arguments(parser):
         help="Dashboard adress of a Dask LocalCluster",
         )
     
-def add_dask_localdirectory_parser_arguments(parser):
+def add_dask_localdirectory_parser_arguments(parser: ArgumentParser) -> None:
     """Add dask argument to argument parser.
     
     Adds an optional argument '--dask-localdirectory' for specifying tempory dask directory.
@@ -437,7 +455,7 @@ def add_dask_localdirectory_parser_arguments(parser):
         help="Path of the temporary dask directory.",
         )
 
-def add_dask_parser_arguments(parser):
+def add_dask_parser_arguments(parser: ArgumentParser) -> None:
     """Add all dask related arguments to argument parser.
     """
     add_dask_nworkers_parser_arguments(parser)
@@ -446,7 +464,7 @@ def add_dask_parser_arguments(parser):
     add_dask_dashboardaddress_parser_arguments(parser)
     add_dask_localdirectory_parser_arguments(parser)
 
-def save_output(ds, fout, ofmt="zarr", scheduler=None):
+def save_output(ds: xr.Dataset, fout: str, ofmt: str = "zarr", scheduler: Optional[str] = None) -> None:
     """Save xarray Dataset to file in specified format.
     
     Saves the provided xarray Dataset to the specified output path using
@@ -500,7 +518,7 @@ def save_output(ds, fout, ofmt="zarr", scheduler=None):
     """
     import dask
     from dask.diagnostics import ProgressBar
-    from armoor.base.io import write_dataset_to_zarr, write_dataset_to_netcdf
+    from armoor.io import write_dataset_to_zarr, write_dataset_to_netcdf
 
     logger.info(f"Saving {fout}")
     if ofmt == "zarr":
@@ -525,7 +543,7 @@ def save_output(ds, fout, ofmt="zarr", scheduler=None):
 
 
 @contextmanager
-def open_decode_materialized(fins, ifmt, platform=None):
+def open_decode_materialized(fins: str, ifmt: str, platform: Optional[str] = None) -> Iterator[xr.Dataset]:
     """Open+decode input files, materializing non-'armoor' formats first.
 
     Some downstream operations (interpolation, filtering) need dask-backed,
@@ -554,7 +572,7 @@ def open_decode_materialized(fins, ifmt, platform=None):
             shutil.rmtree("tmp.zarr", ignore_errors=True)
 
 
-def to_zarr(ds, fout):
+def to_zarr(ds: xr.Dataset, fout: str) -> None:
     """Save xarray Dataset to zarr format with optimized memory usage.
     
     Saves each data variable separately to zarr format with automatic chunking,
@@ -622,8 +640,20 @@ def to_zarr(ds, fout):
         # Explicit cleanup to free memory
         del var_ds
 
-def get_dask_args(args):
+def get_dask_args(args: Namespace) -> tuple:
+    """Extract the ``--dask-*`` CLI args into the tuple `main_*` functions expect.
 
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI args, carrying `dask_nworkers`/`dask_processes`/
+        `dask_memorylimit`/`dask_dashboardaddress`/`dask_localdirectory`.
+
+    Returns
+    -------
+    tuple
+        ``(n_workers, processes, memory_limit, dashboard_address, local_directory)``.
+    """
     dask_dashboardaddress = args.dask_dashboardaddress
     if dask_dashboardaddress == "None":
         dask_dashboardaddress = None
@@ -636,7 +666,7 @@ def get_dask_args(args):
         )
 
 
-def configure_dask_scheduler(kw_dask):
+def configure_dask_scheduler(kw_dask: tuple) -> None:
     """Configure dask's local (non-distributed) scheduler from parsed
     --dask-* CLI args -- shared by armoor-data and armoor-comp-* so both
     stay in sync.
@@ -655,13 +685,27 @@ def configure_dask_scheduler(kw_dask):
     })
 
 
-def check_insitu_platform(fmt, platform):
+def check_insitu_platform(fmt: str, platform: Optional[str]) -> None:
+    """Require ``--platform`` whenever ``fmt=cmems_insitu`` is used.
+
+    Parameters
+    ----------
+    fmt : str
+        Data format, as passed to ``--fmt``.
+    platform : str or None
+        Value of ``--platform``.
+
+    Raises
+    ------
+    ArmoorError
+        If `fmt` is "cmems_insitu" and `platform` is falsy.
+    """
     if (fmt == "cmems_insitu") and not platform:
         raise ArmoorError("`--platform` option is mandatory is case of specifying `cmems_insitu` format.")
 
 
 @contextmanager
-def armoor_cli_session(args, *ifmt_platform_pairs):
+def armoor_cli_session(args: Namespace, *ifmt_platform_pairs: tuple) -> Iterator[None]:
     """Standard setup/teardown shared by every armoor-* CLI entry point.
 
     Configures logging, registers CF conventions, validates each
@@ -679,7 +723,7 @@ def armoor_cli_session(args, *ifmt_platform_pairs):
     """
     import dask.config
     from dask.distributed import Client, LocalCluster
-    from armoor.base.io import setup_dask_client
+    from armoor.io import setup_dask_client
     from armoor.data.open_decode import register_cf
 
     main_setup_logging(args)
@@ -694,7 +738,7 @@ def armoor_cli_session(args, *ifmt_platform_pairs):
             # scheduler (dask.config['scheduler'] == 'dask.distributed') for
             # as long as it exists -- confirmed empirically, it overwrites
             # any 'scheduler' config value set before entering this `with`.
-            # armoor.base.io.compute() nonetheless always runs its actual
+            # armoor.io.compute() nonetheless always runs its actual
             # write graphs through the plain local scheduler (bare
             # dask.compute(), no scheduler= reaching xarray). Left as-is,
             # xarray.backends.locks.get_write_lock() ambiently detects the

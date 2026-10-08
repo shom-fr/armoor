@@ -7,8 +7,8 @@ The interpolation operations are optimized for large datasets using Dask distrib
 import logging
 from argparse import ArgumentParser
 
-from armoor.base.io import ArmoorArgumentHelpFormatter
-from armoor.base.misc import parse_date, is_dict_empty, parse_coords
+from armoor.io import ArmoorArgumentHelpFormatter
+from armoor.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
@@ -35,7 +35,7 @@ class InterpError(Exception):
     pass
 
 
-def get_parser_interp_time():
+def get_parser_interp_time() -> ArgumentParser:
     """Create argument parser for temporal interpolation operations.
     
     Returns
@@ -75,7 +75,7 @@ def get_parser_interp_time():
     return parser
 
 
-def main_interp_time():
+def main_interp_time() -> None:
     """Apply temporal interpolation to input files via command line interface.
     
     This function serves as the main entry point for temporal interpolation operations.
@@ -130,7 +130,7 @@ def main_interp_time():
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")
 
 
-def get_parser_interp_horizontal():
+def get_parser_interp_horizontal() -> ArgumentParser:
     """Create argument parser for horizontal spatial interpolation operations.
     
     Returns
@@ -211,7 +211,7 @@ def get_parser_interp_horizontal():
     return parser
 
 
-def main_interp_horizontal():
+def main_interp_horizontal() -> None:
     """Apply horizontal spatial interpolation to input files via command line interface.
     
     This function serves as the main entry point for horizontal interpolation operations.
@@ -348,7 +348,7 @@ def main_interp_horizontal():
             save_output(ds, args.fout, ofmt=args.ofmt, scheduler="synchronous")
 
 
-def get_parser_interp_vertical():
+def get_parser_interp_vertical() -> ArgumentParser:
     """Create argument parser for vertical interpolation operations.
     
     Returns
@@ -396,7 +396,7 @@ def get_parser_interp_vertical():
     return parser
 
 
-def main_interp_vertical():
+def main_interp_vertical() -> None:
     """Apply vertical interpolation to input files via command line interface.
     
     This function serves as the main entry point for vertical interpolation operations.

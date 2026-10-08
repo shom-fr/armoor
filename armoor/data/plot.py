@@ -22,13 +22,13 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts, plot_flow
 from xoa import geo as xgeo
 
-from armoor.base import LINE_COLORS, CMAP_VARS, MINMAX_VARS
-from armoor.base.dispatch import SubclassingMethodRegistry
-from armoor.base.filters import create_optimized_mask
-from armoor.base.interp import vinterp
-from armoor.base.plot import (create_subplots, diagdisp, format_time_label,
-                              format_vertical_label, get_output_vminmax,
-                              save_figure)
+from armoor import LINE_COLORS, CMAP_VARS, MINMAX_VARS
+from armoor.dispatch import SubclassingMethodRegistry
+from armoor.filters import create_optimized_mask
+from armoor.interp import vinterp
+from armoor.plot import (create_subplots, diagdisp, format_time_label,
+                          format_vertical_label, get_output_vminmax,
+                          save_figure)
 from armoor.data.datatype import (
     DataEddies, DataMeteo, DataOceanModel, DataSstSatellite, get_data_type_by_name
 )
@@ -54,7 +54,7 @@ def _cbar_range(da_all, var, vminmax, nstd, group_range=None,
     (fallback, e.g. if series stats weren't resolved for some reason).
 
     Kept as a plain function (no cartopy/matplotlib) so it's testable on
-    its own -- see armoor.tests.uni.test_data_plot.
+    its own -- see tests.uni.test_data_plot.
     """
     if vminmax and var in vminmax:
         return vminmax[var]
@@ -72,7 +72,7 @@ def _cbar_range(da_all, var, vminmax, nstd, group_range=None,
 
 class _PlotDataBase(SubclassingMethodRegistry):
     """Shared plumbing for all data-source plot types: open the datatree,
-    dispatch plot methods by name (see armoor.base.dispatch)."""
+    dispatch plot methods by name (see armoor.dispatch)."""
 
     _dispatch_label = "Data plot"
 

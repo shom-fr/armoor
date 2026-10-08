@@ -4,7 +4,7 @@ Developer Guide
 ===============
 
 This page is for contributors and maintainers of **armoor**.  It describes the
-architecture, the coding conventions, the testing strategy and the GitLab
+architecture, the coding conventions, the testing strategy and the GitHub
 workflow that every contributor is expected to follow.
 
 .. contents::
@@ -28,14 +28,14 @@ responsibility; higher layers may import lower ones but never the reverse.
    │  armoor.comp         Composite workflows (coloc + stats + plot) │
    │  armoor.data         High-level I/O, interp, range, plot        │
    ├─────────────────────────────────────────────────────────────────┤
-   │  armoor.base         Atomic algorithms (no I/O, no Dask)        │
+   │  armoor              Atomic algorithms (no I/O, no Dask)        │
    └─────────────────────────────────────────────────────────────────┘
 
-``armoor.base``
+``armoor``
     Pure algorithmic functions.  No I/O, no Dask, no side-effects.
     Everything here must be unit-testable in isolation.  Examples:
-    :mod:`armoor.base.stats`, :mod:`armoor.base.interp`,
-    :mod:`armoor.base.ranges`, :mod:`armoor.base.plot`.
+    :mod:`armoor.stats`, :mod:`armoor.interp`,
+    :mod:`armoor.ranges`, :mod:`armoor.plot`.
 
 ``armoor.data``
     High-level dataset operations that may read files or launch Dask tasks,
@@ -74,7 +74,7 @@ accessor method.
 
 1. **No business logic in accessors.**
    An accessor method must be a one- or two-line wrapper that calls an
-   existing function in ``armoor.base`` or ``armoor.data``.  If there is no
+   existing function in ``armoor`` or ``armoor.data``.  If there is no
    such function yet, create it there first, then call it from the accessor.
 
 2. **No code duplication.**
@@ -146,6 +146,17 @@ where Black or the Flake8 ignore list overrides it.  Key points:
 - Imports grouped in order: standard library → third-party → armoor internal.
   Each group separated by a blank line.
 
+Type hints
+~~~~~~~~~~
+
+Add `PEP 484 <https://peps.python.org/pep-0484/>`_ type hints on every
+new public function and method, the same way a docstring is expected.
+Not enforced by a type checker (no mypy/pyright in CI yet) and not yet
+uniform across the package -- ``armoor.cli``, ``armoor.data.interp``,
+``armoor.data.output``, ``armoor.diags.eddies`` and ``armoor.tick.ticket``
+are fully typed; other modules are typed unevenly and aren't required to
+be retrofitted in unrelated changes.
+
 Docstrings — NumPy style
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -200,30 +211,30 @@ Framework
 ~~~~~~~~~
 
 Armoor uses `pytest <https://docs.pytest.org>`_.  Tests live under
-``armoor/tests/uni/`` (unit tests) and ``armoor/tests/int/`` (integration
+``tests/uni/`` (unit tests) and ``tests/integration/`` (integration
 tests, if any).
 
 .. code-block:: bash
 
    # Run the full unit test suite
-   python -m pytest armoor/tests/uni/ -v
+   python -m pytest tests/uni/ -v
 
    # Run a single test file
-   python -m pytest armoor/tests/uni/test_accessors.py -v
+   python -m pytest tests/uni/test_accessors.py -v
 
    # Run tests matching a pattern
-   python -m pytest armoor/tests/uni/ -k "stats" -v
+   python -m pytest tests/uni/ -k "stats" -v
 
 Rules
 ~~~~~
 
-- Every new **public function** in ``armoor.base`` or ``armoor.data`` must
+- Every new **public function** in ``armoor`` or ``armoor.data`` must
   have at least one unit test.
 - Every new **accessor method** must have at least one unit test that checks
   the return type and a known numerical value (or structural property).
 - Tests must be **self-contained**: use ``pytest.fixture`` for shared
   datasets; never rely on files from disk or network access.
-- Tests must **not mock** ``armoor.base`` functions — they must be tested
+- Tests must **not mock** ``armoor`` functions — they must be tested
   against real (small) data.
 - Tests must pass without warnings related to deprecation in armoor code
   itself (third-party warnings can be filtered).
@@ -233,7 +244,7 @@ Naming conventions
 
 .. code-block:: text
 
-   armoor/tests/uni/test_<module>.py      e.g. test_accessors_interp.py
+   tests/uni/test_<module>.py      e.g. test_accessors_interp.py
    class Test<Feature>:                   e.g. TestInterpTime
        def test_<behaviour>(self, ...):   e.g. test_output_times_match_targets
 
@@ -243,24 +254,24 @@ functions describe the expected behaviour, not the implementation detail.
 Coverage
 ~~~~~~~~
 
-The target line coverage for ``armoor.base`` and ``armoor.accessors`` is
+The target line coverage for ``armoor`` and ``armoor.accessors`` is
 **≥ 80 %**.  Run coverage locally with:
 
 .. code-block:: bash
 
-   python -m pytest armoor/tests/uni/ --cov=armoor --cov-report=term-missing
+   python -m pytest tests/uni/ --cov=armoor --cov-report=term-missing
 
 
-GitLab workflow
+GitHub workflow
 ---------------
 
 Repository
 ~~~~~~~~~~
 
 Source code is hosted at
-`<https://gitlab.com/GitShom/STM/armoor>`_.
+`<https://github.com/shom-fr/armoor>`_.
 Documentation is published at
-`<https://gitshom.gitlab.io/STM/armoor/>`_.
+`<https://shom-fr.github.io/armoor/>`_.
 
 Branches
 ~~~~~~~~
@@ -289,7 +300,7 @@ Issues
 ~~~~~~
 
 All work must be tracked in the
-`issue tracker <https://gitlab.com/GitShom/STM/armoor/-/issues>`_ before
+`issue tracker <https://github.com/shom-fr/armoor/issues>`_ before
 a branch is created.
 
 When opening an issue:
@@ -302,30 +313,30 @@ When opening an issue:
   minimal reproducible example.
 - **Assignee**: assign yourself if you intend to work on it immediately.
 
-Merge requests
-~~~~~~~~~~~~~~
+Pull requests
+~~~~~~~~~~~~~
 
-Merge requests (MR) must be opened against ``develop`` (or ``main`` for
+Pull requests (PR) must be opened against ``develop`` (or ``main`` for
 hotfixes).
 
-Checklist before opening an MR:
+Checklist before opening a PR:
 
 .. code-block:: text
 
    [ ] Branch is up to date with the target branch
    [ ] black armoor/ passes with no changes
    [ ] flake8 armoor/ reports no errors
-   [ ] python -m pytest armoor/tests/uni/ passes
+   [ ] python -m pytest tests/uni/ passes
    [ ] New code has docstrings (NumPy style, English)
    [ ] New public API has at least one unit test
    [ ] CHANGES.rst updated with a one-line entry
-   [ ] MR title references the issue number (e.g. "Fix #42 — …")
+   [ ] PR title references the issue number (e.g. "Fix #42 — …")
 
-MR description template:
+PR description template:
 
 .. code-block:: text
 
-   ## What this MR does
+   ## What this PR does
    Short description of the change.
 
    ## Related issue
@@ -349,7 +360,7 @@ Review rules:
 - The CI pipeline (lint + tests) must be **green**.
 - Squash commits when merging feature branches to keep ``develop`` history
   clean.
-- Delete the feature branch after the MR is merged.
+- Delete the feature branch after the PR is merged.
 
 CI/CD variables
 ~~~~~~~~~~~~~~~
@@ -405,14 +416,14 @@ Summary of rules
    * - Typing
      - Type hints on all new public functions
    * - Tests
-     - pytest, one test class per feature, ≥ 80 % coverage on base/accessors
+     - pytest, one test class per feature, ≥ 80 % coverage on armoor/accessors
    * - No logic in accessors
-     - Delegate to ``base`` or ``data``; no duplicated code
+     - Delegate to ``armoor`` or ``data``; no duplicated code
    * - No logic in CLI
-     - Delegate to accessors or ``comp``; no direct ``base``/``data`` calls
+     - Delegate to accessors or ``comp``; no direct ``armoor``/``data`` calls
    * - Imports
      - stdlib → third-party → armoor; one blank line between groups
    * - Branches
      - ``feature/<slug>`` off ``develop``; ``hotfix/<slug>`` off ``main``
-   * - MR
+   * - PR
      - Green CI + one approval + CHANGES.rst entry required

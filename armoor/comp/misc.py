@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from armoor.base.misc import validate_metazone_params
+from armoor.misc import validate_metazone_params
 
 logger = logging.getLogger(__name__)
 

@@ -11,7 +11,7 @@ import os
 # (default os.cpu_count()) at first use, not by later numba.set_num_threads()
 # calls -- unset, concurrent dask worker threads racing into the first call
 # to a parallel=True numba kernel (e.g. gsw/xoa.regrid.regrid1d, see
-# armoor.base.interp.vinterp) can each try to spin up a pool sized to every
+# armoor.interp.vinterp) can each try to spin up a pool sized to every
 # CPU on the node, exhausting the job's thread/process limit.
 # Parallelism is achieved via multiple processes (dask workers), not threads.
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -24,11 +24,12 @@ import logging
 import time
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Optional
 
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
 from armoor import ArmoorError
-from armoor.base.misc import comma_separated, parse_coords, parse_qc_tuple
+from armoor.misc import comma_separated, parse_coords, parse_qc_tuple
 
 
 class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
@@ -70,7 +71,7 @@ _SUBSECTION_PRIMARY_KEY = {
 }
 
 
-def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
+def check_metazones_in(metazones_arg: list, metazones_cfg: dict, func_param: Optional[list] = None, **kwargs) -> dict:
     """Check if all metazone-names given in command-line are present in cfgfile.
 
     This function checks if all elements of the first list are present in the
@@ -142,7 +143,7 @@ def check_metazones_in(metazones_arg, metazones_cfg, func_param=None, **kwargs):
                 #     del metazones[metazone_name]["polygon"]
     return metazones
 
-def get_parser_filters():
+def get_parser_filters() -> ArgumentParser:
     """Get parser for filtering."""
     # Setup argument parser
     parser = ArgumentParser(
@@ -176,11 +177,11 @@ def get_parser_filters():
     
     return parser
 
-def main_filters():
+def main_filters() -> None:
     """Apply filters over metazones."""
     import dask
     from xoa.cfgm import ConfigManager
-    from armoor.base.io import zarrs2netcdfs
+    from armoor.io import zarrs2netcdfs
     from armoor.data.load import load_datasets
     _init_heavy()
 
@@ -223,7 +224,7 @@ def main_filters():
 
     logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
 
-def get_parser_data():
+def get_parser_data() -> ArgumentParser:
     """Get parser for data."""
     # Setup argument parser
     parser = ArgumentParser(
@@ -237,9 +238,10 @@ def get_parser_data():
     return parser
 
 
-def main_data_pipeline(cfgfile, metafile, metazones, jsonfile,
-                        ofilter, no_plot, plot_only, input_json,
-                        kw_dask, data_args={}, load_only=None, input_zarrs=None):
+def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], jsonfile: Path,
+                        ofilter: bool, no_plot: bool, plot_only: Optional[str], input_json: Optional[Path],
+                        kw_dask: tuple, data_args: dict = {}, load_only: Optional[str] = None,
+                        input_zarrs: Optional[list[str]] = None) -> None:
     """Run (a stage of) the armoor-data pipeline: load, output, plot.
 
     Also serves as the per-wave worker entry point for the HPC pipeline
@@ -285,8 +287,8 @@ def main_data_pipeline(cfgfile, metafile, metazones, jsonfile,
         disk); nothing is returned.
     """
     from xoa.cfgm import ConfigManager
-    from armoor.base.io import zarrs2netcdfs
-    from armoor.base.misc import dict_to_list
+    from armoor.io import zarrs2netcdfs
+    from armoor.misc import dict_to_list
     from armoor.cli.io import configure_dask_scheduler
     from armoor.data.load import load_datasets, StagedDataset
 
@@ -448,7 +450,7 @@ def _dispatch_data(parser):
         )
 
 
-def main_data():
+def main_data() -> None:
     """Process data over metazones."""
     _init_heavy()
     _dispatch_data(get_parser_data())
@@ -544,9 +546,10 @@ def _detect_scheduler(hosts_cfg=None):
     return scheduler, host
 
 
-def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
-              ofilter, ocoloc, no_plot, plot_only, input_json,
-              kw_dask, comp_args={}, load_only=None, input_zarrs=None):
+def main_comp(cfgfile: Path, metafile: Path, metazones: list[str], func_comp: str, jsonfile: Path,
+              ofilter: bool, ocoloc: bool, no_plot: bool, plot_only: Optional[str], input_json: Optional[Path],
+              kw_dask: tuple, comp_args: dict = {}, load_only: Optional[str] = None,
+              input_zarrs: Optional[list[str]] = None) -> None:
     """Run (a stage of) the armoor-comp-* pipeline: load, colocate, output, plot.
 
     Also serves as the per-wave worker entry point for the HPC pipeline
@@ -597,8 +600,8 @@ def main_comp(cfgfile, metafile, metazones, func_comp, jsonfile,
         disk); nothing is returned.
     """
     from xoa.cfgm import ConfigManager
-    from armoor.base.io import zarrs2netcdfs
-    from armoor.base.misc import dict_to_list
+    from armoor.io import zarrs2netcdfs
+    from armoor.misc import dict_to_list
     from armoor.cli.io import configure_dask_scheduler
     from armoor.comp.comparison import get_comparison
     from armoor.comp.coloc import main_coloc
@@ -776,7 +779,7 @@ def _dispatch_comp(func_comp, parser, kw_comp_factory):
     )
 
 
-def get_parser_comp_models():
+def get_parser_comp_models() -> ArgumentParser:
     """Get parser for models comparison."""
     # Setup argument parser
     parser = ArgumentParser(
@@ -789,12 +792,12 @@ def get_parser_comp_models():
 
     return parser
 
-def main_comp_models():
+def main_comp_models() -> None:
     """Compare a model reference with other products."""
     _dispatch_comp("comp_models", get_parser_comp_models(),
                    lambda args: {"tbound": args.tbound})
 
-def get_parser_comp_clim():
+def get_parser_comp_clim() -> ArgumentParser:
     """Get parser for climatology comparison."""
     parser = ArgumentParser(
         description="Compare 3D model outputs with an observed hydrological climatology.",
@@ -806,12 +809,12 @@ def get_parser_comp_clim():
     return parser
 
 
-def main_comp_clim():
+def main_comp_clim() -> None:
     """Compare model outputs with an observed climatology."""
     _dispatch_comp("comp_clim", get_parser_comp_clim(),
                    lambda args: {"tbound": args.tbound})
 
-def get_parser_comp_hydrosection():
+def get_parser_comp_hydrosection() -> ArgumentParser:
     """Get parser for hydrological-section comparison."""
     parser = ArgumentParser(
         description="Compare 3D model outputs with observed hydrological sections (gliders, ODAR radiales).",
@@ -834,12 +837,12 @@ def get_parser_comp_hydrosection():
     return parser
 
 
-def main_comp_hydrosection():
+def main_comp_hydrosection() -> None:
     """Compare model outputs with observed hydrological sections (gliders)."""
     _dispatch_comp("comp_hydrosection", get_parser_comp_hydrosection(),
                    lambda args: {"tbound": args.tbound, "cgeo_ref": args.cgeo_ref})
 
-def get_parser_comp_sst():
+def get_parser_comp_sst() -> ArgumentParser:
     """Get parser for sst comparison."""
     # Setup argument parser
     parser = ArgumentParser(
@@ -857,13 +860,13 @@ def get_parser_comp_sst():
         )
     return parser
 
-def main_comp_sst():
+def main_comp_sst() -> None:
     """Compare sst reference with other products."""
     _dispatch_comp("comp_sst", get_parser_comp_sst(),
                    lambda args: {"qc": args.qc, "tbound": args.tbound})
 
 
-def get_parser_comp_argo():
+def get_parser_comp_argo() -> ArgumentParser:
     """Get parser for argo comparison."""
     # Setup argument parser
     parser = ArgumentParser(
@@ -887,12 +890,12 @@ def get_parser_comp_argo():
     
     return parser
 
-def main_comp_argo():
+def main_comp_argo() -> None:
     """Compare argo with other products."""
     _dispatch_comp("comp_argo", get_parser_comp_argo(),
                    lambda args: {"radius": args.radius, "qc": args.qc, "tbound": args.tbound})
 
-def get_parser_comp_mooring():
+def get_parser_comp_mooring() -> ArgumentParser:
     """Get parser for mooring comparison."""
     # Setup argument parser
     parser = ArgumentParser(
@@ -916,12 +919,12 @@ def get_parser_comp_mooring():
     
     return parser
 
-def main_comp_mooring():
+def main_comp_mooring() -> None:
     """Compare mooring with other products."""
     _dispatch_comp("comp_mooring", get_parser_comp_mooring(),
                    lambda args: {"radius": args.radius, "qc": args.qc, "tbound": args.tbound})
 
-def get_parser_comp_drifter():
+def get_parser_comp_drifter() -> ArgumentParser:
     """Get parser for drifter comparison."""
     # Setup argument parser
     parser = ArgumentParser(
@@ -943,14 +946,14 @@ def get_parser_comp_drifter():
         )
     return parser
 
-def main_comp_drifter():
+def main_comp_drifter() -> None:
     """Compare drifter trajectory with other products."""
     _dispatch_comp("comp_drifter", get_parser_comp_drifter(),
                    lambda args: {"period_drift": args.period,
                                  "freq_drift": args.freq,
                                  "tbound": args.tbound})
 
-def get_parser_bull():
+def get_parser_bull() -> ArgumentParser:
     """Get parser for building bull."""
     # Setup argument parser
     parser = ArgumentParser(
@@ -984,7 +987,7 @@ def get_parser_bull():
     
     return parser
 
-def main_bull():
+def main_bull() -> None:
     """Build bull."""
     from xoa.cfgm import ConfigManager
     from armoor.bull.build import Bull
@@ -1020,30 +1023,30 @@ def main_bull():
                 bull.generate_pdf(file)
     
 
-# Fonction de diagnostic pour surveiller les performances
-def monitor_performance():
-    """Surveille les performances du système."""
+# Diagnostic helper to monitor system performance
+def monitor_performance() -> None:
+    """Monitor system performance."""
     try:
         import psutil
 
-        # Mémoire
+        # Memory
         memory = psutil.virtual_memory()
         swap = psutil.swap_memory()
-        
-        logger.info(f"Mémoire: {memory.percent:.1f}% utilisée ({memory.available/1e9:.1f}GB libre)")
-        logger.info(f"Swap: {swap.percent:.1f}% utilisé ({swap.free/1e9:.1f}GB libre)")
-        
+
+        logger.info(f"Memory: {memory.percent:.1f}% used ({memory.available/1e9:.1f}GB free)")
+        logger.info(f"Swap: {swap.percent:.1f}% used ({swap.free/1e9:.1f}GB free)")
+
         # CPU
         cpu_percent = psutil.cpu_percent(interval=1)
-        logger.info(f"CPU: {cpu_percent:.1f}% utilisé")
-        
-        # Alertes
+        logger.info(f"CPU: {cpu_percent:.1f}% used")
+
+        # Alerts
         if memory.percent > 90:
-            logger.warning("Mémoire critique (>90%)")
+            logger.warning("Critical memory usage (>90%)")
         if swap.percent > 50:
-            logger.warning("Swap élevé (>50%)")
-            
+            logger.warning("High swap usage (>50%)")
+
     except ImportError:
-        logger.debug("psutil non disponible")
+        logger.debug("psutil not available")
     except Exception as e:
-        logger.debug(f"Erreur monitoring: {e}")
+        logger.debug(f"Monitoring error: {e}")

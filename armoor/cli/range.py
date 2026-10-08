@@ -7,8 +7,8 @@ import logging
 from argparse import ArgumentParser
 import pandas as pd
 
-from armoor.base.io import ArmoorArgumentHelpFormatter
-from armoor.base.misc import parse_date, is_dict_empty, parse_coords
+from armoor.io import ArmoorArgumentHelpFormatter
+from armoor.misc import parse_date, is_dict_empty, parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
@@ -34,7 +34,7 @@ class RangeError(Exception):
     pass
 
 
-def get_parser_range_time():
+def get_parser_range_time() -> ArgumentParser:
     """Create argument parser for temporal range operations.
     
     Returns
@@ -73,7 +73,7 @@ def get_parser_range_time():
     return parser
 
 
-def main_range_time():
+def main_range_time() -> None:
     """Apply time range to input files via command line interface.
     
     This function serves as the main entry point for time range operations.
@@ -116,7 +116,7 @@ def main_range_time():
         save_output(ds, args.fout, args.ofmt)
 
 
-def get_parser_range_vertical():
+def get_parser_range_vertical() -> ArgumentParser:
     """Create argument parser for vertical range operations.
     
     Returns
@@ -148,7 +148,7 @@ def get_parser_range_vertical():
         )
     return parser
 
-def main_range_vertical():
+def main_range_vertical() -> None:
     """Apply vertical range to input files via command line interface.
     
     This function serves as the main entry point for vertical range operations.

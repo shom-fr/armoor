@@ -11,7 +11,7 @@ import xarray as xr
 from collections import defaultdict
 
 from armoor import ArmoorError
-from armoor.base.io import (
+from armoor.io import (
     get_zarr_encoding,
     sort_ncs_by_suffix,
     write_dataset_to_zarr
@@ -164,6 +164,24 @@ def _rewrite_prod_as_zarr(ncprod, zprod):
 
 
 def preproc_comp_drifter(zins, odt, runtime=None):
+    """Run the OceanParcels simulation for every colocated drifter/product pair.
+
+    Parameters
+    ----------
+    zins : dict
+        ``{drifter_name: {prod_name: [ref_zarr, prod_zarr]}}`` as produced
+        by colocation.
+    odt : timedelta or str
+        Output timestep for the particle-tracking simulation.
+    runtime : timedelta or str, optional
+        Simulation runtime; defaults to the product's own time span.
+
+    Returns
+    -------
+    dict
+        `zins`, updated in place, with each product's zarr pair replaced
+        by ``[simulated_ref_zarr, rewritten_prod_zarr]``.
+    """
     logger.info("Preproc comp_drifter")
     for drifter, prods in zins.items():
         logger.info(drifter)
@@ -457,9 +475,17 @@ class OutputProcessor:
             sorted_prods[prod_name] = {}
             
             for file_type in ["prod", "ref"]:
-                # Filter files by type (prod or ref)
-                type_files = [nc for nc in ncins if file_type in str(nc)]
-                
+                # Filter files by type (prod or ref), matching the
+                # "ref[_<suffix>].zarr"/"prod[_<suffix>].zarr" filename
+                # convention itself (the suffix is empty for an untagged
+                # signature group, e.g. hydrosection's "mld" -- see
+                # armoor.comp.coloc.save_datasets), not a substring check
+                # anywhere in the path -- a metazone name containing "ref"
+                # (e.g. "modelzone_href") would otherwise match every file
+                # under it, misclassifying every product as a second
+                # reference (same bug class already fixed in coloc.py).
+                type_files = [nc for nc in ncins if Path(str(nc)).name.startswith(file_type)]
+
                 # Sort files by the specified dimension
                 sorted_files = sort_ncs_by_suffix(type_files, sort_dim=sort_dim)
                 sorted_prods[prod_name][file_type] = sorted_files
@@ -725,10 +751,18 @@ class OutputProcessor:
         # Concatenate along time dimension
         concatenated = concat_then_merge(datasets)
 
-        # Preserve vrange attributes if present in any dataset
+        # Preserve vrange attributes if present in any dataset -- de-duplicate
+        # first: concatenating many single-time slices of the same vrange
+        # bin (e.g. uvprofiles/udiagts's "concat": ["time"]) would otherwise
+        # repeat the same value once per slice. Compare by equality (not a
+        # set/dict) since vrange_value may itself be an unhashable list.
         vrange_attrs = [ds.range.vrange_value for ds in datasets if ds.range.vrange_value]
         if vrange_attrs:
-            concatenated.attrs["vrange"] = vrange_attrs
+            deduped = []
+            for v in vrange_attrs:
+                if v not in deduped:
+                    deduped.append(v)
+            concatenated.attrs["vrange"] = deduped
 
         return concatenated
     

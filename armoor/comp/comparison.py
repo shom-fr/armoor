@@ -20,7 +20,7 @@ import pandas as pd
 import xarray as xr
 from xoa.geo import bearing, haversine
 
-import armoor.base.ranges as ranges
+import armoor.ranges as ranges
 from armoor import ArmoorError
 
 logger = logging.getLogger(__name__)
@@ -749,7 +749,7 @@ class CompHydrosection(Comparison):
         already vinterp'd onto the reference's own depth levels during
         colocation, see `colocation_params_default["vertical"]` above).
 
-        The tag itself only exists to make `armoor.base.io.output_suffix`
+        The tag itself only exists to make `armoor.io.output_suffix`
         give each "z"-having dims-signature group's coloc file a
         *different* filename -- comp_vars now splits into three such
         groups sharing the same sort_key: {ptemp, sal, pdens, temp,
@@ -788,7 +788,7 @@ class CompHydrosection(Comparison):
         normal to the section.
 
         Geostrophic velocity (see
-        `armoor.base.oceanvars.OceanVars.sel_cgeo`) collapses N stations
+        `armoor.oceanvars.OceanVars.sel_cgeo`) collapses N stations
         into N-1 station-pair values -- it can't be assigned back onto the
         dataset's own "time" dim the way the base class's per-point loop
         assumes, so it's merged in separately here as a new "cgeo"
