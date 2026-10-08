@@ -52,6 +52,10 @@ To get a better understanding of how Armoor processes incoming data, see the :re
 
 .. tip:: Armoor saves the outputs in the folder of execution. Run your commands accordingly.
 
-.. note:: 
-   * For the metazone-based executables, you should probably start with the :ref:`examples` section. This collection of examples will gradually be completed to cover almost all features of the library. 
-   * For the elementary executables, you can find more details in the corresponding armoor.cli API sections. 
+.. note::
+   * For the metazone-based executables, you should probably start with the :ref:`examples` section. This collection of examples will gradually be completed to cover almost all features of the library.
+   * For the elementary executables, you can find more details in the corresponding armoor.cli API sections.
+
+.. tip:: Once you are comfortable with the basics, the :ref:`guides` section
+   explains metazones, colocation, configuration files and the CLI
+   architecture in more depth than the reference pages above.

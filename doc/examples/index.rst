@@ -4,6 +4,7 @@ Gallery of examples
 ===================
 
 Hereafter are presented some examples of configuration files for metazone-based Armoor executables.
+See :ref:`guide-configuration` and :ref:`guide-metazones` for how these files are validated and consumed under the hood.
 
 .. grid:: 3
 

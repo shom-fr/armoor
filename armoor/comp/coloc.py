@@ -11,12 +11,12 @@ import xarray as xr
 import xoa.coords as xcoords
 import xoa.geo as xgeo
 
-import armoor.base.ranges as ranges
+import armoor.ranges as ranges
 from armoor.__init__ import ArmoorError
-from armoor.base.dispatch import SubclassingMethodRegistry
-from armoor.base.interp import coarsen as _coarsen, grid2loc, grid2track, interp_time, regrid, vinterp
-from armoor.base.io import (create_fast_encoding, get_zarr_encoding,
-                            setup_dask_client)
+from armoor.dispatch import SubclassingMethodRegistry
+from armoor.interp import coarsen as _coarsen, grid2loc, grid2track, interp_time, regrid, vinterp
+from armoor.io import (create_fast_encoding, get_zarr_encoding,
+                        setup_dask_client)
 from armoor.comp import COMP_VARS
 from armoor.comp.comparison import get_comparison
 from armoor.comp.misc import get_colocation_params, validate_colocation
@@ -30,7 +30,7 @@ class AbstractColocation(SubclassingMethodRegistry):
     """Abstract base for colocation strategies (time/horizontal/vertical).
 
     Subclasses register their own methods for dispatch via `call`; see
-    `armoor.base.dispatch.SubclassingMethodRegistry`.
+    `armoor.dispatch.SubclassingMethodRegistry`.
     """
 
     _dispatch_label = "Colocation"
@@ -249,7 +249,6 @@ class HorizontalColocation(AbstractColocation):
     def _calculate_distances_vectorized(self, prod_data: xr.Dataset, ref_data: xr.Dataset) -> xr.DataArray:
         """
         Calculate distances using vectorized operations for all timesteps at once.
-        OPTIMISATION 1: Calcul vectorisé pour tous les timesteps simultanément
         """
         rename_dims = {"npts0": "member"}
         if "time" in ref_data.lon.dims:
@@ -269,9 +268,7 @@ class HorizontalColocation(AbstractColocation):
         return dist
     
     def _handle_time_dependent(self, radius_meters: float) -> None:
-        """
-        OPTIMISATION MAJEURE: Traite tous les timesteps simultanément au lieu d'une boucle.
-        """
+        """Process every timestep at once instead of looping over them."""
         dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
         mask = dist_prod2ref < radius_meters
         mask = mask.transpose("time", "member")
@@ -341,8 +338,9 @@ class HorizontalColocation(AbstractColocation):
  
     def radius(self, radius: float) -> Tuple[xr.Dataset, xr.Dataset]:
         """
-        Version optimisée de la méthode radius.
-        
+        Radius-based colocation: keep every product point within `radius`
+        of the reference.
+
         Parameters
         ----------
         radius : float
@@ -354,14 +352,14 @@ class HorizontalColocation(AbstractColocation):
         """
         if radius <= 0:
             raise ValueError("Radius must be positive")
-        
+
         radius_meters = radius * 1e3
         if "member" not in self.dsprod.dims:
             self.dsprod = xcoords.geo_stack(self.dsprod, "member")
         if "time" not in self.dsref.lon.dims:
-            # Cas time-independent (unchanged)
+            # Time-independent case
             dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
-            filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters)#, drop=True)
+            filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters)
             self.dsprod = self._clean_coordinates(filtered_ds)
         else:
             logger.info("time dependent")
@@ -1145,11 +1143,17 @@ def main_coloc(ncs, metazones, comp_func):
     ncs_index = {}
     for nc in ncs:
         nc_str = str(nc)
+        # Match the "ref_<name>.zarr"/"prod_<name>.zarr" filename convention
+        # itself, not a substring check anywhere in the path -- a metazone
+        # name containing "ref" (e.g. "modelzone_href") would otherwise
+        # match every file under it, misclassifying every product as a
+        # second reference.
+        basename = Path(nc_str).name
         for metazone in coloc_params:
             if metazone in nc_str:
                 if metazone not in ncs_index:
                     ncs_index[metazone] = {"ref": [], "prod": []}
-                if "ref" in nc_str:
+                if basename.startswith("ref_"):
                     ncs_index[metazone]["ref"].append(nc)
                 else:
                     ncs_index[metazone]["prod"].append(nc)

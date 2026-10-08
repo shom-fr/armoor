@@ -3,6 +3,7 @@ name = "armoor"
 authors = [
     {name = "Shom", email = "mathieu.morvan@shom.fr"},
 ]
+license = "Apache-2.0"
 license-files = ["LICENSE.rst"]
 description = "Analysis of Regional MOdelised and ObseRved ocean"
 dynamic = ["version"]
@@ -30,7 +31,6 @@ dependencies = [
 
 doc = [
   "sphinx",
-  "nbsphinx",
   "sphinx-argparse",
   "sphinx-book-theme",
   "sphinx-gallery",
@@ -48,9 +48,9 @@ doc = [
 ]
 
 [project.urls]
-homepage = "https://gitshom.gitlab.io/STM/armoor/"
-issue-tracker = "https://gitlab.com/GitShom/STM/armoor/-/issues"
-source-code = "https://gitlab.com/GitShom/STM/armoor"
+homepage = "https://shom-fr.github.io/armoor/"
+issue-tracker = "https://github.com/shom-fr/armoor/issues"
+source-code = "https://github.com/shom-fr/armoor"
 
 
 [project.scripts]
@@ -86,12 +86,12 @@ armoor-tick-search = "armoor.cli.tick:main_tick_search"
 armoor-viewer = "armoor.viewer.app:main"
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0.0", "wheel"]  # PEP 639 license = "Apache-2.0" needs >=77
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = [
-    "armoor", "armoor.accessors", "armoor.algo", "armoor.base",
+    "armoor", "armoor.accessors", "armoor.algo", "armoor.bull",
     "armoor.cli", "armoor.comp", "armoor.data", "armoor.diags", "armoor.tick",
     "armoor.viewer", "armoor.viewer.api", "armoor.viewer.rendering", "armoor.viewer.bridge",
 ]

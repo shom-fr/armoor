@@ -12,13 +12,13 @@ import pandas as pd
 import xarray as xr
 
 from armoor.__init__ import ArmoorError
-from armoor.base.io import (
+from armoor.io import (
     setup_dask_client,
     get_zarr_encoding,
     sort_ncs_by_suffix
     )
-from armoor.base.misc import optimize_for_low_swap, validate_metazone_params
-import armoor.base.ranges as ranges
+from armoor.misc import optimize_for_low_swap, validate_metazone_params
+import armoor.ranges as ranges
 from armoor.data import INTERP_PARAMS_USER
 from armoor.data.datatype import get_data_type_by_name
 from armoor.data.interp import (
@@ -127,7 +127,26 @@ def _merge_zless_into_shallowest(pooled, merge_fn):
         pooled[orphan_key] = merged
 
 
-def get_dim_stats(dsin, dim, mparams):
+def get_dim_stats(dsin: xr.Dataset, dim: Optional[List[str]], mparams: dict) -> Optional[List[str]]:
+    """Filter which dims to reduce mean/std over, based on metazone config.
+
+    Mirrors `armoor.comp.stats.StatsComp._filter_dims`: "time" is only
+    reduced if `mparams` declares ``trange_seq``, "z" only if it declares
+    ``vrange``, and "x"/"y" only if `dsin` actually has an "x" dim.
+
+    Parameters
+    ----------
+    dsin : xarray.Dataset
+    dim : list of str or None
+        Candidate dims requested by the caller.
+    mparams : dict
+        Metazone config parameters.
+
+    Returns
+    -------
+    list of str or None
+        `dim`, filtered; None if `dim` was falsy.
+    """
     if dim:
         dim_stats = dim.copy()
         if ("time" in dim) and ("trange_seq" not in mparams):
@@ -141,7 +160,21 @@ def get_dim_stats(dsin, dim, mparams):
     else:
         return None
     
-def set_time_range(ds, time):
+def set_time_range(ds: xr.Dataset, time: str) -> xr.Dataset:
+    """Assign a single "time" coordinate at the midpoint of a bracketed range.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        A dataset already reduced over "time" (no "time" dim left).
+    time : str
+        A ``"[start_end["``-bracketed range (see `armoor.ranges.trange_seq`).
+
+    Returns
+    -------
+    xarray.Dataset
+        `ds` with a new "time" dim/coordinate at the range's midpoint.
+    """
     if "time" not in ds.dims: # mean/std groups
         if "time" in ds.coords:
             ds = ds.drop_vars("time")
@@ -159,7 +192,25 @@ def set_time_range(ds, time):
         ds = ds.set_coords("time")
     return ds
 
-def get_datatrees(dsins, dim, mparams):
+def get_datatrees(dsins: List[xr.Dataset], dim: Optional[List[str]], mparams: dict) -> List[xr.DataTree]:
+    """Build one `xr.DataTree` per dataset, with "data"/"mean"/"std" groups.
+
+    Parameters
+    ----------
+    dsins : list of xarray.Dataset
+        Datasets to wrap, one per data source.
+    dim : list of str or None
+        Candidate dims to reduce over for mean/std (see `get_dim_stats`).
+    mparams : dict
+        Metazone config parameters, used both to filter `dim` and to tag
+        each "trange_seq"-configured tree with its own time range (see
+        `set_time_range`).
+
+    Returns
+    -------
+    list of xarray.DataTree
+        One tree per input dataset, named after its ``data_name`` attr.
+    """
     dts = []
     for ds in dsins:
         for coord in ["lon", "lat", "depth"]:
@@ -195,7 +246,7 @@ def get_datatrees(dsins, dim, mparams):
         del dt,ds
     return dts
 
-def validate_interpolation(metazones):
+def validate_interpolation(metazones: dict) -> dict:
     """Validate that only one of the two parameters is defined for each metazone.
 
     This function checks if either param1 or param2 is defined, but not both,
@@ -215,7 +266,7 @@ def validate_interpolation(metazones):
     """
     return validate_metazone_params(metazones, INTERP_PARAMS_USER, label="interpolation")
 
-def get_interpolation_params(metazones):
+def get_interpolation_params(metazones: dict) -> dict:
     """
     Retrieve colocation parameters for each metazone based on given parameters.
 
@@ -260,7 +311,7 @@ def get_interpolation_params(metazones):
             interp_params[mz_name] = None
     return interp_params
 
-def validate_and_get_params(metazones):
+def validate_and_get_params(metazones: dict) -> dict:
     """Validate and get colocation parameters.
     
     Parameters
@@ -277,7 +328,7 @@ def validate_and_get_params(metazones):
     interp_params = get_interpolation_params(metazones)
     return interp_params
 
-def save_datasets(dsprod, dirout, prod_name, ofmt):
+def save_datasets(dsprod: xr.Dataset, dirout: Path, prod_name: str, ofmt: list) -> Path:
     """Save dataset to NetCDF files.
 
     Parameters
@@ -1579,7 +1630,8 @@ class OutputProcessor:
                 merged.attrs = group[0].attrs
                 return merged
 
-        def by_vlevel(ds0):
+        def by_vlevel(ds0: xr.Dataset) -> float:
+            """Sort key: a fragment's own "vlevel" attr (0 if unset)."""
             return float(ds0.attrs.get("vlevel", 0))
 
         ds = xr.concat(sorted(group, key=by_vlevel), dim="z")

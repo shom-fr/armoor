@@ -19,11 +19,11 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.geo import haversine
 from xoa.plot import plot_minimap, plot_ts
 
-from armoor.base import LINE_COLORS, CMAP_VARS
-from armoor.base.dispatch import MethodRegistry
-from armoor.base.plot import (create_subplots, diagdisp, format_time_label,
-                              format_vertical_label, get_output_vminmax,
-                              save_figure)
+from armoor import LINE_COLORS, CMAP_VARS
+from armoor.dispatch import MethodRegistry
+from armoor.plot import (create_subplots, diagdisp, format_time_label,
+                          format_vertical_label, get_output_vminmax,
+                          save_figure)
 from armoor.comp import GROUP_SUFFIX, METRIC_LABELS
 from armoor.comp.comparison import get_comparison
 from armoor.data.load import StagedDataset
@@ -136,7 +136,7 @@ class PlotComp(MethodRegistry):
     series) from a colocated armoor-comp-* output datatree.
 
     Plot methods are dispatched by name via `call` (see
-    `armoor.base.dispatch.MethodRegistry`).
+    `armoor.dispatch.MethodRegistry`).
     """
 
     _dispatch_label = "Comparison plot"
@@ -170,10 +170,24 @@ class PlotComp(MethodRegistry):
 
 
     def clean(self):
+        """Close the underlying DataTree (release its zarr/netcdf handles)."""
         self.dt.close()
 
     def diagdisp(self, dsref, dsprod, varname, figtitle, figname):
-        
+        """Render and save a dispersion diagram (scatter + regression + R²)
+        for one variable, with a minimap inset.
+
+        Parameters
+        ----------
+        dsref, dsprod : xarray.Dataset
+            Reference/product datasets, each carrying a ``data_name`` attr.
+        varname : str
+            Variable to plot.
+        figtitle : str
+            Title template, formatted with the local variables in scope.
+        figname : str
+            Output PNG filename (relative to the plot output dir).
+        """
         fig, ax = create_subplots(
             nrows=1,
             figsize=(8, 8),
@@ -598,6 +612,15 @@ class PlotComp(MethodRegistry):
         depth = dsref.depth.where(mask, drop=True)
         zmin = -depth.max()
         zmax = -depth.min()
+        # Radius-based colocation names the extra per-location axis "member";
+        # cloud-based colocation (a fixed list of points) names it "npts"
+        # instead. Normalize to "member" so the rest of this method doesn't
+        # need to care which colocation method produced the data.
+        extra_dims = [d for d in dsprod.dims if d not in ("z", "time")]
+        if extra_dims and extra_dims[0] != "member":
+            dsprod = dsprod.rename({extra_dims[0]: "member"})
+        elif not extra_dims:
+            dsprod = dsprod.expand_dims({"member": 1}, axis=-1)
         dsprod = dsprod.transpose("z", "time", "member")
         for var in dsref.data_vars:
             units = dsref[var].attrs.get('units')
@@ -741,6 +764,11 @@ class PlotComp(MethodRegistry):
                 v for v in ds.data_vars
                 if v != "depth" and "member" in ds[v].dims and ds[v].ndim > 1
                 ]
+            if not agg_vars:
+                # No "member" dimension anywhere (e.g. cloud-based horizontal
+                # colocation, already split down to a single point) --
+                # nothing to reduce.
+                return ds
             other_vars = [v for v in ds.data_vars if v not in agg_vars]
             result = getattr(ds[agg_vars], method)(dim="member")
             for v in other_vars:
@@ -1661,7 +1689,7 @@ class PlotComp(MethodRegistry):
         ``lon_name="lon_pair"``, ``lat_name="lat_pair"`` for the
         geostrophic-velocity case, where each point is already the
         midpoint between two consecutive stations (see
-        `armoor.base.oceanvars.OceanVars.sel_cgeo`) -- no further sorting
+        `armoor.oceanvars.OceanVars.sel_cgeo`) -- no further sorting
         needed there, `sel_cgeo` already sorts by time before differencing.
         """
         if dim == "time":
@@ -1686,7 +1714,7 @@ class PlotComp(MethodRegistry):
 
         `ax` defaults to the shared `self.ax_minimap` position, but
         `_sections_2d`'s ``top_two_bottom_one`` layout (two titled panels
-        immediately below it, see gridspec in `armoor.base.plot.
+        immediately below it, see gridspec in `armoor.plot.
         create_subplots`) needs a smaller, higher one instead to avoid
         the map's own gridline labels bleeding into the "ref" panel's
         title -- confirmed against a real rendered figure.
@@ -1766,7 +1794,7 @@ class PlotComp(MethodRegistry):
 
         axes[0].set_ylabel("Depth, m")
         # Only axes[2] (the bottom "diff" panel) owns the x-axis label --
-        # `top_two_bottom_one`'s gridspec (armoor.base.plot.create_subplots)
+        # `top_two_bottom_one`'s gridspec (armoor.plot.create_subplots)
         # stacks it directly under axes[0]/axes[1] with no row gap, so
         # labelling the top row too made its own "Distance, km" text run
         # into axes[2]'s title right below it.
@@ -1836,7 +1864,7 @@ class PlotComp(MethodRegistry):
                     dscomp_all = dscomp_all.mean(dim="member", keep_attrs=True)
 
                 # "cgeo" (geostrophic velocity normal to the section, see
-                # armoor.base.oceanvars.OceanVars.sel_cgeo) lives on its own
+                # armoor.oceanvars.OceanVars.sel_cgeo) lives on its own
                 # "pair" dim -- one value per pair of consecutive stations
                 # -- instead of "time", with its own lon_pair/lat_pair/
                 # depth_pair coordinates (armoor.comp.comparison.

@@ -21,6 +21,11 @@ Each executable starts with an open-decode task (see section :ref:`opendecode`).
 
 Such executables rely on two distinct **configuration files** : the metazones file and the data (and output) file.
 
+.. seealso::
+   :ref:`guide-metazones`, :ref:`guide-colocation` and :ref:`guide-executables`
+   go deeper into how metazone parameters, colocation and the pipeline
+   stages actually fit together.
+
 Metazones configuration file
 ----------------------------
 

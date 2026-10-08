@@ -9,6 +9,7 @@ import sys
 
 import gitlab
 import requests
+from typing import Any, List, Optional
 from xoa import cfgm
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ class Ticket:
     Class to handle the gitlab tickets from command line
     """
 
-    def __init__(self, data=None):
+    def __init__(self, data: Optional[dict] = None) -> None:
         self.ticket = data
         self.gitlab_token = ""
         self.gitlab_url = ""
@@ -34,7 +35,7 @@ class Ticket:
 
         self.try_connection_to_project()
 
-    def try_connection_to_project(self):
+    def try_connection_to_project(self) -> None:
         """
         Tries to connect with current authentication information
         Returns
@@ -58,7 +59,7 @@ class Ticket:
             logger.error(more_info)
             logger.error(e)
 
-    def connect_to_project(self):
+    def connect_to_project(self) -> Any:
         """
         Connection to project with url, token and project id
         Returns
@@ -79,7 +80,7 @@ class Ticket:
 
         return gitlab_project.projects.get(self.gitlab_project_id)
 
-    def get_gitlab_authentication_information(self):
+    def get_gitlab_authentication_information(self) -> None:
         """
         Retrieve connection information and update the class attributes
         Returns
@@ -108,7 +109,7 @@ class Ticket:
         -------
         Ticket description
         """
-        title_column_1 = "Champ"
+        title_column_1 = "Field"
         title_column_2 = "Description"
         alignment = ":---"
         gitlab_ticket = (
@@ -120,7 +121,7 @@ class Ticket:
 
         return gitlab_ticket
 
-    def print_auth_info(self):
+    def print_auth_info(self) -> None:
         """
         Print authentication information
         Returns
@@ -196,7 +197,7 @@ class Ticket:
         self.create_links(issue_id, related)
         return issue_id
 
-    def search_tickets(self, config_reg, request, state="opened") -> dict:
+    def search_tickets(self, config_reg: str, request: str, state: str = "opened") -> dict:
         """
         Search for tickets
         Parameters
@@ -222,7 +223,7 @@ class Ticket:
         )
         return self.format_input_issues(tickets)
 
-    def format_input_issues(self, issues) -> dict:
+    def format_input_issues(self, issues: list) -> dict:
         """
         Retrieve and format issue information
         Parameters
@@ -247,7 +248,7 @@ class Ticket:
             )
         return new_issues
 
-    def get_description(self, target_id):
+    def get_description(self, target_id: int) -> str:
         """
         Get description from gitlab
         Parameters
@@ -260,7 +261,7 @@ class Ticket:
         """
         return self.project.issues.get(target_id).description
 
-    def get_links(self, target_id):
+    def get_links(self, target_id: int) -> List[int]:
         """
         Retrieve linked issues
         Parameters
@@ -275,7 +276,7 @@ class Ticket:
         links = target_id.links.list()
         return [link.iid for link in links]
 
-    def create_lincked_issue(self, target_id, link_id):
+    def create_lincked_issue(self, target_id: int, link_id: int) -> None:
         """
         create link between two issues
         Parameters
@@ -297,7 +298,7 @@ class Ticket:
 
         target.links.create(data)
 
-    def create_links(self, target_id, id_links):
+    def create_links(self, target_id: int, id_links: list) -> None:
         """
         create links between a target issue and issues from a ids list
         Parameters
@@ -312,7 +313,7 @@ class Ticket:
         for link_id in id_links:
             self.create_lincked_issue(target_id, link_id)
 
-    def format_ticket_from_cli(self, cfg_ticket_lines):
+    def format_ticket_from_cli(self, cfg_ticket_lines: dict) -> dict:
         """
         Format the ticket fields from command line
         Parameters
@@ -328,7 +329,7 @@ class Ticket:
                 cfg_ticket_lines.pop(ticket_value)
         return cfg_ticket_lines
 
-    def query_yes_no(self, question, default="yes"):
+    def query_yes_no(self, question: str, default: Optional[str] = "yes") -> bool:
         """Ask a yes/no question via raw_input() and return their answer.
 
         "question" is a string that is presented to the user.

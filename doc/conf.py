@@ -37,9 +37,7 @@ extensions = [
     'sphinx.ext.viewcode',
     "sphinx.ext.extlinks",
     "sphinx.ext.mathjax",
-    "IPython.sphinxext.ipython_directive",
-    "IPython.sphinxext.ipython_console_highlighting",
-    'nbsphinx',
+    'sphinx_gallery.gen_gallery',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
     'sphinx_rtd_theme',
@@ -56,7 +54,7 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
 
 
 # %% Options for HTML output -------------------------------------------------
@@ -76,7 +74,7 @@ html_theme_options = {
         "image_light": "images/armoor.png",
         "image_dark": "images/armoor.png",
     },
-    "repository_url": "https://gitlab.com/GitShom/STM/armoor",
+    "repository_url": "https://github.com/shom-fr/armoor",
     "repository_branch": "develop",
     "use_repository_button": True,
     "use_issues_button": True,
@@ -90,10 +88,31 @@ autosummary_generate = True
 # The master toctree document.
 master_doc ='index'
 
+# %% sphinx-gallery (tutorials/*.py) ------------------------------------------
+
+# Tutorials live as plain Python scripts at the repository root (../tutorials,
+# sibling to armoor/, doc/, tests/), not under doc/ -- so they can be run
+# directly with `python tutorials/01_....py`, no Jupyter/nbsphinx required.
+# sphinx-gallery executes each one at doc-build time, capturing every
+# matplotlib figure and stdout print, and builds three artifacts per script:
+# the rendered HTML page, a downloadable .py, and a downloadable .ipynb --
+# with the gallery thumbnail taken from one of the actual generated figures
+# (by default, the first one; see `sphinx_gallery_thumbnail_number` in a
+# script to pick a different one).
 sphinx_gallery_conf = {
-    'examples_dirs': '../examples/configs',
-    'gallery_dirs': 'auto_examples/configs',
-    'filename_pattern': '/*.cfg',
+    'examples_dirs': '../tutorials',
+    'gallery_dirs': 'tutorials',
+    # Matches "01_mooring_dataset.py", "02_gridded_model.py", etc. -- the
+    # default pattern (r'/plot') is scikit-learn/matplotlib's own convention
+    # and wouldn't match our numbered filenames.
+    'filename_pattern': r'/\d+_.*\.py$',
+    'download_all_examples': False,
+    'remove_config_comments': True,
+    # The CLI tutorials ship their own real data.cfg/metazones.cfg next to
+    # the script (displayed inline with `.. literalinclude::`, same as
+    # doc/examples/) -- copy them into the built gallery page's own
+    # directory too, so the :download: links there work.
+    'copyfile_regex': r'.*\.cfg$',
 }
 
 # %% Options for LATEXPDF output---------------------------------------------

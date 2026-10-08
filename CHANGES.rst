@@ -19,7 +19,7 @@ New features
   sample to confirm against -- see the new ``OdarDecoder``/
   ``open_decode_odar``, dispatched purely by each file's own
   ``ODAR_DATASET_TYPE`` attr, no ``platform=`` needed). ODAR sections carry
-  raw conductivity instead of salinity, so ``armoor.base.oceanvars``'
+  raw conductivity instead of salinity, so ``armoor.oceanvars``'
   ``sel_sal`` now falls back to ``gsw.SP_from_C`` (conductivity in mS/cm,
   the unit ODAR already reports, no conversion needed) when ``sal`` is
   absent -- and ``sel_ptemp`` was fixed to call ``sel_sal()`` instead of
@@ -29,7 +29,7 @@ New features
   derived salinity had been materialized.
   Colocation always: time-matches nearest-to-reference, interpolates the
   product onto the reference's own moving track (new
-  ``HorizontalColocation.track`` / ``armoor.base.interp.grid2track``, a
+  ``HorizontalColocation.track`` / ``armoor.interp.grid2track``, a
   pointwise (time, lon, lat)-paired interpolation -- unlike ``cloud``'s fixed
   station list, whose "time" x "npts" cross product a moving track can't
   use), and vinterps the product onto the reference's own per-profile depth
@@ -41,7 +41,7 @@ New features
   ref/product/diff line curves for 2D variables (e.g. mld).
 
   Also computes the geostrophic current normal to the section (new
-  ``armoor.base.oceanvars.OceanVars.sel_cgeo``, via
+  ``armoor.oceanvars.OceanVars.sel_cgeo``, via
   ``gsw.geo_strf_dyn_height``/``gsw.geostrophic_velocity``), independently
   for the reference and the product from their own colocated hydrography --
   not derived from any model current field, so both sides are computed the
@@ -102,7 +102,7 @@ New features
   colocation wave. New ``data.ini`` ``[hpc]`` section.
 
 - Registered ``t2m``, ``si10``, ``r2`` and ``prmsl`` in
-  ``armoor.base.CMAP_VARS``/``MINMAX_VARS`` for sensible default colormap
+  ``armoor.CMAP_VARS``/``MINMAX_VARS`` for sensible default colormap
   and min/max scaling in plots.
 
 - Added ``bathy`` and ``ssh`` ocean variables
@@ -143,13 +143,26 @@ Breaking changes
   ``[header] logo`` to display one. The default title is now the neutral
   "Ocean Forecast Qualification Bulletin".
 
+- Relicensed armoor from Shom's internal proprietary terms ("cannot be
+  used and distributed without permission") to the Apache License 2.0,
+  matching ``xoa``. Anyone redistributing or depending on armoor should
+  review the new ``LICENSE.rst``.
+
+- Moved every ``armoor.base.*`` submodule (``dispatch``, ``filters``,
+  ``interp``, ``io``, ``misc``, ``oceanvars``, ``plot``, ``ranges``,
+  ``stats``) up to the top level (e.g. ``armoor.base.io`` ->
+  ``armoor.io``), merging ``base/__init__.py``'s ``LINE_COLORS``/
+  ``CMAP_VARS``/``MINMAX_VARS`` into ``armoor/__init__.py``. Update any
+  ``armoor.base.X`` import. ``armoor/tests/`` also moved to a top-level
+  ``tests/`` directory.
+
 Deprecations
 ------------
 
 Refactoring
 -----------
 
-- ``armoor.base.interp.grid2loc`` now interpolates variables in parallel
+- ``armoor.interp.grid2loc`` now interpolates variables in parallel
   (one thread each, capped at ``--dask-nworkers``) instead of serially,
   since xoa's interpolation core runs single-threaded on already-
   materialized numpy.
@@ -158,13 +171,40 @@ Refactoring
   interpolated datasets and processing sorted output groups, previously
   done one at a time.
 
+- Added NumPy-style docstrings to every public function/method that had
+  none, and PEP 484 type hints to ``armoor.cli``, ``data.interp``,
+  ``data.output``, ``diags.eddies`` and ``tick.ticket``. Translated
+  remaining French text (code, docstrings, log messages,
+  ``doc/tick.rst``'s issue-field table) to English, and removed dead/
+  commented-out code (~590 unused lines in ``armoor/comp/io.py`` alone).
+
 Bug fixes
 ---------
+
+- Fixed several ``armoor-comp-*`` pipeline bugs found while building the
+  tutorials: the zarr-write progress bar's 30s refresh interval stalled
+  every write by up to that long regardless of data size (dropped to
+  1s); reference/product file classification matched ``"ref"`` as a bare
+  substring anywhere in the path, so a metazone named e.g.
+  ``modelzone_href`` misclassified every product as a second reference
+  and silently paired the wrong dates together; ``vrange`` attrs were
+  appended once per concatenated time slice instead of de-duplicated,
+  blowing up output filenames (``File name too long``) on metazones
+  spanning enough slices; ``_mvprofiles`` hardcoded the per-location axis
+  name as ``member``, breaking cloud-based colocation (named ``npts``
+  instead), and ``uvprofiles``' ``_safe_reduce`` crashed when no
+  ``member`` dimension was present at all; and ``StatsComp`` didn't
+  recognize ``armoor-comp-clim``'s forced ``tmonth`` matching as a reason
+  to reduce the ``time`` dimension, leaving ``otype=maps`` with an
+  unreduced multi-month dimension that crashed ``pcolormesh``.
 
 - Fixed ``armoor-data`` output dispatch using the user-chosen ``[outputs]``
   section name instead of ``otype`` to select the plot method, which made
   plotting fail (e.g. ``Data plot 'vsection' not found``) unless a section
   happened to be named exactly like its ``otype``.
+
+- Fixed ``armoor.bull`` missing from ``pyproject.toml``'s packaged modules
+  list, so it wasn't actually shipped in the installed package.
 
 - Fixed ``update_auth_cfg`` (``armoor-tick-authentication``) writing empty
   nested sections (e.g. ``proxies``) as a bare string, which made the
@@ -205,14 +245,37 @@ Bug fixes
 Documentation
 -------------
 
-- Added the ``nbsphinx`` dependency to the ``doc`` extra: ``doc/conf.py`` has
-  used the extension for a while, but ``make html`` failed with
-  ``Could not import extension nbsphinx`` on any environment that only
-  installs ``.[doc]`` (e.g. CI).
-
 - Fixed remaining Sphinx build warnings and added missing modules to
   ``doc/api.rst``. Documented the ``[outputs]`` section of
   ``armoor-comp-*``/``armoor-data`` config files.
+
+- Added an in-depth "guides" section (colocation, metazones,
+  configuration, executables) for concepts that cut across several
+  ``armoor-comp-*`` executables and don't fit the per-command reference
+  pages, cross-linked from the existing reference/``howtostart`` pages.
+
+- Migrated the tutorials from hand-written Jupyter notebooks (executed by
+  ``nbsphinx``, now dropped from the ``doc`` extra along with
+  ``ipykernel``) to plain Python scripts at the repository root
+  (``tutorials/``), executed and rendered as a gallery by
+  ``sphinx-gallery`` at doc-build time -- every page gets a thumbnail
+  from one of its own generated figures, plus downloadable
+  ``.py``/``.ipynb``/``.zip`` versions. They're split into two
+  subsections: a library walkthrough (the Python API/accessors, no CLI
+  involved) and command-line tool tutorials (``armoor-data``,
+  ``armoor-comp-*``) -- the latter now ship their real
+  ``data.cfg``/``metazones.cfg`` files next to the script and display
+  them with ``literalinclude`` (same convention as the configuration
+  examples gallery), rather than building them from an embedded string.
+
+- Documentation and project metadata now point at GitHub as well as
+  GitLab: ``README.rst``, ``doc/conf.py``, ``doc/contributing.rst``,
+  ``doc/index.rst``, ``doc/install.rst`` and ``pyproject.toml`` link to
+  ``github.com/shom-fr/armoor``, and the repo gained GitHub-native
+  project files (``.github/ISSUE_TEMPLATE.md``,
+  ``PULL_REQUEST_TEMPLATE.md``, ``dependabot.yml``, and a
+  ``workflows/ci.yml`` translating the GitLab CI pipeline's lint/test/doc
+  stages), matching the ``shom-fr/xoa``/``shom-fr/woom`` convention.
 
 2026.7.0
 ========

@@ -31,8 +31,8 @@ from pyproj import Geod
 from xoa.grid import dz2depth, shift, to_rect
 
 from armoor import ROOTDIR, ArmoorError
-from armoor.base.interp import regrid
-from armoor.base.misc import optimize_for_low_swap
+from armoor.interp import regrid
+from armoor.misc import optimize_for_low_swap
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +184,12 @@ def _glob_and_resolve(pattern: str, sort_results: bool = True) -> List[str]:
 
 
 def register_cf():
+    """Register every armoor CF spec (``armoor/data/cf_*.cfg``) into xoa.
+
+    Must be called once before decoding any format-specific dataset (e.g.
+    cmems_model, cmems_argo) so `xoa.meta` recognizes its variable/coordinate
+    naming conventions.
+    """
     cfg_files = glob.glob(os.path.join(ROOTDIR, "data", "cf_*.cfg"))
     for cfg_file in cfg_files:
         logger.info(f"register {cfg_file}")
@@ -835,6 +841,7 @@ def open_decode_cmems_model(path_files):
     """
 
     def preprocess_cmems_model(ds):
+        """Decode CF specs, rename dims to x/y/z and broadcast lon/lat/depth."""
         ds = cfspecs.decode(ds)
         if "bathy" in ds.data_vars:
             ds = ds[["bathy"]]
@@ -902,6 +909,7 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
     """
 
     def preprocess_hycom(ds):
+        """Clean a single HYCOM file before merging (density coord, u/v lon/lat, bathy)."""
         # Clean density coord if present
         if "dens" in ds.coords:
             ds = ds.reset_coords("dens")
@@ -919,9 +927,11 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
         return ds
 
     def shift_u_block(d):
+        """Shift a HYCOM "u" block from its staggered grid onto the T-grid."""
         return shift(d["u"], {"x": "right"}).xoa.reloc(u=False)
 
     def shift_v_block(d):
+        """Shift a HYCOM "v" block from its staggered grid onto the T-grid."""
         return shift(d["v"], {"y": "top"}).xoa.reloc(v=False)
 
     sorted_paths = sorted(map(str, path_files))
@@ -1437,7 +1447,7 @@ def open_decode_odar(path_files):
       seconds/minutes/hours/days) -- decoded manually here instead.
     - Practical salinity isn't in the file, only raw ``conduct`` (mS/cm) --
       kept as-is here and derived later, lazily, by
-      `armoor.base.oceanvars.OceanVarsAccessor.sel_sal` (on the tiny
+      `armoor.oceanvars.OceanVarsAccessor.sel_sal` (on the tiny
       colocated subset, not eagerly on the full section: computing it here
       on the still dask-backed decode output corrupted the task graph --
       ``ValueError: Missing dependency ('open_dataset-conduct-...')`` --
@@ -2051,6 +2061,7 @@ def open_decode_eddy_shoot(path_files):
 
     # Open
     def preprocessing(ds):
+        """Set "time" as a coordinate before concatenating along "obs"."""
         return ds.set_coords("time")
 
     da = xr.open_mfdataset(path_files, combine='nested', concat_dim='obs', preprocess=preprocessing)
@@ -2128,14 +2139,31 @@ def depth_from_pres(ds):
 
 
 def concat_cmems(list_ds):
+    """Concatenate several raw CMEMS in-situ datasets into one.
+
+    Concatenates directly along "TIME" when every dataset shares the same
+    depth/time sizes (one instrument, several files); otherwise resamples
+    every dataset onto shared depth/time axes first and concatenates along
+    a new "instr" dim (several instruments).
+
+    Parameters
+    ----------
+    list_ds : list of xarray.Dataset
+        Raw (pre-CF-decode) CMEMS in-situ datasets, each with "TIME"/"DEPTH"
+        dims.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
     times = np.unique([len(ds.TIME.data) for ds in list_ds])
     depths = np.unique([len(ds.DEPTH.data) for ds in list_ds])
 
-    # Cas où on concat plusieurs fichiers d'1 instrument, même nombre de depth et time dans tous les fichiers
+    # Case where we concat several files from 1 instrument, same number of depth and time values in every file
     if len(depths) == 1 and len(times) == 1:
         cmems = xr.concat(list_ds, dim="TIME")
 
-    # Cas où on concat plusieurs instruments
+    # Case where we concat several instruments
     else:
         # Compute same DEPTH
         nb_depth_max = np.nanmax(depths)
@@ -2187,11 +2215,11 @@ def concat_cora(list_ds_cora):
     times = np.unique([len(ds.time.data) for ds in list_ds_cora])
     depths = np.unique([len(ds.N_levels.data) for ds in list_ds_cora])
 
-    # Cas où on concat plusieurs fichiers d'1 instrument, même nombre de depth et time dans tous les fichiers
+    # Case where we concat several files from 1 instrument, same number of depth and time values in every file
     if len(depths) == 1 and len(times) == 1:
         cora = xr.concat(list_ds_cora, dim="time")
 
-    # Cas où on concat plusieurs instruments
+    # Case where we concat several instruments
     else:
         # Compute same DEPTH
         nb_depth_max = np.nanmax(depths)
@@ -2229,6 +2257,22 @@ def concat_cora(list_ds_cora):
 
 
 def concat_argo(list_ds):
+    """Concatenate several decoded Argo profile datasets, padding to a
+    shared depth size.
+
+    Each dataset's "z"-dependent variables are NaN-padded up to the
+    largest "z" size across `list_ds` before concatenating along "time",
+    so profiles with fewer levels don't block the merge.
+
+    Parameters
+    ----------
+    list_ds : list of xarray.Dataset
+        Decoded Argo profile datasets, each with a "z" dim.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
     dim_z = np.max([ds.sizes["z"] for ds in list_ds])
     for ids, dsin in enumerate(list_ds):
         dsin = dsin.reset_coords("depth")

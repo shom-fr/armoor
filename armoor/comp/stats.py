@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from armoor.base import stats
+from armoor import stats
 
 logger = logging.getLogger(__name__)
 
@@ -57,20 +57,26 @@ class StatsComp:
         self.dsref = dsref
 
         dims = list(dims) if dims else []
-        self.dims = self._filter_dims(dims, self.mparams)
+        # CompClim's forced "tmonth" colocation (see armoor.comp.coloc.
+        # TimeColocation.tmonth) is the one time strategy that never shows up
+        # as a literal metazone.cfg key ("trange_seq"/"tfreq" are both user-
+        # optional and comp_clim doesn't accept either) -- so _filter_dims
+        # can't recognize it from mparams alone. It does leave a distinctive
+        # mark on the data though: a plain-integer "time" coordinate (the
+        # 1-12 calendar month index), unlike every other strategy's
+        # datetime64 "time". Detect that instead of adding a mparams key.
+        is_climatology = "time" in dsref.dims and np.issubdtype(dsref["time"].dtype, np.integer)
+        self.dims = self._filter_dims(dims, self.mparams, is_climatology=is_climatology)
         self.extra_dims = extra_dims
         self.exclude_dims = exclude_dims
         
-        # Mean over ensemble members if present
-        if "member" in dsprod.dims and len(self.dims) > 0:
-            logger.info("Averaging product dataset across 'member' dimension.")
-            dsprod = (
-                dsprod.reset_coords(["lon", "lat"])
-                .mean(dim="member")
-                .set_coords(["lon", "lat"])
-                )
-        self.dsprod = dsprod
-
+        # "prod/data" keeps the raw, member-resolved dataset -- some outputs
+        # (e.g. mvprofiles/uvprofiles) plot one line per matched member on
+        # purpose. But the diff/stats math below (self.dsprod) must use the
+        # matched points' mean -- unconditionally: the "diff" comp group
+        # (used when self.dims is empty, e.g. otype=maps) must already be a
+        # difference against that mean, not a per-member value, regardless
+        # of whether further stats dims follow.
         self.dtref = xr.DataTree(name="ref")
         self.dtref.update(
             xr.DataTree.from_dict({"data": dsref})
@@ -80,6 +86,15 @@ class StatsComp:
             xr.DataTree.from_dict({"data": dsprod})
         )
         self.dtcomps = xr.DataTree(name="comps")
+
+        if "member" in dsprod.dims:
+            logger.info("Averaging product dataset across 'member' dimension.")
+            dsprod = (
+                dsprod.reset_coords(["lon", "lat"])
+                .mean(dim="member")
+                .set_coords(["lon", "lat"])
+                )
+        self.dsprod = dsprod
 
     # -------------------------------------------------------------------------
     # Main execution
@@ -103,7 +118,7 @@ class StatsComp:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def _filter_dims(dims: List[str], mparams: Dict) -> List[str]:
+    def _filter_dims(dims: List[str], mparams: Dict, is_climatology: bool = False) -> List[str]:
         """
         Filter dimensions based on mparams context rules.
 
@@ -111,6 +126,14 @@ class StatsComp:
         ----------
         dims : list of str
             Dimensions requested by user.
+        is_climatology : bool, optional
+            True when "time" is a plain calendar-month index (comp_clim's
+            forced "tmonth" colocation) rather than a real datetime axis --
+            see the call site in `__init__`. That strategy never appears as
+            a literal metazone.cfg key, so it can't be recognized below the
+            same way "trange_seq" is; without this, otype=maps' explicit
+            `"stat": ["time"]` request was silently dropped and a real,
+            multi-month "time" dim reached pcolormesh unreduced.
 
         Returns
         -------
@@ -120,11 +143,12 @@ class StatsComp:
         dims = list(dims)
 
         def safe_remove(val):
+            """Remove `val` from `dims` if present; no-op otherwise."""
             if val in dims:
                 dims.remove(val)
 
-        # Time only if trange_seq
-        if "time" in dims and "trange_seq" not in mparams:
+        # Time only if trange_seq (or comp_clim's tmonth climatology, see above)
+        if "time" in dims and "trange_seq" not in mparams and not is_climatology:
             safe_remove("time")
 
         # Vertical only if vrange

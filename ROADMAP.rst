@@ -1,4 +1,0 @@
-.. _roadmap:
-
-Development roadmap
-===================

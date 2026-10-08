@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 import xarray as xr
 
 import armoor  # noqa: F401 — registers ds.stats accessor
-from armoor.base.io import ArmoorArgumentHelpFormatter
+from armoor.io import ArmoorArgumentHelpFormatter
 from armoor.cli.io import (
     add_comp_io_parser_arguments,
     add_dask_parser_arguments,
@@ -35,7 +35,7 @@ class CompError(Exception):
     pass
 
 
-def drop_time_range(dsref, dsprod):
+def drop_time_range(dsref: xr.Dataset, dsprod: xr.Dataset) -> tuple[xr.Dataset, xr.Dataset]:
     """
     Drop the 'time_range' variable from reference and product datasets.
     
@@ -58,7 +58,7 @@ def drop_time_range(dsref, dsprod):
     return dsref, dsprod
 
 
-def rename_stat_var(ds, stat):
+def rename_stat_var(ds: xr.Dataset, stat: str) -> xr.Dataset:
     """
     Rename all data variables in a dataset by adding a prefix.
     
@@ -81,7 +81,7 @@ def rename_stat_var(ds, stat):
         })
     return ds.rename_vars(dico)
 
-def process_diff(dsref, dsprod):
+def process_diff(dsref: xr.Dataset, dsprod: xr.Dataset) -> xr.Dataset:
     """
     Process and merge reference, product, and difference datasets.
     
@@ -118,7 +118,7 @@ def process_diff(dsref, dsprod):
     ])
 
 
-def process_stat(dsref, dsprod, dim):
+def process_stat(dsref: xr.Dataset, dsprod: xr.Dataset, dim: str | list[str]) -> xr.Dataset:
     """
     Compute comprehensive statistics comparing reference and product datasets.
     
@@ -168,7 +168,7 @@ def process_stat(dsref, dsprod, dim):
         ds = ds.rename_vars({"time_range": "time"})
     return ds
 
-def get_parser_comp():
+def get_parser_comp() -> ArgumentParser:
     """Create argument parser for comparison operations.
     
     Returns
@@ -192,7 +192,7 @@ def get_parser_comp():
         )
     return parser
 
-def main_comp():
+def main_comp() -> None:
     """Apply comparison to input files via command line interface.
     
     This function serves as the main entry point for comparison operations.

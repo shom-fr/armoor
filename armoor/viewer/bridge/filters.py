@@ -11,7 +11,7 @@ def apply_combined_filters(ds: xr.Dataset, filters_config: dict) -> xr.Dataset:
     """Apply armoor combined filters to *ds*.
 
     Requires the ``armoorfilters`` accessor to be registered.  This is done
-    by importing ``armoor.base.filters`` (the import itself registers the
+    by importing ``armoor.filters`` (the import itself registers the
     accessor).
 
     Parameters

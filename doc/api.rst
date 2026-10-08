@@ -14,16 +14,15 @@ Package API
     armoor.accessors.interp
     armoor.accessors.range
     armoor.accessors.plot
-    armoor.base
-    armoor.base.dispatch
-    armoor.base.filters
-    armoor.base.interp
-    armoor.base.io
-    armoor.base.misc
-    armoor.base.oceanvars
-    armoor.base.plot
-    armoor.base.ranges
-    armoor.base.stats
+    armoor.dispatch
+    armoor.filters
+    armoor.interp
+    armoor.io
+    armoor.misc
+    armoor.oceanvars
+    armoor.plot
+    armoor.ranges
+    armoor.stats
     armoor.cli
     armoor.cli.coloc
     armoor.cli.comp
