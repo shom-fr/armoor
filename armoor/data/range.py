@@ -69,6 +69,8 @@ def process_time_range(ds, tfreq):
     combined = xr.concat(
         subsets,
         dim="trange",
+        join="outer",
+        data_vars="all",
         # coords="minimal",   # don't try to align all coordinates
         # compat="override",  # allow metadata differences
         # join="override"     # don't merge coordinates by labels

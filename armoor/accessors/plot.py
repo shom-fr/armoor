@@ -11,7 +11,7 @@ The override warning is suppressed because this is an intentional extension.
     ds.plot.shadow_line(x_var, y_var)  # → base.plot.shadow_line
 
 All computation/layout logic for diagdisp and shadow_line lives in
-:mod:`armoor.base.plot`; this accessor only wires them onto xr.Dataset.
+:mod:`armoor.plot`; this accessor only wires them onto xr.Dataset.
 
 The batch DataTree-based plots (maps with cartopy+minimap, T-S diagrams,
 multi vertical profiles, …) are handled by :class:`armoor.data.plot.PlotData`
@@ -24,7 +24,7 @@ import warnings
 import xarray as xr
 from xarray.plot.accessor import DatasetPlotAccessor
 
-# matplotlib and armoor.base.plot are imported lazily inside each method that
+# matplotlib and armoor.plot are imported lazily inside each method that
 # needs them — both trigger heavy NFS stat chains on HPC cluster filesystems.
 
 
@@ -124,13 +124,13 @@ class ArmoorPlot(DatasetPlotAccessor):
         return da.plot.line(x="time", ax=ax, **kwargs)
 
     # ------------------------------------------------------------------
-    # Delegating to armoor.base.plot
+    # Delegating to armoor.plot
     # ------------------------------------------------------------------
 
     def diagdisp(self, x_var, y_var, ax=None, x_label=None, y_label=None):
         """Scatter plot with diagonal, linear regression and R² annotation.
 
-        Delegates to :func:`armoor.base.plot.diagdisp`.
+        Delegates to :func:`armoor.plot.diagdisp`.
 
         Parameters
         ----------
@@ -155,7 +155,7 @@ class ArmoorPlot(DatasetPlotAccessor):
         >>> ds.plot.diagdisp("ref_temp", "prod_temp")
         """
         import matplotlib.pyplot as plt
-        from armoor.base.plot import diagdisp as _diagdisp
+        from armoor.plot import diagdisp as _diagdisp
         ds = self._obj
         if ax is None:
             _, ax = plt.subplots()
@@ -170,7 +170,7 @@ class ArmoorPlot(DatasetPlotAccessor):
     def shadow_line(self, x_var, y_var, ax=None, label=None, color="k"):
         """Line plot with a grey shadow offset for visual depth.
 
-        Delegates to :func:`armoor.base.plot.shadow_line`.
+        Delegates to :func:`armoor.plot.shadow_line`.
 
         Parameters
         ----------
@@ -195,7 +195,7 @@ class ArmoorPlot(DatasetPlotAccessor):
         >>> ds.plot.shadow_line("time", "temp", label="temperature")
         """
         import matplotlib.pyplot as plt
-        from armoor.base.plot import shadow_line as _shadow_line
+        from armoor.plot import shadow_line as _shadow_line
         ds = self._obj
         if ax is None:
             _, ax = plt.subplots()

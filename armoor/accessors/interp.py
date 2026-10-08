@@ -24,7 +24,7 @@ import warnings
 
 import xarray as xr
 
-from armoor.base.interp import interp_time, regrid
+from armoor.interp import interp_time, regrid
 from armoor.data.interp import (
     process_horizontal_interpolation,
     process_time_interpolation,
@@ -79,7 +79,7 @@ class InterpAccessor:
              keep_flag=False, diurnal_vars=None, persistency=None):
         """Temporal interpolation at arbitrary dates.
 
-        Delegates to :func:`armoor.base.interp.interp_time` (handles
+        Delegates to :func:`armoor.interp.interp_time` (handles
         out-of-range dates, persistency, diurnal correction).
 
         Parameters
@@ -175,7 +175,9 @@ class InterpAccessor:
         xr.Dataset
             Dataset with a ``distance`` coordinate (metres from start).
         """
-        return process_horizontal_interpolation(self._obj, ("section", coords, dx))
+        return process_horizontal_interpolation(
+            self._obj, ("section", {"coords": coords, "dx": dx})
+        )
 
     def regrid_from_latlon(self, lon_grid, lat_grid):
         """Horizontal regrid onto a regular lon/lat grid (requires xesmf).
@@ -218,7 +220,7 @@ class InterpAccessor:
     def regrid(self, ds_target):
         """Horizontal regridding onto an arbitrary target grid (requires xesmf).
 
-        Delegates to :func:`armoor.base.interp.regrid`.
+        Delegates to :func:`armoor.interp.regrid`.
 
         Parameters
         ----------

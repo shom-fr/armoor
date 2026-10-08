@@ -1,5 +1,8 @@
 import copy
 import logging.config
+from argparse import ArgumentParser, Namespace
+from types import TracebackType
+from typing import Optional, Union
 
 DEFAULT_LOGGING_CONFIG = {
     "version": 1,
@@ -35,9 +38,10 @@ DEFAULT_LOGGING_CONFIG = {
 
 
 def setup_logging(
-    console_level=None, file_level=None, to_file=True,
-    show_init_msg=False, **kwargs
-):
+    console_level: Optional[str] = None, file_level: Optional[str] = None,
+    to_file: Union[bool, str] = True,
+    show_init_msg: bool = False, **kwargs
+) -> None:
     """Setup the logging"""
 
     # Deep copy so dictConfig cannot mutate DEFAULT_LOGGING_CONFIG in place.
@@ -73,14 +77,16 @@ def setup_logging(
             "*** INITIALISED LOGGING SESSION ***")
 
 
-def add_logging_parser_arguments(parser, default_level="info"):
+def add_logging_parser_arguments(parser: ArgumentParser, default_level: str = "info") -> None:
+    """Add ``--log-level``/``--log-file`` arguments to an argparse parser."""
     add_log_level_parser_arguments(parser, default_level=default_level)
     parser.add_argument(
         "--log-file", help="logging file name", default="armoor.log"
     )
 
 
-def add_log_level_parser_arguments(parser, default_level="info"):
+def add_log_level_parser_arguments(parser: ArgumentParser, default_level: str = "info") -> None:
+    """Add a ``--log-level`` argument to an argparse parser."""
     parser.add_argument(
         "--log-level",
         help="logging level",
@@ -88,7 +94,18 @@ def add_log_level_parser_arguments(parser, default_level="info"):
         default=default_level,
     )
 
-def main_setup_logging(args):
+def main_setup_logging(args: Namespace) -> None:
+    """Configure logging from parsed CLI args (``--log-level``/``--log-file``).
+
+    Skips the file handler when running inside a Slurm/PBS batch job, since
+    the scheduler already captures stdout/stderr to its own file.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Must carry `log_level` and `log_file` (see
+        `add_logging_parser_arguments`).
+    """
     import os
     # When running inside a batch job, the scheduler already captures
     # stdout/stderr to a file.  Enabling FileHandler on top would write
@@ -109,14 +126,19 @@ class LoggingLevelContext(object):
     >>> ... logger.warning("warning level here")
     """
 
-    def __init__(self, level, logger=None):
+    def __init__(self, level: int, logger: Optional[logging.Logger] = None) -> None:
         self.logger = logger if logger else logging.root
         self.level = level
 
-    def __enter__(self):
+    def __enter__(self) -> logging.Logger:
         self.old_level = self.logger.level
         self.logger.level = self.level
         return self.logger
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
         self.logger.level = self.old_level

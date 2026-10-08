@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  # Same checks as `pre-commit run --all-files` (see .pre-commit-config.yaml):
+  # ruff (lint + format) and bandit, both scoped to armoor/.
+  lint:
+    name: Lint (pre-commit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: pre-commit/action@v3.0.1
+
+  # armoor's own dependencies (xoa, esmf/esmpy/xesmf, cartopy, parcels, ...)
+  # are conda-forge/git installs, not all published on PyPI, so tests run
+  # against the same conda environment as the GitLab CI pipeline
+  # (environment.yml), not a plain pip matrix.
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Miniforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          environment-file: environment.yml
+          activate-environment: armoor-env
+          use-mamba: true
+
+      - name: Install armoor
+        shell: bash -l {0}
+        run: pip install .
+
+      - name: Force cartopy's Natural Earth shapefile download
+        shell: bash -l {0}
+        run: python -c "import cartopy.feature as cfeature; list(cfeature.LAND.geometries())"
+
+      - name: Run unit tests
+        shell: bash -l {0}
+        run: |
+          export PYTHONPATH=$PWD
+          pytest -v -s tests/uni
+
+      - name: Run integration tests
+        shell: bash -l {0}
+        run: |
+          export PYTHONPATH=$PWD
+          pytest -v -s tests/integration/test_armoor_woom.py
+
+  docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Miniforge
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          environment-file: environment.yml
+          activate-environment: armoor-env
+          use-mamba: true
+
+      - name: Install armoor with doc dependencies
+        shell: bash -l {0}
+        run: pip install ".[doc]"
+
+      - name: Build Sphinx documentation
+        shell: bash -l {0}
+        run: |
+          export PYTHONPATH=$PWD
+          cd doc
+          make html
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: doc/_build/html/

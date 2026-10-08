@@ -22,6 +22,24 @@ _TS_CACHE_SIZE = 64
 
 @bp.route("/<dataset_id>/timeseries", methods=["GET"])
 def get_timeseries(dataset_id: str):
+    """Flask view for ``GET /api/datasets/<id>/timeseries``.
+
+    Query parameters
+    ----------------
+    variable : str
+        Variable name to extract.
+    lon, lat : float
+        Point to extract the nearest-grid-point series at.
+    depth_idx : int, optional
+        Vertical index to select (default 0).
+
+    Returns
+    -------
+    flask.Response
+        JSON time series on success, or a JSON ``{"error": ...}`` with a
+        4xx/5xx status on a missing dataset/variable/parameter or an
+        extraction failure.
+    """
     try:
         entry = store.get(dataset_id)
     except KeyError:

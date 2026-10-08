@@ -1,4 +1,4 @@
-"""ds.range accessor — thin facade over armoor.base.ranges and armoor.data.range.
+"""ds.range accessor — thin facade over armoor.ranges and armoor.data.range.
 
 All computation lives in those modules; this accessor only wires them
 onto xr.Dataset.
@@ -15,8 +15,8 @@ onto xr.Dataset.
 
 import xarray as xr
 
-from armoor.base import ranges as _ranges
-from armoor.base.io import output_suffix as _output_suffix
+from armoor import ranges as _ranges
+from armoor.io import output_suffix as _output_suffix
 from armoor.data.range import process_time_range, process_vertical_range
 
 
@@ -30,7 +30,7 @@ class RangeAccessor:
 
     Low-level split methods (``trange_seq``, ``vrange``, ``vlevels``,
     ``by_time``) return a **list** of :class:`xr.Dataset`; they delegate
-    to :mod:`armoor.base.ranges`.
+    to :mod:`armoor.ranges`.
     """
 
     def __init__(self, obj):
@@ -86,7 +86,7 @@ class RangeAccessor:
     def by_time(self) -> list:
         """Split the dataset into one subset per unique time step.
 
-        Delegates to :func:`armoor.base.ranges.tfreq`.
+        Delegates to :func:`armoor.ranges.tfreq`.
 
         Returns
         -------
@@ -99,7 +99,7 @@ class RangeAccessor:
     def trange_seq(self, tstart, tend, tbin) -> list:
         """Split the dataset into sequential time bins.
 
-        Delegates to :func:`armoor.base.ranges.trange_seq`.
+        Delegates to :func:`armoor.ranges.trange_seq`.
 
         Parameters
         ----------
@@ -120,7 +120,7 @@ class RangeAccessor:
     def vrange(self, vname, vbins) -> list:
         """Apply vertical range masking for a list of bins.
 
-        Delegates to :func:`armoor.base.ranges.vrange`.
+        Delegates to :func:`armoor.ranges.vrange`.
 
         Parameters
         ----------
@@ -139,7 +139,7 @@ class RangeAccessor:
     def vlevels(self, vname) -> list:
         """Split the dataset into one subset per vertical level.
 
-        Delegates to :func:`armoor.base.ranges.vlevels`.
+        Delegates to :func:`armoor.ranges.vlevels`.
 
         Parameters
         ----------
@@ -185,6 +185,6 @@ class RangeAccessor:
     def suffix(self) -> str:
         """The ``_<time-or-trange>_<vlevel-or-vrange>`` output filename suffix.
 
-        Delegates to :func:`armoor.base.io.output_suffix`.
+        Delegates to :func:`armoor.io.output_suffix`.
         """
         return _output_suffix(self._obj.attrs)

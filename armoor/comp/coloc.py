@@ -11,12 +11,12 @@ import xarray as xr
 import xoa.coords as xcoords
 import xoa.geo as xgeo
 
-import armoor.base.ranges as ranges
+import armoor.ranges as ranges
 from armoor.__init__ import ArmoorError
-from armoor.base.dispatch import SubclassingMethodRegistry
-from armoor.base.interp import coarsen as _coarsen, grid2loc, interp_time, regrid, vinterp
-from armoor.base.io import (create_fast_encoding, get_zarr_encoding,
-                            setup_dask_client)
+from armoor.dispatch import SubclassingMethodRegistry
+from armoor.interp import coarsen as _coarsen, grid2loc, grid2track, interp_time, regrid, vinterp
+from armoor.io import (create_fast_encoding, get_zarr_encoding,
+                        setup_dask_client)
 from armoor.comp import COMP_VARS
 from armoor.comp.comparison import get_comparison
 from armoor.comp.misc import get_colocation_params, validate_colocation
@@ -30,7 +30,7 @@ class AbstractColocation(SubclassingMethodRegistry):
     """Abstract base for colocation strategies (time/horizontal/vertical).
 
     Subclasses register their own methods for dispatch via `call`; see
-    `armoor.base.dispatch.SubclassingMethodRegistry`.
+    `armoor.dispatch.SubclassingMethodRegistry`.
     """
 
     _dispatch_label = "Colocation"
@@ -162,6 +162,25 @@ class HorizontalColocation(AbstractColocation):
         else:
             return grid2loc(self.dsref, coords), grid2loc(self.dsprod, coords)
         
+    def track(self) -> Tuple[xr.Dataset, xr.Dataset]:
+        """Interpolate the product onto the reference's own moving track.
+
+        Unlike `cloud` (a fixed list of points), this pairs each product
+        interpolation with the reference's own (time, lon, lat) -- e.g. one
+        point per profile along a glider mission -- so the product keeps a
+        single "time" dim matching the reference's, instead of a
+        "time" x "npts" cross product. Relies on `dsprod`'s "time" already
+        being aligned (same values/order) with `dsref`'s, which the time
+        colocation step (run first, see `_apply_colocations`) guarantees.
+
+        Returns
+        -------
+        tuple[xarray.Dataset, xarray.Dataset]
+            The reference dataset (unchanged) and the product dataset
+            interpolated onto its track.
+        """
+        return self.dsref, grid2track(self.dsprod, self.dsref)
+
     def href(self, ref: str):
         """Regrid dataset on 'ref' grid.
 
@@ -230,7 +249,6 @@ class HorizontalColocation(AbstractColocation):
     def _calculate_distances_vectorized(self, prod_data: xr.Dataset, ref_data: xr.Dataset) -> xr.DataArray:
         """
         Calculate distances using vectorized operations for all timesteps at once.
-        OPTIMISATION 1: Calcul vectorisé pour tous les timesteps simultanément
         """
         rename_dims = {"npts0": "member"}
         if "time" in ref_data.lon.dims:
@@ -250,9 +268,7 @@ class HorizontalColocation(AbstractColocation):
         return dist
     
     def _handle_time_dependent(self, radius_meters: float) -> None:
-        """
-        OPTIMISATION MAJEURE: Traite tous les timesteps simultanément au lieu d'une boucle.
-        """
+        """Process every timestep at once instead of looping over them."""
         dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
         mask = dist_prod2ref < radius_meters
         mask = mask.transpose("time", "member")
@@ -322,8 +338,9 @@ class HorizontalColocation(AbstractColocation):
  
     def radius(self, radius: float) -> Tuple[xr.Dataset, xr.Dataset]:
         """
-        Version optimisée de la méthode radius.
-        
+        Radius-based colocation: keep every product point within `radius`
+        of the reference.
+
         Parameters
         ----------
         radius : float
@@ -335,14 +352,14 @@ class HorizontalColocation(AbstractColocation):
         """
         if radius <= 0:
             raise ValueError("Radius must be positive")
-        
+
         radius_meters = radius * 1e3
         if "member" not in self.dsprod.dims:
             self.dsprod = xcoords.geo_stack(self.dsprod, "member")
         if "time" not in self.dsref.lon.dims:
-            # Cas time-independent (unchanged)
+            # Time-independent case
             dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
-            filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters)#, drop=True)
+            filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters)
             self.dsprod = self._clean_coordinates(filtered_ds)
         else:
             logger.info("time dependent")
@@ -689,6 +706,7 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
     _OCEANVAR_INPUTS = {
         "ptemp": {"temp", "sal", "pres"},
         "temp":  {"ptemp", "sal", "pres"},
+        "sal":   {"conduct", "temp", "pres"},
         "pdens": {"ptemp", "temp", "sal", "pres"},
         "sndspeed": {"ptemp", "temp", "sal", "pres"},
         "u":     {"cdir", "cspeed"},
@@ -906,7 +924,7 @@ def _save_colocation_results(dssref, dssprod, staged):
     return paths
 
 
-def _process_single_product(dsrefin, ncin, params, tbound, staged):
+def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None):
     """Process colocation for a single product against a reference.
 
     Parameters
@@ -921,6 +939,9 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged):
         Time bounds.
     staged: StagedDataset
         Pipeline context (comp_func/metazone) for this colocation run.
+    mparams: dict, optional
+        Full metazone parameter dict (e.g. carrying a CLI-supplied
+        ``cgeo_ref``), forwarded to `Comparison.compute_oceanvars`.
 
     Returns
     -------
@@ -960,8 +981,8 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged):
     dsprod = dsprod.assign_attrs(gattrs_prod)
 
     comparison = get_comparison(comp_func)
-    dsref = comparison.compute_oceanvars(dsref)
-    dsprod = comparison.compute_oceanvars(dsprod)
+    dsref = comparison.compute_oceanvars(dsref, mparams)
+    dsprod = comparison.compute_oceanvars(dsprod, mparams)
 
     # Set depth/pres as coordinate if needed
     for vcoord in ["depth", "pres"]:
@@ -1011,7 +1032,7 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged):
     return ref_name, prod_name, paths
 
 
-def _process_reference(ncref, ncins, params, tbound, staged, ncouts):
+def _process_reference(ncref, ncins, params, tbound, staged, ncouts, mparams=None):
     """Process all products for a single reference.
 
     Parameters
@@ -1028,6 +1049,8 @@ def _process_reference(ncref, ncins, params, tbound, staged, ncouts):
         Pipeline context (comp_func/metazone) for this colocation run.
     ncouts: dict
         Dictionary to store output paths.
+    mparams: dict, optional
+        Full metazone parameter dict, forwarded to `_process_single_product`.
     """
     metazone = staged.metazone
     logger.info(f"Use reference {ncref}")
@@ -1041,7 +1064,7 @@ def _process_reference(ncref, ncins, params, tbound, staged, ncouts):
 
     results = []
     for ncin in ncins:
-        result = _process_single_product(dsrefin, ncin, params, tbound, staged)
+        result = _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=mparams)
         results.append(result)
 
     # Merge results into ncouts
@@ -1077,13 +1100,14 @@ def _process_metazone(staged, params, mz_files, metazones, ncouts):
     logger.info(f"Colocation parameters are: {params}")
 
     tbound = metazones[metazone].get("tbound")
+    mparams = metazones[metazone]
     ncouts[metazone] = {}
 
     ncrefs = mz_files["ref"]
     ncins = mz_files["prod"]
 
     for ncref in ncrefs:
-        _process_reference(ncref, ncins, params, tbound, staged, ncouts)
+        _process_reference(ncref, ncins, params, tbound, staged, ncouts, mparams=mparams)
 
     logger.info(f"End colocation for {metazone}.")
 
@@ -1119,11 +1143,17 @@ def main_coloc(ncs, metazones, comp_func):
     ncs_index = {}
     for nc in ncs:
         nc_str = str(nc)
+        # Match the "ref_<name>.zarr"/"prod_<name>.zarr" filename convention
+        # itself, not a substring check anywhere in the path -- a metazone
+        # name containing "ref" (e.g. "modelzone_href") would otherwise
+        # match every file under it, misclassifying every product as a
+        # second reference.
+        basename = Path(nc_str).name
         for metazone in coloc_params:
             if metazone in nc_str:
                 if metazone not in ncs_index:
                     ncs_index[metazone] = {"ref": [], "prod": []}
-                if "ref" in nc_str:
+                if basename.startswith("ref_"):
                     ncs_index[metazone]["ref"].append(nc)
                 else:
                     ncs_index[metazone]["prod"].append(nc)

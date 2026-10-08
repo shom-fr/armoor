@@ -2,7 +2,7 @@
 
 import xarray as xr
 
-from armoor.base.filters import ArmoorFilters
+from armoor.filters import ArmoorFilters
 
 
 @xr.register_dataset_accessor("filters")

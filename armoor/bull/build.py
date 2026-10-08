@@ -7,8 +7,9 @@ from typing import Dict, List, Optional
 from configobj import ConfigObj
 from validate import Validator
 from jinja2 import Environment, FileSystemLoader, Template
+import json
 
-from . import BULL_TPL, SHOM_LOGO_PATH
+from . import BULL_TPL
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +44,11 @@ class Bull:
     
     def _prepare_template_data(self) -> Dict:
         """Prepare data dictionary for Jinja2 template."""
-        # Encode logo if present
+        # Encode logo if one is given in [header]
         logo_data = None
         logo_mime = None
-        logo_path = SHOM_LOGO_PATH
-        if os.path.exists(logo_path):
+        logo_path = self.config['header'].get('logo')
+        if logo_path and os.path.exists(logo_path):
             logo_data = self._encode_image_base64(logo_path)
             ext = os.path.splitext(logo_path)[1].lower()
             logo_mime = {
@@ -57,34 +58,105 @@ class Bull:
                 '.svg': 'image/svg+xml',
                 '.gif': 'image/gif'
             }.get(ext, 'image/png')
+        elif logo_path:
+            logger.warning(f"Logo not found: {logo_path}")
         
-        # Process images for each comparison type and zone
+        # Process images for each comparison type, section, output and zone
         processed_images = {}
         for comp_type in self.config['comparison_types'].sections:
-            processed_images[comp_type] = {}
-            if 'images' in self.config and comp_type in self.config['images'].sections:
-                for output in self.config['images'][comp_type].sections:
-                    processed_images[comp_type][output] = {}
-                    for zone in self.config['images'][comp_type][output].sections:
-                        processed_images[comp_type][output][zone] = []
-                        image_pathes = self.config['images'][comp_type][output][zone]['path']
-                        if len(image_pathes) == 1 and "*" in image_pathes[0]:
-                            image_pathes = glob.glob(image_pathes[0])
-                        for image_path in image_pathes:
+            logger.debug(
+                f"Comparison type {comp_type}: {dict(self.config['comparison_types'][comp_type])}"
+            )
+            processed_images[comp_type] = {
+                "label": self._get_label(self.config['comparison_types'], comp_type),
+                "sections": {},
+            }
+
+            if 'images' not in self.config:
+                continue
+            if comp_type not in self.config['images'].sections:
+                continue
+            comp_cfg = self.config['images'][comp_type]
+
+            for section in comp_cfg.sections:
+                section_cfg = comp_cfg[section]
+                processed_section = processed_images[comp_type]["sections"][section] = {
+                    "label": self._get_label(comp_cfg, section),
+                    "outputs": {},
+                }
+
+                for output in section_cfg.sections:
+                    output_cfg = section_cfg[output]
+                    if 'path' in output_cfg.scalars:
+                        raise ValueError(
+                            f"[images] [[{comp_type}]] [[[{section}]]] [[[[{output}]]]]: "
+                            "'path' found at the output level. [images] now expects "
+                            "type / section / output / zone / path: add a section level "
+                            "to your bull config."
+                        )
+                    processed_output = processed_section["outputs"][output] = {
+                        "label": self._get_label(section_cfg, output),
+                        "zones": {},
+                    }
+
+                    for zone in output_cfg.sections:
+                        image_paths = output_cfg[zone]['path']
+                        if len(image_paths) == 1 and "*" in image_paths[0]:
+                            image_paths = sorted(glob.glob(image_paths[0]))
+
+                        images_list = []
+                        for image_path in image_paths:
                             if os.path.exists(image_path):
-                                image_data = self._encode_image_base64(image_path)
-                                processed_images[comp_type][output][zone].append({
-                                    'data': image_data,
+                                images_list.append({
+                                    'data': self._encode_image_base64(image_path),
                                     'path': image_path,
-                                    'found': True
+                                    'found': True,
                                 })
                             else:
-                                processed_images[comp_type][output][zone].append({
+                                logger.warning(f"Image not found : {image_path}")
+                                images_list.append({
                                     'data': None,
                                     'path': image_path,
-                                    'found': False
+                                    'found': False,
                                 })
+                        processed_output["zones"][zone] = {
+                            "label": self._get_label(output_cfg, zone),
+                            "images": images_list,
+                        }
+
+        if logger.isEnabledFor(logging.DEBUG):
+            images_tree = {
+                k: {
+                    "label": v["label"],
+                    "sections": {
+                        s: {"label": sd["label"], "outputs": list(sd["outputs"].keys())}
+                        for s, sd in v["sections"].items()
+                    },
+                }
+                for k, v in processed_images.items()
+            }
+            logger.debug(
+                "Images tree:\n" + json.dumps(images_tree, indent=2, ensure_ascii=False)
+            )
         
+        # Process ocean-features (main ocean features per zone)
+        processed_ocean_features = None
+        if 'ocean-features' in self.config:
+            processed_ocean_features = {}
+            for zone in self.config['ocean-features'].sections:
+                zone_label = self._get_label(self.config['ocean-features'], zone)
+                processed_ocean_features[zone] = {
+                    "label": zone_label,
+                    "features": {}
+                }
+                for feature in self.config['ocean-features'][zone].sections:
+                    feat_label = self._get_label(self.config['ocean-features'][zone], feature)
+                    feat_desc = self.config['ocean-features'][zone][feature].get('description', '')
+                    processed_ocean_features[zone]["features"][feature] = {
+                        "label": feat_label,
+                        "description": feat_desc
+                    }
+
         return {
             'header': {
                 'title': self.config['header']['title'],
@@ -97,6 +169,10 @@ class Bull:
             'summary': dict(self.config['summary']) if self.config.get("summary") else None,
             'comparison_types': dict(self.config['comparison_types']),
             'zones': dict(self.config['zones']),
+            'ocean_features': processed_ocean_features,
+            'ocean_features_title': self.config.get('ocean-features', {}).get(
+                'title', 'Main ocean features'
+            ),
             'images': processed_images
         }
     
@@ -107,7 +183,6 @@ class Bull:
         template_name = os.path.basename(self.template_file)
         env = Environment(loader=FileSystemLoader(template_dir))
         template = env.get_template(template_name)
-
         html_content = template.render(**data)
         
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -130,3 +205,11 @@ class Bull:
         HTML(temp_html).write_pdf(output_path)
         os.remove(temp_html)
         logger.info(f"PDF bulletin generated: {output_path}")
+
+    def _get_label(self,section_obj,key:str)-> str:
+        """Retourne le label lisible si defini, sinon la cle brute."""
+        try:
+            label = section_obj[key].get('label','').strip()
+            return label if label else key 
+        except (KeyError, AttributeError, TypeError):
+            return key 
