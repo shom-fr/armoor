@@ -1482,6 +1482,26 @@ def open_decode_odar(path_files):
     return dss
 
 
+#: Velocities of CROCO (u and v components) decoded on the rho points and
+#: rotated to east and north
+_CROCO_VELOCITY_PAIRS = (("u", "v"), ("u_surf", "v_surf"))
+
+#: Standard names of the velocities rotated to east and north
+_CROCO_ROTATED_STANDARD_NAMES = {
+    "u": "eastward_sea_water_velocity",
+    "v": "northward_sea_water_velocity",
+    "u_surf": "surface_eastward_sea_water_velocity",
+    "v_surf": "surface_northward_sea_water_velocity",
+}
+
+#: Attributes of the depth of the decoded CROCO outputs
+_CROCO_DEPTH_ATTRS = {
+    "standard_name": "depth",
+    "long_name": "Depth",
+    "units": "m",
+    "positive": "down",
+}
+
 #: Variables removed from the decoded CROCO outputs
 _CROCO_DROP_VARS = (
     "sig_rho",
@@ -1558,6 +1578,8 @@ def _finalize_croco(ds):
         for uname, vname in pairs:
             da_u = ds[uname] * np.cos(angle) - ds[vname] * np.sin(angle)
             da_v = ds[vname] * np.cos(angle) + ds[uname] * np.sin(angle)
+            for name, da in ((uname, da_u), (vname, da_v)):
+                da.attrs = dict(ds[name].attrs, standard_name=_CROCO_ROTATED_STANDARD_NAMES[name])
             ds = ds.drop_vars([uname, vname])
             ds[uname] = da_u
             ds[vname] = da_v
@@ -1572,7 +1594,9 @@ def _finalize_croco(ds):
     if "z" in ds.dims:
         ds = ds.isel(z=slice(None, None, -1))
         if "depth" in ds.coords:
-            ds = ds.assign_coords(depth=-ds.depth)
+            depth = -ds.depth
+            depth.attrs = dict(_CROCO_DEPTH_ATTRS)
+            ds = ds.assign_coords(depth=depth)
 
     # Final rechunk: large spatial chunks now that sigma coords are decoded
     good_var = None
@@ -1806,9 +1830,6 @@ def open_decode_croco(path_file, fmt="croco"):
 _CROCO_XIOS_U_FIELDS = ("u", "u_surf", "ubar", "sustr", "bustr")
 _CROCO_XIOS_V_FIELDS = ("v", "v_surf", "vbar", "svstr", "bvstr")
 
-#: Velocities of CROCO (u and v components) decoded on the rho points and
-#: rotated to east and north
-_CROCO_VELOCITY_PAIRS = (("u", "v"), ("u_surf", "v_surf"))
 
 #: Location of the points of the XIOS domains of CROCO: base domains and
 #: points of the extraction domains (``<domain>_<points>``)
@@ -1901,6 +1922,8 @@ def _normalize_croco_xios(ds):
     drop.extend(f"{c}_{loc}" for c in ("lon", "lat") for loc in ("rho", "u", "v"))
     ds = ds.drop_vars(drop, errors="ignore")
 
+    if "time_counter" in ds.coords:
+        ds["time_counter"].attrs.pop("bounds", None)
     renames = {"time_counter": "time"}
     navs = {}
     drop = []
@@ -2269,7 +2292,8 @@ def open_decode_croco_xios(path_file):
             combine="nested",
             concat_dim="time",
             chunks={},
-            parallel=len(files) > 1,
+            # parallel opening crashes with netCDF4 (HDF5 is not thread-safe)
+            parallel=False,
             data_vars="minimal",
             coords="minimal",
             compat="override",

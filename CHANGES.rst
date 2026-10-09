@@ -29,6 +29,16 @@ New features
   CROCO, not available in xoa, if absent. The decoded dataset has the same variables and
   dimensions as with the native outputs.
 
+Bug fixes
+---------
+
+- ``open_decode_croco``: the velocities rotated to east and north have the
+  standard names ``eastward_sea_water_velocity`` and
+  ``northward_sea_water_velocity`` instead of those of the grid axes
+  (``sea_water_x_velocity``...), and the depth of the levels the attributes
+  of a positive depth (``standard_name = "depth"``, ``positive = "down"``)
+  instead of those of the height computed by xoa.
+
 2026.10.0
 =========
 

@@ -227,6 +227,9 @@ class TestOpenDecodeCrocoXios:
                 ds.depth.isel(time=itime).values, expected_depth(h, zeta), rtol=1e-6
             )
         assert (ds.depth.diff("z") > 0).all()
+        assert ds.depth.attrs["standard_name"] == "depth"
+        assert ds.depth.attrs["positive"] == "down"
+        assert "bounds" not in ds.time.attrs
         np.testing.assert_allclose(ds.bathy.values, h)
 
     def test_vertical_fields(self, tmp_path):
@@ -263,6 +266,7 @@ class TestOpenDecodeCrocoXios:
         assert ds.u_surf.dims == ("time", "y", "x")
         np.testing.assert_allclose(ds.u_surf.isel(time=0, y=2, x=3), -2.0, atol=1e-6)
         np.testing.assert_allclose(ds.v_surf.isel(time=0, y=2, x=3), 3.0, atol=1e-6)
+        assert ds.u_surf.attrs["standard_name"] == "surface_eastward_sea_water_velocity"
 
     def test_velocities_only(self, tmp_path):
         """Outputs on the u and v points only: rho points rebuilt from the
@@ -304,6 +308,8 @@ class TestOpenDecodeCrocoXios:
         # angle = pi / 2: east = -v_xi, north = u_xi
         np.testing.assert_allclose(ds.u.isel(time=0, z=0, y=2, x=3), -2.0, atol=1e-6)
         np.testing.assert_allclose(ds.v.isel(time=0, z=0, y=2, x=3), 3.0, atol=1e-6)
+        assert ds.u.attrs["standard_name"] == "eastward_sea_water_velocity"
+        assert ds.v.attrs["standard_name"] == "northward_sea_water_velocity"
 
     def test_extraction(self, tmp_path):
         """Extraction of sloop: rho points [1, 3] x [1, 2] with the faces of
