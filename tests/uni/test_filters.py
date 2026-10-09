@@ -319,6 +319,28 @@ class TestArmoorFilters:
         with pytest.raises(Exception, match="less than hourly"):
             ArmoorFilters.tidal_filter(daily.copy(), filter_name="demerliac", errors="raise")
 
+    def test_filters_time_dependent_depth(self):
+        """The depth that depends on time is filtered with the variables."""
+        times = pd.date_range("2020-01-01", periods=120, freq="1h")
+        hours = np.arange(times.size)
+        tide = np.cos(2 * np.pi * hours / 12.42)
+        ds = xr.Dataset(
+            {"var1": (("time", "x"), np.stack([10 + tide, 10 + tide], axis=1))},
+            coords={
+                "time": times,
+                "lon": ("x", [0.0, 1.0]),
+                "depth": (("time", "x"), np.stack([5 + tide, 5 + tide], axis=1)),
+            },
+        )
+        result = ArmoorFilters.tidal_filter(ds.copy(), filter_name="demerliac")
+        assert "depth" in result.coords
+        valid = result.depth.isel(time=slice(40, 80))
+        np.testing.assert_allclose(valid, 5.0, atol=0.05)
+        np.testing.assert_allclose(result.var1.isel(time=slice(40, 80)), 10.0, atol=0.05)
+        result = ArmoorFilters.tresample(ds, freq="1D")
+        assert "depth" in result.coords and result.depth.dims == ("time", "x")
+        np.testing.assert_allclose(result.depth.values[0], ds.depth.values[:24].mean(axis=0))
+
     def test_tsmooth_without_depth(self, sample_ds_with_depth):
         """tsmooth of a dataset without depth."""
         ds = sample_ds_with_depth[["var1"]].drop_vars("depth")

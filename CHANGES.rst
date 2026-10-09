@@ -38,6 +38,10 @@ Bug fixes
 
 - ``ArmoorFilters.tsmooth`` failed on a dataset without ``depth``
   (``KeyError``).
+- ``ArmoorFilters.tidal_filter`` and ``ArmoorFilters.tresample`` filter the
+  coordinates that depend on time (``depth`` of the sigma levels...) with
+  the variables: ``tidal_filter`` left them unfiltered and ``tresample``
+  removed them.
 - ``open_decode_croco``: the velocities rotated to east and north have the
   standard names ``eastward_sea_water_velocity`` and
   ``northward_sea_water_velocity`` instead of those of the grid axes
