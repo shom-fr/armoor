@@ -28,6 +28,10 @@ New features
   (``VertCoordType``); ``Cs_rho`` is computed with the stretching curves of
   CROCO, not available in xoa, if absent. The decoded dataset has the same variables and
   dimensions as with the native outputs.
+- ``armoor.interp.vinterp`` accepts ``extrap``, the extrapolation mode of
+  ``xoa.regrid.regrid1d`` (default ``"both"``): ``"bottom"`` extrapolates a
+  positive depth toward the surface only, without values below the deepest
+  level of each column.
 - ``ArmoorFilters.tidal_filter`` accepts ``errors="raise"`` to raise the
   error of a variable that cannot be filtered (data less than hourly
   sampled...), instead of logging a warning and keeping it unfiltered
@@ -36,6 +40,9 @@ New features
 Bug fixes
 ---------
 
+- ``armoor.interp.regrid`` regrids the coordinates on the ``x`` and ``y``
+  dimensions other than ``lon`` and ``lat`` (``depth`` of the sigma
+  levels...), which were removed.
 - ``ArmoorFilters.tsmooth`` failed on a dataset without ``depth``
   (``KeyError``).
 - ``ArmoorFilters.tidal_filter`` and ``ArmoorFilters.tresample`` filter the

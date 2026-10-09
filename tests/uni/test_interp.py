@@ -831,3 +831,35 @@ class TestIntegration:
         assert 'distance' in final_result.coords
         assert len(final_result.time) == 1
         assert len(final_result.z) == 3
+
+def test_vinterp_extrap():
+    """No values below the deepest level with extrap="bottom" (positive depth)."""
+    ds = xr.Dataset(
+        {"temp": (("z", "x"), [[20.0], [15.0], [10.0]], {"units": "degC"})},
+        coords={"depth": (("z", "x"), [[1.0], [10.0], [50.0]])},
+    )
+    levels = xr.DataArray([0.0, 5.0, 100.0], dims="z", name="depth")
+    out = vinterp(ds, "depth", levels, extrap="bottom")
+    np.testing.assert_allclose(out.temp.values.ravel(), [20.0, 17.0 + 7 / 9, np.nan])
+    assert out.temp.attrs["units"] == "degC"
+    out = vinterp(ds, "depth", levels)
+    np.testing.assert_allclose(out.temp.values.ravel(), [20.0, 17.0 + 7 / 9, 10.0])
+
+
+def test_regrid_depth():
+    """The depth on the x and y dimensions is regridded with the variables."""
+    lon, lat = np.meshgrid(np.linspace(0, 4, 5), np.linspace(40, 43, 4))
+    depth = np.broadcast_to(np.array([1.0, 10.0])[:, None, None], (2, 4, 5))
+    dsi = xr.Dataset(
+        {"temp": (("z", "y", "x"), np.full((2, 4, 5), 12.0))},
+        coords={
+            "lon": (("y", "x"), lon),
+            "lat": (("y", "x"), lat),
+            "depth": (("z", "y", "x"), depth),
+        },
+    )
+    dso = xr.Dataset(coords={"lon": ("lon", [1.0, 2.0]), "lat": ("lat", [41.0, 42.0])})
+    out = regrid(dsi, dso)
+    assert "depth" in out.coords and out.depth.dims == ("z", "lat", "lon")
+    np.testing.assert_allclose(out.depth.values[:, 0, 0], [1.0, 10.0])
+    np.testing.assert_allclose(out.temp.values, 12.0)
