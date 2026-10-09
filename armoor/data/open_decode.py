@@ -188,6 +188,131 @@ def register_cf():
         xmeta.register_meta_specs(mycfspecs)
 
 
+#: Attributes of the models removed from the decoded datasets (bookkeeping
+#: of CROCO and XIOS...)
+BOOKKEEPING_ATTRS = (
+    "online_operation",
+    "interval_operation",
+    "interval_write",
+    "field",
+    "time_origin",
+)
+
+
+#: Standard names relative to the grid, kept by `format_cf`: velocities not
+#: rotated to east and north
+GRID_STANDARD_NAMES = (
+    "sea_water_x_velocity",
+    "sea_water_y_velocity",
+    "sea_surface_x_velocity",
+    "sea_surface_y_velocity",
+)
+
+
+def get_generic_specs():
+    """Get the generic CF specs of armoor (``cf_generic.cfg``)."""
+    try:
+        return xmeta.get_meta_specs("generic")
+    except Exception:
+        register_cf()
+        return xmeta.get_meta_specs("generic")
+
+
+def get_generic_name(name, cfspecs=None):
+    """Get the name of a variable in the generic CF specs of armoor.
+
+    Parameters
+    ----------
+    name : str
+        Name of the variable in an armoor dataset (``ptemp``, ``sndspeed``...).
+    cfspecs : xoa.meta.MetaSpecs, optional
+        Default: the generic specs.
+
+    Returns
+    -------
+    (str, str) or None
+        The category (``data_vars`` or ``coords``) and the name of the specs
+        of the variable, by name, then by alternate names.
+    """
+    cfspecs = cfspecs or get_generic_specs()
+    for category in ("coords", "data_vars"):
+        if name in cfspecs[category].names:
+            return category, name
+    for category in ("coords", "data_vars"):
+        for meta_name in cfspecs[category].names:
+            if name in (cfspecs[category][meta_name].get("alt_names") or []):
+                return category, meta_name
+    return None
+
+
+def _format_cf_attrs(da, spec):
+    """Set the CF attributes of the specs of a variable.
+
+    The attributes are the first values of the specs. A standard name
+    relative to the grid (`GRID_STANDARD_NAMES`) that is in the specs is
+    kept, with the long name of the same position.
+    """
+    attrs = dict(da.attrs)
+    for attr in BOOKKEEPING_ATTRS:
+        attrs.pop(attr, None)
+    specs = spec.get("attrs") or {}
+    standard_names = list(specs.get("standard_name") or [])
+    current = attrs.get("standard_name")
+    index = 0
+    if current in GRID_STANDARD_NAMES and current in standard_names:
+        index = standard_names.index(current)
+    for attr, values in specs.items():
+        if isinstance(values, (list, tuple)):
+            if not values:
+                continue
+            attrs[attr] = values[index] if attr in ("standard_name", "long_name") and index < len(values) else values[0]
+        else:
+            attrs[attr] = values
+    return attrs
+
+
+def format_cf(ds):
+    """Set the CF attributes of a decoded dataset, with the generic CF specs.
+
+    The attributes of the variables known by the generic specs of armoor
+    (``cf_generic.cfg``, by name or alternate name) are replaced by the
+    first values of their specs, without renaming anything; a standard name
+    relative to the grid is kept (velocities not rotated). The bookkeeping
+    attributes of the models are removed.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset, xarray.DataArray or list of them
+
+    Returns
+    -------
+    Same type as ``ds``
+    """
+    if isinstance(ds, list):
+        return [format_cf(d) for d in ds]
+    if ds is None:
+        return ds
+    cfspecs = get_generic_specs()
+    if isinstance(ds, xr.DataArray):
+        found = get_generic_name(ds.name, cfspecs) if ds.name else None
+        if found is None:
+            return ds
+        da = ds.copy()
+        da.attrs = _format_cf_attrs(ds, cfspecs[found[0]][found[1]])
+        return da
+    ds = ds.copy()
+    for name in list(ds.variables):
+        found = get_generic_name(name, cfspecs)
+        if found is None:
+            attrs = dict(ds[name].attrs)
+            for attr in BOOKKEEPING_ATTRS:
+                attrs.pop(attr, None)
+        else:
+            attrs = _format_cf_attrs(ds[name], cfspecs[found[0]][found[1]])
+        ds[name].attrs = attrs
+    return ds
+
+
 def _normalize_geo_coords(ds):
     """Ensure lon/lat coordinates carry standard_name so xoa can locate them."""
     if isinstance(ds, list):
@@ -722,9 +847,12 @@ def open_decode(path_files, fmt, platform=None) -> xr.Dataset:
     ArmoorError
         If `fmt` is not a registered format (see `get_decoder`).
     """
-    path_files = get_paths(path_files)
+    if isinstance(path_files, (list, tuple)):
+        path_files = [path for pattern in path_files for path in get_paths(str(pattern))]
+    else:
+        path_files = get_paths(path_files)
     result = get_decoder(fmt).decode(path_files, fmt, platform=platform)
-    return _normalize_geo_coords(result)
+    return format_cf(_normalize_geo_coords(result))
 
 
 def open_decode_arpege_insta(path_files):
@@ -1494,14 +1622,6 @@ _CROCO_ROTATED_STANDARD_NAMES = {
     "v_surf": "surface_northward_sea_water_velocity",
 }
 
-#: Attributes of the depth of the decoded CROCO outputs
-_CROCO_DEPTH_ATTRS = {
-    "standard_name": "depth",
-    "long_name": "Depth",
-    "units": "m",
-    "positive": "down",
-}
-
 #: Variables removed from the decoded CROCO outputs
 _CROCO_DROP_VARS = (
     "sig_rho",
@@ -1594,8 +1714,9 @@ def _finalize_croco(ds):
     if "z" in ds.dims:
         ds = ds.isel(z=slice(None, None, -1))
         if "depth" in ds.coords:
+            # positive depth: its attributes are set by format_cf
             depth = -ds.depth
-            depth.attrs = dict(_CROCO_DEPTH_ATTRS)
+            depth.attrs = {}
             ds = ds.assign_coords(depth=depth)
 
     # Final rechunk: large spatial chunks now that sigma coords are decoded

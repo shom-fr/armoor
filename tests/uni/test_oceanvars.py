@@ -160,7 +160,32 @@ class TestOceanVars:
         result = self.ds.oceanvars.sel_pdens(ref_dens=0)
         assert result is not None
         assert 'pdens' in self.ds
-        assert self.ds['pdens'].attrs['units'] == 'kg/m3'
+        assert self.ds['pdens'].attrs['units'] == 'kg m-3'
+
+    def test_computed_attrs(self):
+        """The computed variables have their own attributes, not those of an input."""
+        ds = self.ds.drop_vars("pres")
+        ds["sal"].attrs = {"standard_name": "sea_water_salinity", "long_name": "Salinity"}
+        ds["temp"].attrs = {"standard_name": "sea_water_temperature"}
+        ds["ptemp"] = ds["temp"].assign_attrs(standard_name="sea_water_potential_temperature")
+        ds = ds.drop_vars("temp")
+        ds["u"] = ds["sal"] * 0 + 0.3
+        ds["v"] = ds["sal"] * 0 + 0.4
+        expected = {
+            "pdens": "sea_water_sigma_theta",
+            "sndspeed": "speed_of_sound_in_sea_water",
+            "pres": "sea_water_pressure",
+            "temp": "sea_water_temperature",
+            "cspeed": "sea_water_speed",
+        }
+        for name, standard_name in expected.items():
+            result = ds.copy().oceanvars.sel(name)
+            assert result.attrs["standard_name"] == standard_name, name
+            assert result.attrs.get("long_name") != "Salinity", name
+        result = ds.copy().oceanvars.sel_pdens(ref_dens=1000)
+        assert "standard_name" not in result.attrs
+        assert result.attrs["reference_pressure"] == "1000 dbar"
+        assert ds.copy().oceanvars.sel("cdir").attrs["units"] == "radian"
 
     def test_sel_pdens_missing_sal(self):
         """Test potential density without salinity"""
@@ -173,7 +198,7 @@ class TestOceanVars:
         result = self.ds.oceanvars.sel_sndspeed()
         assert result is not None
         assert 'sndspeed' in self.ds
-        assert self.ds['sndspeed'].attrs['units'] == 'm/s'
+        assert self.ds['sndspeed'].attrs['units'] == 'm s-1'
 
     def test_sel_sndspeed_missing_temp(self):
         """Test sound speed without temperature"""

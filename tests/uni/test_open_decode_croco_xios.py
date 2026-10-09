@@ -21,6 +21,7 @@ from armoor import ArmoorError
 from armoor.data.open_decode import (
     _croco_s_curves,
     get_decoder,
+    open_decode,
     open_decode_croco,
     open_decode_croco_xios,
 )
@@ -219,7 +220,8 @@ class TestOpenDecodeCrocoXios:
     def test_depth(self, whole_grid_files):
         """Depth of the levels from h (grid file), zeta, the s_rho axis and
         the stretching curves computed with the global attributes."""
-        ds = open_decode_croco_xios(whole_grid_files).compute()
+        # with the CF attributes of open_decode
+        ds = open_decode(whole_grid_files, "croco_xios").compute()
         h = bathy()
         # each file has the free surface 0.1, 0.2...
         for itime, zeta in ((0, zeta_values(DAY1)[0]), (3, zeta_values(DAY2)[1])):
@@ -228,6 +230,9 @@ class TestOpenDecodeCrocoXios:
             )
         assert (ds.depth.diff("z") > 0).all()
         assert ds.depth.attrs["standard_name"] == "depth"
+        assert ds.ptemp.attrs["units"] == "degree_celsius"
+        assert ds.lon.attrs["standard_name"] == "longitude"
+        assert ds.time.attrs["standard_name"] == "time"
         assert ds.depth.attrs["positive"] == "down"
         assert "bounds" not in ds.time.attrs
         np.testing.assert_allclose(ds.bathy.values, h)
@@ -262,7 +267,7 @@ class TestOpenDecodeCrocoXios:
         fields = {"u": ["u_surf"], "v": ["v_surf"], "rho": ["zeta"]}
         uv = xios_dataset("surf_UV", DAY1, WHOLE, fields)
         files = [write(uv, tmp_path / "uv.nc"), write_grid(tmp_path / "grd.nc", angle=np.pi / 2)]
-        ds = open_decode_croco_xios(files).compute()
+        ds = open_decode(files, "croco_xios").compute()
         assert ds.u_surf.dims == ("time", "y", "x")
         np.testing.assert_allclose(ds.u_surf.isel(time=0, y=2, x=3), -2.0, atol=1e-6)
         np.testing.assert_allclose(ds.v_surf.isel(time=0, y=2, x=3), 3.0, atol=1e-6)
@@ -304,7 +309,7 @@ class TestOpenDecodeCrocoXios:
         times = DAY1
         uv = xios_dataset("MED_inst_UV", times, WHOLE, {"u": ["u"], "v": ["v"]})
         files = [write(uv, tmp_path / "uv.nc"), write_grid(tmp_path / "grd.nc", angle=np.pi / 2)]
-        ds = open_decode_croco_xios(files).compute()
+        ds = open_decode(files, "croco_xios").compute()
         # angle = pi / 2: east = -v_xi, north = u_xi
         np.testing.assert_allclose(ds.u.isel(time=0, z=0, y=2, x=3), -2.0, atol=1e-6)
         np.testing.assert_allclose(ds.v.isel(time=0, z=0, y=2, x=3), 3.0, atol=1e-6)
@@ -407,3 +412,12 @@ def test_croco_s_curves(new):
     cs = _croco_s_curves(sc, THETA_S, THETA_B, new)
     np.testing.assert_allclose(cs[[0, -1]], [-1, 0], atol=1e-12)
     assert (np.diff(cs) > 0).all()
+
+
+def test_velocities_not_rotated(tmp_path):
+    """Without angle, the velocities keep standard names relative to the grid."""
+    uv = xios_dataset("MED_inst_UV", DAY1, WHOLE, {"u": ["u"], "v": ["v"]})
+    uv["u"].attrs["standard_name"] = "sea_water_x_velocity"
+    ds = open_decode([write(uv, tmp_path / "uv.nc")], "croco_xios")
+    assert ds.u.attrs["standard_name"] == "sea_water_x_velocity"
+    assert ds.u.attrs["long_name"] == "Sea water velocity along X"

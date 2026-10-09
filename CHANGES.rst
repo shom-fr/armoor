@@ -40,6 +40,24 @@ New features
 Bug fixes
 ---------
 
+- ``open_decode`` sets the CF attributes of the decoded datasets of every
+  format with the generic CF specs (``cf_generic.cfg``) through the new
+  ``format_cf``: the attributes of the variables known by name or alternate
+  name are the first values of their specs, except the standard names
+  relative to the grid (velocities not rotated), and the bookkeeping
+  attributes of the models (``online_operation``, ``interval_write``...)
+  are removed. ``cf_generic.cfg``: ``degree_celsius``,
+  ``sea_surface_height_above_geoid``, ``sea_water_sigma_theta``,
+  ``ocean_mixed_layer_thickness``, ``sea_water_pressure``, ``depth``
+  positive down, ``sea_binary_mask`` (mask of CROCO), eastward and
+  northward velocities first, and alternate names of the ``OceanVars``
+  names (``sndspeed``, ``cspeed``, ``u_surf``, ``v_surf``).
+- ``open_decode`` accepts a list of paths or patterns.
+- ``OceanVars``: the computed variables (``pdens``, ``sndspeed``, ``mld``,
+  ``temp``, ``pres``, ``cspeed``) have the CF attributes of the generic CF
+  specs (``reference_pressure`` for ``pdens``), and ``cdir`` its own (radian,
+  counterclockwise from east), instead of those of an input (``pdens`` was a
+  "Salinity", ``pres`` a "Depth"...).
 - ``armoor.interp.regrid`` regrids the coordinates on the ``x`` and ``y``
   dimensions other than ``lon`` and ``lat`` (``depth`` of the sigma
   levels...), which were removed.
