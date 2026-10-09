@@ -11,11 +11,7 @@ import xarray as xr
 from collections import defaultdict
 
 from armoor import ArmoorError
-from armoor.io import (
-    get_zarr_encoding,
-    sort_ncs_by_suffix,
-    write_dataset_to_zarr
-    )
+from armoor.io import get_zarr_encoding, sort_ncs_by_suffix, write_dataset_to_zarr
 from armoor.comp import GROUP_SUFFIX
 from armoor.comp.comparison import get_comparison
 from armoor.comp.stats import StatsComp
@@ -80,10 +76,9 @@ def check_output(func_name, outputs):
 def _convert_time_to_epoch_seconds(ds, epoch=EPOCH):
     """Convert dataset time coordinates to seconds since epoch."""
     return [
-        (pd.to_datetime(time) - pd.to_datetime(epoch))
-        / pd.to_timedelta("1s")
+        (pd.to_datetime(time) - pd.to_datetime(epoch)) / pd.to_timedelta("1s")
         for time in ds.time.values
-        ]
+    ]
 
 
 def _prepare_prod_for_parcels(zprod):
@@ -101,8 +96,8 @@ def _prepare_prod_for_parcels(zprod):
             attrs={
                 'dtype': 'float64',
                 'units': f'seconds since {EPOCH} 00:00:00',
-                }
-            )
+            },
+        )
         dsprod.to_netcdf(ncprod)
     return ncprod, timeprod
 
@@ -110,35 +105,25 @@ def _prepare_prod_for_parcels(zprod):
 def _interpolate_ref_and_run_parcels(zref, odt, timeprod, ncprod, runtime):
     """Interpolate reference dataset and execute Parcels simulation."""
     with xr.open_dataset(zref) as dsref:
-        dsref_update = (
-            dsref.reset_coords(["lon", "lat"]).drop("depth")
-            .interp.tfreq(odt)
-        )
+        dsref_update = dsref.reset_coords(["lon", "lat"]).drop("depth").interp.tfreq(odt)
     zref = str(zref)
     dsref_update = dsref_update.compute()
     write_dataset_to_zarr(
-        dsref_update,
-        zref.replace(".zarr", "_tmp.zarr"),
-        mode="w",
-        consolidated=True,
-        compute=True
-        )
+        dsref_update, zref.replace(".zarr", "_tmp.zarr"), mode="w", consolidated=True, compute=True
+    )
     timeref = [
-        float((pd.to_datetime(time) - pd.to_datetime(EPOCH))
-              / pd.to_timedelta("1s")) - timeprod[0]
+        float((pd.to_datetime(time) - pd.to_datetime(EPOCH)) / pd.to_timedelta("1s")) - timeprod[0]
         for time in dsref_update.time.values
-        ]
+    ]
     ptc_coords_start = {
         "time": timeref,
         "lon": dsref_update.lon.values,
-        "lat": dsref_update.lat.values
-        }
+        "lat": dsref_update.lat.values,
+    }
     if runtime:
         rruntime = pd.to_timedelta(runtime) / pd.to_timedelta("1s")
     else:
-        rruntime = (
-            dsref_update.time.max() - dsref_update.time.min()
-            ) / pd.to_timedelta("1s")
+        rruntime = (dsref_update.time.max() - dsref_update.time.min()) / pd.to_timedelta("1s")
     rruntime = float(rruntime)
     del dsref_update
     Parcels(
@@ -146,7 +131,7 @@ def _interpolate_ref_and_run_parcels(zref, odt, timeprod, ncprod, runtime):
         ptc_coords_start,
         rruntime,
         outputdt=odt,
-        ).execute()
+    ).execute()
     return zref
 
 
@@ -154,13 +139,7 @@ def _rewrite_prod_as_zarr(ncprod, zprod):
     """Remove old prod zarr, rewrite from parcels netcdf output."""
     shutil.rmtree(zprod)
     with xr.open_dataset(ncprod) as dsprod:
-        write_dataset_to_zarr(
-            dsprod,
-            zprod,
-            mode="w",
-            consolidated=True,
-            compute=True
-            )
+        write_dataset_to_zarr(dsprod, zprod, mode="w", consolidated=True, compute=True)
 
 
 def preproc_comp_drifter(zins, odt, runtime=None):
@@ -195,14 +174,11 @@ def preproc_comp_drifter(zins, odt, runtime=None):
             zref = [z for z in zs if Path(z).name.startswith("ref")][0]
             zprod = [z for z in zs if Path(z).name.startswith("prod")][0]
             ncprod, timeprod = _prepare_prod_for_parcels(zprod)
-            zref = _interpolate_ref_and_run_parcels(
-                zref, odt, timeprod, ncprod, runtime
-                )
+            zref = _interpolate_ref_and_run_parcels(zref, odt, timeprod, ncprod, runtime)
             _rewrite_prod_as_zarr(ncprod, zprod)
-            zins[drifter].update({
-                prod: [zref, zprod]
-                })
+            zins[drifter].update({prod: [zref, zprod]})
     return zins
+
 
 def preproc_comp(func_comp, ncs, **kwargs):
     """Preprocess loaded inputs before output computation.
@@ -267,18 +243,10 @@ def concat_then_merge(datasets, dim="time"):
     groups = defaultdict(list)
 
     for ds in datasets:
-        signature = tuple(
-            sorted(
-                frozenset(ds[var].dims)
-                for var in ds.data_vars
-            )
-        )
+        signature = tuple(sorted(frozenset(ds[var].dims) for var in ds.data_vars))
         groups[signature].append(ds)
 
-    concat_groups = [
-        xr.concat(dss, dim=dim, combine_attrs="override")
-        for dss in groups.values()
-    ]
+    concat_groups = [xr.concat(dss, dim=dim, combine_attrs="override") for dss in groups.values()]
 
     if len(concat_groups) > 1:
         # Variables with a dims signature that doesn't include the vertical
@@ -295,9 +263,7 @@ def concat_then_merge(datasets, dim="time"):
         max_len = max(cg.sizes[dim] for cg in concat_groups)
         dominant = [cg for cg in concat_groups if cg.sizes[dim] == max_len]
         minor = [cg for cg in concat_groups if cg.sizes[dim] != max_len]
-        shared_names = set().union(
-            *(set(cg.dims) | set(cg.variables) for cg in dominant)
-        )
+        shared_names = set().union(*(set(cg.dims) | set(cg.variables) for cg in dominant))
         renamed_minor = []
         for i, cg in enumerate(minor):
             overlap = shared_names & (set(cg.dims) | set(cg.variables))
@@ -305,7 +271,10 @@ def concat_then_merge(datasets, dim="time"):
                 logger.debug(
                     "concat_then_merge: renaming %s on group %s "
                     "(vars=%s) to avoid a '%s' cardinality mismatch",
-                    sorted(overlap), i, list(cg.data_vars), dim,
+                    sorted(overlap),
+                    i,
+                    list(cg.data_vars),
+                    dim,
                 )
                 cg = cg.rename({name: f"{name}{GROUP_SUFFIX}{i}" for name in overlap})
             renamed_minor.append(cg)
@@ -331,14 +300,14 @@ class OutputProcessor:
         """
         self.func_comp = func_comp
         self.comparison = get_comparison(func_comp)
-    
+
     def process_output(self, ocfg: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[str]]]:
         """
         Process output configurations to generate statistical comparisons.
-        
+
         This function processes production and reference datasets to generate
         statistical comparisons and save them in various output formats.
-        
+
         Parameters
         ----------
         ocfg
@@ -369,52 +338,53 @@ class OutputProcessor:
         # Extract configuration components
         config = self._parse_configuration(ocfg)
         metazone, output, mparams, oparams = config
-        
+
         logger.info(f"{metazone} -- {output}")
-        
+
         # Validate output compatibility
         if not self._validate_output_compatibility(oparams, mparams, metazone, output):
             return {output: {metazone: []}}
-        
+
         # Get output parameters and initialize result structure
         output_params = self.comparison.outputs_params[output]
         ncouts = {output: {metazone: []}}
         ref_ncins = mparams.get("ncins")
-        
+
         # Process each reference dataset
         for ref_name, prods in ref_ncins.items():
             logger.info(f"Process {output} for {ref_name}")
-            
+
             # Sort and organize input files
             sorted_prods = self._sort_products(prods, output_params)
- 
+
             # Generate statistics and comparisons
             processed_datasets = self._generate_statistics_and_comparisons(
                 sorted_prods, mparams, output_params, output
-                )
+            )
             # Save outputs
             staged = StagedDataset("", metazone=metazone, comp_func=self.func_comp, stage="output")
             output_files = self._save_outputs(
-                processed_datasets, sorted_prods, staged,
-                ref_name, output, output_params
-                )
-            
+                processed_datasets, sorted_prods, staged, ref_name, output, output_params
+            )
+
             ncouts[output][metazone].extend(output_files)
-            
+
             # Cleanup
             del processed_datasets
             gc.collect()
         return ncouts
-    
-    def _parse_configuration(self, ocfg: List[Dict[str, Any]]) -> Tuple[str, str, Dict[str, Any], Dict[str, Any]]:
+
+    def _parse_configuration(
+        self, ocfg: List[Dict[str, Any]]
+    ) -> Tuple[str, str, Dict[str, Any], Dict[str, Any]]:
         """
         Parse and extract configuration components.
-        
+
         Parameters
         ----------
         ocfg
             Configuration list containing metazone and output configs
-            
+
         Returns
         -------
         Tuple of (metazone_name, output_name, metazone_params, output_params)
@@ -425,14 +395,15 @@ class OutputProcessor:
         mparams = ocfg[0][metazone]
         oparams = ocfg[1][output_key]
         output = oparams.get("otype")
-        
+
         return metazone, output, mparams, oparams
-    
-    def _validate_output_compatibility(self, oparams: Dict[str, Any], mparams: Dict[str, Any], 
-                                     metazone: str, output: str) -> bool:
+
+    def _validate_output_compatibility(
+        self, oparams: Dict[str, Any], mparams: Dict[str, Any], metazone: str, output: str
+    ) -> bool:
         """
         Validate if output type is compatible with metazone parameters.
-        
+
         Parameters
         ----------
         oparams
@@ -443,25 +414,26 @@ class OutputProcessor:
             Metazone name
         output
             Output type name
-            
+
         Returns
         -------
         True if compatible, False otherwise
         """
         return self.comparison.validate_output_compatibility(oparams, mparams, metazone, output)
-    
-    def _sort_products(self, prods: Dict[str, Dict[str, List]], 
-                      output_params: Dict[str, Any]) -> Dict[str, Dict[str, Dict]]:
+
+    def _sort_products(
+        self, prods: Dict[str, Dict[str, List]], output_params: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Dict]]:
         """
         Sort and organize product files by type (prod/ref) and sorting criteria.
-        
+
         Parameters
         ----------
         prods
             Dictionary mapping product names to their file lists
         output_params
             Output configuration parameters
-            
+
         Returns
         -------
         Dictionary with sorted products organized by type
@@ -469,11 +441,11 @@ class OutputProcessor:
         logger.info("Sorting products")
         sorted_prods = {}
         sort_dim = output_params.get("sort")
-        
+
         for prod_name, ncins in prods.items():
             logger.info(f"Sorting {prod_name}")
             sorted_prods[prod_name] = {}
-            
+
             for file_type in ["prod", "ref"]:
                 # Filter files by type (prod or ref), matching the
                 # "ref[_<suffix>].zarr"/"prod[_<suffix>].zarr" filename
@@ -489,15 +461,19 @@ class OutputProcessor:
                 # Sort files by the specified dimension
                 sorted_files = sort_ncs_by_suffix(type_files, sort_dim=sort_dim)
                 sorted_prods[prod_name][file_type] = sorted_files
-        
+
         return sorted_prods
-    
-    def _generate_statistics_and_comparisons(self, sorted_prods: Dict[str, Dict], 
-                                           mparams: Dict[str, Any],
-                                           output_params: Dict[str, Any], output) -> Dict[str, Dict]:
+
+    def _generate_statistics_and_comparisons(
+        self,
+        sorted_prods: Dict[str, Dict],
+        mparams: Dict[str, Any],
+        output_params: Dict[str, Any],
+        output,
+    ) -> Dict[str, Dict]:
         """
         Generate statistics and comparisons for all products.
-        
+
         Parameters
         ----------
         sorted_prods
@@ -506,16 +482,16 @@ class OutputProcessor:
             Metazone parameters
         output_params
             Output configuration parameters
-            
+
         Returns
         -------
         Dictionary containing processed datasets organized by product and data type
         """
         logger.info("Computing statistics & concatenations")
-        
+
         dss = {}
         concat_dim = output_params.get("concat")
-        
+
         for prod_name in sorted_prods.keys():
             logger.info(f"Processing {prod_name}")
             dss[prod_name] = {dt: {} for dt in DATA_TYPES}
@@ -523,7 +499,6 @@ class OutputProcessor:
             # Process each sorting group
             sort_keys = sorted_prods[prod_name]["prod"].keys()
             for sort_key in sort_keys:
-
                 # Generate statistics for this sorting group
                 stats_data = self._compute_statistics_for_sort_group(
                     sorted_prods[prod_name], sort_key, mparams, output_params, output
@@ -534,15 +509,20 @@ class OutputProcessor:
                         stats_data[data_type], concat_dim, output
                     )
                     dss[prod_name][data_type][sort_key] = concatenated_data
-        
+
         return dss
-    
-    def _compute_statistics_for_sort_group(self, prod_files: Dict[str, Dict], 
-                                         sort_key: str, mparams: Dict[str, Any],
-                                         output_params: Dict[str, Any], output) -> Dict[str, List]:
+
+    def _compute_statistics_for_sort_group(
+        self,
+        prod_files: Dict[str, Dict],
+        sort_key: str,
+        mparams: Dict[str, Any],
+        output_params: Dict[str, Any],
+        output,
+    ) -> Dict[str, List]:
         """
         Compute statistics for a specific sorting group.
-        
+
         Parameters
         ----------
         prod_files
@@ -573,14 +553,8 @@ class OutputProcessor:
         prod_datasets = []
         ref_datasets = []
         try:
-            prod_datasets = [
-                xr.open_dataset(f)
-                for f in prod_files_list
-            ]
-            ref_datasets = [
-                xr.open_dataset(f)
-                for f in ref_files_list
-            ]
+            prod_datasets = [xr.open_dataset(f) for f in prod_files_list]
+            ref_datasets = [xr.open_dataset(f) for f in ref_files_list]
 
             # Process each file pair
             for file_idx in range(num_files):
@@ -602,20 +576,23 @@ class OutputProcessor:
                 # same coloc file. Split those apart here, scoped to just
                 # these two otypes, instead of hardening the shared coloc
                 # stage for everyone.
-                if (output in ("uvprofiles", "udiagts")
-                        and ds_ref.sizes.get("time", 1) > 1):
+                if output in ("uvprofiles", "udiagts") and ds_ref.sizes.get("time", 1) > 1:
                     pairs = [
                         (ds_prod.isel(time=[it]), ds_ref.isel(time=[it]))
                         for it in range(ds_ref.sizes["time"])
-                        ]
+                    ]
                 else:
                     pairs = [(ds_prod, ds_ref)]
 
                 for ds_prod_i, ds_ref_i in pairs:
                     self._process_coloc_pair(
-                        ds_prod_i, ds_ref_i, mparams, output_params, output,
+                        ds_prod_i,
+                        ds_ref_i,
+                        mparams,
+                        output_params,
+                        output,
                         computed_data,
-                        )
+                    )
         finally:
             # Close all files at end
             for ds in prod_datasets + ref_datasets:
@@ -623,8 +600,7 @@ class OutputProcessor:
 
         return computed_data
 
-    def _process_coloc_pair(self, ds_prod, ds_ref, mparams, output_params,
-                          output, computed_data):
+    def _process_coloc_pair(self, ds_prod, ds_ref, mparams, output_params, output, computed_data):
         """Compute stats (and, for uvprofiles/udiagts, the closest-member
         profile) for a single ref/prod pair, appending results in place to
         `computed_data`.
@@ -641,9 +617,11 @@ class OutputProcessor:
         # udiagts read a single representative profile instead of the
         # ensemble mean/std.
         closest_ds = None
-        if (output in ("uvprofiles", "udiagts")
-                and "member" in ds_prod.dims
-                and "depth" in ds_prod.variables):
+        if (
+            output in ("uvprofiles", "udiagts")
+            and "member" in ds_prod.dims
+            and "depth" in ds_prod.variables
+        ):
             # Colocation runs once per metazone and is shared by every
             # otype, so a sort_key bucket here can also hold the mld-only
             # file (no "z"/"depth", split apart upstream by dims signature)
@@ -657,9 +635,7 @@ class OutputProcessor:
         # Prepare statistics configuration
         stats = output_params.get("stat").copy() if output_params.get("stat") else None
         # Compute statistics and comparisons
-        dt_prod, dt_ref, dt_comps = StatsComp(
-            mparams, ds_prod, ds_ref, stats
-        ).compute()
+        dt_prod, dt_ref, dt_comps = StatsComp(mparams, ds_prod, ds_ref, stats).compute()
         dt_comps = self.comparison.compute_comparison(dt_comps, ds_ref, ds_prod, output)
         if closest_ds is not None:
             dt_prod.update(xr.DataTree.from_dict({"closest": closest_ds}))
@@ -668,9 +644,10 @@ class OutputProcessor:
         computed_data["prod"].append(dt_prod)
         computed_data["ref"].append(dt_ref)
         computed_data["comp"].append(dt_comps)
-    
-    def _concatenate_datasets(self, data_trees: List[Any],
-                            concat_dim: List[str], output: str = None) -> Dict[str, xr.Dataset]:
+
+    def _concatenate_datasets(
+        self, data_trees: List[Any], concat_dim: List[str], output: str = None
+    ) -> Dict[str, xr.Dataset]:
         """
         Concatenate datasets from data trees along specified dimensions.
 
@@ -715,25 +692,22 @@ class OutputProcessor:
                 # list out into numbered children of `ds_name`.
                 concatenated_dataset = datasets
             else:
-                logger.info(
-                        "Concatenation request: %s datasets: %s",
-                        len(datasets),
-                        datasets)
+                logger.info("Concatenation request: %s datasets: %s", len(datasets), datasets)
                 raise ArmoorError("Multi-dataset concatenation not implemented")
 
             concatenated_data[ds_name] = concatenated_dataset
-        
+
         return concatenated_data
-    
+
     def _concatenate_time_datasets(self, datasets: List[xr.Dataset]) -> xr.Dataset:
         """
         Concatenate datasets along the time dimension.
-        
+
         Parameters
         ----------
         datasets
             List of datasets to concatenate
-            
+
         Returns
         -------
         Concatenated dataset
@@ -742,10 +716,9 @@ class OutputProcessor:
         if any(ds.sizes["time"] > 1 for ds in datasets):
             time_slices = []
             for ds in datasets:
-                time_slices.extend([
-                    ds.isel(time=[time_idx])
-                    for time_idx in range(ds.sizes["time"])
-                ])
+                time_slices.extend(
+                    [ds.isel(time=[time_idx]) for time_idx in range(ds.sizes["time"])]
+                )
             datasets = time_slices
 
         # Concatenate along time dimension
@@ -765,11 +738,16 @@ class OutputProcessor:
             concatenated.attrs["vrange"] = deduped
 
         return concatenated
-    
-    def _save_outputs(self, processed_datasets: Dict[str, Dict],
-                     sorted_prods: Dict[str, Dict],
-                     staged: StagedDataset, ref_name: str, output: str,
-                     output_params: Dict[str, Any]) -> List[str]:
+
+    def _save_outputs(
+        self,
+        processed_datasets: Dict[str, Dict],
+        sorted_prods: Dict[str, Dict],
+        staged: StagedDataset,
+        ref_name: str,
+        output: str,
+        output_params: Dict[str, Any],
+    ) -> List[str]:
         """
         Save processed datasets to output files.
 
@@ -796,15 +774,15 @@ class OutputProcessor:
 
         # Create base output directory
         dirout = staged.output_dir("output", ref_name=ref_name, output=output)
-        
+
         # Get all sorting keys
         sort_keys = list(sorted_prods[list(sorted_prods.keys())[0]]["prod"].keys())
-        
+
         # Save outputs for each sorting group
         for sort_key in sort_keys:
             sort_dir = dirout / sort_key
             sort_dir.mkdir(parents=True, exist_ok=True)
-            
+
             if output_params.get("output"):
                 # Save all products in a single file
                 output_file = self._save_combined_output(
@@ -817,15 +795,19 @@ class OutputProcessor:
                     processed_datasets, sort_key, sort_dir, sorted_prods
                 )
                 output_files.extend([str(f) for f in separate_files])
-        
+
         return output_files
-    
-    def _save_combined_output(self, processed_datasets: Dict[str, Dict], 
-                            sort_key: str, sort_dir: Path,
-                            sorted_prods: Dict[str, Dict]) -> Path:
+
+    def _save_combined_output(
+        self,
+        processed_datasets: Dict[str, Dict],
+        sort_key: str,
+        sort_dir: Path,
+        sorted_prods: Dict[str, Dict],
+    ) -> Path:
         """
         Save all products in a combined output file.
-        
+
         Parameters
         ----------
         processed_datasets
@@ -836,17 +818,17 @@ class OutputProcessor:
             Output directory for this sort group
         sorted_prods
             Sorted product information
-            
+
         Returns
         -------
         Path to saved combined file
         """
         dt = xr.DataTree()
-        
+
         for prod_name in sorted_prods.keys():
             # Create product node in data tree
             dt.update(xr.DataTree.from_dict({prod_name: xr.DataTree()}))
-            
+
             # Add data for each type (prod, ref, comp)
             for data_type in DATA_TYPES:
                 datasets = processed_datasets[prod_name][data_type][sort_key]
@@ -870,13 +852,17 @@ class OutputProcessor:
         dt.to_zarr(output_file, mode="w", encoding=encoding)
         logger.info(f"{output_file} saved")
         return output_file
-    
-    def _save_separate_outputs(self, processed_datasets: Dict[str, Dict], 
-                             sort_key: str, sort_dir: Path,
-                             sorted_prods: Dict[str, Dict]) -> List[Path]:
+
+    def _save_separate_outputs(
+        self,
+        processed_datasets: Dict[str, Dict],
+        sort_key: str,
+        sort_dir: Path,
+        sorted_prods: Dict[str, Dict],
+    ) -> List[Path]:
         """
         Save each product in a separate output file.
-        
+
         Parameters
         ----------
         processed_datasets
@@ -887,19 +873,19 @@ class OutputProcessor:
             Output directory for this sort group
         sorted_prods
             Sorted product information
-            
+
         Returns
         -------
         List of paths to saved files
         """
         output_files = []
-        
+
         for prod_name in sorted_prods.keys():
             dt = xr.DataTree()
-            
+
             # Create product node in data tree
             dt.update(xr.DataTree.from_dict({prod_name: xr.DataTree()}))
-            
+
             # Add data for each type (prod, ref, comp)
             for data_type in DATA_TYPES:
                 datasets = processed_datasets[prod_name][data_type][sort_key]
@@ -913,7 +899,7 @@ class OutputProcessor:
             dt.to_zarr(output_file, mode="w", encoding=encoding)
             output_files.append(output_file)
             logger.info(f"{output_file} saved")
-        
+
         return output_files
 
 
@@ -921,7 +907,7 @@ class OutputPipelineManager:
     """
     Manager class for handling the complete output processing pipeline with parallelization.
     """
-    
+
     def __init__(self, func_comp=None):
         """Initialize the OutputPipelineManager.
 
@@ -934,25 +920,27 @@ class OutputPipelineManager:
         self.processor = OutputProcessor(func_comp=func_comp)
         self.func_comp = func_comp
         self.comparison = get_comparison(func_comp)
-    
-    def process_and_extract(self, output_config: List[Dict[str, Any]]) -> Dict[str, Dict[str, List[str]]]:
+
+    def process_and_extract(
+        self, output_config: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, List[str]]]:
         """
         Process output configuration and extract non-empty results.
-        
+
         This method is designed to be used with Dask for parallel processing.
-        
+
         Parameters
         ----------
         output_config
             Output configuration
-            
+
         Returns
         -------
         Dictionary with only non-empty results
         """
         # Process the output
         results = self.processor.process_output(output_config)
-        
+
         # Filter out empty results
         filtered_results = {}
         for output_name, metazones in results.items():
@@ -961,14 +949,15 @@ class OutputPipelineManager:
                     if output_name not in filtered_results:
                         filtered_results[output_name] = {}
                     filtered_results[output_name][metazone_name] = file_paths
-        
+
         return filtered_results
-    
-    def process_all_outputs(self, ncs: Dict[str, Any], metazones_in: Dict[str, Any],
-                          outputs: Dict[str, Any], **kwargs) -> Dict[str, Dict[str, List[str]]]:
+
+    def process_all_outputs(
+        self, ncs: Dict[str, Any], metazones_in: Dict[str, Any], outputs: Dict[str, Any], **kwargs
+    ) -> Dict[str, Dict[str, List[str]]]:
         """
         Process all output configurations with parallel execution.
-        
+
         Parameters
         ----------
         ncs
@@ -977,11 +966,11 @@ class OutputPipelineManager:
             Input metazone configurations
         outputs
             Output configurations
-            
+
         Returns
         -------
         Dictionary mapping output types to metazones to file paths
-            
+
         Examples
         --------
         >>> manager = OutputPipelineManager()
@@ -991,30 +980,25 @@ class OutputPipelineManager:
         >>> result = manager.process_all_outputs(ncs, metazones, outputs, 'validation')
         """
         # Prepare configurations
-        output_configs = self._prepare_output_configurations(
-            ncs, metazones_in, outputs, **kwargs
-        )
+        output_configs = self._prepare_output_configurations(ncs, metazones_in, outputs, **kwargs)
         # Create delayed tasks for parallel processing
         delayed_tasks = [
-            dask.delayed(self.process_and_extract)(config)
-            for config in output_configs
+            dask.delayed(self.process_and_extract)(config) for config in output_configs
         ]
-        
+
         # Execute all tasks in parallel
         results = dask.compute(*delayed_tasks)
-        
+
         # Merge all results
         results = self._merge_results(results)
         return results
-    
-    def _prepare_output_configurations(self, ncs: Dict[str, Any], 
-                                     metazones_in: Dict[str, Any],
-                                     outputs: Dict[str, Any],
-                                     **kwargs
-                                     ) -> List[List[Dict[str, Any]]]:
+
+    def _prepare_output_configurations(
+        self, ncs: Dict[str, Any], metazones_in: Dict[str, Any], outputs: Dict[str, Any], **kwargs
+    ) -> List[List[Dict[str, Any]]]:
         """
         Prepare output configurations for processing.
-        
+
         Parameters
         ----------
         ncs
@@ -1023,7 +1007,7 @@ class OutputPipelineManager:
             Input metazone configurations
         outputs
             Output configurations
-            
+
         Returns
         -------
         List of output configurations ready for processing
@@ -1043,28 +1027,28 @@ class OutputPipelineManager:
                     # drifter/mooring/argo profile actually fell inside it
                     # for the requested period) -- skip it instead of
                     # crashing deep inside preproc() on a None ncins.
-                    logger.warning(
-                        f"No colocated input for metazone '{metazone_name}', skipping"
-                        )
+                    logger.warning(f"No colocated input for metazone '{metazone_name}', skipping")
                     continue
                 if preproc:
                     self.comparison.preproc(ncins, **kwargs)
                 prepared_metazones[metazone_name] = {
                     "ncins": ncins,
                     "vars": self.comparison.comp_vars,
-                    **metazone_config.copy()
+                    **metazone_config.copy(),
                 }
-        
+
         # Convert to list format expected by the processor
         metazone_list = [{key: value} for key, value in prepared_metazones.items()]
         output_list = [{key: value} for key, value in output_configs.items()]
-        
+
         # Create all combinations of metazones and outputs
         output_combinations = list(itertools.product(metazone_list, output_list))
-        
+
         return output_combinations
-    
-    def _merge_results(self, results: List[Dict[str, Dict[str, List[str]]]]) -> Dict[str, Dict[str, List[str]]]:
+
+    def _merge_results(
+        self, results: List[Dict[str, Dict[str, List[str]]]]
+    ) -> Dict[str, Dict[str, List[str]]]:
         """
         Merge results from parallel processing.
 
@@ -1088,18 +1072,23 @@ class OutputPipelineManager:
                         merged_results[output_name][mz_name].extend(file_paths)
                     else:
                         merged_results[output_name][mz_name] = file_paths
-        
+
         return merged_results
 
 
-def main_output(ncs: Dict[str, Any], metazones_in: Dict[str, Any],
-               outputs: Dict[str, Any], func_comp: str, **kwargs) -> Dict[str, Dict[str, List[str]]]:
+def main_output(
+    ncs: Dict[str, Any],
+    metazones_in: Dict[str, Any],
+    outputs: Dict[str, Any],
+    func_comp: str,
+    **kwargs,
+) -> Dict[str, Dict[str, List[str]]]:
     """
     Main function for processing all output configurations with parallel execution.
-    
+
     This function maintains backward compatibility while providing improved structure
     and parallel processing capabilities.
-    
+
     Parameters
     ----------
     ncs
@@ -1110,13 +1099,13 @@ def main_output(ncs: Dict[str, Any], metazones_in: Dict[str, Any],
         Dictionary of output configurations (fmt key will be removed)
     func_comp
         Function component identifier for directory structure
-        
+
     Returns
     -------
     Dictionary mapping output names to metazones to lists of output file paths.
     Structure
         {output_name: {metazone_name: [file_path1, file_path2, ...]}}
-        
+
     Examples
     --------
     >>> ncs = {'atlantic': {'ref1': {'prod1': ['file1.nc', 'file2.nc']}}}

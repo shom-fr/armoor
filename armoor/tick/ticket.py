@@ -22,7 +22,7 @@ class Ticket:
 
     def __init__(self, data: Optional[dict] = None) -> None:
         self.ticket = data
-        self.gitlab_token = ""
+        self.gitlab_token = ""  # nosec B105
         self.gitlab_url = ""
         self.gitlab_project_id = -1
         self.gitlab_proxies = None
@@ -73,9 +73,7 @@ class Ticket:
             session = requests.Session()
             session.proxies.update(self.gitlab_proxies)
 
-        gitlab_project = gitlab.Gitlab(
-            self.gitlab_url, self.gitlab_token, session=session
-        )
+        gitlab_project = gitlab.Gitlab(self.gitlab_url, self.gitlab_token, session=session)
         gitlab_project.auth()
 
         return gitlab_project.projects.get(self.gitlab_project_id)
@@ -113,11 +111,11 @@ class Ticket:
         title_column_2 = "Description"
         alignment = ":---"
         gitlab_ticket = (
-            f"| {title_column_1 : <20} | {title_column_2 : <100} |\n"
-            f"| {alignment : <20} | {alignment : <100} |"
+            f"| {title_column_1: <20} | {title_column_2: <100} |\n"
+            f"| {alignment: <20} | {alignment: <100} |"
         )
         for field in data:
-            gitlab_ticket += f"\n| {field : <20} | {data[field] : <100} |"
+            gitlab_ticket += f"\n| {field: <20} | {data[field]: <100} |"
 
         return gitlab_ticket
 
@@ -145,22 +143,18 @@ class Ticket:
         issue id of the ticket created
         """
         # title with labels and T0
-        model = ticket_data.get("model" "")
+        model = ticket_data.get("model")
         config = ticket_data.get("config", "")
         production_time = ticket_data.get("production_time", "")
         issue_title = ticket_data.get("title", "")
         if issue_title == "":
-            logger.warning(
-                'The "title" parameter is required and must be provided.'
-            )
+            logger.warning('The "title" parameter is required and must be provided.')
         if production_time == "":
             logger.warning(
                 'The "production_time" parameter is essential and needs to be specified.'
             )
         if config == "":
-            logger.warning(
-                'It is mandatory to include the "config" parameter in your input.'
-            )
+            logger.warning('It is mandatory to include the "config" parameter in your input.')
         if "" in [issue_title, production_time, config]:
             sys.exit()
 
@@ -359,6 +353,4 @@ class Ticket:
             if choice in valid:
                 return valid[choice]
 
-            sys.stdout.write(
-                "Please respond with 'yes' or 'no' (or 'y' or 'n').\n"
-            )
+            sys.stdout.write("Please respond with 'yes' or 'no' (or 'y' or 'n').\n")

@@ -3,6 +3,7 @@
 Create, search, read and authenticate against GitLab issues ("tickets")
 used to report and track anomalies found in armoor comparison outputs.
 """
+
 import logging
 import os
 import pathlib
@@ -37,28 +38,22 @@ def main_tick_create() -> None:
     parser = ArgumentParser(
         description="Create a GitLab ticket.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     cfg_ticket_lines, args = cfgm_fields.arg_parse(parser=parser, getargs=True)
     main_setup_logging(args)
 
-    extra_keys = set(cfg_ticket_lines.keys()).difference(
-        cfgm_fields.defaults.dict().keys()
-    )
+    extra_keys = set(cfg_ticket_lines.keys()).difference(cfgm_fields.defaults.dict().keys())
     if extra_keys:
         print("Ticket aborted")
-        print(
-            f"armoor-tick-create: error: unrecognized arguments in cfgfile: {extra_keys}"
-        )
+        print(f"armoor-tick-create: error: unrecognized arguments in cfgfile: {extra_keys}")
         return
 
     ticket = Ticket()
     formatted_ticket = ticket.format_ticket_from_cli(cfg_ticket_lines)
 
     show_create(formatted_ticket)
-    if ticket.query_yes_no(
-        "Do you want to create a ticket with the information above ?"
-    ):
+    if ticket.query_yes_no("Do you want to create a ticket with the information above ?"):
         issue_id = ticket.create_ticket(formatted_ticket)
         print(f"Ticket created : {issue_id}")
     else:
@@ -72,11 +67,9 @@ def main_tick_search() -> None:
     parser = ArgumentParser(
         description="Search for GitLab tickets.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
-    cfg_ticket_lines, args = cfgm_fields.arg_parse(
-        parser=parser, getargs=True, cfgfileopt=False
-        )
+    cfg_ticket_lines, args = cfgm_fields.arg_parse(parser=parser, getargs=True, cfgfileopt=False)
     main_setup_logging(args)
 
     ticket = Ticket()
@@ -94,13 +87,11 @@ def get_parser_tick_description() -> ArgumentParser:
     parser = ArgumentParser(
         description="Retrieve a GitLab ticket description.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     parser.add_argument(
-        'issue_id',
-        type=int,
-        help="Id of the ticket to retrieve the description of."
-        )
+        'issue_id', type=int, help="Id of the ticket to retrieve the description of."
+    )
     return parser
 
 
@@ -127,7 +118,7 @@ def get_parser_tick_authentication_info() -> ArgumentParser:
     parser = ArgumentParser(
         description="Display the GitLab authentication information.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     return parser
 
@@ -149,19 +140,17 @@ def main_tick_authentication() -> None:
     parser = ArgumentParser(
         description="Update the GitLab authentication information.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     cfg_auth_lines, args = cfgm_fields.arg_parse(
         parser=parser,
         getargs=True,
         cfgfile=os.path.join(current_dir, "auth.cfg"),
-        )
+    )
     main_setup_logging(args)
 
     formatted_cfg_auth = update_auth_cfg(cfg_auth_lines)
-    with open(
-        os.path.join(current_dir, "auth.cfg"), "w", encoding="utf-8"
-    ) as auth_file:
+    with open(os.path.join(current_dir, "auth.cfg"), "w", encoding="utf-8") as auth_file:
         auth_file.write("\n".join(formatted_cfg_auth))
 
     print("Update done")

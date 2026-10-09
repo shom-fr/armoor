@@ -113,21 +113,11 @@ filterwarnings = [
     "ignore:Converting non-nanosecond precision datetime values:UserWarning",
 ]
 
-[tool.flake8]
-max-line-length = 100
-ignore = [
-    "E203",  # whitespace before ':'
-    "E402",  # module level import not at top of file
-    "E501",  # line too long - let black worry about that
-    "E731",  # do not assign a lambda expression, use a def
-    "W503"   # line break before binary operator
-]
-exclude = [
-    ".eggs",
-    "doc"
-]
-
-[tool.black]
+[tool.ruff]
 line-length = 100
-target-version = ['py311']
-skip-string-normalization = true
+target-version = "py311"
+
+[tool.ruff.format]
+# Keep existing single/double quotes as-is (was black's
+# skip-string-normalization).
+quote-style = "preserve"

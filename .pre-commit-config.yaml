@@ -4,8 +4,10 @@ repos:
     hooks:
       - id: trailing-whitespace
         files: ^armoor/
+        exclude: ^armoor/(_samples/|viewer/static/js/vendor/)
       - id: end-of-file-fixer
         files: ^armoor/
+        exclude: ^armoor/(_samples/|viewer/static/js/vendor/)
       - id: check-yaml
         files: ^armoor/
       - id: check-toml

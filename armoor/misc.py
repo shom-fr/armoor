@@ -1,10 +1,11 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Optional
 from datetime import datetime
 from argparse import ArgumentTypeError
 from armoor.__init__ import ArmoorError
 
 logger = logging.getLogger(__name__)
+
 
 def is_dict_empty(dictionary: Optional[Dict[Any, Any]]) -> bool:
     """
@@ -27,11 +28,12 @@ def is_dict_empty(dictionary: Optional[Dict[Any, Any]]) -> bool:
     """
     if dictionary is None:
         return True
-    
+
     if not isinstance(dictionary, dict):
         raise TypeError("Input must be a dictionary or None")
-    
+
     return not dictionary
+
 
 def parse_qc_tuple(value):
     """Parse a ``"varname,flag,replacement"`` CLI argument into a tuple.
@@ -48,6 +50,7 @@ def parse_qc_tuple(value):
     """
     parts = value.split(',')
     return (parts[0].strip(), int(parts[1].strip()), int(parts[2].strip()))
+
 
 def validate_metazone_params(metazones, params, label="colocation"):
     """Validate that only one of each pair of parameters is defined for each metazone.
@@ -123,19 +126,20 @@ def validate_metazone_params(metazones, params, label="colocation"):
             result[mz_name] = None
     return result
 
+
 def parse_coords(s):
     """
     Parse a string into latitude and longitude coordinates.
-    
+
     Parameters
     ----------
     s: str
         A string representing the coordinates in the format "lat,lon".
-    
+
     Returns
     -------
     tuple: A tuple containing the latitude and longitude as floats.
-    
+
     Raises
     ------
     ArmoorError: If the string is not in the correct format.
@@ -144,12 +148,14 @@ def parse_coords(s):
         if not isinstance(s, str):
             s = ",".join(s)
         return string_to_tuples_float(s)
-    except:
+    except Exception:
         raise ArmoorError("Coordinates must be a list of tuples (lat,lon)")
+
 
 def comma_separated(sarg):
     """Parse a string of comma-separated list."""
     return [a.strip() for a in sarg.split(",")]
+
 
 def str2bool(sarg):
     """Parse an argparse `--flag True/False`-style boolean argument.
@@ -168,9 +174,11 @@ def str2bool(sarg):
     # ArmoorError) for its own "invalid X value" CLI error message to fire.
     raise ValueError(f"Expected True/False, got {sarg!r}")
 
+
 def blanck_separated(sarg):
     """Parse a string of blanck-separated list."""
     return [a.strip() for a in sarg.split(" ")]
+
 
 def various_separated(sarg):
     """Parse a string/list of various-separated list."""
@@ -179,6 +187,7 @@ def various_separated(sarg):
         return comma_separated(sarg)
     else:
         return blanck_separated(sarg)
+
 
 def parse_date(date_string):
     """Parse a date string in one of several accepted formats.
@@ -206,7 +215,8 @@ def parse_date(date_string):
     raise ArgumentTypeError(
         f"Invalid date format: {date_string}. Use YYYY-MM-DD, MM/DD/YYYY, or DD-MM-YYYY"
     )
-    
+
+
 def parse_hours(hours_string):
     """Parse a time-of-day string in one of several accepted formats.
 
@@ -230,9 +240,8 @@ def parse_hours(hours_string):
             return datetime.strptime(hours_string, fmt).time()
         except ValueError:
             continue
-    raise ArgumentTypeError(
-        f"Invalid date format: {hours_string}. Use hh:mm:ss or hhmmss"
-    )
+    raise ArgumentTypeError(f"Invalid date format: {hours_string}. Use hh:mm:ss or hhmmss")
+
 
 def geo_vars(ds):
     """List data variables that have both an "x" and a "y" dimension.
@@ -245,11 +254,7 @@ def geo_vars(ds):
     -------
     list of str
     """
-    geo_vars = [
-        var
-        for var in ds.data_vars
-        if ("x" in ds[var].dims) and ("y" in ds[var].dims)
-    ]
+    geo_vars = [var for var in ds.data_vars if ("x" in ds[var].dims) and ("y" in ds[var].dims)]
 
     return geo_vars
 
@@ -266,12 +271,11 @@ def nongeo_vars(ds):
     list of str
     """
     nongeo_vars = [
-        var
-        for var in ds.data_vars
-        if ("x" not in ds[var].dims) and ("y" not in ds[var].dims)
+        var for var in ds.data_vars if ("x" not in ds[var].dims) and ("y" not in ds[var].dims)
     ]
 
     return nongeo_vars
+
 
 def string_to_tuples_float(s):
     """
@@ -298,6 +302,7 @@ def string_to_tuples_float(s):
 
     return tuples
 
+
 def get_last_keys_generator(d):
     """Generator version that yields last keys one by one."""
     for key, value in d.items():
@@ -305,6 +310,7 @@ def get_last_keys_generator(d):
             yield from get_last_keys_generator(value)
         else:
             yield value
+
 
 def dict_to_list(d):
     """
@@ -338,17 +344,16 @@ def dict_to_list(d):
     This function depends on get_last_keys_generator(d) which should yield
     iterable objects that will be flattened into the final list.
     """
-    return [
-        item for sublist in get_last_keys_generator(d) for item in sublist
-        ]  
+    return [item for sublist in get_last_keys_generator(d) for item in sublist]
+
 
 def optimize_for_low_swap(dataset, target_chunk_mb=256):
     """
     Optimize dataset chunks to reduce swap usage.
-    
-    This function calculates optimal chunk sizes for xarray datasets to minimize 
+
+    This function calculates optimal chunk sizes for xarray datasets to minimize
     memory usage and prevent excessive swap utilization during processing.
-    
+
     Parameters
     ----------
     dataset : xarray.Dataset or xarray.DataArray
@@ -356,42 +361,42 @@ def optimize_for_low_swap(dataset, target_chunk_mb=256):
     target_chunk_mb : int, optional
         Target chunk size in megabytes (default: 16)
         Smaller values reduce memory usage but may increase overhead
-    
+
     Returns
     -------
     xarray.Dataset or xarray.DataArray
         Dataset with optimized chunk sizes
-    
+
     Notes
     -----
     - Assumes float64 data type (8 bytes per element)
     - Distributes chunk size evenly across all dimensions
     - Chunk size per dimension = (total_elements_per_chunk)^(1/n_dimensions)
     - Ensures chunk size doesn't exceed dimension size
-    
+
     Examples
     --------
     >>> import xarray as xr
     >>> ds = xr.open_zarr('large_dataset.zarr')
     >>> ds_optimized = optimize_for_low_swap(ds, target_chunk_mb=8)
     >>> print(ds_optimized.chunks)
-    
+
     >>> # For very memory-constrained environments
     >>> ds_minimal = optimize_for_low_swap(ds, target_chunk_mb=4)
     """
     # Calculate optimal chunk size
     element_size = 8  # float64 bytes per element
     elements_per_chunk = (target_chunk_mb * 1024**2) // element_size
-    
+
     # Distribute across dimensions
     n_dims = len(dataset.dims)
-    elements_per_dim = int(elements_per_chunk ** (1/n_dims))
-    
+    elements_per_dim = int(elements_per_chunk ** (1 / n_dims))
+
     chunks = {}
     for dim in dataset.dims:
         # Ensure chunk size doesn't exceed dimension size
         chunks[dim] = min(dataset.sizes[dim], elements_per_dim)
-    
+
     # z_dim = chunks.get("z")
     # if z_dim:
     #     chunks.update({"z": -1})
@@ -400,9 +405,10 @@ def optimize_for_low_swap(dataset, target_chunk_mb=256):
     #     chunks.update({"lev": -1})
     # z_dim = chunks.get("time")
     # if z_dim:
-    #     chunks.update({"time": -1}) 
+    #     chunks.update({"time": -1})
     logger.info(f"Anti-swap chunks: {chunks}")
-    logger.info(f"Estimated chunk size: {(elements_per_dim**n_dims * element_size) / 1024**2:.1f} MB per chunk")
-    
-    return dataset.chunk(chunks).unify_chunks()
+    logger.info(
+        f"Estimated chunk size: {(elements_per_dim**n_dims * element_size) / 1024**2:.1f} MB per chunk"
+    )
 
+    return dataset.chunk(chunks).unify_chunks()

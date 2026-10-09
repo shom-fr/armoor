@@ -2,23 +2,16 @@
 Open files and decode data.
 """
 
-import concurrent.futures
 import warnings
 import datetime
-import gc
 import glob
 import logging
 import os
 import re
-import sys
-from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import List
 
 import time
-import dask
 import gsw
 import numpy as np
 import pandas as pd
@@ -27,12 +20,9 @@ import xoa
 import xoa.meta as xmeta
 from xoa.meta.general import MetaSpecs
 import xoa.geo as xgeo
-from pyproj import Geod
-from xoa.grid import dz2depth, shift, to_rect
+from xoa.grid import dz2depth, shift
 
 from armoor import ROOTDIR, ArmoorError
-from armoor.interp import regrid
-from armoor.misc import optimize_for_low_swap
 
 logger = logging.getLogger(__name__)
 
@@ -960,7 +950,7 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
                         if tvar is not None and n > 0:
                             return (n, float(tvar[0]), float(tvar[-1]))
                         return (n, None, None)
-        except Exception:
+        except Exception:  # nosec B110
             pass
         return None
 
@@ -1020,16 +1010,16 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
             ds = _group_ds[0]
         else:
             ds = xr.concat(_group_ds, dim="time", data_vars="all")
-    logger.info(f"  [timing] open_mfdataset: {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] open_mfdataset: {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     cfspecs = xmeta.get_meta_specs("hycom")
     ds = cfspecs.decode(ds)
-    logger.info(f"  [timing] xoa.decode:     {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] xoa.decode:     {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     ds = ds.unify_chunks()
-    logger.info(f"  [timing] unify_chunks:   {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] unify_chunks:   {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     if "bathy" in ds:
@@ -1042,7 +1032,7 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
         ds["u"] = ds.map_blocks(shift_u_block, template=ds["u"])
     if "v" in ds:
         ds["v"] = ds.map_blocks(shift_v_block, template=ds["v"])
-    logger.info(f"  [timing] map_blocks u/v: {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] map_blocks u/v: {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     if bathy is not None:
@@ -1050,11 +1040,11 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
     if "dz" in ds:
         depth = dz2depth(ds.dz, centered=True)
         ds = ds.assign_coords(depth=depth).drop_vars(["dz", "z"])
-    logger.info(f"  [timing] dz2depth:       {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] dz2depth:       {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     ds = ds.sel(time=~ds.get_index("time").duplicated()).sortby("time")
-    logger.info(f"  [timing] dedup time:     {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] dedup time:     {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     good_var = None
@@ -1074,7 +1064,7 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
             # they are somehow still small (unknown dim name was ignored).
             chunk_dict[dim] = min(dim_size, max(dim_chunks[0], 1024))
     ds = ds.chunk(chunk_dict)
-    logger.info(f"  [timing] final rechunk:  {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] final rechunk:  {time.perf_counter() - _t:.1f}s")
     return ds
 
 
@@ -1517,7 +1507,7 @@ def open_decode_croco(path_file, fmt="croco"):
                     if required_vars.issubset(_d.variables.keys()):
                         if "time" not in _d.dimensions:
                             return f
-            except Exception:
+            except Exception:  # nosec B110
                 pass
         return None
 
@@ -1531,7 +1521,7 @@ def open_decode_croco(path_file, fmt="croco"):
                 with _nc4.Dataset(f) as _d:
                     if required_vars.issubset(_d.variables.keys()):
                         return f
-            except Exception:
+            except Exception:  # nosec B110
                 pass
         return None
 
@@ -1583,7 +1573,7 @@ def open_decode_croco(path_file, fmt="croco"):
         decode_cf=True,
         mask_and_scale=True,
     )
-    logger.info(f"  [timing] open_mfdataset:   {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] open_mfdataset:   {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     if "auxil" in ds.dims:
@@ -1607,14 +1597,14 @@ def open_decode_croco(path_file, fmt="croco"):
 
     # Deduplicate time via pandas index (avoids np.unique which forces eager compute)
     ds = ds.sel(time=~ds.get_index("time").duplicated())
-    logger.info(f"  [timing] dedup time:       {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] dedup time:       {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     if 'scrum_time' in ds:
         ds = ds.drop_vars('scrum_time')
 
     ds = cfspecs.decode(ds)
-    logger.info(f"  [timing] xoa.decode:       {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] xoa.decode:       {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     with xmeta.set_meta_specs(cfspecs):
@@ -1624,9 +1614,9 @@ def open_decode_croco(path_file, fmt="croco"):
                 if "hc" not in ds.data_vars:
                     ds["hc"] = float(ds.attrs.get("hc"))
                 if sig == "sig_w":
-                    ds[sig].attrs[
-                        "formula_terms"
-                    ] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
+                    ds[sig].attrs["formula_terms"] = (
+                        "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
+                    )
                 elif sig == "sig_rho":
                     if "cs_r" in ds:
                         cs_rho = "cs_r"
@@ -1636,9 +1626,9 @@ def open_decode_croco(path_file, fmt="croco"):
                         raise ArmoorError(
                             "cs_r and cs_rho are missing. Armoor should find one of them."
                         )
-                    ds[sig].attrs[
-                        "formula_terms"
-                    ] = f"s: sig_rho C: {cs_rho} eta: ssh depth: bathy depth_c: hc"
+                    ds[sig].attrs["formula_terms"] = (
+                        f"s: sig_rho C: {cs_rho} eta: ssh depth: bathy depth_c: hc"
+                    )
                 if "standard_name" not in ds[sig].attrs:
                     logger.warning(f"No standard_name attributes in {sig}")
                     if sig == "sig_rho":
@@ -1646,11 +1636,11 @@ def open_decode_croco(path_file, fmt="croco"):
                     elif sig == "sig_w":
                         ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
         ds = ds.decode_sigma()
-    logger.info(f"  [timing] decode_sigma:     {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] decode_sigma:     {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     ds = ds.unify_chunks()
-    logger.info(f"  [timing] unify_chunks:     {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] unify_chunks:     {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     for v in [
@@ -1719,7 +1709,7 @@ def open_decode_croco(path_file, fmt="croco"):
         v.encoding = ds["v"].encoding.copy()
         dav = shift(v, {"y_v": "top"}).isel(y_v=slice(None, -1)).xoa.reloc(v="rho")
         ds["v"] = dav.assign_coords(**ds.ptemp.coords)
-    logger.info(f"  [timing] u/v shift:        {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] u/v shift:        {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     if "z" in ds.dims:
@@ -1771,7 +1761,7 @@ def open_decode_croco(path_file, fmt="croco"):
             else:
                 chunk_dict[dim] = min(dim_size, max(dim_chunks[0], 512))
         ds = ds.chunk(chunk_dict)
-    logger.info(f"  [timing] final rechunk:    {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] final rechunk:    {time.perf_counter() - _t:.1f}s")
 
     return ds
 
@@ -1960,7 +1950,6 @@ def open_decode_eddy_sacso(path_files):
     dates = []
     surfaces = []
     suffix_date = 'Date' + ' ' * 33
-    suffix_type = 'Sens_de_rotation' + ' ' * 21  # suffix+spaces = 37
     suffix_center = 'Centre(lon/lat)' + ' ' * 22
     suffix_surface = 'Surface(km2)' + ' ' * 25
 

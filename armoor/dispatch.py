@@ -7,6 +7,7 @@ every callable, non-dunder method of the class, plus a ``call(name, ...)``
 dispatcher. This module hosts that mechanism once, in two variants matching
 the two usage shapes found in the codebase.
 """
+
 from armoor.__init__ import ArmoorError
 
 
@@ -110,4 +111,5 @@ class SubclassingMethodRegistry(MethodRegistry):
                 method = getattr(type(self), name)
                 if callable(method):
                     self.register_method(method)
+
         cls.__post_init__ = __post_init__

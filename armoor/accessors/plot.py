@@ -65,6 +65,7 @@ class ArmoorPlot(DatasetPlotAccessor):
         matplotlib.collections.QuadMesh or list thereof
         """
         import matplotlib.pyplot as plt
+
         ds = self._obj
         if var is None:
             var = next(iter(ds.data_vars))
@@ -91,6 +92,7 @@ class ArmoorPlot(DatasetPlotAccessor):
         list of Line2D
         """
         import matplotlib.pyplot as plt
+
         ds = self._obj
         if var is None:
             var = next(iter(ds.data_vars))
@@ -115,6 +117,7 @@ class ArmoorPlot(DatasetPlotAccessor):
         list of Line2D
         """
         import matplotlib.pyplot as plt
+
         ds = self._obj
         if var is None:
             var = next(iter(ds.data_vars))
@@ -156,6 +159,7 @@ class ArmoorPlot(DatasetPlotAccessor):
         """
         import matplotlib.pyplot as plt
         from armoor.plot import diagdisp as _diagdisp
+
         ds = self._obj
         if ax is None:
             _, ax = plt.subplots()
@@ -196,6 +200,7 @@ class ArmoorPlot(DatasetPlotAccessor):
         """
         import matplotlib.pyplot as plt
         from armoor.plot import shadow_line as _shadow_line
+
         ds = self._obj
         if ax is None:
             _, ax = plt.subplots()

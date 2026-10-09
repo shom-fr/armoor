@@ -13,6 +13,7 @@ for backward compatibility with existing call sites), not the other way
 round -- so this module must not import from ``armoor.comp`` to avoid a
 circular import.
 """
+
 import logging
 
 import numpy as np
@@ -256,8 +257,16 @@ class CompSst(Comparison):
     name = "comp_sst"
     title = "Sea surface temperature"
     metazone_params = [
-        "tbound", "thours", "trange_seq", "tfreq", "polygon", "href",
-        "cloud", "oceanvars", "qc", "bathy",
+        "tbound",
+        "thours",
+        "trange_seq",
+        "tfreq",
+        "polygon",
+        "href",
+        "cloud",
+        "oceanvars",
+        "qc",
+        "bathy",
     ]
     colocation_params_user = {
         "time": ("trange_seq", "tfreq"),
@@ -302,8 +311,16 @@ class CompArgo(Comparison):
     name = "comp_argo"
     title = "Hydrological profiles"
     metazone_params = [
-        "tbound", "thours", "trange_seq", "vrange", "vlevel", "polygon",
-        "radius", "oceanvars", "qc", "bathy",
+        "tbound",
+        "thours",
+        "trange_seq",
+        "vrange",
+        "vlevel",
+        "polygon",
+        "radius",
+        "oceanvars",
+        "qc",
+        "bathy",
     ]
     colocation_params_user = {
         "time": ("trange_seq",),
@@ -391,8 +408,15 @@ class CompMooring(_ForcedDepthVLevelMixin, Comparison):
     name = "comp_mooring"
     title = "Hydrological mooring"
     metazone_params = [
-        "tfreq", "thours", "tbound", "trange_seq", "polygon", "oceanvars",
-        "radius", "qc", "bathy",
+        "tfreq",
+        "thours",
+        "tbound",
+        "trange_seq",
+        "polygon",
+        "oceanvars",
+        "radius",
+        "qc",
+        "bathy",
     ]
     colocation_params_user = {
         "time": ("trange_seq", "tfreq"),
@@ -418,8 +442,14 @@ class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
     name = "comp_drifter"
     title = "Drifters"
     metazone_params = [
-        "tbound", "polygon", "oceanvars", "freq_drift", "period_drift",
-        "tresample", "tsmooth", "bathy",
+        "tbound",
+        "polygon",
+        "oceanvars",
+        "freq_drift",
+        "period_drift",
+        "tresample",
+        "tsmooth",
+        "bathy",
     ]
     colocation_params_user = {}
     colocation_params_default = {
@@ -506,6 +536,7 @@ class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
             The result of `preproc_comp_drifter`.
         """
         from armoor.comp.output import preproc_comp_drifter
+
         return preproc_comp_drifter(
             ncs, kwargs.get("freq_drift"), runtime=kwargs.get("period_drift")
         )
@@ -592,24 +623,32 @@ class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
             if isinstance(angle, np.float64):
                 angle = [angle]
             angle = np.concatenate([[0], angle])
-            data_list.append(pd.DataFrame({
-                "time": (dsparti.time - dsparti.time.min()).values / pd.to_timedelta("1d"),
-                "dist": dist.values if hasattr(dist, "values") else dist,
-                "angle": angle.values if hasattr(angle, "values") else angle,
-            }))
+            data_list.append(
+                pd.DataFrame(
+                    {
+                        "time": (dsparti.time - dsparti.time.min()).values / pd.to_timedelta("1d"),
+                        "dist": dist.values if hasattr(dist, "values") else dist,
+                        "angle": angle.values if hasattr(angle, "values") else angle,
+                    }
+                )
+            )
 
         df_all = pd.concat(data_list, ignore_index=True)
         grouped = df_all.groupby("time").agg({"dist": "mean", "angle": "mean"})
         dtcomps = xr.DataTree(name="comps")
-        dtcomps.update(xr.DataTree.from_dict({
-            "diff": xr.Dataset(
-                data_vars=dict(
-                    distance=(["time"], grouped["dist"].values),
-                    direction=(["time"], grouped["angle"].values),
-                ),
-                coords=dict(time=grouped.index.values),
+        dtcomps.update(
+            xr.DataTree.from_dict(
+                {
+                    "diff": xr.Dataset(
+                        data_vars=dict(
+                            distance=(["time"], grouped["dist"].values),
+                            direction=(["time"], grouped["angle"].values),
+                        ),
+                        coords=dict(time=grouped.index.values),
+                    )
+                }
             )
-        }))
+        )
         return dtcomps
 
 
@@ -619,8 +658,17 @@ class CompModels(Comparison):
     name = "comp_models"
     title = ""
     metazone_params = [
-        "tfreq", "tbound", "thours", "trange_seq", "polygon", "href",
-        "cloud", "vrange", "vlevel", "oceanvars", "bathy",
+        "tfreq",
+        "tbound",
+        "thours",
+        "trange_seq",
+        "polygon",
+        "href",
+        "cloud",
+        "vrange",
+        "vlevel",
+        "oceanvars",
+        "bathy",
     ]
     colocation_params_user = {
         "time": ("trange_seq", "tfreq"),

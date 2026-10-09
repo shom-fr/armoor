@@ -86,7 +86,7 @@ class StatsAccessor:
         """
         if dim is None:
             d = _stats.diff(self._obj - self._obj.mean(), ds_ref - ds_ref.mean())
-            return np.sqrt(d ** 2)
+            return np.sqrt(d**2)
         return _stats.crms(self._obj, ds_ref, dim)
 
     # ------------------------------------------------------------------

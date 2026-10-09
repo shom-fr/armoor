@@ -9,6 +9,7 @@ from armoor import ArmoorError
 
 logger = logging.getLogger(__name__)
 
+
 def timegroups_to_list(grouped, label="trange"):
     """Turn a ``groupby``/``groupby_bins`` result into a list of datasets.
 
@@ -39,7 +40,8 @@ def timegroups_to_list(grouped, label="trange"):
             dso.attrs[label] = f"[{name.left:%Y-%m-%dT%H:%M:%S}_{name.right:%Y-%m-%dT%H:%M:%S}["
         dss.append(dso)
     return dss
-   
+
+
 def tfreq(ds):
     """Split a dataset into one subset per native time step.
 
@@ -55,6 +57,7 @@ def tfreq(ds):
     """
     grouped = ds.groupby("time")
     return timegroups_to_list(grouped, label="time")
+
 
 def trange_seq(ds, tstart, tend, tbin):
     """Split a dataset into sequential time bins.
@@ -81,13 +84,9 @@ def trange_seq(ds, tstart, tend, tbin):
     """
     regex = re.compile(r"[0-9][M-Y]")
     if regex.fullmatch(tbin):
-        raise ArmoorError(
-            "Use trange=1MS, 2MS... to specify a  monthly sequential range."
-            )
+        raise ArmoorError("Use trange=1MS, 2MS... to specify a  monthly sequential range.")
     time_bins = pd.date_range(start=tstart, end=tend, freq=tbin)
-    grouped = ds.groupby_bins(
-        "time", time_bins, right=False
-        )
+    grouped = ds.groupby_bins("time", time_bins, right=False)
     return timegroups_to_list(grouped, label="trange")
 
 
@@ -115,7 +114,7 @@ def vrange(dssi, vname, vbins):
         var = dsi[vname]
         for vbin in vbins:
             low, high = vbin[0], vbin[1]
-            mask = ((var >= low) & (var <= high))
+            mask = (var >= low) & (var <= high)
             daos = []
             for v in dsi.data_vars:
                 dai = dsi[v]
@@ -130,6 +129,7 @@ def vrange(dssi, vname, vbins):
             dso.attrs["vrange"] = f"{low}-{high}"
             dss.append(dso)
     return dss
+
 
 def vlevels(dssi, vname):
     """Split each dataset into one subset per vertical (depth) level.
@@ -170,9 +170,7 @@ def vlevels(dssi, vname):
                 # subset (below the seafloor everywhere in it) -- skip
                 # rather than emit an empty group that later otypes
                 # (maps, profiles, diagts) can't render.
-                logger.info(
-                    f"Skipping vlevel {vlevel:.1f} -- no valid data anywhere"
-                    )
+                logger.info(f"Skipping vlevel {vlevel:.1f} -- no valid data anywhere")
                 continue
             # vname itself can be broadcast to leftover non-"z" dims from
             # loading (e.g. armoor.data.open_decode's cmems_model loader
@@ -187,6 +185,7 @@ def vlevels(dssi, vname):
             dso.attrs["vlevel"] = f"{vlevel:.1f}"
             dss.append(dso)
     return dss
+
 
 def get_time_bins(start, end, tbin):
     """Build the sequence of bin-edge timestamps for a time range.
@@ -205,4 +204,4 @@ def get_time_bins(start, end, tbin):
         start=pd.to_datetime(start),
         end=pd.to_datetime(end),
         freq=tbin,
-        )
+    )

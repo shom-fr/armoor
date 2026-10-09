@@ -10,10 +10,10 @@ Importing this module registers the following accessors on xr.Dataset:
   - ds.plot      : extended plot accessor (superset of xarray's built-in)
 """
 
-from armoor.accessors import filters    # noqa: F401
+from armoor.accessors import filters  # noqa: F401
 from armoor.accessors import oceanvars  # noqa: F401
-from armoor.accessors import coloc      # noqa: F401
-from armoor.accessors import stats      # noqa: F401
-from armoor.accessors import interp     # noqa: F401
-from armoor.accessors import range      # noqa: F401
-from armoor.accessors import plot       # noqa: F401
+from armoor.accessors import coloc  # noqa: F401
+from armoor.accessors import stats  # noqa: F401
+from armoor.accessors import interp  # noqa: F401
+from armoor.accessors import range  # noqa: F401
+from armoor.accessors import plot  # noqa: F401

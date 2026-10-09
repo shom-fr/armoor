@@ -21,13 +21,13 @@ import os
 from flask import Blueprint, make_response, request
 from PIL import Image
 
-Image.MAX_IMAGE_PIXELS = None   # 21600×10800 exceeds PIL's default bomb check
+Image.MAX_IMAGE_PIXELS = None  # 21600×10800 exceeds PIL's default bomb check
 
-from armoor.viewer import config as cfg
+from armoor.viewer import config as cfg  # noqa: E402
 
 bp = Blueprint("basemap", __name__)
 
-_IMG_PATH  = cfg.IMG_PATH
+_IMG_PATH = cfg.IMG_PATH
 _CACHE_DIR = cfg.CACHE_DIR
 
 _img_cache: Image.Image | None = None
@@ -64,8 +64,9 @@ def _dark_tile(width: int = 256, height: int = 256) -> bytes:
     return buf.getvalue()
 
 
-def _crop_tile(west: float, south: float, east: float, north: float,
-               width: int = 256, height: int = 256) -> bytes:
+def _crop_tile(
+    west: float, south: float, east: float, north: float, width: int = 256, height: int = 256
+) -> bytes:
     """Crop a geographic region from the Blue Marble image and return JPEG bytes.
 
     Falls back to a solid dark tile if the image file is missing.
@@ -87,10 +88,10 @@ def _crop_tile(west: float, south: float, east: float, north: float,
         return _dark_tile(width, height)
 
     W, H = img.size
-    x0 = max(0, round((west  + 180) / 360 * W))
-    y0 = max(0, round((90   - north) / 180 * H))
-    x1 = min(W, round((east  + 180) / 360 * W))
-    y1 = min(H, round((90   - south) / 180 * H))
+    x0 = max(0, round((west + 180) / 360 * W))
+    y0 = max(0, round((90 - north) / 180 * H))
+    x1 = min(W, round((east + 180) / 360 * W))
+    y1 = min(H, round((90 - south) / 180 * H))
     if x1 <= x0 or y1 <= y0:
         out = Image.new("RGB", (width, height), (10, 10, 24))
     else:
@@ -122,6 +123,7 @@ def _cache_put(z: int, x: int, y: int, data: bytes) -> None:
 # ── EPSG:4326 geographic tile endpoint ───────────────────────────────────────
 # Geographic tile scheme: 2^(z+1) cols × 2^z rows.
 
+
 @bp.route("/basemap/geo/<int:z>/<int:x>/<int:y>.png")
 def tile_geo(z: int, x: int, y: int):
     """Serve an EPSG:4326 basemap tile.
@@ -138,15 +140,15 @@ def tile_geo(z: int, x: int, y: int):
     if not (0 <= z <= 8):
         return "Invalid zoom", 400
     nx = 2 ** (z + 1)
-    ny = 2 ** z
-    x  = x % nx
+    ny = 2**z
+    x = x % nx
     if not (0 <= y < ny):
         return "Invalid y", 400
     data = _cache_get(z, x, y)
     if data is None:
-        west  =  x      / nx * 360 - 180
-        east  = (x + 1) / nx * 360 - 180
-        north = 90 -  y      / ny * 180
+        west = x / nx * 360 - 180
+        east = (x + 1) / nx * 360 - 180
+        north = 90 - y / ny * 180
         south = 90 - (y + 1) / ny * 180
         data = _crop_tile(west, south, east, north)
         _cache_put(z, x, y, data)
@@ -157,6 +159,7 @@ def tile_geo(z: int, x: int, y: int):
 
 
 # ── WMS endpoint (kept for compatibility) ─────────────────────────────────────
+
 
 @bp.route("/basemap/wms")
 def wms():
@@ -176,11 +179,11 @@ def wms():
         WMS version (affects axis order for EPSG:4326).
     """
     bbox_str = request.args.get("BBOX") or request.args.get("bbox", "-90,-180,90,180")
-    width    = int(request.args.get("WIDTH")  or request.args.get("width",  256))
-    height   = int(request.args.get("HEIGHT") or request.args.get("height", 256))
-    crs      = (request.args.get("CRS") or request.args.get("SRS") or "EPSG:4326").upper()
-    version  = request.args.get("VERSION", "1.3.0")
-    vals     = list(map(float, bbox_str.split(",")))
+    width = int(request.args.get("WIDTH") or request.args.get("width", 256))
+    height = int(request.args.get("HEIGHT") or request.args.get("height", 256))
+    crs = (request.args.get("CRS") or request.args.get("SRS") or "EPSG:4326").upper()
+    version = request.args.get("VERSION", "1.3.0")
+    vals = list(map(float, bbox_str.split(",")))
     if "4326" in crs and version.startswith("1.3"):
         south, west, north, east = vals
     else:
@@ -193,6 +196,7 @@ def wms():
 
 
 # ── Old XYZ endpoint (kept for compatibility) ─────────────────────────────────
+
 
 @bp.route("/basemap/<int:z>/<int:x>/<int:y>.png")
 def tile(z: int, x: int, y: int):
@@ -213,9 +217,9 @@ def tile(z: int, x: int, y: int):
     x = x % n
     if not (0 <= y < n):
         return "Invalid y", 400
-    west  =  x      / n * 360 - 180
-    east  = (x + 1) / n * 360 - 180
-    north = 90 -  y      / n * 180
+    west = x / n * 360 - 180
+    east = (x + 1) / n * 360 - 180
+    north = 90 - y / n * 180
     south = 90 - (y + 1) / n * 180
     data = _crop_tile(west, south, east, north)
     resp = make_response(data)

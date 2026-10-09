@@ -1,4 +1,5 @@
 """Interpolation functions."""
+
 # pyproj and xoa.regrid are imported lazily (inside the functions that need
 # them) to avoid the significant NFS stat overhead on HPC cluster filesystems
 # when the whole armoor package is imported at startup.
@@ -23,7 +24,7 @@ def interp_time(
     keep_flag=False,
     diurnal_vars=None,
     persistency=None,
-    ):
+):
     """Interpolate a dataset in time.
 
     Vectorized: all in-range dates are interpolated in a single
@@ -66,13 +67,13 @@ def interp_time(
             persistency_config = {
                 'timedelta': pd.to_timedelta(int(m["term"]), m["units"]),
                 'term': int(m["term"]),
-                'units': m["units"]
-                }
+                'units': m["units"],
+            }
 
     # Classify dates
     dates_before = []
     dates_after = []
-    dates_main = []     # exact matches + in-range → single vectorized interp
+    dates_main = []  # exact matches + in-range → single vectorized interp
 
     for date in dates:
         if date < begindate_nc:
@@ -83,17 +84,13 @@ def interp_time(
             dates_main.append(date)
 
     # --- Build result parts (bulk multi-timestep datasets) ---
-    parts = []          # [(dataset, sort_key)]
+    parts = []  # [(dataset, sort_key)]
 
     # 1. Exact + in-range: single vectorized interpolation
     #    (scipy returns exact values at data points, no precision issue)
     if dates_main:
         sorted_main = sorted(dates_main)
-        interp_ds = ds[varstime].interp(
-            {time_name: sorted_main},
-            method=method,
-            assume_sorted=True
-        )
+        interp_ds = ds[varstime].interp({time_name: sorted_main}, method=method, assume_sorted=True)
         parts.append(interp_ds)
 
     # 2. Before range (persistency / extrapolation)
@@ -101,8 +98,7 @@ def interp_time(
         base_ds = ds_first[varstime]
         if persistency_config:
             date_target = begindate_nc + persistency_config['timedelta']
-            ds_pers = ds.where(ds[time_name] <= date_target).mean(
-                dim=time_name, keepdims=True)
+            ds_pers = ds.where(ds[time_name] <= date_target).mean(dim=time_name, keepdims=True)
 
         before_dss = []
         for date in sorted(dates_before):
@@ -111,8 +107,7 @@ def interp_time(
             if persistency_config:
                 for vname in ds_pers:
                     if vname in this_ds:
-                        this_ds[vname] = this_ds[vname].copy(
-                            data=ds_pers[vname].data)
+                        this_ds[vname] = this_ds[vname].copy(data=ds_pers[vname].data)
             before_dss.append(this_ds)
         parts.append(xr.concat(before_dss, time_name))
 
@@ -121,8 +116,7 @@ def interp_time(
         base_ds = ds_last[varstime]
         if persistency_config:
             date_target = enddate_nc - persistency_config['timedelta']
-            ds_pers = ds.where(ds[time_name] >= date_target).mean(
-                dim=time_name, keepdims=True)
+            ds_pers = ds.where(ds[time_name] >= date_target).mean(dim=time_name, keepdims=True)
 
         after_dss = []
         for date in sorted(dates_after):
@@ -131,8 +125,7 @@ def interp_time(
             if persistency_config:
                 for vname in ds_pers:
                     if vname in this_ds:
-                        this_ds[vname] = this_ds[vname].copy(
-                            data=ds_pers[vname].data)
+                        this_ds[vname] = this_ds[vname].copy(data=ds_pers[vname].data)
             after_dss.append(this_ds)
         parts.append(xr.concat(after_dss, time_name))
 
@@ -163,7 +156,8 @@ def interp_time(
         dso = parts[0]
     else:
         dso = xr.concat(
-            parts, time_name,
+            parts,
+            time_name,
             compat="no_conflicts",
             coords="minimal",
             data_vars="all",
@@ -186,6 +180,7 @@ def interp_time(
 
     return dso
 
+
 def _crop_to_bbox(ds, coords, margin_deg=1.0):
     """Crop a gridded dataset to the (lat, lon) bounding box of `coords`.
 
@@ -207,9 +202,11 @@ def _crop_to_bbox(ds, coords, margin_deg=1.0):
     lats = np.array([c[0] for c in coords])
     lons = np.array([c[1] for c in coords])
     mask = (
-        (ds.lat >= lats.min() - margin_deg) & (ds.lat <= lats.max() + margin_deg)
-        & (ds.lon >= lons.min() - margin_deg) & (ds.lon <= lons.max() + margin_deg)
-        )
+        (ds.lat >= lats.min() - margin_deg)
+        & (ds.lat <= lats.max() + margin_deg)
+        & (ds.lon >= lons.min() - margin_deg)
+        & (ds.lon <= lons.max() + margin_deg)
+    )
     if not bool(mask.any()):
         return ds
 
@@ -220,6 +217,7 @@ def _crop_to_bbox(ds, coords, margin_deg=1.0):
         idx = np.flatnonzero(touched)
         slices[dim] = slice(max(idx[0] - 1, 0), idx[-1] + 2)
     return ds.isel(**slices)
+
 
 def _grid2loc_var(var, ds, dsi, loc):
     """Interpolate one variable at `loc`'s scattered points.
@@ -233,6 +231,7 @@ def _grid2loc_var(var, ds, dsi, loc):
     on already-materialized numpy).
     """
     import xoa.regrid as xregrid
+
     da = ds[var]
     if ("time" in da.dims) and ("z" in da.dims):
         da = xregrid.grid2loc(da, loc)
@@ -275,13 +274,22 @@ def grid2loc(ds, coords: [(float, float)]):
         Dataset with elements located at specific coordinates.
     """
     import dask
+
     lat, lon = zip(*coords)
     loc = xr.Dataset(
         coords={
-            "lon": ("npts", list(lon), {"axis": "X", "standard_name": "longitude", "units": "degrees_east"}),
-            "lat": ("npts", list(lat), {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"}),
-            }
-        )
+            "lon": (
+                "npts",
+                list(lon),
+                {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
+            ),
+            "lat": (
+                "npts",
+                list(lat),
+                {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"},
+            ),
+        }
+    )
     dsi = ds.copy()
     if "time" in ds:
         dso = xr.Dataset(coords=dict(time=dsi.time, **loc.coords))
@@ -290,9 +298,7 @@ def grid2loc(ds, coords: [(float, float)]):
     if "depth" in dsi.coords:
         if "time" in dsi.depth.dims:
             dsi = dsi.reset_coords("depth")
-    vars_grid2loc = [
-        var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)
-        ]
+    vars_grid2loc = [var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)]
     # One thread per variable, capped at the --dask-nworkers the caller
     # already configured (armoor.cli.io.configure_dask_scheduler) -- reuses
     # the existing knob instead of adding a new one. Threads, not
@@ -301,13 +307,9 @@ def grid2loc(ds, coords: [(float, float)]):
     # the GIL, and threads avoid having to pickle `ds`/`dsi` across
     # processes.
     n_workers = max(dask.config.get('num_workers', default=1), 1)
-    logger.debug(
-        f"grid2loc: {len(vars_grid2loc)} variable(s), n_workers={n_workers}"
-        )
+    logger.debug(f"grid2loc: {len(vars_grid2loc)} variable(s), n_workers={n_workers}")
     with ThreadPoolExecutor(max_workers=n_workers) as pool:
-        dss = list(pool.map(
-            lambda var: _grid2loc_var(var, ds, dsi, loc), vars_grid2loc
-            ))
+        dss = list(pool.map(lambda var: _grid2loc_var(var, ds, dsi, loc), vars_grid2loc))
     dso = xr.merge(dss)
     if "depth" in dso:
         dso = dso.set_coords("depth")
@@ -315,6 +317,7 @@ def grid2loc(ds, coords: [(float, float)]):
         dso["depth"] = dsi.depth
         dso = dso.set_coords("depth")
     return dso
+
 
 def grid2track(ds, ds_ref):
     """Interpolate a gridded dataset onto another dataset's own moving track.
@@ -346,20 +349,27 @@ def grid2track(ds, ds_ref):
         indexed by "time" (and "z" when present).
     """
     import xoa.regrid as xregrid
+
     loc = xr.Dataset(
         coords={
-            "lon": ("time", np.atleast_1d(ds_ref.lon.values), {"axis": "X", "standard_name": "longitude", "units": "degrees_east"}),
-            "lat": ("time", np.atleast_1d(ds_ref.lat.values), {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"}),
+            "lon": (
+                "time",
+                np.atleast_1d(ds_ref.lon.values),
+                {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
+            ),
+            "lat": (
+                "time",
+                np.atleast_1d(ds_ref.lat.values),
+                {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"},
+            ),
             "time": ("time", np.atleast_1d(ds_ref.time.values)),
-            }
-        )
+        }
+    )
     dsi = ds.copy()
     if "depth" in dsi.coords and "time" in dsi.depth.dims:
         dsi = dsi.reset_coords("depth")
     dss = []
-    vars_grid2track = [
-        var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)
-        ]
+    vars_grid2track = [var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)]
     for var in vars_grid2track:
         da = xregrid.grid2loc(ds[var], loc)
         if "z" in da.dims:
@@ -374,6 +384,7 @@ def grid2track(ds, ds_ref):
         dso["depth"] = dsi.depth
         dso = dso.set_coords("depth")
     return dso
+
 
 def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     """Interpolate a dataset on section.
@@ -391,49 +402,51 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     -------
     xarray.Dataset, xarray.Dataset
         Dataset interpolated over a section.
-    """    
+    """
     from pyproj import Geod
-    import xoa.regrid as xregrid  # noqa: F811
+
     dx = dx * 1e3  # Convert to meters
     geod = Geod(ellps='WGS84')
-    
+
     # Collect all interpolated points and distances for each segment
     all_lats = []
     all_lons = []
     all_distances = []
     cumulative_dist = 0.0
-    
+
     # Process each segment between consecutive points
     for i in range(len(coords) - 1):
         lat0, lon0 = coords[i]
         lat1, lon1 = coords[i + 1]
-        
+
         # Calculate segment properties
         d = geod.inv(lon0, lat0, lon1, lat1, return_back_azimuth=True)
         segment_length = d[-1]  # Total distance of segment
-        
+
         # Get intermediate points for this segment
-        r = geod.inv_intermediate(lon0, lat0, lon1, lat1, int(segment_length / dx), return_back_azimuth=True)
-        
+        r = geod.inv_intermediate(
+            lon0, lat0, lon1, lat1, int(segment_length / dx), return_back_azimuth=True
+        )
+
         # Add points from this segment
         for npt in range(r.npts):
             all_lats.append(r.lats[npt])
             all_lons.append(r.lons[npt])
             all_distances.append(cumulative_dist + npt * r.del_s)
-        
+
         # Update cumulative distance for next segment
         cumulative_dist += segment_length
-    
+
     # Add the final point
     all_lats.append(coords[-1][0])
     all_lons.append(coords[-1][1])
     all_distances.append(cumulative_dist)
-        
+
     dist = xr.Dataset(
         coords=dict(
             distance=(["npts"], all_distances),
-            )
         )
+    )
     # ds = grid2loc(ds, list(zip(r.lats, r.lons)))
     section_points = list(zip(all_lats, all_lons))
     ds = _crop_to_bbox(ds, section_points)
@@ -441,14 +454,19 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     ds = xr.merge([ds, dist])
     return ds
 
+
 @contextmanager
 def create_regridder(dsi, dso, method="bilinear"):
     """Context manager for safe regridder creation and cleanup."""
     import xesmf as xe
+
     regridder = None
     try:
         regridder = xe.Regridder(
-            dsi, dso, method, parallel=False,
+            dsi,
+            dso,
+            method,
+            parallel=False,
             ignore_degenerate=True,
             unmapped_to_nan=True,
         )
@@ -457,19 +475,24 @@ def create_regridder(dsi, dso, method="bilinear"):
         if regridder is not None:
             del regridder
         import gc
+
         gc.collect()
+
 
 def regrid(dsi, dso) -> xr.Dataset:
     """Regrid a variable."""
     vars2sub = geo_vars(dsi)
-    
+
     with create_regridder(dsi, dso) as regridder:
         dsi_subset = dsi[vars2sub]
         dsio = regridder(dsi_subset, keep_attrs=True)
-    
+
     return dsio
 
-def coarsen(dsi: xr.Dataset, factor: int, boundary: str = "trim", method: str = "mean") -> xr.Dataset:
+
+def coarsen(
+    dsi: xr.Dataset, factor: int, boundary: str = "trim", method: str = "mean"
+) -> xr.Dataset:
     """Coarsen a gridded dataset by aggregating over spatial blocks.
 
     Each ``(factor × factor)`` block of cells is reduced to a single cell
@@ -559,6 +582,7 @@ def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
         ds = ds.set_coords(vname)
     import numba
     import xoa.regrid as xregrid  # noqa: F811
+
     # regrid1d's underlying numba kernels are themselves parallel
     # (numba.njit(parallel=True)); when this runs as a dask task, dask
     # already parallelizes across chunks/variables, so letting numba also
@@ -570,13 +594,13 @@ def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
     for var in ds.data_vars:
         if "z" in ds[var].dims:
             da = xregrid.regrid1d(
-                ds[var],#.chunk(dict(z=-1)),
+                ds[var],  # .chunk(dict(z=-1)),
                 vlevels,
                 method=method,
                 extrap="both",
                 dim="z",
                 coord_in_name=vname,
-                )
+            )
         else:
             da = ds[var]
         das.append(da)

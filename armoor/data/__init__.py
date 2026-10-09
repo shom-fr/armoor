@@ -3,15 +3,16 @@
 See `armoor.data.datatype` for the per-data-type hierarchy that now backs
 `OUTPUTS_PARAMS`.
 """
+
 INTERP_PARAMS_USER = {
     "time": ("tfreq",),
     "horizontal": ("cloud", "section"),
-    "vertical": ("vlevel","vfreq"),
-    }
+    "vertical": ("vlevel", "vfreq"),
+}
 
 # Kept for backward compatibility with call sites still importing this dict
 # directly; the source of truth is now DataOceanModel.outputs_params
 # (armoor.data.datatype) — see the per-data-type hierarchy there.
-from armoor.data.datatype import DataOceanModel
+from armoor.data.datatype import DataOceanModel  # noqa: E402
 
 OUTPUTS_PARAMS = DataOceanModel().outputs_params

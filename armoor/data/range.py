@@ -4,18 +4,17 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from armoor.__init__ import ArmoorError
 
 logger = logging.getLogger(__name__)
 
 
 def process_time_range(ds, tfreq):
     """Process time range by splitting dataset into time intervals.
-    
+
     Splits an xarray dataset into temporal subsets based on a specified frequency
     and concatenates them along a new 'trange' dimension. Each subset is assigned
     a time_range coordinate indicating its temporal bounds.
-    
+
     Parameters
     ----------
     ds : xarray.Dataset
@@ -23,19 +22,19 @@ def process_time_range(ds, tfreq):
     tfreq : str
         Frequency string for time intervals (e.g., 'D' for daily, 'M' for monthly,
         'H' for hourly). Follows pandas date_range frequency conventions.
-    
+
     Returns
     -------
     xarray.Dataset
         Combined dataset with subsets concatenated along the 'trange' dimension.
         Each element along 'trange' corresponds to one time interval.
-    
+
     Notes
     -----
     The function creates non-overlapping time intervals using pd.date_range and
     selects data within each interval. The resulting dataset has a new 'trange'
     dimension indexed from 0 to n-1, where n is the number of intervals.
-    
+
     Examples
     --------
     >>> ds = xr.Dataset({'temp': (['time'], [1, 2, 3])},
@@ -46,11 +45,7 @@ def process_time_range(ds, tfreq):
     """
     t_start = ds.time.min().data
     t_end = ds.time.max().data
-    time_ranges = pd.date_range(
-        start=f"{t_start}",
-        end=f"{t_end}",
-        freq=tfreq
-    )
+    time_ranges = pd.date_range(start=f"{t_start}", end=f"{t_end}", freq=tfreq)
     subsets = []
     for idate in range(len(time_ranges) - 1):
         t_start = time_ranges[idate]
@@ -58,14 +53,13 @@ def process_time_range(ds, tfreq):
         sub = ds.sel(time=slice(t_start, t_end))
         sub = sub.expand_dims(dim="trange")
         for var in sub.data_vars:
-            if not "time" in ds[var].sizes:
+            if "time" not in ds[var].sizes:
                 sub[var] = sub[var].squeeze(dim="trange")
         sub["time_range"] = xr.DataArray(
-            [f"{t_start:%Y%m%dT%H%M%S}_to_{t_end:%Y%m%dT%H%M%S}"],
-            dims=("trange",)
-            )
+            [f"{t_start:%Y%m%dT%H%M%S}_to_{t_end:%Y%m%dT%H%M%S}"], dims=("trange",)
+        )
         subsets.append(sub)
-        
+
     combined = xr.concat(
         subsets,
         dim="trange",
@@ -81,10 +75,10 @@ def process_time_range(ds, tfreq):
 
 def process_vertical_range(ds, vname, vrange):
     """Process vertical range by filtering data within specified bounds.
-    
+
     Filters 3D variables in the dataset to retain only values within a specified
     vertical range. 2D variables (without a 'z' dimension) are preserved unchanged.
-    
+
     Parameters
     ----------
     ds : xarray.Dataset
@@ -94,20 +88,20 @@ def process_vertical_range(ds, vname, vrange):
     vrange : tuple or list of length 2
         Vertical range bounds as (minimum, maximum). Data outside this range
         will be masked (set to NaN) for 3D variables.
-    
+
     Returns
     -------
     xarray.Dataset
         Filtered dataset where 3D variables are masked outside the specified
         vertical range, and 2D variables remain unchanged.
-    
+
     Notes
     -----
     The function separates variables into two groups: those with and without
     a 'z' dimension. Only variables with a 'z' dimension are filtered using
     the vertical range mask. The mask is computed before applying to improve
     performance with dask-backed datasets.
-    
+
     Examples
     --------
     >>> ds = xr.Dataset({

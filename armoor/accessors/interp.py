@@ -59,8 +59,9 @@ class InterpAccessor:
     # Preserve xarray's native ds.interp(coords, …) behaviour
     # ------------------------------------------------------------------
 
-    def __call__(self, coords=None, method="linear", assume_sorted=False,
-                 kwargs=None, **coords_kwargs):
+    def __call__(
+        self, coords=None, method="linear", assume_sorted=False, kwargs=None, **coords_kwargs
+    ):
         """Delegate to xarray's native ``Dataset.interp``."""
         return _xr_dataset_interp(
             self._obj,
@@ -75,8 +76,15 @@ class InterpAccessor:
     # Temporal
     # ------------------------------------------------------------------
 
-    def time(self, dates, method="linear", preserve_encoding=False,
-             keep_flag=False, diurnal_vars=None, persistency=None):
+    def time(
+        self,
+        dates,
+        method="linear",
+        preserve_encoding=False,
+        keep_flag=False,
+        diurnal_vars=None,
+        persistency=None,
+    ):
         """Temporal interpolation at arbitrary dates.
 
         Delegates to :func:`armoor.interp.interp_time` (handles
@@ -102,7 +110,8 @@ class InterpAccessor:
         xr.Dataset
         """
         return interp_time(
-            self._obj, dates,
+            self._obj,
+            dates,
             method=method,
             preserve_encoding=preserve_encoding,
             keep_flag=keep_flag,
@@ -261,9 +270,7 @@ class InterpAccessor:
         >>> ds_coarse = ds_model.interp.coarsen(4)            # ×4 degradation, mean
         >>> ds_coarse = ds_model.interp.coarsen(8, method="median")
         """
-        return process_horizontal_interpolation(
-            self._obj, ("coarsen", factor, boundary, method)
-        )
+        return process_horizontal_interpolation(self._obj, ("coarsen", factor, boundary, method))
 
     # ------------------------------------------------------------------
     # Vertical
@@ -311,9 +318,7 @@ class InterpAccessor:
         xr.Dataset or None
             ``None`` if the dataset has no ``"z"`` dimension.
         """
-        return process_vertical_interpolation(
-            self._obj, ("vfreq", {"vname": vname, "step": step})
-        )
+        return process_vertical_interpolation(self._obj, ("vfreq", {"vname": vname, "step": step}))
 
 
 # Register after class definition — suppress warning because we intentionally

@@ -40,7 +40,9 @@ class DatasetStore:
     def __init__(self):
         self._lock = threading.Lock()
         self._store: Dict[str, DatasetEntry] = {}
-        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="ds-load")
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="ds-load"
+        )
         self._jobs: Dict[str, dict] = {}
         self._jobs_lock = threading.Lock()
 
@@ -52,7 +54,12 @@ class DatasetStore:
         """Submit a dataset load in a background thread.  Returns a job_id."""
         job_id = str(uuid.uuid4())
         with self._jobs_lock:
-            self._jobs[job_id] = {"status": "loading", "message": "Opening dataset…", "dataset_id": None, "error": None}
+            self._jobs[job_id] = {
+                "status": "loading",
+                "message": "Opening dataset…",
+                "dataset_id": None,
+                "error": None,
+            }
         self._executor.submit(self._load_job, job_id, path, fmt)
         return job_id
 
@@ -60,11 +67,15 @@ class DatasetStore:
         try:
             entry = self.load(path, fmt)
             with self._jobs_lock:
-                self._jobs[job_id].update({"status": "ready", "dataset_id": entry.id, "message": "Done"})
+                self._jobs[job_id].update(
+                    {"status": "ready", "dataset_id": entry.id, "message": "Done"}
+                )
         except Exception as exc:
             logger.exception("Background load failed for job %s", job_id)
             with self._jobs_lock:
-                self._jobs[job_id].update({"status": "error", "error": str(exc), "message": str(exc)})
+                self._jobs[job_id].update(
+                    {"status": "error", "error": str(exc), "message": str(exc)}
+                )
 
     def get_job(self, job_id: str) -> dict:
         """Return current status of a load job (raises KeyError if unknown)."""

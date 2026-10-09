@@ -43,7 +43,7 @@ def pdf(ds: xr.Dataset) -> xr.Dataset:
             **{
                 f'{var}_C': dsc[var].assign_attrs({**dsc[var].attrs, 'eddy_type': 'cyclones'})
                 for var in dsc.data_vars
-            }
+            },
         }
     )
 
@@ -69,10 +69,9 @@ def area2radius(ds: xr.Dataset) -> xr.Dataset:
     """
     vmax_area = ds.vmax_area
     vmax_radius = np.sqrt(vmax_area / np.pi)
-    ds['vmax_radius'] = vmax_radius.assign_attrs({
-        'comment': 'Radius of the vmax contour from vmax_area',
-        'units': 'km'
-        })
+    ds['vmax_radius'] = vmax_radius.assign_attrs(
+        {'comment': 'Radius of the vmax contour from vmax_area', 'units': 'km'}
+    )
     return ds
 
 

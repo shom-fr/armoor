@@ -2,8 +2,10 @@ import os
 
 ROOTDIR = os.path.abspath(os.path.dirname(__file__))
 
+
 class ArmoorError(Exception):
     pass
+
 
 LINE_COLORS = [
     '#1f77b4',
@@ -15,8 +17,8 @@ LINE_COLORS = [
     '#e377c2',
     '#7f7f7f',
     '#bcbd22',
-    '#17becf'
-    ]
+    '#17becf',
+]
 
 CMAP_VARS = {
     "ptemp": "cmo.thermal",
@@ -35,7 +37,7 @@ CMAP_VARS = {
     "si10": "cmo.speed",
     "r2": "cmo.rain",
     "prmsl": "cmo.dense",
-    }
+}
 
 MINMAX_VARS = {
     "ptemp": "pos",
@@ -54,6 +56,6 @@ MINMAX_VARS = {
     "si10": "pos",
     "r2": "pos",
     "prmsl": "pos",
-    }
+}
 
 import armoor.accessors  # noqa: E402, F401 — registers ds.filters / ds.oceanvars / ds.coloc / ds.stats / ds.plot

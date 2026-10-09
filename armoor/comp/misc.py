@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 from armoor.misc import validate_metazone_params
 
@@ -33,6 +32,7 @@ def validate_colocation(metazones, params):
     """
     return validate_metazone_params(metazones, params)
 
+
 def get_colocation_params(metazones, params_user, params_default=None):
     """
     Retrieve colocation parameters for each metazone based on given parameters.
@@ -60,7 +60,7 @@ def get_colocation_params(metazones, params_user, params_default=None):
 
     Returns
     -------
-    dict 
+    dict
         A dictionary where each key is a metazone and each value is a
         dictionary containing the colocation parameters found for that
         metazone.
@@ -74,10 +74,10 @@ def get_colocation_params(metazones, params_user, params_default=None):
                     coloc_params[mz_name][coloc] = param
             coloc_params[mz_name] = {
                 coloc: (param_candidate, mz_params.get(param_candidate))
-                for coloc in ("time", "horizontal", "vertical") 
+                for coloc in ("time", "horizontal", "vertical")
                 for param_candidate in params_user.get(coloc, [])
                 if (mz_params.get(param_candidate) is not None)
-                }
+            }
             if params_default:
                 for coloc, param in params_default.items():
                     if coloc_params[mz_name].get(coloc) is None:
@@ -85,23 +85,24 @@ def get_colocation_params(metazones, params_user, params_default=None):
         else:
             coloc_params[mz_name] = None
     return coloc_params
-    
+
+
 def get_tbound(metazones):
     """Get tbound for each metazone.
-    
+
     Parameters
     ----------
     metazones: dict
         Dictionnary containing metazone parameters
-    
+
     Returns
     -------
     dict
         tbound for each metazones.
     """
     return {
-        metazone: v for metazone, params in metazones.items()
-        for k, v in params.items() if k == "tbound"
-        }
-
-    
+        metazone: v
+        for metazone, params in metazones.items()
+        for k, v in params.items()
+        if k == "tbound"
+    }

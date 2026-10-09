@@ -1,8 +1,7 @@
 import gc
 import logging
-import warnings
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Tuple
 
 import dask
 import numpy as np
@@ -15,8 +14,7 @@ import armoor.ranges as ranges
 from armoor.__init__ import ArmoorError
 from armoor.dispatch import SubclassingMethodRegistry
 from armoor.interp import coarsen as _coarsen, grid2loc, grid2track, interp_time, regrid, vinterp
-from armoor.io import (create_fast_encoding, get_zarr_encoding,
-                        setup_dask_client)
+from armoor.io import get_zarr_encoding
 from armoor.comp import COMP_VARS
 from armoor.comp.comparison import get_comparison
 from armoor.comp.misc import get_colocation_params, validate_colocation
@@ -44,7 +42,7 @@ class TimeColocation(AbstractColocation):
     xarray_obj : xarray.Dataset
         Observation dataset to subset.
     """
-    
+
     def __init__(self, dsref, dsprod, tbound):
         self.dsref = dsref
         self.dsprod = dsprod
@@ -54,12 +52,12 @@ class TimeColocation(AbstractColocation):
 
     def tfreq(self, tfreq: str) -> xr.Dataset:
         """Subset dataset selecting elements at specific terms.
-    
+
         Parameters
         ----------
         freq : str
             Frequency aliases.
-            
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
@@ -68,7 +66,7 @@ class TimeColocation(AbstractColocation):
         self.dsref = interp_time(self.dsref, time)
         self.dsprod = interp_time(self.dsprod, time)
         return self.dsref, self.dsprod
-    
+
     def tmonth(self) -> Tuple[xr.Dataset, xr.Dataset]:
         """Monthly climatological colocation.
 
@@ -76,8 +74,7 @@ class TimeColocation(AbstractColocation):
         then aligns with the reference climatology on a shared month index (1–12).
         """
         ds_prod_monthly = (
-            self.dsprod
-            .sel(time=slice(self.start, self.end))
+            self.dsprod.sel(time=slice(self.start, self.end))
             .groupby("time.month")
             .mean("time")
             .rename({"month": "time"})
@@ -92,9 +89,7 @@ class TimeColocation(AbstractColocation):
         # indices as floats with 'units'/'calendar' in attrs, while the
         # product has plain int months from groupby. Make both consistent
         # (int, no CF attrs) so zarr encoding doesn't conflict.
-        ds_ref_monthly = ds_ref_monthly.assign_coords(
-            time=("time", common_months.astype(int), {})
-        )
+        ds_ref_monthly = ds_ref_monthly.assign_coords(time=("time", common_months.astype(int), {}))
         return ds_ref_monthly, ds_prod_monthly
 
     def trange_seq(self, args: dict) -> xr.Dataset:
@@ -124,11 +119,10 @@ class TimeColocation(AbstractColocation):
             self.dsref["time"].attrs = self.dsprod.time.attrs
         else:
             raise ArmoorError(
-                "Use 'reference' or 'product' to specify the reference time"
-                "for ranging then."
-                )
+                "Use 'reference' or 'product' to specify the reference timefor ranging then."
+            )
         return self.dsref, self.dsprod
-    
+
 
 class HorizontalColocation(AbstractColocation):
     """Colocate horizontaly two datasets.
@@ -138,7 +132,7 @@ class HorizontalColocation(AbstractColocation):
     xarray_obj : xarray.Dataset
         Observation dataset to subset.
     """
-    
+
     def __init__(self, dsref, dsprod):
         self.dsref = dsref
         self.dsprod = dsprod
@@ -161,7 +155,7 @@ class HorizontalColocation(AbstractColocation):
             return None, grid2loc(self.dsprod, coords)
         else:
             return grid2loc(self.dsref, coords), grid2loc(self.dsprod, coords)
-        
+
     def track(self) -> Tuple[xr.Dataset, xr.Dataset]:
         """Interpolate the product onto the reference's own moving track.
 
@@ -206,10 +200,12 @@ class HorizontalColocation(AbstractColocation):
         if "mask" in self.dsprod:
             self.dsprod = self.dsprod.drop_vars("mask")
         if "mask" in self.dsref:
-            self.dsref= self.dsref.drop_vars("mask")
+            self.dsref = self.dsref.drop_vars("mask")
         return self.dsref, self.dsprod
 
-    def coarsen(self, factor: int, on: str = "product", boundary: str = "trim", method: str = "mean") -> Tuple[xr.Dataset, xr.Dataset]:
+    def coarsen(
+        self, factor: int, on: str = "product", boundary: str = "trim", method: str = "mean"
+    ) -> Tuple[xr.Dataset, xr.Dataset]:
         """Coarsen one or both datasets by aggregating spatial blocks.
 
         Useful for degrading model resolution before computing comparison
@@ -242,22 +238,25 @@ class HorizontalColocation(AbstractColocation):
         """Remove temporary coordinates and rename primary ones."""
         coords_to_drop = ["lon", "lat", "lon_1", "lat_1"]
         existing_coords = [coord for coord in coords_to_drop if coord in dataset.coords]
-        
+
         cleaned_ds = dataset.drop_vars(existing_coords)
         return cleaned_ds.rename({"lon_0": "lon", "lat_0": "lat"})
-    
-    def _calculate_distances_vectorized(self, prod_data: xr.Dataset, ref_data: xr.Dataset) -> xr.DataArray:
+
+    def _calculate_distances_vectorized(
+        self, prod_data: xr.Dataset, ref_data: xr.Dataset
+    ) -> xr.DataArray:
         """
         Calculate distances using vectorized operations for all timesteps at once.
         """
         rename_dims = {"npts0": "member"}
         if "time" in ref_data.lon.dims:
             rename_dims["npts1"] = "time"
-        dist = (xgeo.get_distances(prod_data, ref_data)
-                #.squeeze()
-                .rename(rename_dims)
-                .assign_coords(member=prod_data.member)
-            )
+        dist = (
+            xgeo.get_distances(prod_data, ref_data)
+            # .squeeze()
+            .rename(rename_dims)
+            .assign_coords(member=prod_data.member)
+        )
         if "npts1" in dist.dims:
             # A time-independent reference (e.g. a single fixed mooring) has
             # exactly one point here -- squeeze it out, otherwise it leaks
@@ -266,7 +265,7 @@ class HorizontalColocation(AbstractColocation):
             # `select_vars_by_dims` and silently dropping the whole group.
             dist = dist.squeeze("npts1", drop=True)
         return dist
-    
+
     def _handle_time_dependent(self, radius_meters: float) -> None:
         """Process every timestep at once instead of looping over them."""
         dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
@@ -286,9 +285,7 @@ class HorizontalColocation(AbstractColocation):
             valid_idx = np.where(any_valid.values)[0]
             self.dsprod = self.dsprod.isel(member=valid_idx)
             mask = mask.isel(member=valid_idx)
-            logger.info(
-                f"Compacted members: {n_before} -> {self.dsprod.sizes['member']}"
-            )
+            logger.info(f"Compacted members: {n_before} -> {self.dsprod.sizes['member']}")
 
         # Drop members whose ocean data are all-NaN at every (time, z) point.
         # These are land/masked cells in the model that passed the geographic
@@ -335,7 +332,7 @@ class HorizontalColocation(AbstractColocation):
         mask = mask.drop_vars(coords)
         self.dsprod = self.dsprod.where(mask)
         self.dsprod = self.dsprod.set_coords(["lon", "lat"])
- 
+
     def radius(self, radius: float) -> Tuple[xr.Dataset, xr.Dataset]:
         """
         Radius-based colocation: keep every product point within `radius`
@@ -365,10 +362,10 @@ class HorizontalColocation(AbstractColocation):
             logger.info("time dependent")
             self._handle_time_dependent(radius_meters)
         # Set depth coordinate if needed (unchanged)
-        #if "depth" not in self.dsprod.coords and "depth" in self.dsprod.data_vars:
+        # if "depth" not in self.dsprod.coords and "depth" in self.dsprod.data_vars:
         #    self.dsprod = self.dsprod.set_coords("depth")
         return self.dsref, self.dsprod
-    
+
 
 class VerticalColocation(AbstractColocation):
     """Colocate horizontaly two datasets.
@@ -378,13 +375,13 @@ class VerticalColocation(AbstractColocation):
     xarray_obj : xarray.Dataset
         Observation dataset to subset.
     """
-    
+
     def __init__(self, dsref, dsprod):
         self.dsref = dsref
         self.dsprod = dsprod
         self.methods = {}
         self.logger = logging.getLogger(__name__)
-        
+
     def vlevel(self, args: dict):
         """Interpolate datasets to specified vertical levels.
 
@@ -426,7 +423,7 @@ class VerticalColocation(AbstractColocation):
         self.dsref.attrs.update(ref_attrs)
         self.dsprod.attrs.update(prod_attrs)
         return self.dsref, self.dsprod
-    
+
     def vrange(self, args: dict) -> xr.Dataset:
         """
         Colocate reference and product on the same vertical axis before ranging.
@@ -449,32 +446,31 @@ class VerticalColocation(AbstractColocation):
             attrs = self.dsprod.attrs
             self.dsprod = vinterp(
                 self.dsprod.chunk(dict(z=-1)), vcoord, self.dsref[vcoord].chunk(dict(z=-1))
-                )
+            )
             self.dsprod.attrs.update(attrs)
         elif vref == "product":
             attrs = self.dsref.attrs
             self.dsref = vinterp(
                 self.dsref.chunk(dict(z=-1)), vcoord, self.dsprod[vcoord].chunk(dict(z=-1))
-                )
+            )
             self.dsref.attrs.update(attrs)
         else:
             raise ArmoorError(
-                "Use 'reference' or 'product' to specify the vertical "
-                "reference for ranging then."
-                )
+                "Use 'reference' or 'product' to specify the vertical reference for ranging then."
+            )
         return self.dsref, self.dsprod
 
 
 def validate_and_get_params(metazones, comp_func):
     """Validate and get colocation parameters.
-    
+
     Parameters
     ----------
     metazones: dict
         Dictionary containing metazone information.
     comp_func: str
         Comparison function identifier.
-    
+
     Returns
     -------
     dict
@@ -483,16 +479,14 @@ def validate_and_get_params(metazones, comp_func):
     comparison = get_comparison(comp_func)
     metazones = validate_colocation(metazones, comparison.colocation_params_user)
     coloc_params = get_colocation_params(
-        metazones,
-        comparison.colocation_params_user,
-        comparison.colocation_params_default
-        )
+        metazones, comparison.colocation_params_user, comparison.colocation_params_default
+    )
     return coloc_params
 
 
 def process_time_colocation(dsref, dsprod, param, tbound):
     """Process colocation for time dimension.
-    
+
     Parameters
     ----------
     dsref: xr.Dataset
@@ -503,7 +497,7 @@ def process_time_colocation(dsref, dsprod, param, tbound):
         Parameters for time colocation.
     tbound: list
         Time bounds for colocation.
-    
+
     Returns
     -------
     tuple
@@ -514,10 +508,11 @@ def process_time_colocation(dsref, dsprod, param, tbound):
     coloc.__post_init__()
     dsref, dsprod = coloc.call(*param)
     return dsref, dsprod
-    
+
+
 def process_horizontal_colocation(dsref, dsprod, param):
     """Process colocation for horizontal dimensions.
-    
+
     Parameters
     ----------
     dsref: xr.Dataset
@@ -526,7 +521,7 @@ def process_horizontal_colocation(dsref, dsprod, param):
         Product dataset.
     param: list
         Parameters for horizontal colocation.
-    
+
     Returns
     -------
     tuple
@@ -538,9 +533,10 @@ def process_horizontal_colocation(dsref, dsprod, param):
     dsref, dsprod = coloc.call(*param)
     return dsref, dsprod
 
+
 def process_vertical_colocation(dsref, dsprod, param):
     """Process colocation for vertical dimensions.
-    
+
     Parameters
     ----------
     dsref: xr.Dataset
@@ -549,17 +545,18 @@ def process_vertical_colocation(dsref, dsprod, param):
         Product dataset.
     param: list
         Parameters for vertical colocation.
-    
+
     Returns
     -------
     tuple
         Colocated reference and product datasets.
     """
-    logger.info("---- Vertical colocation")    
+    logger.info("---- Vertical colocation")
     coloc = VerticalColocation(dsref, dsprod)
     coloc.__post_init__()
     dsref, dsprod = coloc.call(*param)
     return dsref, dsprod
+
 
 def _drop_time_cf_attrs_if_not_datetime(ds):
     """Remove CF time encoding attrs from the time coordinate before zarr write.
@@ -587,8 +584,9 @@ def _drop_time_cf_attrs_if_not_datetime(ds):
         # CF encoder will add "units" to attrs; if they're already there the
         # write fails.  Strip them so the encoder can set them properly.
         if any(k in time_var.attrs for k in ("units", "calendar")):
-            clean_attrs = {k: v for k, v in time_var.attrs.items()
-                           if k not in ("units", "calendar")}
+            clean_attrs = {
+                k: v for k, v in time_var.attrs.items() if k not in ("units", "calendar")
+            }
             clean_time = xr.Variable(
                 "time",
                 time_var.values,
@@ -705,13 +703,13 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
     # Map each derived variable to its required raw inputs.
     _OCEANVAR_INPUTS = {
         "ptemp": {"temp", "sal", "pres"},
-        "temp":  {"ptemp", "sal", "pres"},
-        "sal":   {"conduct", "temp", "pres"},
+        "temp": {"ptemp", "sal", "pres"},
+        "sal": {"conduct", "temp", "pres"},
         "pdens": {"ptemp", "temp", "sal", "pres"},
         "sndspeed": {"ptemp", "temp", "sal", "pres"},
-        "u":     {"cdir", "cspeed"},
-        "v":     {"cdir", "cspeed"},
-        "cdir":  {"u", "v"},
+        "u": {"cdir", "cspeed"},
+        "v": {"cdir", "cspeed"},
+        "cdir": {"u", "v"},
         "cspeed": {"u", "v"},
         "mld": {"ptemp", "temp", "sal", "pres"},
     }
@@ -743,11 +741,13 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
     # climatologies opened with decode_times=False (e.g. WOA18's raw month
     # index 1-12), "time" isn't a datetime at all, and astype("datetime64[ns]")
     # would silently reinterpret the month index as a bogus timestamp.
-    if "time" in ds.coords and np.issubdtype(ds["time"].dtype, np.datetime64) \
-            and ds["time"].dtype != np.dtype("datetime64[ns]"):
+    if (
+        "time" in ds.coords
+        and np.issubdtype(ds["time"].dtype, np.datetime64)
+        and ds["time"].dtype != np.dtype("datetime64[ns]")
+    ):
         ds["time"] = ds["time"].astype("datetime64[ns]")
     return ds
-
 
 
 def _apply_colocations(dsref, dsprod, params, tbound):
@@ -770,21 +770,15 @@ def _apply_colocations(dsref, dsprod, params, tbound):
         Colocated (dsref, dsprod).
     """
     if params.get("time"):
-        dsref, dsprod = process_time_colocation(
-            dsref, dsprod, params["time"], tbound
-        )
+        dsref, dsprod = process_time_colocation(dsref, dsprod, params["time"], tbound)
         gc.collect()
 
     if params.get("horizontal"):
-        dsref, dsprod = process_horizontal_colocation(
-            dsref, dsprod, params["horizontal"]
-        )
+        dsref, dsprod = process_horizontal_colocation(dsref, dsprod, params["horizontal"])
         gc.collect()
 
     if params.get("vertical"):
-        dsref, dsprod = process_vertical_colocation(
-            dsref, dsprod, params["vertical"]
-        )
+        dsref, dsprod = process_vertical_colocation(dsref, dsprod, params["vertical"])
         gc.collect()
 
     return dsref, dsprod
@@ -822,7 +816,7 @@ def _apply_time_ranges(dsref, dsprod, params, tbound):
         if tfreq != "*":
             return (
                 ranges.trange_seq(dsref, *tbound, tfreq),
-                ranges.trange_seq(dsprod, *tbound, tfreq)
+                ranges.trange_seq(dsprod, *tbound, tfreq),
             )
 
     return [dsref], [dsprod]
@@ -863,8 +857,9 @@ def _split_by_dims(ds):
         groups[key].append(var)
     return {key: ds[vars_list] for key, vars_list in groups.items()}
 
+
 def select_vars_by_dims(prod_groups, sig):
-    """ Extract all the variables from a dataset
+    """Extract all the variables from a dataset
     depending at least on dimensions in sig.
 
     Returns None, like a plain dict .get(), when no product group matches
@@ -976,7 +971,7 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
             dsref = dsref.set_coords(vcoord)
         if vcoord in dsprod.data_vars:
             dsprod = dsprod.set_coords(vcoord)
-    
+
     dsref = dsref.assign_attrs(gattrs_ref)
     dsprod = dsprod.assign_attrs(gattrs_prod)
 
@@ -1022,7 +1017,9 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
                 sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]
 
             if "z" in sub_ref.dims:
-                sub_ref_list, sub_prod_list = _apply_vertical_ranges(sub_ref_list, sub_prod_list, params, comp_func)
+                sub_ref_list, sub_prod_list = _apply_vertical_ranges(
+                    sub_ref_list, sub_prod_list, params, comp_func
+                )
 
             dssref.extend(sub_ref_list)
             dssprod.extend(sub_prod_list)
@@ -1058,8 +1055,7 @@ def _process_reference(ncref, ncins, params, tbound, staged, ncouts, mparams=Non
     _ds_meta = xr.open_dataset(ncref, engine="zarr", chunks={}, decode_times=False)
     _is_climato = get_data_type_by_name(_ds_meta.attrs.get("data_type")).is_climatology
     _ds_meta.close()
-    dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={},
-                               decode_times=not _is_climato)
+    dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={}, decode_times=not _is_climato)
     dsrefin = _prepare_dataset(dsrefin, staged.comp_func, is_reference=True)
 
     results = []

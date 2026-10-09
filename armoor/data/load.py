@@ -2,65 +2,62 @@ import gc
 import logging
 import os
 import shutil
-import sys
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Tuple
 
 import dask
 import dask.array as da
-from collections import Counter
 import numpy as np
 import xarray as xr
 
 import armoor  # noqa: F401 — registers all xarray accessors (ds.filters, …)
-from armoor.io import (setup_dask_client, create_fast_encoding,
-                        write_dataset_to_zarr, compute_bundled_zarr_writes)
-from armoor.misc import optimize_for_low_swap
+from armoor.io import write_dataset_to_zarr, compute_bundled_zarr_writes
 from armoor.data.datatype import get_data_type
 from armoor.data.open_decode import get_decoder, open_decode, register_cf
 
 
 logger = logging.getLogger(__name__)
 
+
 def build_filters_config(mz_param, data_name):
     """
     Build filters configuration dictionary from mz_param.
-    
+
     Parameters
     ----------
     mz_param : dict
         Configuration parameters containing filter settings
     data_name : str
         Name of the data source
-        
+
     Returns
     -------
     dict
         Filters configuration for apply_combined_filters
     """
     filters_config = {}
-    
+
     # Time filters (assuming they become data_selection filters)
     if 'tbound' in mz_param:
         filters_config['time_selection'] = {
             'minimum': mz_param.get('tbound')[0],
-            'maximum': mz_param.get('tbound')[1]
+            'maximum': mz_param.get('tbound')[1],
         }
     if 'thours' in mz_param:
         filters_config['hours_selection'] = {
             'minimum': mz_param.get('thours')[0],
-            'maximum': mz_param.get('thours')[1]
+            'maximum': mz_param.get('thours')[1],
         }
     if 'tide' in mz_param:
         filters_config['tide'] = mz_param.get("tide")
-    
+
     if 'tresample' in mz_param:
         filters_config['tresample'] = mz_param.get("tresample")
-        
+
     if 'tsmooth' in mz_param:
         filters_config['tsmooth'] = mz_param.get("tsmooth")
-    
+
     if 'bathy' in mz_param:
         bathy = mz_param.get('bathy')
         filters_config['bathy'] = {
@@ -68,11 +65,11 @@ def build_filters_config(mz_param, data_name):
             'fmt': bathy['fmt'],
             'min': bathy.get('min'),
             'max': bathy.get('max'),
-            }
-    
+        }
+
     if 'oceanvars' in mz_param:
         filters_config["oceanvars"] = mz_param.get('oceanvars')
-        
+
     # # Depth filters
     # if 'depth_min' in mz_param or 'depth_max' in mz_param:
     #     filters_config['depth_selection'] = {
@@ -80,21 +77,21 @@ def build_filters_config(mz_param, data_name):
     #         'minimum': mz_param.get('depth_min'),
     #         'maximum': mz_param.get('depth_max')
     #     }
-    
+
     # Quality filters
     if 'qc' in mz_param:
         # Assuming quality variable name based on data_name or a specific field
         filters_config['quality'] = {
             'qname': mz_param.get('qc')[0],
             'qmin': mz_param.get('qc')[1],
-            'qmax': mz_param.get('qc')[2]
-            }
-    
+            'qmax': mz_param.get('qc')[2],
+        }
+
     # Horizontal/spatial filters
     if 'polygon' in mz_param:
         filters_config['polygon'] = {
             'coords': mz_param['polygon'],
-            'dilate': True if mz_param.get("href") else False
+            'dilate': True if mz_param.get("href") else False,
         }
     # elif 'bbox' in mz_param:
     #     # Convert bounding box to polygon coordinates
@@ -109,7 +106,7 @@ def build_filters_config(mz_param, data_name):
     #         'coords': coords,
     #         'dilate': True,#mz_param.get('polygon_dilate', False)
     #     }
-    
+
     # # Geographic bounds as data selection
     # if 'lon_min' in mz_param or 'lon_max' in mz_param:
     #     filters_config['lon_selection'] = {
@@ -117,20 +114,21 @@ def build_filters_config(mz_param, data_name):
     #         'minimum': mz_param.get('lon_min'),
     #         'maximum': mz_param.get('lon_max')
     #     }
-    
+
     # if 'lat_min' in mz_param or 'lat_max' in mz_param:
     #     filters_config['lat_selection'] = {
     #         'dim': 'lat',
     #         'minimum': mz_param.get('lat_min'),
     #         'maximum': mz_param.get('lat_max')
     #     }
-    
+
     return filters_config
+
 
 def process_single_combination(ds, mz_name, mz_param):
     """
     Optimized version using combined filters to reduce memory usage and dask operations.
-    
+
     Parameters
     ----------
     ds : xarray.Dataset
@@ -139,7 +137,7 @@ def process_single_combination(ds, mz_name, mz_param):
         Name of the processing zone
     mz_param : dict
         Parameters for the processing zone
-        
+
     Returns
     -------
     xarray.Dataset or None
@@ -149,14 +147,14 @@ def process_single_combination(ds, mz_name, mz_param):
     combination_id = f"{data_name}_{mz_name}"
     start_time = time.time()
     dsout = None
-    
+
     logger.info(f"Processing {combination_id}")
-    
+
     # Check if data is available
     if ds is None:
         logger.error(f"Dataset is None for {combination_id}")
         return None
-    
+
     data_name = ds.attrs["data_name"]
     data_ref = ds.attrs["data_ref"]
     data_type = ds.attrs.get("data_type")
@@ -175,7 +173,7 @@ def process_single_combination(ds, mz_name, mz_param):
     else:
         logger.info(f"No filters to apply for {combination_id}")
         dsout = ds.copy()
-    
+
     # Check if dataset is not empty after filtering
     if dsout is not None:
         # Check if dataset has any data left
@@ -185,8 +183,10 @@ def process_single_combination(ds, mz_name, mz_param):
         elif "time" not in dsout.dims:
             logger.warning(f"No index found for coordinate 'time' for {combination_id}")
         elif dsout.sizes["time"] == 1:
-            logger.warning(f"One time step in the filtered dataset for {combination_id}, this may cause troubleshooting.")
-        #return None
+            logger.warning(
+                f"One time step in the filtered dataset for {combination_id}, this may cause troubleshooting."
+            )
+        # return None
 
     # Final metadata
     if dsout is not None:
@@ -198,8 +198,9 @@ def process_single_combination(ds, mz_name, mz_param):
 
     elapsed = time.time() - start_time
     logger.info(f"Processing {combination_id} completed in {elapsed:.1f}s")
-        
+
     return dsout
+
 
 class StagedDataset(str):
     """A pipeline output path that also carries the config metadata it was
@@ -219,9 +220,20 @@ class StagedDataset(str):
     re-wrap the recovered path explicitly.
     """
 
-    def __new__(cls, path, *, metazone=None, comp_func=None, stage=None,
-                fmt=None, platform=None, vlevel=None, vrange=None,
-                trange=None, time=None):
+    def __new__(
+        cls,
+        path,
+        *,
+        metazone=None,
+        comp_func=None,
+        stage=None,
+        fmt=None,
+        platform=None,
+        vlevel=None,
+        vrange=None,
+        trange=None,
+        time=None,
+    ):
         """Create a str instance carrying extra pipeline-context attributes.
 
         Parameters
@@ -375,12 +387,13 @@ def save_result(dsout, mz_name, func_comp):
         consolidated=True,
         compute=False,
         compressor=_OUTPUT_COMPRESSOR,
-        )
+    )
     compute_bundled_zarr_writes([write_job])
     dsout.close()
     del dsout
     logger.info(f"Saved: {nc}")
     return StagedDataset(str(nc), metazone=mz_name, comp_func=func_comp, stage="load")
+
 
 def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     """Process a single dataset×metazone combination."""
@@ -406,6 +419,7 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     # if 'ds' in locals():
     #     ds.close()
     # gc.collect()
+
 
 def _process_single_task_from_zarr(zfile, mz_name, mz_param, dirout):
     """Open zarr, process one combination, close. Thread-safe for parallel use."""
@@ -473,9 +487,7 @@ def process_all_combinations(inputs, metazones, dirout, max_workers=1):
             # Each task opens its own zarr file (thread-safe for parallel)
             for mz_name, mz_param in metazones.items():
                 delayed_results.append(
-                    dask.delayed(_process_single_task_from_zarr)(
-                        inp, mz_name, mz_param, dirout
-                    )
+                    dask.delayed(_process_single_task_from_zarr)(inp, mz_name, mz_param, dirout)
                 )
         else:
             # Dataset passed directly -- process sequentially to avoid sharing issues
@@ -489,11 +501,12 @@ def process_all_combinations(inputs, metazones, dirout, max_workers=1):
         ncouts = []
     return ncouts
 
+
 _ZARR_SIZE_THRESHOLD_DEFAULT = 2 * 1024**3  # 2 GB fallback
-_ZARR_SIZE_THRESHOLD_MAX = 4 * 1024**3     # 4 GB cap (avoids Dask graph serialization overhead)
+_ZARR_SIZE_THRESHOLD_MAX = 4 * 1024**3  # 4 GB cap (avoids Dask graph serialization overhead)
 _ZARR_RAM_FRACTION = 0.6
-_TARGET_CHUNK_BYTES = 2 * 1024**3          # target uncompressed size per output zarr chunk
-_BLOSC_MAX_CHUNK_BYTES = 2_000_000_000     # Blosc per-variable per-chunk limit
+_TARGET_CHUNK_BYTES = 2 * 1024**3  # target uncompressed size per output zarr chunk
+_BLOSC_MAX_CHUNK_BYTES = 2_000_000_000  # Blosc per-variable per-chunk limit
 
 
 def _compute_output_time_chunk(dsout):
@@ -515,15 +528,13 @@ def _compute_output_time_chunk(dsout):
     timed_vars = [v for v in dsout.data_vars if 'time' in dsout[v].dims]
     if not timed_vars:
         return None
-    max_bytes_per_var_per_tstep = max(
-        dsout[v].nbytes / n_time for v in timed_vars
-    )
+    max_bytes_per_var_per_tstep = max(dsout[v].nbytes / n_time for v in timed_vars)
     if max_bytes_per_var_per_tstep <= 0:
         return None
     tc = max(1, int(_BLOSC_MAX_CHUNK_BYTES / max_bytes_per_var_per_tstep))
     logger.debug(
         f"_compute_output_time_chunk: {len(timed_vars)} timed vars, "
-        f"max {max_bytes_per_var_per_tstep/1e6:.1f} MB/var/tstep → time_chunk={tc}"
+        f"max {max_bytes_per_var_per_tstep / 1e6:.1f} MB/var/tstep → time_chunk={tc}"
     )
     return tc
 
@@ -532,6 +543,7 @@ def _get_available_ram():
     """Return available RAM in bytes, or None if detection fails."""
     try:
         import psutil
+
         return psutil.virtual_memory().available
     except ImportError:
         pass
@@ -541,19 +553,22 @@ def _get_available_ram():
         return None
 
 
-_SHM_DIR = Path("/dev/shm")
-_SHM_MIN_FREE = 2 * 1024**3   # require at least 2 GB free in /dev/shm
-_RAM_LOAD_FRACTION = 0.50      # load into RAM if filtered data < 50 % of available RAM
+_SHM_DIR = Path("/dev/shm")  # nosec B108
+_SHM_MIN_FREE = 2 * 1024**3  # require at least 2 GB free in /dev/shm
+_RAM_LOAD_FRACTION = 0.50  # load into RAM if filtered data < 50 % of available RAM
 _STAGING_SPATIAL_CHUNK = 64  # rechunk non-time dims to this size before staging
-_STAGING_TIME_CHUNK = 10       # rechunk time to this size to reduce task count
+_STAGING_TIME_CHUNK = 10  # rechunk time to this size to reduce task count
+
 
 def _make_staging_compressor():
     """Fast lz4 compressor for temporary staging zarrs."""
     try:
         from numcodecs import Blosc
+
         return Blosc(cname='lz4', clevel=1, shuffle=Blosc.BITSHUFFLE)
     except ImportError:
         return None
+
 
 def _make_output_compressor():
     """zstd+BITSHUFFLE compressor for final output zarrs.
@@ -564,16 +579,18 @@ def _make_output_compressor():
     """
     try:
         from numcodecs import Blosc
+
         return Blosc(cname='zstd', clevel=1, shuffle=Blosc.BITSHUFFLE)
     except ImportError:
         return None
 
+
 _STAGING_COMPRESSOR = _make_staging_compressor()
-_OUTPUT_COMPRESSOR  = _make_output_compressor()
+_OUTPUT_COMPRESSOR = _make_output_compressor()
 
 _STAGING_COMPRESS_RATIO = 4.0  # lz4 cl1 on ocean data: typically 3-5×
-_OUTPUT_COMPRESS_RATIO  = 6.0  # zstd+BITSHUFFLE on ocean data: typically 5-8×
-_OUTPUT_SHM_MARGIN      = 1.2  # require 20 % safety margin when staging output to /dev/shm
+_OUTPUT_COMPRESS_RATIO = 6.0  # zstd+BITSHUFFLE on ocean data: typically 5-8×
+_OUTPUT_SHM_MARGIN = 1.2  # require 20 % safety margin when staging output to /dev/shm
 
 
 def _get_zarr_tmp_dir(needed_bytes=0):
@@ -632,9 +649,13 @@ def _get_zarr_size_threshold():
     available = _get_available_ram()
     if available and available > 0:
         threshold = min(int(available * _ZARR_RAM_FRACTION), _ZARR_SIZE_THRESHOLD_MAX)
-        logger.info(f"Available RAM: {available / 1024**3:.1f} GB -- zarr threshold: {threshold / 1024**3:.1f} GB")
+        logger.info(
+            f"Available RAM: {available / 1024**3:.1f} GB -- zarr threshold: {threshold / 1024**3:.1f} GB"
+        )
         return threshold
-    logger.info(f"Cannot detect available RAM -- using default {_ZARR_SIZE_THRESHOLD_DEFAULT / 1024**3:.0f} GB threshold")
+    logger.info(
+        f"Cannot detect available RAM -- using default {_ZARR_SIZE_THRESHOLD_DEFAULT / 1024**3:.0f} GB threshold"
+    )
     return _ZARR_SIZE_THRESHOLD_DEFAULT
 
 
@@ -685,8 +706,11 @@ def _apply_prefilter(ds, bounds):
     # --- Temporal pre-filter ---
     # Skip for climatologies: time is not decoded as datetime64 (e.g. WOA18
     # opened with decode_times=False stores month indices as floats).
-    if ('time_min' in bounds and 'time' in ds.dims
-            and np.issubdtype(ds['time'].dtype, np.datetime64)):
+    if (
+        'time_min' in bounds
+        and 'time' in ds.dims
+        and np.issubdtype(ds['time'].dtype, np.datetime64)
+    ):
         ds = ds.sel(time=slice(bounds['time_min'], bounds['time_max']))
 
     # --- Spatial pre-filter ---
@@ -745,7 +769,7 @@ def _apply_prefilter(ds, bounds):
     # lon_vals = lon.compute().values
     # mask_sub = ((lat_vals >= lat_min) & (lat_vals <= lat_max)) & ((lon_vals >= lon_min) & (lon_vals <= lon_max))
     # return ds.where(mask_sub)
-    
+
     mask_2d = ((lat >= lat_min) & (lat <= lat_max) & (lon >= lon_min) & (lon <= lon_max)).compute()
     arg_where = np.argwhere(mask_2d.values)
     if arg_where.size == 0:
@@ -778,8 +802,10 @@ def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
              prefilter, process, and write the final zarr.  All phase-2 writes
              are fused into a single dask.compute() call.
     """
-    logger.info(f"_process_large_dataset_pipelined: data_key={data_key!r} "
-                f"n_datasets={len(dss)} n_metazones={len(metazones)}")
+    logger.info(
+        f"_process_large_dataset_pipelined: data_key={data_key!r} "
+        f"n_datasets={len(dss)} n_metazones={len(metazones)}"
+    )
 
     # Rechunk AFTER the union prefilter (on reduced data).
     # HDF5 sources often have small internal chunks (e.g. 100×100) that produce
@@ -826,11 +852,17 @@ def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
                     ds = ds.chunk({'time': uniform_t})
             zfile = zarr_dir / f"tmp_{data_key}_{ids}.zarr"
             logger.info(f"Staging {data_key} ({ids + 1}/{len(dss_rechunked)}) -> {zfile}")
-            write_jobs.append(write_dataset_to_zarr(
-                ds, str(zfile), mode="w", consolidated=True,
-                compute=False, minmax=False,
-                compressor=_STAGING_COMPRESSOR,
-            ))
+            write_jobs.append(
+                write_dataset_to_zarr(
+                    ds,
+                    str(zfile),
+                    mode="w",
+                    consolidated=True,
+                    compute=False,
+                    minmax=False,
+                    compressor=_STAGING_COMPRESSOR,
+                )
+            )
             zfiles.append(zfile)
 
         t0 = time.time()
@@ -921,9 +953,7 @@ def load_datasets(data_cfg, metazones, dirout):
 
         try:
             dss = open_decode(
-                cfg_data["path"],
-                fmt=cfg_data["fmt"],
-                platform=cfg_data.get("platform")
+                cfg_data["path"], fmt=cfg_data["fmt"], platform=cfg_data.get("platform")
             )
         except armoor.ArmoorError as e:
             logger.warning(f"{dataset_name}: {e} — skipping")
@@ -956,7 +986,9 @@ def load_datasets(data_cfg, metazones, dirout):
                     continue
                 dss_filtered.append(ds_f)
             if not dss_filtered:
-                logger.warning(f"{dataset_name}: all sub-datasets empty after union prefilter — skipping")
+                logger.warning(
+                    f"{dataset_name}: all sub-datasets empty after union prefilter — skipping"
+                )
                 continue
             filtered_nbytes = sum(ds.nbytes for ds in dss_filtered)
             logger.info(

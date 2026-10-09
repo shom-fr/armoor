@@ -83,7 +83,7 @@ def _extract_timeseries(entry, variable: str, lon: float, lat: float, depth_idx:
     ds = entry.ds
     da = ds[variable]
 
-    time_dim  = _find_dim(da, ("time",))
+    time_dim = _find_dim(da, ("time",))
     depth_dim = _find_dim(da, ("z", "s_rho", "s_w", "depth", "deptht", "level", "nz", "nz1"))
 
     j, i, y_dim, x_dim = nearest_ij(entry, lat, lon)
@@ -167,6 +167,7 @@ def _zarr_point(entry, da, time_dim, depth_dim, depth_idx, y_dim, x_dim, j, i):
     """
     try:
         import zarr
+
         store_obj = zarr.open_consolidated(entry.path, mode="r")
         if da.name not in store_obj:
             return None, None
@@ -207,10 +208,11 @@ def _compute_1d(series_da, time_dim):
     """
     try:
         import dask.array as dsa
+
         if isinstance(series_da.data, dsa.Array):
             rechunked = series_da.chunk({time_dim: -1})
             return rechunked.compute(scheduler="threads").values.astype(float)
-    except Exception:
+    except Exception:  # nosec B110
         pass
     return series_da.values.astype(float)
 

@@ -153,7 +153,9 @@ def _extract_section(
 
     # Build multi-segment path, allocating points proportionally to segment length.
     seg_dists = [
-        _haversine_km(waypoint_lons[i], waypoint_lats[i], waypoint_lons[i + 1], waypoint_lats[i + 1])
+        _haversine_km(
+            waypoint_lons[i], waypoint_lats[i], waypoint_lons[i + 1], waypoint_lats[i + 1]
+        )
         for i in range(len(waypoint_lons) - 1)
     ]
     total_dist = sum(seg_dists) or 1.0
@@ -204,8 +206,7 @@ def _extract_section(
     if slab.ndim == 2:
         slab = slab[np.newaxis]  # treat as single depth level
     values = [
-        [None if np.isnan(v) else float(v) for v in slab[d, j_arr, i_arr]]
-        for d in range(n_depths)
+        [None if np.isnan(v) else float(v) for v in slab[d, j_arr, i_arr]] for d in range(n_depths)
     ]
 
     # Colour scale from section data

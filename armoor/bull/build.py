@@ -1,17 +1,16 @@
 import base64
-import os, glob
+import os
+import glob
 import logging
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional
-from configobj import ConfigObj
-from validate import Validator
-from jinja2 import Environment, FileSystemLoader, Template
+from typing import Dict, Optional
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 import json
 
 from . import BULL_TPL
 
 logger = logging.getLogger(__name__)
+
 
 class Bull:
     """
@@ -21,7 +20,7 @@ class Bull:
     def __init__(self, config, template_file: Optional[str] = BULL_TPL):
         """
         Initialize bulletin from configuration files.
-        
+
         Parameters
         ----------
         config
@@ -32,7 +31,7 @@ class Bull:
         self.config = config
         self.template_file = template_file
         self.date = datetime.now().strftime("%Y-%m-%d")
-    
+
     def _encode_image_base64(self, image_path: str) -> Optional[str]:
         """Encode image to base64."""
         try:
@@ -41,7 +40,7 @@ class Bull:
         except FileNotFoundError:
             logger.warning(f"Image not found: {image_path}")
             return None
-    
+
     def _prepare_template_data(self) -> Dict:
         """Prepare data dictionary for Jinja2 template."""
         # Encode logo if one is given in [header]
@@ -56,11 +55,11 @@ class Bull:
                 '.jpg': 'image/jpeg',
                 '.jpeg': 'image/jpeg',
                 '.svg': 'image/svg+xml',
-                '.gif': 'image/gif'
+                '.gif': 'image/gif',
             }.get(ext, 'image/png')
         elif logo_path:
             logger.warning(f"Logo not found: {logo_path}")
-        
+
         # Process images for each comparison type, section, output and zone
         processed_images = {}
         for comp_type in self.config['comparison_types'].sections:
@@ -107,18 +106,22 @@ class Bull:
                         images_list = []
                         for image_path in image_paths:
                             if os.path.exists(image_path):
-                                images_list.append({
-                                    'data': self._encode_image_base64(image_path),
-                                    'path': image_path,
-                                    'found': True,
-                                })
+                                images_list.append(
+                                    {
+                                        'data': self._encode_image_base64(image_path),
+                                        'path': image_path,
+                                        'found': True,
+                                    }
+                                )
                             else:
                                 logger.warning(f"Image not found : {image_path}")
-                                images_list.append({
-                                    'data': None,
-                                    'path': image_path,
-                                    'found': False,
-                                })
+                                images_list.append(
+                                    {
+                                        'data': None,
+                                        'path': image_path,
+                                        'found': False,
+                                    }
+                                )
                         processed_output["zones"][zone] = {
                             "label": self._get_label(output_cfg, zone),
                             "images": images_list,
@@ -135,26 +138,21 @@ class Bull:
                 }
                 for k, v in processed_images.items()
             }
-            logger.debug(
-                "Images tree:\n" + json.dumps(images_tree, indent=2, ensure_ascii=False)
-            )
-        
+            logger.debug("Images tree:\n" + json.dumps(images_tree, indent=2, ensure_ascii=False))
+
         # Process ocean-features (main ocean features per zone)
         processed_ocean_features = None
         if 'ocean-features' in self.config:
             processed_ocean_features = {}
             for zone in self.config['ocean-features'].sections:
                 zone_label = self._get_label(self.config['ocean-features'], zone)
-                processed_ocean_features[zone] = {
-                    "label": zone_label,
-                    "features": {}
-                }
+                processed_ocean_features[zone] = {"label": zone_label, "features": {}}
                 for feature in self.config['ocean-features'][zone].sections:
                     feat_label = self._get_label(self.config['ocean-features'][zone], feature)
                     feat_desc = self.config['ocean-features'][zone][feature].get('description', '')
                     processed_ocean_features[zone]["features"][feature] = {
                         "label": feat_label,
-                        "description": feat_desc
+                        "description": feat_desc,
                     }
 
         return {
@@ -164,7 +162,7 @@ class Bull:
                 'period': self.config['header'].get('period'),
                 'logo_data': logo_data,
                 'logo_mime': logo_mime,
-                'date': self.date
+                'date': self.date,
             },
             'summary': dict(self.config['summary']) if self.config.get("summary") else None,
             'comparison_types': dict(self.config['comparison_types']),
@@ -173,43 +171,42 @@ class Bull:
             'ocean_features_title': self.config.get('ocean-features', {}).get(
                 'title', 'Main ocean features'
             ),
-            'images': processed_images
+            'images': processed_images,
         }
-    
+
     def generate_html(self, output_path: str = "my_bull.html") -> None:
         """Generate HTML bulletin."""
         data = self._prepare_template_data()
         template_dir = os.path.dirname(self.template_file)
         template_name = os.path.basename(self.template_file)
-        env = Environment(loader=FileSystemLoader(template_dir))
+        env = Environment(loader=FileSystemLoader(template_dir), autoescape=select_autoescape())
         template = env.get_template(template_name)
         html_content = template.render(**data)
-        
+
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
-    
+
         logger.info(f"HTML bulletin generated: {output_path}")
-    
+
     def generate_pdf(self, output_path: str = "my_bull.pdf") -> None:
         """Generate PDF bulletin."""
         try:
             from weasyprint import HTML
         except ImportError:
             raise ImportError(
-                "weasyprint is required for PDF generation. "
-                "Install it with: pip install weasyprint"
+                "weasyprint is required for PDF generation. Install it with: pip install weasyprint"
             )
-        
+
         temp_html = "temp_bulletin.html"
         self.generate_html(temp_html)
         HTML(temp_html).write_pdf(output_path)
         os.remove(temp_html)
         logger.info(f"PDF bulletin generated: {output_path}")
 
-    def _get_label(self,section_obj,key:str)-> str:
+    def _get_label(self, section_obj, key: str) -> str:
         """Retourne le label lisible si defini, sinon la cle brute."""
         try:
-            label = section_obj[key].get('label','').strip()
-            return label if label else key 
+            label = section_obj[key].get('label', '').strip()
+            return label if label else key
         except (KeyError, AttributeError, TypeError):
-            return key 
+            return key

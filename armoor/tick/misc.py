@@ -18,11 +18,11 @@ def show_create(ticket):
     title_column_2 = "Description"
     line = "-"
     gitlab_ticket = (
-        f"| {title_column_1 : <20} | {title_column_2 : <100} |\n"
-        f"| {line * 20 : <20} | {line * 100 : <100} |"
+        f"| {title_column_1: <20} | {title_column_2: <100} |\n"
+        f"| {line * 20: <20} | {line * 100: <100} |"
     )
     for field in ticket:
-        gitlab_ticket += f"\n| {field : <20} | {str(ticket[field]) : <100} |"
+        gitlab_ticket += f"\n| {field: <20} | {str(ticket[field]): <100} |"
     print(gitlab_ticket)
 
 
@@ -47,11 +47,11 @@ def show_tickets(tickets):
         title_column_5 = "Linked issues"
 
         gitlab_column_title = (
-            f"| {title_column_1 : <5} "
-            f"| {title_column_2 : <70} "
-            f"| {title_column_3 : <6} "
-            f"| {title_column_4 : <19} "
-            f"| {title_column_5 : <16} |"
+            f"| {title_column_1: <5} "
+            f"| {title_column_2: <70} "
+            f"| {title_column_3: <6} "
+            f"| {title_column_4: <19} "
+            f"| {title_column_5: <16} |"
         )
         print(gitlab_column_title)
 

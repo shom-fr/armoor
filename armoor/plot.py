@@ -1,4 +1,5 @@
 """Plot functions."""
+
 # matplotlib, scipy and gridspec are imported lazily (inside each function)
 # to avoid the several-second NFS penalty on HPC clusters where hundreds of
 # .py/.so files are stat'd during a standard matplotlib/__init__.py traversal.
@@ -109,6 +110,7 @@ def format_time_label(attrs, ds=None, allow_clim_month=False):
         return time_str, f"_{time_str}"
     if allow_clim_month and "clim_month" in attrs:
         import calendar
+
         return calendar.month_name[attrs["clim_month"]], f"_m{attrs['clim_month']:02d}"
     return "", ""
 
@@ -152,6 +154,7 @@ def format_vertical_label(attrs, allow_vrange=True):
 def _get_plt():
     """Return matplotlib.pyplot, applying the armoor style on first import."""
     import matplotlib.pyplot as _plt
+
     _plt.style.use('seaborn-v0_8-whitegrid')
     return _plt
 
@@ -176,7 +179,19 @@ def create_figure(width, height):
     fig = plt.figure(figsize=(width, height))
     return fig
 
-def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x_label='X-axis', y_label='Y-axis', title='Subplots', sharex=False, sharey=False, projection=None):  # noqa: E501
+
+def create_subplots(
+    nrows=None,
+    ncols=None,
+    layout_type=None,
+    figsize=(8, 10),
+    x_label='X-axis',
+    y_label='Y-axis',
+    title='Subplots',
+    sharex=False,
+    sharey=False,
+    projection=None,
+):  # noqa: E501
     """Create and return a figure with a specified number of subplots arranged in a grid.
 
     Parameters
@@ -211,9 +226,9 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
     #     sharex=sharex,
     #     sharey=sharey,
     #     subplot_kw=subplot_kw)
-    
+
     # if ncols == 1 and nrows > 1:
-    #     axes = axes.reshape(-1, 1) 
+    #     axes = axes.reshape(-1, 1)
 
     # # Set a common title for the entire figure
     # fig.suptitle(title)
@@ -239,23 +254,22 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
     #     for col in axes[:, 1:]:
     #         for ax in col:
     #             ax.set_ylabel('')
-    
+
     # Create a figure
     # projection=ccrs.PlateCarree()
     import matplotlib.gridspec as gridspec
+
     plt = _get_plt()
     subplot_kw = {}
     if projection is not None:
         subplot_kw['projection'] = projection
 
     fig = plt.figure(figsize=figsize)
-    axes = []   
- 
+    axes = []
+
     if layout_type == 'top_two_bottom_one':
         # Layout: Two subplots on top, one subplot below
-        gs = gridspec.GridSpec(3, 2, figure=fig,
-                               height_ratios=[1, 1, 2],
-                               width_ratios=[1, 1])
+        gs = gridspec.GridSpec(3, 2, figure=fig, height_ratios=[1, 1, 2], width_ratios=[1, 1])
 
         ax1 = fig.add_subplot(gs[0, 0], **subplot_kw)
         ax2 = fig.add_subplot(gs[0, 1], **subplot_kw)
@@ -264,9 +278,7 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
         axes = [ax1, ax2, ax3]
 
     elif layout_type == 'one':
-        gs = gridspec.GridSpec(1, 1, figure=fig,
-                               height_ratios=[1],
-                               width_ratios=[1])
+        gs = gridspec.GridSpec(1, 1, figure=fig, height_ratios=[1], width_ratios=[1])
         ax1 = fig.add_subplot(gs[0, 0], **subplot_kw)
         axes = [ax1]
 
@@ -278,7 +290,7 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
         ax3 = fig.add_subplot(gs[1, 0], **subplot_kw)
         ax4 = fig.add_subplot(gs[1, 1], **subplot_kw)
         axes = [ax1, ax2, ax3, ax4]
- 
+
     elif layout_type == 'left_large_right_stacked':
         # Layout: One large subplot on the left, stacked subplots on the right
         gs = gridspec.GridSpec(2, 2, figure=fig, width_ratios=[2, 1])
@@ -286,7 +298,7 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
         ax2 = fig.add_subplot(gs[0, 1], **subplot_kw)
         ax3 = fig.add_subplot(gs[1, 1], **subplot_kw)
         axes = [ax1, ax2, ax3]
- 
+
     elif layout_type == 'left_stacked_right_large':
         # Layout: Stacked subplots on the left, one large subplot on the right
         gs = gridspec.GridSpec(2, 2, figure=fig, width_ratios=[1, 2])
@@ -294,7 +306,7 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
         ax2 = fig.add_subplot(gs[1, 0], **subplot_kw)
         ax3 = fig.add_subplot(gs[:, 1], **subplot_kw)
         axes = [ax1, ax2, ax3]
- 
+
     elif nrows:
         gs = gridspec.GridSpec(nrows, 1, figure=fig)
         for irow in range(nrows):
@@ -307,7 +319,7 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
                 if irow < nrows - 1:
                     axes[irow].set_xticklabels([])
                     axes[irow].sharex(axes[0])
-                    
+
     elif ncols:
         gs = gridspec.GridSpec(1, ncols, figure=fig)
         for icol in range(ncols):
@@ -320,12 +332,13 @@ def create_subplots(nrows=None, ncols=None, layout_type=None, figsize=(8, 10), x
                 if icol < ncols - 1:
                     axes[icol].set_yticklabels([])
                     axes[icol].sharey(axes[0])
-                    
+
     else:
-        raise ValueError("Invalid layout_type or None nrows. Please choose a valid layout type or nrows.")
+        raise ValueError(
+            "Invalid layout_type or None nrows. Please choose a valid layout type or nrows."
+        )
 
     return fig, axes
-
 
 
 def save_figure(fig, filename, dpi=300):
@@ -344,7 +357,8 @@ def save_figure(fig, filename, dpi=300):
     # Save the figure with the specified filename and DPI
     fig.savefig(filename, dpi=dpi, bbox_inches='tight')
     plt.close(fig)
-    
+
+
 def diagdisp(x_data, y_data, ax, x_label, y_label):
     """Scatter plot with a diagonal, a linear regression line and R².
 
@@ -363,6 +377,7 @@ def diagdisp(x_data, y_data, ax, x_label, y_label):
         `ax`, or None if `x_data`/`y_data` have no valid (non-NaN) points.
     """
     from scipy.stats import linregress
+
     plt = _get_plt()
 
     x = x_data.values.ravel()
@@ -380,24 +395,45 @@ def diagdisp(x_data, y_data, ax, x_label, y_label):
     ax.set_ylim(global_min, global_max)
 
     res = linregress(x, y)
-    x_fit = np.linspace(global_min,global_max, 100)
+    x_fit = np.linspace(global_min, global_max, 100)
     y_fit = res.slope * x_fit + res.intercept
 
     ax.scatter(x, y, color='#1f77b4', edgecolor='k', alpha=0.6, label='Colocated data', s=50)
-    ax.plot([global_min, global_max], [global_min, global_max], linestyle='--', color='gray', linewidth=2, label='x = y')
-    ax.plot(x_fit, y_fit, color='#2ca02c', linewidth=3, label=f'y = {res.slope:.2f}x + {res.intercept:.2f}')
+    ax.plot(
+        [global_min, global_max],
+        [global_min, global_max],
+        linestyle='--',
+        color='gray',
+        linewidth=2,
+        label='x = y',
+    )
+    ax.plot(
+        x_fit,
+        y_fit,
+        color='#2ca02c',
+        linewidth=3,
+        label=f'y = {res.slope:.2f}x + {res.intercept:.2f}',
+    )
 
-    stats_text = f'$R^2$ = {res.rvalue**2:.2f}'#'\nσ = {res.stderr:.4f}'
-    ax.text(0.98, 0.05, stats_text, transform=plt.gca().transAxes,
-             verticalalignment='bottom', horizontalalignment='right',
-             fontsize=12, bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
+    stats_text = f'$R^2$ = {res.rvalue**2:.2f}'  #'\nσ = {res.stderr:.4f}'
+    ax.text(
+        0.98,
+        0.05,
+        stats_text,
+        transform=plt.gca().transAxes,
+        verticalalignment='bottom',
+        horizontalalignment='right',
+        fontsize=12,
+        bbox=dict(boxstyle='round', facecolor='white', alpha=0.9),
+    )
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     ax.legend(loc='upper left', fontsize=11, frameon=True, fancybox=True)
     ax.set_aspect('equal', adjustable='box')
-    #plt.tight_layout()
+    # plt.tight_layout()
     return ax
-    
+
+
 def shadow_line(x, y, ax, label=None, color='k'):
     """Plot a shadow line."""
     ax.plot(x, y - 0.2, color='gray', linewidth=3, alpha=0.3)

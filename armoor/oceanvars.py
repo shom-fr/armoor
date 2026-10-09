@@ -13,10 +13,12 @@ logger = logging.getLogger(__name__)
 def _gsw_ufunc(func, *args):
     """Wrap a gsw function so it works with both numpy and dask arrays."""
     return xr.apply_ufunc(
-        func, *args,
+        func,
+        *args,
         dask="parallelized",
         output_dtypes=[np.float32],
     )
+
 
 class OceanVars(MethodRegistry):
     """
@@ -88,7 +90,6 @@ class OceanVars(MethodRegistry):
         else:
             logger.warning("ssh not in dataset")
 
-
     def sel_bathy(self):
         """Select bathymetry from the dataset, if present."""
         if "bathy" in self.ds:
@@ -110,7 +111,7 @@ class OceanVars(MethodRegistry):
         if "cspeed" in self.ds:
             return self.ds["cspeed"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
-            return (self.ds.u ** 2 + self.ds.v ** 2) ** 0.5
+            return (self.ds.u**2 + self.ds.v**2) ** 0.5
         else:
             logger.warning("cspeed cannot be infered or computed")
 
@@ -152,20 +153,18 @@ class OceanVars(MethodRegistry):
                 pres = self.sel_pres()
                 ptemp = _gsw_ufunc(
                     gsw.conversions.pt0_from_t,
-                    sal, self.ds.temp, pres,
+                    sal,
+                    self.ds.temp,
+                    pres,
                 )
-                ptemp.attrs["standard_name"] = (
-                    "sea_water_potential_temperature"
-                )
+                ptemp.attrs["standard_name"] = "sea_water_potential_temperature"
                 ptemp.attrs["units"] = "degrees_celsius"
                 ptemp.attrs["long_name"] = "Potential temperature"
                 return ptemp
             else:
-                logger.warning(
-                    "No salinity found, potential temperature cannot be computed."
-                )
+                logger.warning("No salinity found, potential temperature cannot be computed.")
                 return None
-    
+
     def sel_temp(self):
         """
         Select temperature from the dataset.
@@ -190,7 +189,7 @@ class OceanVars(MethodRegistry):
             temp = _gsw_ufunc(gsw.t_from_CT, sal, cons_temp, pres)
             temp.attrs["units"] = "degC"
             return temp
-    
+
     def sel_sal(self):
         """
         Select or compute salinity from the dataset.
@@ -220,7 +219,7 @@ class OceanVars(MethodRegistry):
             sal.attrs["units"] = "1e-3"
             return sal
         return None
-    
+
     def sel_pres(self):
         """Select or compute sea pressure from the dataset.
 
@@ -250,7 +249,7 @@ class OceanVars(MethodRegistry):
             # multiple times via sel_ptemp / SA_from_SP).
             self.ds["pres"] = pres
             return self.ds["pres"]
-        
+
     def sel_pdens(self, ref_dens=None):
         """
         Select density from the dataset.
@@ -272,11 +271,14 @@ class OceanVars(MethodRegistry):
             ptemp = self.sel_ptemp()
             asal = _gsw_ufunc(
                 gsw.conversions.SA_from_SP,
-                sal, pres, self.ds.lon, self.ds.lat,
+                sal,
+                pres,
+                self.ds.lon,
+                self.ds.lat,
             )
             ctemp = _gsw_ufunc(gsw.CT_from_pt, asal, ptemp)
             del ptemp
-            if not asal is None and not ctemp is None:
+            if asal is not None and ctemp is not None:
                 if ref_dens is None or ref_dens not in [
                     0,
                     1000,
@@ -302,16 +304,14 @@ class OceanVars(MethodRegistry):
                     func = gsw.sigma4
                 pdens = _gsw_ufunc(func, asal, ctemp)
                 self.ds["pdens"] = pdens
-                self.ds["pdens"] = self.ds["pdens"].assign_attrs(
-                    {"units": "kg/m3"}
-                )
+                self.ds["pdens"] = self.ds["pdens"].assign_attrs({"units": "kg/m3"})
             else:
                 logger.warning(
                     "Caution, potential density could not be computed, ptemp or sal are missing."
                 )
                 return None
         return self.ds["pdens"]
-    
+
     def sel_sndspeed(self):
         """
         Compute the sound speed.
@@ -335,7 +335,10 @@ class OceanVars(MethodRegistry):
         pres = self.sel_pres()
         sal = _gsw_ufunc(
             gsw.conversions.SA_from_SP,
-            self.sel_sal(), pres, self.ds.lon, self.ds.lat,
+            self.sel_sal(),
+            pres,
+            self.ds.lon,
+            self.ds.lat,
         )
         snd_speed = _gsw_ufunc(gsw.sound_speed, sal, cons_temp, pres)
         snd_speed.attrs["units"] = "m/s"
@@ -353,18 +356,14 @@ class OceanVars(MethodRegistry):
         """
         from xoa.thermdyn import mixed_layer_depth
 
-        logger.info(
-                "COMPUTE MLD"
-        ) 
+        logger.info("COMPUTE MLD")
         if "mld" not in self.ds:
             ptemp = self.sel_ptemp()
             if not isinstance(ptemp, xr.DataArray):
                 logger.warning("Potential temperature cannot be computed")
                 return None
             if "depth" not in self.ds:
-                logger.warning(
-                    "No depth coordinate found, mixed layer depth cannot be computed"
-                )
+                logger.warning("No depth coordinate found, mixed layer depth cannot be computed")
                 return None
             # armoor.data.open_decode.register_cf() registers per-format CF
             # specs (cmems_argo, cmems_model, ...) into xoa's global meta
@@ -485,6 +484,7 @@ class OceanVars(MethodRegistry):
             return self.ds["div"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
             from shoot.dyn import get_div
+
             return get_div(self.ds.u, self.ds.v)
         else:
             logger.warning("Divergence cannot be infered or computed")
@@ -502,6 +502,7 @@ class OceanVars(MethodRegistry):
             return self.ds["okuboweiss"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
             from shoot.dyn import get_okuboweiss
+
             return get_okuboweiss(self.ds.u, self.ds.v)
         else:
             logger.warning("Okubo-Weiss cannot be infered or computed")
@@ -519,6 +520,7 @@ class OceanVars(MethodRegistry):
             return self.ds["relvort"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
             from shoot.dyn import get_relvort
+
             return get_relvort(self.ds.u, self.ds.v)
         else:
             logger.warning("Relative vorticity cannot be infered or computed")

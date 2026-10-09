@@ -10,8 +10,7 @@ DEFAULT_LOGGING_CONFIG = {
     "disable_existing_loggers": False,
     "formatters": {
         "brief": {
-            "format": ("%(asctime)s %(name)-12s: %(levelname)-8s"
-                       " %(message)s"),
+            "format": ("%(asctime)s %(name)-12s: %(levelname)-8s %(message)s"),
         },
         "precise": {
             "format": "%(asctime)s %(name)-12s: %(levelname)-8s %(message)s",
@@ -38,9 +37,11 @@ DEFAULT_LOGGING_CONFIG = {
 
 
 def setup_logging(
-    console_level: Optional[str] = None, file_level: Optional[str] = None,
+    console_level: Optional[str] = None,
+    file_level: Optional[str] = None,
     to_file: Union[bool, str] = True,
-    show_init_msg: bool = False, **kwargs
+    show_init_msg: bool = False,
+    **kwargs,
 ) -> None:
     """Setup the logging"""
 
@@ -73,16 +74,13 @@ def setup_logging(
     # Load it
     logging.config.dictConfig(logging_config)
     if show_init_msg:
-        logging.getLogger(__name__).debug(
-            "*** INITIALISED LOGGING SESSION ***")
+        logging.getLogger(__name__).debug("*** INITIALISED LOGGING SESSION ***")
 
 
 def add_logging_parser_arguments(parser: ArgumentParser, default_level: str = "info") -> None:
     """Add ``--log-level``/``--log-file`` arguments to an argparse parser."""
     add_log_level_parser_arguments(parser, default_level=default_level)
-    parser.add_argument(
-        "--log-file", help="logging file name", default="armoor.log"
-    )
+    parser.add_argument("--log-file", help="logging file name", default="armoor.log")
 
 
 def add_log_level_parser_arguments(parser: ArgumentParser, default_level: str = "info") -> None:
@@ -93,6 +91,7 @@ def add_log_level_parser_arguments(parser: ArgumentParser, default_level: str = 
         choices=["debug", "info", "warning", "error", "critical"],
         default=default_level,
     )
+
 
 def main_setup_logging(args: Namespace) -> None:
     """Configure logging from parsed CLI args (``--log-level``/``--log-file``).
@@ -107,6 +106,7 @@ def main_setup_logging(args: Namespace) -> None:
         `add_logging_parser_arguments`).
     """
     import os
+
     # When running inside a batch job, the scheduler already captures
     # stdout/stderr to a file.  Enabling FileHandler on top would write
     # every line twice to the same file (StreamHandler→stderr + FileHandler).

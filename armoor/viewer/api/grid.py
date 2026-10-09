@@ -62,9 +62,11 @@ def get_grid(dataset_id: str):
         j_idx = np.round(np.linspace(0, len(lats_1d) - 1, ny + 1)).astype(int)
         lons_mesh, lats_mesh = np.meshgrid(lons_1d[i_idx], lats_1d[j_idx])
 
-    return jsonify({
-        "lons": lons_mesh.tolist(),
-        "lats": lats_mesh.tolist(),
-        "nx": nx,
-        "ny": ny,
-    })
+    return jsonify(
+        {
+            "lons": lons_mesh.tolist(),
+            "lats": lats_mesh.tolist(),
+            "nx": nx,
+            "ny": ny,
+        }
+    )

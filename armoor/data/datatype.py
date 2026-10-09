@@ -6,10 +6,11 @@ metazone-parameter compatibility rules, and eventually different output/plot
 behavior. This mirrors ``armoor.comp.comparison``'s ``Comparison`` hierarchy,
 which solves the same shape of problem for ``armoor-comp-*``.
 """
+
 from armoor import ArmoorError
 
-_REGISTRY = {}     # fmt string -> DataType instance
-_BY_NAME = {}      # DataType.name -> DataType instance
+_REGISTRY = {}  # fmt string -> DataType instance
+_BY_NAME = {}  # DataType.name -> DataType instance
 
 
 class DataType:
@@ -93,13 +94,13 @@ class DataOceanModel(DataType):
         "maps": {
             "sort": ["time", "z"],
             "stat": ["time", "z"],
-            },
+        },
         "timeseries": {
             "sort": ["z"],
             "concat": ["time"],
             "stat": ["time", "z", "y", "x"],
             "output": "merge",
-            },
+        },
         "vprofiles_sel": {
             # Vertical profiles, one figure per trange/time and/or
             # vrange/vlevel group -- works with or without cloud
@@ -111,11 +112,11 @@ class DataOceanModel(DataType):
             "sort": ["time", "z"],
             "mparams_pro": {
                 "selection": ["tfreq", "trange_seq", "vlevel", "vrange"],
-                },
+            },
             "mparams_con": {
                 "vertical": ["vlevel"],
-                }
             },
+        },
         "mvprofiles": {
             # Vertical profiles, every point/member overlaid on one figure
             # per variable, merged across the whole series -- works with
@@ -129,20 +130,18 @@ class DataOceanModel(DataType):
             "output": "merge",
             "mparams_con": {
                 "vertical": ["vlevel"],
-                }
             },
+        },
         "uvprofiles": {
             # Cloud vertical profiles, one figure per point in the cloud.
             # concat (not sort) over both time and z -- see mvprofiles.
             "concat": ["time", "z"],
             "output": "merge",
-            "mparams_pro": {
-                "horizontal": ["cloud"]
-                },
+            "mparams_pro": {"horizontal": ["cloud"]},
             "mparams_con": {
                 "vertical": ["vlevel"],
-                }
             },
+        },
         "diagts_sel": {
             # Theta-saln diagram, one figure per trange/time and/or
             # vrange/vlevel group -- works with or without cloud
@@ -151,8 +150,8 @@ class DataOceanModel(DataType):
             "sort": ["time", "z"],
             "mparams_pro": {
                 "selection": ["tfreq", "trange_seq", "vlevel", "vrange"],
-                },
             },
+        },
         "mdiagts": {
             # Theta-saln diagram merging every time/z group into one
             # dataset (no sort -> single group; concat over both dims) so
@@ -166,29 +165,29 @@ class DataOceanModel(DataType):
             "output": "merge",
             "mparams_con": {
                 "vertical": ["vlevel"],
-                }
             },
+        },
         "udiagts": {
             # Cloud theta-saln diagram, one figure per profile in the cloud.
             "concat": ["time", "z"],
             "output": "merge",
             "mparams_pro": {
                 "horizontal": ["cloud"],
-                },
+            },
             "mparams_con": {
                 "vertical": ["vlevel"],
-                }
             },
+        },
         "vsections": {
             "concat": ["time", "z"],
             "output": "merge",
             "mparams_pro": {
                 "horizontal": ["section"],
-                },
+            },
             "mparams_con": {
                 "vertical": ["vlevel"],
-                }
             },
+        },
         "mapseries": {
             # One zarr per (time-bin, z) -- same "sort" as "maps", deliberately
             # *not* concat=["time"]: one output file per plot keeps main_plot's
@@ -200,8 +199,8 @@ class DataOceanModel(DataType):
             # pre-pass and attaches it as attrs, since a single zarr here no
             # longer holds the full series to compute it from directly.
             "sort": ["time", "z"],
-            },
-        }
+        },
+    }
 
 
 class DataWoa18(DataOceanModel):
@@ -259,7 +258,8 @@ class DataMeteo(DataOceanModel):
     name = "meteo"
     fmts = ("arpege_insta",)
     outputs_params = {
-        otype: params for otype, params in DataOceanModel.outputs_params.items()
+        otype: params
+        for otype, params in DataOceanModel.outputs_params.items()
         if otype in ("timeseries", "maps", "mapseries")
     }
 
@@ -278,8 +278,8 @@ class DataEddies(DataType):
             # of the time/z-based stat/sort armoor.data.datatype.py's
             # other types use. See armoor.diags.eddies.pdf.
             "concat": ["obs"],
-            },
-        }
+        },
+    }
 
 
 def get_data_type(fmt: str) -> DataType:

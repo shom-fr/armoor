@@ -57,9 +57,7 @@ class ColocSession:
         -------
         ColocSession
         """
-        dsref, dsprod = process_time_colocation(
-            self._ref, self._prod, param, tbound
-        )
+        dsref, dsprod = process_time_colocation(self._ref, self._prod, param, tbound)
         return ColocSession(dsprod, dsref)
 
     def horizontal(self, param):
@@ -74,9 +72,7 @@ class ColocSession:
         -------
         ColocSession
         """
-        dsref, dsprod = process_horizontal_colocation(
-            self._ref, self._prod, param
-        )
+        dsref, dsprod = process_horizontal_colocation(self._ref, self._prod, param)
         return ColocSession(dsprod, dsref)
 
     def vertical(self, param):
@@ -91,9 +87,7 @@ class ColocSession:
         -------
         ColocSession
         """
-        dsref, dsprod = process_vertical_colocation(
-            self._ref, self._prod, param
-        )
+        dsref, dsprod = process_vertical_colocation(self._ref, self._prod, param)
         return ColocSession(dsprod, dsref)
 
 

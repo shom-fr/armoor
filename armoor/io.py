@@ -1,8 +1,10 @@
 """Input/output."""
-import re, os
+
+import re
+import os
 import logging
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from argparse import ArgumentDefaultsHelpFormatter, RawDescriptionHelpFormatter
 
 import zarr
@@ -10,6 +12,7 @@ import dask
 import numpy as np
 import xarray as xr
 from dask.diagnostics import ProgressBar
+
 # dask.distributed is imported lazily in setup_dask_client to avoid the
 # heavy import cost at module load time on NFS HPC filesystems.
 from numcodecs import Blosc
@@ -17,9 +20,9 @@ from numcodecs import Blosc
 logger = logging.getLogger(__name__)
 
 
-class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
-                                 ArgumentDefaultsHelpFormatter):
+class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter, ArgumentDefaultsHelpFormatter):
     pass
+
 
 def find_valid_chunk_size(dim_size: int, current_first_chunk: int) -> int:
     """
@@ -81,17 +84,17 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
         logger.debug("=" * 70)
         logger.debug("AUTO-FIX ZARR CHUNKS")
         logger.debug("=" * 70)
-    
-    ds_fixed = ds.copy()   
-    
+
+    ds_fixed = ds.copy()
+
     encoding = {}
     lazy_minmax = []
     minmax_vars = []
 
     _CF_GEO_ATTRS = {
-        "lon":   {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
-        "lat":   {"axis": "Y", "standard_name": "latitude",  "units": "degrees_north"},
-        "depth": {"axis": "Z", "standard_name": "depth",     "positive": "down"},
+        "lon": {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
+        "lat": {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"},
+        "depth": {"axis": "Z", "standard_name": "depth", "positive": "down"},
     }
     # Process all variables (data + coords)
     all_vars = list(ds_fixed.data_vars) + list(ds_fixed.coords)
@@ -145,14 +148,20 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                         n_full = dim_size // optimal_size
                         remainder = dim_size % optimal_size
                         if remainder > 0:
-                            logger.debug(f"    - Result: {n_full} chunks of {optimal_size} + 1 chunk of {remainder}")
+                            logger.debug(
+                                f"    - Result: {n_full} chunks of {optimal_size} + 1 chunk of {remainder}"
+                            )
                         else:
-                            logger.debug(f"    - Result: {n_full} chunks of {optimal_size} (exact division)")
+                            logger.debug(
+                                f"    - Result: {n_full} chunks of {optimal_size} (exact division)"
+                            )
                 else:
                     # Chunks OK - keep the first chunk's size
                     new_chunks[dim_name] = first_chunk
                     if verbose:
-                        logger.debug(f"  {dim_name}: Chunks OK ({n_chunks} chunks: {first_chunk}...{last_chunk})")
+                        logger.debug(
+                            f"  {dim_name}: Chunks OK ({n_chunks} chunks: {first_chunk}...{last_chunk})"
+                        )
 
             # Cap chunks to stay under the Blosc 2 GB per-buffer limit
             _BLOSC_MAX_CHUNK_BYTES = 2_000_000_000
@@ -163,7 +172,7 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                         spatial = {d: new_chunks[d] for d in new_chunks if d != 'time'}
                         dim_to_reduce = max(
                             spatial if spatial else new_chunks,
-                            key=(spatial if spatial else new_chunks).__getitem__
+                            key=(spatial if spatial else new_chunks).__getitem__,
                         )
                         new_chunks[dim_to_reduce] = max(1, new_chunks[dim_to_reduce] // 2)
                         chunk_bytes = int(np.prod(list(new_chunks.values()))) * var.dtype.itemsize
@@ -192,7 +201,11 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
                 da_fixed.attrs[key] = float(val)
             elif isinstance(val, str):
                 da_fixed.attrs[key] = str(val)
-        if np.issubdtype(da_fixed.dtype, np.number) and da_fixed.size > 0 and da_fixed.chunks is not None:
+        if (
+            np.issubdtype(da_fixed.dtype, np.number)
+            and da_fixed.size > 0
+            and da_fixed.chunks is not None
+        ):
             lazy_minmax.append(da_fixed.min())
             lazy_minmax.append(da_fixed.max())
             minmax_vars.append(var_name)
@@ -219,6 +232,7 @@ def auto_fix_zarr_encoding(ds: xr.Dataset, verbose: bool = True) -> xr.Dataset:
 
     return ds_fixed, encoding, (lazy_minmax, minmax_vars)
 
+
 def _apply_minmax_to_zarr(path, minmax_vars, computed_minmax, ds):
     """Update zarr store attrs with computed valid_min/valid_max."""
     import cftime
@@ -241,10 +255,8 @@ def _apply_minmax_to_zarr(path, minmax_vars, computed_minmax, ds):
             if "units" in da_t.encoding:
                 units = da_t.encoding['units']
                 calendar = da_t.encoding.get('calendar', 'standard')
-                vmin = float(cftime.date2num(
-                    pd.to_datetime(vmin).to_pydatetime(), units, calendar))
-                vmax = float(cftime.date2num(
-                    pd.to_datetime(vmax).to_pydatetime(), units, calendar))
+                vmin = float(cftime.date2num(pd.to_datetime(vmin).to_pydatetime(), units, calendar))
+                vmax = float(cftime.date2num(pd.to_datetime(vmax).to_pydatetime(), units, calendar))
         store[var_name].attrs['valid_min'] = float(vmin)
         store[var_name].attrs['valid_max'] = float(vmax)
     zarr.consolidate_metadata(str(path))
@@ -270,8 +282,7 @@ class _BundledNetcdfWrite:
         """
         results = dask.compute(self._write_delayed, *self._lazy_minmax)
         if self._lazy_minmax:
-            _apply_minmax_to_netcdf(
-                self._path, self._minmax_vars, results[1:], self._ds)
+            _apply_minmax_to_netcdf(self._path, self._minmax_vars, results[1:], self._ds)
         return results[0]
 
 
@@ -300,8 +311,7 @@ class _BundledZarrWrite:
         """
         results = dask.compute(self._write_delayed, *self._lazy_minmax)
         if self._lazy_minmax:
-            _apply_minmax_to_zarr(
-                self._path, self._minmax_vars, results[1:], self._ds)
+            _apply_minmax_to_zarr(self._path, self._minmax_vars, results[1:], self._ds)
         return results[0]
 
 
@@ -325,7 +335,6 @@ def compute_bundled_zarr_writes(write_jobs):
     write_jobs : list of _BundledZarrWrite
         Write jobs returned by ``write_dataset_to_zarr(..., compute=False)``.
     """
-    import os
     scheduler = os.environ.get("ARMOOR_DASK_SCHEDULER", "threads")
 
     all_delayed = []
@@ -378,7 +387,8 @@ def compute_bundled_zarr_writes(write_jobs):
         n = len(job._lazy_minmax)
         if job._lazy_minmax:
             _apply_minmax_to_zarr(
-                job._path, job._minmax_vars, results[offset + 1: offset + 1 + n], job._ds)
+                job._path, job._minmax_vars, results[offset + 1 : offset + 1 + n], job._ds
+            )
         else:
             # No min/max to compute, but still consolidate metadata so that
             # subsequent xr.open_zarr() calls read a single .zmetadata file
@@ -402,10 +412,12 @@ def _apply_minmax_to_netcdf(path, minmax_vars, computed_minmax, ds):
                 if "units" in da_t.encoding:
                     units = da_t.encoding['units']
                     calendar = da_t.encoding.get('calendar', 'standard')
-                    vmin = float(cftime.date2num(
-                        pd.to_datetime(vmin).to_pydatetime(), units, calendar))
-                    vmax = float(cftime.date2num(
-                        pd.to_datetime(vmax).to_pydatetime(), units, calendar))
+                    vmin = float(
+                        cftime.date2num(pd.to_datetime(vmin).to_pydatetime(), units, calendar)
+                    )
+                    vmax = float(
+                        cftime.date2num(pd.to_datetime(vmax).to_pydatetime(), units, calendar)
+                    )
             if var_name in nc.variables:
                 nc.variables[var_name].setncattr('valid_min', float(vmin))
                 nc.variables[var_name].setncattr('valid_max', float(vmax))
@@ -436,8 +448,8 @@ def write_dataset_to_netcdf(ds: xr.Dataset, path: str, compute: bool = True):
             _apply_minmax_to_netcdf(path, minmax_vars, results[1:], ds)
         return results[0]
     else:
-        return _BundledNetcdfWrite(
-            write_delayed, lazy_minmax, minmax_vars, path, ds)
+        return _BundledNetcdfWrite(write_delayed, lazy_minmax, minmax_vars, path, ds)
+
 
 def write_dataset_to_zarr(
     ds: xr.Dataset,
@@ -447,8 +459,8 @@ def write_dataset_to_zarr(
     compute: bool = True,
     minmax: bool = True,
     compressor=None,
-    **kwargs
-    ):
+    **kwargs,
+):
     """
     Safely save a dataset to Zarr, with automatic encoding fixes.
 
@@ -489,13 +501,8 @@ def write_dataset_to_zarr(
 
     # Create delayed write job
     write_delayed = ds.to_zarr(
-        path,
-        mode=mode,
-        consolidated=consolidated,
-        compute=False,
-        encoding=encoding,
-        **kwargs
-        )
+        path, mode=mode, consolidated=consolidated, compute=False, encoding=encoding, **kwargs
+    )
 
     if write_delayed is None:
         # Older xarray (< 2022.06) writes synchronously for non-dask datasets
@@ -512,8 +519,8 @@ def write_dataset_to_zarr(
         return results[0]
     else:
         logger.info("Delayed writting.")
-        return _BundledZarrWrite(
-            write_delayed, lazy_minmax, minmax_vars, path, ds)
+        return _BundledZarrWrite(write_delayed, lazy_minmax, minmax_vars, path, ds)
+
 
 def create_fast_encoding(ds):
     """Create an encoding optimized for save speed."""
@@ -522,7 +529,7 @@ def create_fast_encoding(ds):
     for var_name, var in ds.data_vars.items():
         encoding[var_name] = {
             'compressor': Blosc(cname='zstd', clevel=1),
-            'dtype': np.float32 if var.dtype == np.float64 else var.dtype
+            'dtype': np.float32 if var.dtype == np.float64 else var.dtype,
         }
         # Optimized NetCDF chunks
         if hasattr(var.data, 'chunks') and var.data.chunks:
@@ -534,22 +541,23 @@ def create_fast_encoding(ds):
                 else:
                     chunk_size = min(dim_chunks, var.shape[i])
                 chunksizes.append(int(chunk_size))
-            
+
             encoding[var_name]['chunks'] = tuple(chunksizes)
-    
+
     return encoding
+
 
 def get_zarr_encoding(ds: xr.Dataset, rechunk: bool = True) -> dict:
     """
     Create encoding dict for fast zarr save/load of large datasets.
-    
+
     Parameters
     ----------
     ds
         xarray dataset
     rechunk
         if True, rechunk dataset to avoid conflicts
-        
+
     Returns
     -------
     encoding dict for .to_zarr()
@@ -560,29 +568,29 @@ def get_zarr_encoding(ds: xr.Dataset, rechunk: bool = True) -> dict:
 def zarrs2netcdfs(fins):
     """
     Convert multiple Zarr files to NetCDF format.
-    
+
     This function takes a list of Zarr file paths and converts each one to NetCDF format
     by replacing the file extension from 'zarr' to 'nc'. The conversion is performed
     using xarray's open_zarr() and to_netcdf() methods.
-    
+
     Parameters
     ----------
     fins : list of str
         List of input Zarr file paths to be converted. Empty or None values in the
         list will be skipped.
-    
+
     Returns
     -------
     list of str
         List of output NetCDF file paths that were successfully created.
-        
+
     Notes
     -----
     - Requires xarray to be imported as 'xr'
     - Input files must have 'zarr' extension
     - Output files will have 'nc' extension
     - Empty or None input paths are automatically skipped
-    
+
     Examples
     --------
     >>> import xarray as xr
@@ -614,24 +622,28 @@ def zarrs2netcdfs(fins):
         fouts = []
     return fouts
 
+
 def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, localdirectory):  # noqa: E501
     """Build a robust Dask client configuration."""
     from dask.distributed import Client  # noqa: F401 — lazy import, heavy on NFS HPC
-    dask.config.set({
-        "distributed.worker.profile.enabled": False,
-        'distributed.worker.daemon': False,
-        'distributed.comm.timeouts.connect': '120s',
-        'distributed.comm.timeouts.tcp': '120s',
-        'distributed.worker.memory.target': 0.9,
-        'distributed.worker.memory.spill': 0.8,
-        'distributed.worker.memory.pause': 0.9,
-        'distributed.worker.memory.terminate': 0.95,
-        'distributed.worker.memory.monitor-interval': '100ms',
-        'distributed.scheduler.allowed-failures': 2,
-        'distributed.scheduler.work-stealing': True,
-        'array.slicing.split_large_chunks': True,
-        'optimization.fuse.active': True,
-    })
+
+    dask.config.set(
+        {
+            "distributed.worker.profile.enabled": False,
+            'distributed.worker.daemon': False,
+            'distributed.comm.timeouts.connect': '120s',
+            'distributed.comm.timeouts.tcp': '120s',
+            'distributed.worker.memory.target': 0.9,
+            'distributed.worker.memory.spill': 0.8,
+            'distributed.worker.memory.pause': 0.9,
+            'distributed.worker.memory.terminate': 0.95,
+            'distributed.worker.memory.monitor-interval': '100ms',
+            'distributed.scheduler.allowed-failures': 2,
+            'distributed.scheduler.work-stealing': True,
+            'array.slicing.split_large_chunks': True,
+            'optimization.fuse.active': True,
+        }
+    )
 
     kw_client = dict(
         n_workers=n_workers,
@@ -640,10 +652,11 @@ def setup_dask_client(n_workers, processes, memory_limit, dashboardaddress, loca
         silence_logs=True,
         dashboard_address=dashboardaddress,
         local_directory=localdirectory,
-        processes=processes
+        processes=processes,
     )
 
     return kw_client
+
 
 def output_suffix(attrs):
     """Build the ``_<time-or-trange>_<vlevel-or-vrange>`` output filename suffix.
@@ -680,19 +693,19 @@ def output_suffix(attrs):
 def extract_suffix_from_filename(filename):
     """
     Extracts 'time' and 'z' values from a filename in the format ref_[time]_[z].nc
-    
+
     Parameters
     ----------
     filename : str
         Filename to analyze
-        
+
     Returns
     -------
     dict
         Dictionary with 'time' and 'z' keys (values None if not found)
     """
     result = {'time': None, 'z': None}
-    
+
     sub_pattern_time = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
     pattern_time = rf'(_(?P<dates>{sub_pattern_time}(?:_{sub_pattern_time})?))'
 
@@ -717,8 +730,9 @@ def extract_suffix_from_filename(filename):
     match_z = re.search(pattern_z_only, filename)
     if match_z and not result['time']:  # Only if time not already found
         result['z'] = match_z.group(2)
-        
+
     return result
+
 
 def _range_info_from_staged(nc):
     """Read time/vlevel-like info directly off a StagedDataset, if present.
@@ -751,8 +765,7 @@ def _range_info_from_staged(nc):
 
 
 def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List[str]]:
-    """Sort a list of NetCDF files by their suffix.
-    """
+    """Sort a list of NetCDF files by their suffix."""
     ncouts = {}
     for nc in ncs:
         res = _range_info_from_staged(nc)
@@ -763,9 +776,9 @@ def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List
             if res.get("time") and res.get("z"):
                 suff = f"{res['time']}_{res['z']}"
             elif not res.get("time") and res.get("z"):
-                suff =  f"{res['z']}"
+                suff = f"{res['z']}"
             elif res.get("time") and not res.get("z"):
-                suff =  f"{res['time']}"
+                suff = f"{res['time']}"
             else:
                 suff = "None"
         elif sort_dim == ["z"]:
@@ -783,7 +796,7 @@ def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List
 
         if not ncouts.get(suff):
             ncouts[suff] = []
-        
+
         ncouts[suff].append(nc)
 
     return ncouts

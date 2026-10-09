@@ -1,9 +1,5 @@
 import logging
-import os
-import re
-from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -14,23 +10,26 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from tqdm import tqdm
-from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
-from cartopy.mpl.ticker import (LatitudeFormatter, LatitudeLocator,
-                                LongitudeFormatter, LongitudeLocator)
 from matplotlib.collections import LineCollection
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts, plot_flow
 from xoa import geo as xgeo
 
-from armoor import LINE_COLORS, CMAP_VARS, MINMAX_VARS
+from armoor import CMAP_VARS, MINMAX_VARS
 from armoor.dispatch import SubclassingMethodRegistry
-from armoor.filters import create_optimized_mask
-from armoor.interp import vinterp
-from armoor.plot import (create_subplots, diagdisp, format_time_label,
-                          format_vertical_label, get_output_vminmax,
-                          save_figure)
+from armoor.plot import (
+    create_subplots,
+    format_time_label,
+    format_vertical_label,
+    get_output_vminmax,
+    save_figure,
+)
 from armoor.data.datatype import (
-    DataEddies, DataMeteo, DataOceanModel, DataSstSatellite, get_data_type_by_name
+    DataEddies,
+    DataMeteo,
+    DataOceanModel,
+    DataSstSatellite,
+    get_data_type_by_name,
 )
 # from armoor.comp.stats import StatsComp
 
@@ -43,8 +42,7 @@ plt.rcParams.update({'font.size': 8})
 MS_TO_KNOTS = 1.9438444924406046
 
 
-def _cbar_range(da_all, var, vminmax, nstd, group_range=None,
-                series_mean=None, series_std=None):
+def _cbar_range(da_all, var, vminmax, nstd, group_range=None, series_mean=None, series_std=None):
     """Compute a scalar variable's color scale, fixed once over a whole
     mapseries -- not recomputed per frame like maps()/`_maps_raw` do.
 
@@ -148,11 +146,7 @@ class PlotOceanModel(_PlotDataBase):
         -------
         None
         """
-        fig, axes = create_subplots(
-            ncols=1,
-            figsize=(8, 8),
-            title=figtitle.format(**locals())
-            )
+        fig, axes = create_subplots(ncols=1, figsize=(8, 8), title=figtitle.format(**locals()))
         ax0 = axes[0]
         if 'depth' in self.vminmax:
             vmin, vmax = self.vminmax['depth']
@@ -160,37 +154,42 @@ class PlotOceanModel(_PlotDataBase):
             vmin = -dsprod.depth.max()
             vmax = -dsprod.depth.min()
         if 'ptemp' in self.vminmax:
-            tmin,tmax = self.vminmax['ptemp']
+            tmin, tmax = self.vminmax['ptemp']
         else:
             tmin = dsprod.ptemp.min()
             tmax = dsprod.ptemp.max()
         if 'ptemp' in self.vminmax:
-            smin,smax = self.vminmax['sal']
+            smin, smax = self.vminmax['sal']
         else:
             smin = dsprod.sal.min()
             smax = dsprod.sal.max()
         tsprod = plot_ts(
-            dsprod.ptemp, dsprod.sal,
-            dens=True, potential=True, absolute=False,
-            clabel=True, contour_linewidths=0.2,
+            dsprod.ptemp,
+            dsprod.sal,
+            dens=True,
+            potential=True,
+            absolute=False,
+            clabel=True,
+            contour_linewidths=0.2,
             colorbar=False,
             axes=ax0,
             scatter_kwargs=dict(
                 c=-dsprod.depth,
                 cmap=cmo.cm.deep_r,
-                vmin=vmin, vmax=vmax,
+                vmin=vmin,
+                vmax=vmax,
                 edgecolor='k',
                 alpha=0.8,
                 linewidths=0.5,
                 s=50,
-                )
-            )
+            ),
+        )
         tsprod["axes"].set_ylabel("ptemp, degrees_C")
         tsprod["axes"].set_xlabel("sal, psu")
         tsprod["axes"].set_xlim([smin, smax])
         tsprod["axes"].set_ylim([tmin, tmax])
         tsprod["axes"].grid(False)
-    
+
         divider = make_axes_locatable(tsprod["axes"])
         cax = divider.append_axes("right", size="5%", pad=0.1)
         cax.axis('off')
@@ -201,34 +200,25 @@ class PlotOceanModel(_PlotDataBase):
             fraction=0.02,
             pad=0.02,
             shrink=0.7,
-            label="Depth, m"
-            )
-        if dsprod.lon.dims != ("x" ,"y"):
+            label="Depth, m",
+        )
+        if dsprod.lon.dims != ("x", "y"):
             kw = dict(
-                plot_coords = "points",
+                plot_coords="points",
                 coords_markersize=4,
                 gridlines_draw_labels=True,
-                )
+            )
         else:
             kw = dict(
-                plot_coords = "filledbox",
+                plot_coords="filledbox",
                 gridlines_draw_labels=True,
-                )
-        kw.update(
-            gridlines_xlabel_style={'size': 6},
-            gridlines_ylabel_style={'size': 6}
             )
+        kw.update(gridlines_xlabel_style={'size': 6}, gridlines_ylabel_style={'size': 6})
         ax_minimap = plot_minimap(dsprod, ax=self.ax_minimap, **kw)
-        fig.suptitle(
-            figtitle.format(**locals()),
-            y=1.02
-            )
+        fig.suptitle(figtitle.format(**locals()), y=1.02)
         fig.subplots_adjust(top=0.85)
-        self.save_figure(
-            fig,
-            figname.format(**locals())
-            )
-    
+        self.save_figure(fig, figname.format(**locals()))
+
     def _diagts_merged(self, prefix, include_vertical):
         """Render one theta-saln diagram merging every point it is given.
 
@@ -268,15 +258,8 @@ class PlotOceanModel(_PlotDataBase):
             if v_title:
                 xtitle += f"\n{v_title}"
             xfigname += v_name
-        figtitle = (
-            f"{data_name}\n"
-            f"{self.metazone}\n"
-            f"{xtitle}"
-            )
-        figname = (
-            f"data/plot/{self.metazone}/"
-            f"{prefix}_{data_name}{xfigname}.png"
-            )
+        figtitle = f"{data_name}\n{self.metazone}\n{xtitle}"
+        figname = f"data/plot/{self.metazone}/{prefix}_{data_name}{xfigname}.png"
         self._mdiagts(dsprod, figtitle, figname)
 
     def diagts_sel(self):
@@ -316,43 +299,39 @@ class PlotOceanModel(_PlotDataBase):
                 xtitle = f"{time:%Y-%m-%dT%H:%M:%S}"
                 xfigname = f"_{time:%Y-%m-%dT%H:%M:%S}"
                 figname = (
-                    f"data/plot/{self.metazone}/"
-                    f"udiagts_{data_name}_{lat_pt}_{lon_pt}{xfigname}.png"
-                    )
-                figtitle = (
-                    f"{data_name}\n"
-                    f"{self.metazone}\n"
-                    f"{lat_pt}N; {lon_pt}E\n"
-                    f"{xtitle}"
-                    )
+                    f"data/plot/{self.metazone}/udiagts_{data_name}_{lat_pt}_{lon_pt}{xfigname}.png"
+                )
+                figtitle = f"{data_name}\n{self.metazone}\n{lat_pt}N; {lon_pt}E\n{xtitle}"
                 fig, ax = create_subplots(
                     nrows=1,
                     figsize=(5, 8),
-                    )
-                fig.suptitle(
-                    figtitle,
-                    y=1.01
-                    )
+                )
+                fig.suptitle(figtitle, y=1.01)
                 fig.subplots_adjust(top=0.85)
                 ax = ax[0]
                 kw_prod = {"label": data_name}
                 tsprod = plot_ts(
-                    ds.ptemp, ds.sal,
-                    dens=True, potential=True, absolute=False,
-                    clabel=True, contour_linewidths=0.2,
+                    ds.ptemp,
+                    ds.sal,
+                    dens=True,
+                    potential=True,
+                    absolute=False,
+                    clabel=True,
+                    contour_linewidths=0.2,
                     colorbar=False,
                     axes=ax,
                     scatter_kwargs=dict(
                         c=-ds.depth,
                         cmap=cmo.cm.deep_r,
-                        vmin=zmin, vmax=zmax,
+                        vmin=zmin,
+                        vmax=zmax,
                         edgecolor='k',
                         alpha=0.8,
                         linewidths=0.5,
                         s=50,
-                        **kw_prod
-                        )
-                    )
+                        **kw_prod,
+                    ),
+                )
                 divider = make_axes_locatable(tsprod["axes"])
                 cax = divider.append_axes("right", size="5%", pad=0.1)
                 cax.axis('off')
@@ -363,24 +342,21 @@ class PlotOceanModel(_PlotDataBase):
                     fraction=0.02,
                     pad=0.02,
                     shrink=0.7,
-                    label="Depth, m"
-                    )
+                    label="Depth, m",
+                )
                 ax = tsprod["axes"]
                 ax.set_ylabel("temp, degrees_C")
                 ax.set_xlabel("sal, psu")
                 ax.grid(False)
                 kw = dict(
-                    plot_coords = "points",
+                    plot_coords="points",
                     coords_markersize=4,
                     gridlines_draw_labels=True,
                     gridlines_xlabel_style={'size': 6},
                     gridlines_ylabel_style={'size': 6},
-                    )
+                )
                 plot_minimap(ds, ax=self.ax_minimap, **kw)
-                self.save_figure(
-                    fig,
-                    figname.format(**locals())
-                    )
+                self.save_figure(fig, figname.format(**locals()))
 
     def _mvprofiles(self, dsprod, figtitle, figname):
         """Render and save multiple vertical profiles, one figure per variable.
@@ -411,9 +387,7 @@ class PlotOceanModel(_PlotDataBase):
         # not share mask's other dims (time/member/npts) -- reduce the
         # mask down to "z" first so .where() has matching dims, keeping
         # whichever levels have at least one valid point.
-        z_mask = mask if mask.dims == ("z",) else mask.any(
-            dim=[d for d in mask.dims if d != "z"]
-            )
+        z_mask = mask if mask.dims == ("z",) else mask.any(dim=[d for d in mask.dims if d != "z"])
         depth = dsprod.depth.where(z_mask, drop=True)
         if 'depth' in self.vminmax:
             zmin, zmax = self.vminmax['depth']
@@ -432,62 +406,59 @@ class PlotOceanModel(_PlotDataBase):
             if "z" not in dsprod[var].squeeze().dims:
                 continue
             units = dsprod[var].attrs.get('units')
-            fig, ax = create_subplots(
-                nrows=1,
-                figsize=(5, 8),
-                title=figtitle.format(**locals())
-                )
+            fig, ax = create_subplots(nrows=1, figsize=(5, 8), title=figtitle.format(**locals()))
             ax = ax[0]
 
             if "member" not in dsprod.depth.dims:
                 dsprod["depth"] = dsprod["depth"].broadcast_like(dsprod[var])
             daprod = dsprod[var]
-            
+
             if var in self.vminmax:
                 vmin, vmax = self.vminmax[var]
             else:
                 vmin = daprod.min()
                 vmax = daprod.max()
-            
+
             prod_data = daprod.values
             prod_depth = -dsprod["depth"].values
-            
+
             n_depths, n_times, n_members = prod_data.shape
-            
+
             # Create LineCollection for production data
-            prod_segments = [np.column_stack([prod_data[:, i, j], prod_depth[:, i, j]]) 
-                             for i in range(n_times) for j in range(n_members)]
-            prod_lc = LineCollection(prod_segments, colors=prod_color, linewidths=1.0, alpha=0.5, label=dsprod.attrs["data_name"])
+            prod_segments = [
+                np.column_stack([prod_data[:, i, j], prod_depth[:, i, j]])
+                for i in range(n_times)
+                for j in range(n_members)
+            ]
+            prod_lc = LineCollection(
+                prod_segments,
+                colors=prod_color,
+                linewidths=1.0,
+                alpha=0.5,
+                label=dsprod.attrs["data_name"],
+            )
             ax.add_collection(prod_lc)
 
-            ax.legend(
-                fontsize=11, frameon=True, fancybox=True
-                )
-                
+            ax.legend(fontsize=11, frameon=True, fancybox=True)
+
             ax.set_xlabel(f"{var}, {units}")
             ax.set_ylabel("Depth, m")
             ax.set_xlim([vmin, vmax])
             ax.set_ylim([zmin, zmax])
             kw = dict(
-                plot_coords = "points",
+                plot_coords="points",
                 coords_markersize=4,
                 gridlines_draw_labels=True,
                 gridlines_xlabel_style={'size': 6},
                 gridlines_ylabel_style={'size': 6},
-                )
+            )
             ax_minimap = plot_minimap(dsprod, ax=self.ax_minimap, **kw)
-            
-            fig.suptitle(
-                figtitle.format(**locals()),
-                y=1.01
-                )
+
+            fig.suptitle(figtitle.format(**locals()), y=1.01)
             fig.subplots_adjust(top=0.85)
 
-            self.save_figure(
-                fig,
-                figname.format(**locals())
-                )
-    
+            self.save_figure(fig, figname.format(**locals()))
+
     def _vprofiles_merged(self, prefix):
         """Render vertical profiles, one figure per variable, for whatever
         points/times this call is given (shared by `vprofiles_sel` and
@@ -515,15 +486,8 @@ class PlotOceanModel(_PlotDataBase):
         xfigname += v_name
         var = "{var}"
         prodname = dsprod.attrs.get("data_name")
-        figtitle = (
-            f"{prodname}\n"
-            f"{self.metazone}\n"
-            f"{xtitle}"
-            )
-        figname = (
-            f"data/plot/{self.metazone}/"
-            f"{prefix}_{prodname}_{var}{xfigname}.png"
-            )
+        figtitle = f"{prodname}\n{self.metazone}\n{xtitle}"
+        figname = f"data/plot/{self.metazone}/{prefix}_{prodname}_{var}{xfigname}.png"
         self._mvprofiles(dsprod, figtitle, figname)
 
     def vprofiles_sel(self):
@@ -555,13 +519,8 @@ class PlotOceanModel(_PlotDataBase):
                 figname = (
                     f"data/plot/{self.metazone}/"
                     "uvprofiles_{data_name}_{var}_{lat_pt}_{lon_pt}{xfigname}.png"
-                    )
-                figtitle = (
-                    f"{data_name}\n"
-                    f"{self.metazone}\n"
-                    f"{lat_pt}N; {lon_pt}E\n"
-                    f"{xtitle}"
-                    )
+                )
+                figtitle = f"{data_name}\n{self.metazone}\n{lat_pt}N; {lon_pt}E\n{xtitle}"
                 daprod = ds[var].copy()
                 if "z" not in daprod.dims:
                     continue
@@ -575,22 +534,20 @@ class PlotOceanModel(_PlotDataBase):
                 mask = ~daprod.isnull()
                 depth = depth.where(mask, drop=True)
                 daprod = daprod.where(mask, drop=True)
-                
+
                 units = daprod.attrs.get('units')
                 fig, ax = create_subplots(
-                    nrows=1,
-                    figsize=(5, 8),
-                    title=figtitle.format(**locals())
-                    )
+                    nrows=1, figsize=(5, 8), title=figtitle.format(**locals())
+                )
                 ax = ax[0]
-                        
+
                 if var in self.vminmax:
                     vmin, vmax = self.vminmax[var]
                 else:
                     vmin = daprod.min()
                     vmax = daprod.max()
                 prod_data = daprod.values
-                
+
                 if 'depth' in self.vminmax:
                     zmin, zmax = self.vminmax['depth']
                 else:
@@ -601,39 +558,34 @@ class PlotOceanModel(_PlotDataBase):
                 n_depths, n_times = daprod.shape
 
                 # Create LineCollection for production data
-                prod_segments = [np.column_stack([prod_data[:, i], -depth_data[:, i]]) 
-                                  for i in range(n_times)]
-                prod_lc = LineCollection(prod_segments, colors="slateblue", linewidths=2.0, alpha=0.8, label=data_name)
+                prod_segments = [
+                    np.column_stack([prod_data[:, i], -depth_data[:, i]]) for i in range(n_times)
+                ]
+                prod_lc = LineCollection(
+                    prod_segments, colors="slateblue", linewidths=2.0, alpha=0.8, label=data_name
+                )
                 ax.add_collection(prod_lc)
-                
-                ax.legend(
-                    fontsize=11, frameon=True, fancybox=True
-                    )
-                    
+
+                ax.legend(fontsize=11, frameon=True, fancybox=True)
+
                 ax.set_xlabel(f"{var}, {units}")
                 ax.set_ylabel("Depth, m")
                 ax.set_xlim([vmin, vmax])
                 ax.set_ylim([zmin, zmax])
-                
+
                 kw = dict(
-                    plot_coords = "points",
+                    plot_coords="points",
                     coords_markersize=4,
                     gridlines_draw_labels=True,
                     gridlines_xlabel_style={'size': 6},
                     gridlines_ylabel_style={'size': 6},
-                    )
+                )
                 ax_minimap = plot_minimap(ds, ax=self.ax_minimap, **kw)
-                
-                fig.suptitle(
-                    figtitle.format(**locals()),
-                    y=1.01
-                    )
+
+                fig.suptitle(figtitle.format(**locals()), y=1.01)
                 fig.subplots_adjust(top=0.85)
 
-                self.save_figure(
-                    fig,
-                    figname.format(**locals())
-                    )
+                self.save_figure(fig, figname.format(**locals()))
 
     def vsections(self):
         """Plot vertical sections (distance vs depth) along a broken-line transect."""
@@ -643,10 +595,7 @@ class PlotOceanModel(_PlotDataBase):
         section_name = dsprod.attrs.get("section_name")
         distance = dsprod["distance"] / 1000.0
 
-        vars2plot = [
-            var for var in dsprod.data_vars
-            if var != "depth" and "z" in dsprod[var].dims
-            ]
+        vars2plot = [var for var in dsprod.data_vars if var != "depth" and "z" in dsprod[var].dims]
         times = dsprod["time"].values if "time" in dsprod.dims else [None]
 
         for var in vars2plot:
@@ -674,9 +623,8 @@ class PlotOceanModel(_PlotDataBase):
                 depth2d = depth2d.transpose("z", "npts")
 
                 time_str = (
-                    pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
-                    if time_val is not None else ""
-                    )
+                    pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S") if time_val is not None else ""
+                )
                 title_lines = [data_name, self.metazone]
                 if section_name:
                     title_lines.append(section_name)
@@ -688,13 +636,21 @@ class PlotOceanModel(_PlotDataBase):
                 fig, axes = create_subplots(nrows=1, figsize=(9, 5))
                 ax = axes[0]
                 m = ax.pcolormesh(
-                    distance2d, -depth2d, da,
-                    vmin=vmin, vmax=vmax, cmap=CMAP_VARS[var],
-                    )
+                    distance2d,
+                    -depth2d,
+                    da,
+                    vmin=vmin,
+                    vmax=vmax,
+                    cmap=CMAP_VARS[var],
+                )
                 fig.colorbar(
-                    m, ax=ax, orientation="vertical", label=f"{var}, {units}",
-                    fraction=0.05, shrink=0.8,
-                    )
+                    m,
+                    ax=ax,
+                    orientation="vertical",
+                    label=f"{var}, {units}",
+                    fraction=0.05,
+                    shrink=0.8,
+                )
                 ax.set_xlabel("Distance, km")
                 ax.set_ylabel("Depth, m")
 
@@ -704,7 +660,7 @@ class PlotOceanModel(_PlotDataBase):
                     gridlines_draw_labels=True,
                     gridlines_xlabel_style={'size': 6},
                     gridlines_ylabel_style={'size': 6},
-                    )
+                )
                 plot_minimap(dsprod, ax=self.ax_minimap, **kw)
 
                 fig.suptitle(figtitle, y=1.01)
@@ -715,7 +671,7 @@ class PlotOceanModel(_PlotDataBase):
                     f"vsections_{var}_{data_name}"
                     f"{'_' + section_name if section_name else ''}"
                     f"{'_' + time_str if time_str else ''}.png"
-                    )
+                )
                 self.save_figure(fig, figname)
 
     def _timeseries_raw(self, ds_data):
@@ -771,11 +727,13 @@ class PlotOceanModel(_PlotDataBase):
                     figname = (
                         f"data/plot/{self.metazone}/"
                         f"timeseries_{data_name}_{var}{pt_name}{z_name}.png"
-                        )
+                    )
                     fig, axes = create_subplots(
-                        nrows=1, figsize=(10, 5),
-                        x_label='Date', y_label=None,
-                        )
+                        nrows=1,
+                        figsize=(10, 5),
+                        x_label='Date',
+                        y_label=None,
+                    )
                     ax = axes[0]
                     title_lines = [data_name, self.metazone]
                     if z_title.strip():
@@ -797,7 +755,7 @@ class PlotOceanModel(_PlotDataBase):
                         gridlines_draw_labels=True,
                         gridlines_xlabel_style={'size': 6},
                         gridlines_ylabel_style={'size': 6},
-                        )
+                    )
                     ax.plot(da["time"], da, color="slateblue", linewidth=2)
                     ax.set_ylabel(var)
                     self.save_figure(fig, figname)
@@ -811,19 +769,16 @@ class PlotOceanModel(_PlotDataBase):
         ds_std = self.dt.children["std"].to_dataset()
         attrs = ds_data.attrs
         data_name = attrs.get("data_name")
-        
+
         if "npts" in ds_data.dims:
             npts = ds_data.sizes["npts"]
             figname = (
                 "data/plot/{self.metazone}/"
                 "timeseries_{data_name}_{var}_{lat_pt}_{lon_pt}{ncname}.png"
-                )
+            )
         else:
             npts = 1
-            figname = (
-                "data/plot/{self.metazone}/"
-                "timeseries_{data_name}_{var}{ncname}.png"
-                )
+            figname = "data/plot/{self.metazone}/timeseries_{data_name}_{var}{ncname}.png"
         vars2plot = [var for var in ds_data.data_vars if var != "depth"]
         for var in vars2plot:
             for inpt in range(npts):
@@ -844,10 +799,8 @@ class PlotOceanModel(_PlotDataBase):
                         v_part = f"{vrange}"
                 t_part = f"time range {attrs.get('trange_seq')}" if "trange_seq" in attrs else ""
                 fig, axes = create_subplots(
-                    nrows=2, figsize=(10, 6),
-                    x_label='Date', y_label=None,
-                    sharex=True
-                    )
+                    nrows=2, figsize=(10, 6), x_label='Date', y_label=None, sharex=True
+                )
                 pt_part = ""
                 if npts > 1:
                     da_mean = ds_mean[var].isel(npts=inpt)
@@ -871,7 +824,7 @@ class PlotOceanModel(_PlotDataBase):
                 fig.suptitle("\n".join(title_lines), y=1.01)
                 fig.subplots_adjust(top=0.85)
                 lw = 2
-                
+
                 if ds_data.lon.dims == ("x", "y"):
                     plot_coords = "filledbox"
                 else:
@@ -885,31 +838,31 @@ class PlotOceanModel(_PlotDataBase):
                     gridlines_xlabel_style={'size': 6},
                     gridlines_ylabel_style={'size': 6},
                 )
-                
+
                 if "member" in da_mean.dims:
                     da_mean = da_mean.mean("member")
                     da_std = da_std.mean("member")
-                    
+
                 axes[0].plot(
                     da_mean["time"],
                     da_mean,
                     color="slateblue",
                     linewidth=lw,
-                    )
-                
+                )
+
                 axes[1].plot(
                     da_std["time"],
                     da_std,
                     color="slateblue",
                     linewidth=lw,
-                    )
-                
+                )
+
                 axes[0].set_ylabel("Mean")
                 axes[1].set_ylabel("St. D.")
-    
+
                 self.save_figure(fig, figname.format(**locals()))
-        return None    
-        
+        return None
+
     def _plot_current_background(self, ax, u, v, vmin, vmax, show_flow=True):
         """Plot current speed (module) as a pcolormesh/scatter background,
         optionally with current direction overlaid via xoa.plot.plot_flow
@@ -932,18 +885,12 @@ class PlotOceanModel(_PlotDataBase):
         matplotlib.collections.QuadMesh or PathCollection
             The background mappable, for colorbar attachment.
         """
-        speed = np.sqrt(u ** 2 + v ** 2)
+        speed = np.sqrt(u**2 + v**2)
         is_cloud = ("npts" in u.dims) or (u.lon.dims != ("y", "x"))
         if is_cloud:
-            m = ax.scatter(
-                u.lon, u.lat, c=speed,
-                vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
-                )
+            m = ax.scatter(u.lon, u.lat, c=speed, vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"])
         else:
-            m = ax.pcolormesh(
-                u.lon, u.lat, speed,
-                vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
-                )
+            m = ax.pcolormesh(u.lon, u.lat, speed, vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"])
 
         if not show_flow:
             return m
@@ -963,19 +910,24 @@ class PlotOceanModel(_PlotDataBase):
         # to integer". Reproduce the same estimate with nanmean instead, and
         # skip the overlay entirely if there's no usable (finite, nonzero)
         # speed at all (e.g. an all-land tile).
-        mean_speed = np.sqrt(
-            np.nanmean(np.abs(u.values)) ** 2 + np.nanmean(np.abs(v.values)) ** 2
-        )
+        mean_speed = np.sqrt(np.nanmean(np.abs(u.values)) ** 2 + np.nanmean(np.abs(v.values)) ** 2)
         if mean_speed and np.isfinite(mean_speed):
             dist = xgeo.haversine(
-                float(u.lon.min()), float(u.lat.min()),
-                float(u.lon.max()), float(u.lat.max()),
-                )
+                float(u.lon.min()),
+                float(u.lat.min()),
+                float(u.lon.max()),
+                float(u.lat.max()),
+            )
             duration = dist / mean_speed / 30
             plot_flow(
-                u, v, duration=duration, step=duration / 10, axes=ax,
-                color="white", linewidth=0.6,
-                )
+                u,
+                v,
+                duration=duration,
+                step=duration / 10,
+                axes=ax,
+                color="white",
+                linewidth=0.6,
+            )
         else:
             logger.warning("Current speed is zero or all-NaN -- skipping flow overlay")
         return m
@@ -1021,25 +973,25 @@ class PlotOceanModel(_PlotDataBase):
         dlon = ds_mean.lon.max() - ds_mean.lon.min()
         aspect_ratio = 3 / 2 * dlat / dlon
         fig, axes = create_subplots(
-                nrows=2,
-                figsize=(8 / aspect_ratio, 8),
-                x_label='Date', y_label=None,
-                sharex=True, projection=ccrs.PlateCarree()
-            )
+            nrows=2,
+            figsize=(8 / aspect_ratio, 8),
+            x_label='Date',
+            y_label=None,
+            sharex=True,
+            projection=ccrs.PlateCarree(),
+        )
 
         m0 = self._plot_current_background(axes[0], ds_mean["u"], ds_mean["v"], cmin, cmax)
         m1 = self._plot_current_background(
             axes[1], ds_std["u"], ds_std["v"], 0, vmax, show_flow=False
-            )
+        )
 
-        cbar0 = fig.colorbar(
-            m0, ax=axes[0], orientation='vertical', label="Mean speed",
-            fraction=0.05, shrink=0.5
-            )
-        cbar1 = fig.colorbar(
-            m1, ax=axes[1], orientation='vertical', label="St.D. speed",
-            fraction=0.05, shrink=0.5
-            )
+        fig.colorbar(
+            m0, ax=axes[0], orientation='vertical', label="Mean speed", fraction=0.05, shrink=0.5
+        )
+        fig.colorbar(
+            m1, ax=axes[1], orientation='vertical', label="St.D. speed", fraction=0.05, shrink=0.5
+        )
 
         plt.subplots_adjust(hspace=0.02, wspace=0.01, top=0.88)
         for iax, ax in enumerate(axes):
@@ -1049,15 +1001,12 @@ class PlotOceanModel(_PlotDataBase):
                 linewidth=0.5,
                 color='gray',
                 alpha=0.5,
-                linestyle='--'
-                )
+                linestyle='--',
+            )
             gl.top_labels = False
             gl.right_labels = False
 
-        figname = (
-            f"data/plot/{self.metazone}/"
-            f"map_current_{data_name}{ncname}.png"
-            )
+        figname = f"data/plot/{self.metazone}/map_current_{data_name}{ncname}.png"
         fig.suptitle(figtitle)
         self.save_figure(fig, figname)
 
@@ -1096,7 +1045,7 @@ class PlotOceanModel(_PlotDataBase):
             ds_data = ds_data_all[[var]]
             ds_mean = ds_mean_all[[var]]
             ds_std = ds_std_all[[var]]
-            
+
             attrs = ds_data.attrs
             xtitle, ncname = format_time_label(attrs)
             v_title = ""
@@ -1117,70 +1066,66 @@ class PlotOceanModel(_PlotDataBase):
             ds_data = ds_data[var]
             ds_mean = ds_mean[var]
             ds_std = ds_std[var]
-            
+
             cmean = ds_mean.mean()
-            cstd =  1.75 * ds_mean.std()
+            cstd = 1.75 * ds_mean.std()
             if var in self.vminmax:
                 cmin, cmax = self.vminmax[var]
             else:
                 cmin, cmax = cmean - cstd, cmean + cstd
             vmean = ds_std.mean()
             vstd = vmean + 1.75 * ds_std.std()
-            vmin, vmax =  - vstd, vstd
-            
+            vmax = vstd
+
             dlat = ds_mean.lat.max() - ds_mean.lat.min()
             dlon = ds_mean.lon.max() - ds_mean.lon.min()
             aspect_ratio = 3 / 2 * dlat / dlon
             fig, axes = create_subplots(
-                    nrows=2,
-                    figsize=(8 / aspect_ratio, 8),
-                    x_label='Date', y_label=None,
-                    sharex=True, projection=ccrs.PlateCarree()
-                )
+                nrows=2,
+                figsize=(8 / aspect_ratio, 8),
+                x_label='Date',
+                y_label=None,
+                sharex=True,
+                projection=ccrs.PlateCarree(),
+            )
             ds_mean = ds_mean.squeeze()
             ds_std = ds_std.squeeze()
-            if ("npts" in ds_data.dims) or (ds_data.lon.dims != ("y" ,"x")):
+            if ("npts" in ds_data.dims) or (ds_data.lon.dims != ("y", "x")):
                 m0 = axes[0].scatter(
-                    ds_mean.lon, ds_mean.lat,
-                    c=ds_mean,
-                    vmin=cmin,
-                    vmax=cmax,
-                    cmap=CMAP_VARS[var]
-                    )
+                    ds_mean.lon, ds_mean.lat, c=ds_mean, vmin=cmin, vmax=cmax, cmap=CMAP_VARS[var]
+                )
                 # axes[0].set_title("Mean")
                 m1 = axes[1].scatter(
-                    ds_std.lon, ds_std.lat,
-                    c=ds_std,
-                    vmin=0,
-                    vmax=vmax,
-                    cmap=CMAP_VARS[var]
-                    )
+                    ds_std.lon, ds_std.lat, c=ds_std, vmin=0, vmax=vmax, cmap=CMAP_VARS[var]
+                )
                 # axes[1].set_title("St.D.")
             else:
                 m0 = axes[0].pcolormesh(
-                    ds_mean.lon, ds_mean.lat, ds_mean,
-                    vmin=cmin,
-                    vmax=cmax,
-                    cmap=CMAP_VARS[var]
-                    )
+                    ds_mean.lon, ds_mean.lat, ds_mean, vmin=cmin, vmax=cmax, cmap=CMAP_VARS[var]
+                )
                 # axes[0].set_title("Mean")
                 m1 = axes[1].pcolormesh(
-                    ds_std.lon, ds_std.lat, ds_std,
-                    vmin=0,
-                    vmax=vmax,
-                    cmap=CMAP_VARS[var]
-                    )
+                    ds_std.lon, ds_std.lat, ds_std, vmin=0, vmax=vmax, cmap=CMAP_VARS[var]
+                )
                 # axes[1].set_title("St.D.")
-                
-            cbar0 = fig.colorbar(
-                m0, ax=axes[0], orientation='vertical', label="Mean",
-                fraction=0.05, shrink=0.5#, pad=0.04
-                )
-            cbar1 = fig.colorbar(
-                m1, ax=axes[1], orientation='vertical', label="St.D.",
-                fraction=0.05, shrink=0.5#, pad=0.02,
-                )
-            
+
+            fig.colorbar(
+                m0,
+                ax=axes[0],
+                orientation='vertical',
+                label="Mean",
+                fraction=0.05,
+                shrink=0.5,  # , pad=0.04
+            )
+            fig.colorbar(
+                m1,
+                ax=axes[1],
+                orientation='vertical',
+                label="St.D.",
+                fraction=0.05,
+                shrink=0.5,  # , pad=0.02,
+            )
+
             plt.subplots_adjust(hspace=0.02, wspace=0.01, top=0.88)
             for iax, ax in enumerate(axes):
                 gl = axes[iax].gridlines(
@@ -1189,25 +1134,21 @@ class PlotOceanModel(_PlotDataBase):
                     linewidth=0.5,
                     color='gray',
                     alpha=0.5,
-                    linestyle='--'
-                    )
+                    linestyle='--',
+                )
                 gl.top_labels = False
                 gl.right_labels = False
 
-            figname = (
-                f"data/plot/{self.metazone}/" +
-                f"map_{var}_{data_name}{ncname}.png"
-                )
-            
+            figname = f"data/plot/{self.metazone}/" + f"map_{var}_{data_name}{ncname}.png"
+
             # pos0 = axes[0].get_position()
             # pos1 = axes[1].get_position()
             # pos0.x0 = pos1.x0
             # axes[0].set_position(pos0)
-            
+
             fig.suptitle(figtitle)
 
             self.save_figure(fig, figname)
-
 
         return None
 
@@ -1243,9 +1184,8 @@ class PlotOceanModel(_PlotDataBase):
                 da = da_all.sel(time=time_val) if time_val is not None else da_all
                 units = da.attrs.get("units")
                 time_str = (
-                    pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
-                    if time_val is not None else ""
-                    )
+                    pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S") if time_val is not None else ""
+                )
                 title_lines = [data_name, self.metazone]
                 if time_str:
                     title_lines.append(time_str)
@@ -1263,32 +1203,23 @@ class PlotOceanModel(_PlotDataBase):
                 dlon = da.lon.max() - da.lon.min()
                 aspect_ratio = 3 / 2 * dlat / dlon
                 fig, axes = create_subplots(
-                        nrows=1,
-                        figsize=(8 / aspect_ratio, 8),
-                        x_label='Date', y_label=None,
-                        projection=ccrs.PlateCarree()
-                    )
+                    nrows=1,
+                    figsize=(8 / aspect_ratio, 8),
+                    x_label='Date',
+                    y_label=None,
+                    projection=ccrs.PlateCarree(),
+                )
                 ax = axes[0]
                 if ("npts" in da.dims) or (da.lon.dims != ("y", "x")):
-                    m0 = ax.scatter(
-                        da.lon, da.lat,
-                        c=da,
-                        vmin=vmin,
-                        vmax=vmax,
-                        cmap=CMAP_VARS[var]
-                        )
+                    m0 = ax.scatter(da.lon, da.lat, c=da, vmin=vmin, vmax=vmax, cmap=CMAP_VARS[var])
                 else:
                     m0 = ax.pcolormesh(
-                        da.lon, da.lat, da,
-                        vmin=vmin,
-                        vmax=vmax,
-                        cmap=CMAP_VARS[var]
-                        )
+                        da.lon, da.lat, da, vmin=vmin, vmax=vmax, cmap=CMAP_VARS[var]
+                    )
 
                 fig.colorbar(
-                    m0, ax=ax, orientation='vertical', label=var,
-                    fraction=0.05, shrink=0.5
-                    )
+                    m0, ax=ax, orientation='vertical', label=var, fraction=0.05, shrink=0.5
+                )
 
                 gl = ax.gridlines(
                     crs=ccrs.PlateCarree(),
@@ -1296,16 +1227,15 @@ class PlotOceanModel(_PlotDataBase):
                     linewidth=0.5,
                     color='gray',
                     alpha=0.5,
-                    linestyle='--'
-                    )
+                    linestyle='--',
+                )
                 gl.top_labels = False
                 gl.right_labels = False
 
                 vlevel_suffix = f"_{vlevel}" if vlevel is not None else ""
                 figname = (
-                    f"data/plot/{self.metazone}/"
-                    f"map_{var}_{data_name}_{time_str}{vlevel_suffix}.png"
-                    )
+                    f"data/plot/{self.metazone}/map_{var}_{data_name}_{time_str}{vlevel_suffix}.png"
+                )
                 fig.suptitle(figtitle)
                 fig.subplots_adjust(top=0.88)
                 self.save_figure(fig, figname)
@@ -1321,9 +1251,7 @@ class PlotOceanModel(_PlotDataBase):
         vlevel_str = f"{vlevel}m" if vlevel is not None else ""
         # Squeeze away size-1 dims (e.g. "z") but keep "time" as a real dim
         # even when it's also size-1 -- see _maps_raw()'s identical guard.
-        squeeze_dims = [
-            d for d, s in ds_data_all["u"].sizes.items() if s == 1 and d != "time"
-            ]
+        squeeze_dims = [d for d, s in ds_data_all["u"].sizes.items() if s == 1 and d != "time"]
         u_all = ds_data_all["u"].squeeze(dim=squeeze_dims) if squeeze_dims else ds_data_all["u"]
         v_all = ds_data_all["v"].squeeze(dim=squeeze_dims) if squeeze_dims else ds_data_all["v"]
         units = ds_data_all["u"].attrs.get("units")
@@ -1331,11 +1259,10 @@ class PlotOceanModel(_PlotDataBase):
         for time_val in times:
             u = u_all.sel(time=time_val) if time_val is not None else u_all
             v = v_all.sel(time=time_val) if time_val is not None else v_all
-            speed = np.sqrt(u ** 2 + v ** 2)
+            speed = np.sqrt(u**2 + v**2)
             time_str = (
-                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
-                if time_val is not None else ""
-                )
+                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S") if time_val is not None else ""
+            )
             title_lines = [data_name, self.metazone]
             if time_str:
                 title_lines.append(time_str)
@@ -1353,18 +1280,18 @@ class PlotOceanModel(_PlotDataBase):
             dlon = u.lon.max() - u.lon.min()
             aspect_ratio = 3 / 2 * dlat / dlon
             fig, axes = create_subplots(
-                    nrows=1,
-                    figsize=(8 / aspect_ratio, 8),
-                    x_label='Date', y_label=None,
-                    projection=ccrs.PlateCarree()
-                )
+                nrows=1,
+                figsize=(8 / aspect_ratio, 8),
+                x_label='Date',
+                y_label=None,
+                projection=ccrs.PlateCarree(),
+            )
             ax = axes[0]
             m0 = self._plot_current_background(ax, u, v, vmin, vmax)
 
             fig.colorbar(
-                m0, ax=ax, orientation='vertical', label="speed",
-                fraction=0.05, shrink=0.5
-                )
+                m0, ax=ax, orientation='vertical', label="speed", fraction=0.05, shrink=0.5
+            )
 
             gl = ax.gridlines(
                 crs=ccrs.PlateCarree(),
@@ -1372,16 +1299,15 @@ class PlotOceanModel(_PlotDataBase):
                 linewidth=0.5,
                 color='gray',
                 alpha=0.5,
-                linestyle='--'
-                )
+                linestyle='--',
+            )
             gl.top_labels = False
             gl.right_labels = False
 
             vlevel_suffix = f"_{vlevel}" if vlevel is not None else ""
             figname = (
-                f"data/plot/{self.metazone}/"
-                f"map_current_{data_name}_{time_str}{vlevel_suffix}.png"
-                )
+                f"data/plot/{self.metazone}/map_current_{data_name}_{time_str}{vlevel_suffix}.png"
+            )
             fig.suptitle(figtitle)
             fig.subplots_adjust(top=0.88)
             self.save_figure(fig, figname)
@@ -1422,8 +1348,8 @@ class PlotOceanModel(_PlotDataBase):
             linewidth=0.5,
             color='gray',
             alpha=0.5,
-            linestyle='--'
-            )
+            linestyle='--',
+        )
         gl.top_labels = False
         gl.right_labels = False
         ax.coastlines()
@@ -1452,7 +1378,7 @@ class PlotOceanModel(_PlotDataBase):
             cellLoc='center',
             rowLoc='center',
             loc="upper right",
-            )
+        )
         taxes.set_axis_off()
         table.set_fontsize(8)
         for (irow, icol), cell in table.get_celld().items():
@@ -1486,7 +1412,9 @@ class PlotOceanModel(_PlotDataBase):
 
         cbar_min = attrs.get(f"cbar_min_{var}")
         cbar_max = attrs.get(f"cbar_max_{var}")
-        group_range = (cbar_min, cbar_max) if cbar_min is not None and cbar_max is not None else None
+        group_range = (
+            (cbar_min, cbar_max) if cbar_min is not None and cbar_max is not None else None
+        )
         series_mean = attrs.get(f"series_mean_{var}")
         series_std = attrs.get(f"series_std_{var}")
         vmin, vmax = _cbar_range(
@@ -1500,13 +1428,11 @@ class PlotOceanModel(_PlotDataBase):
         for time_val in times:
             da = da_all.sel(time=time_val) if time_val is not None else da_all
             time_str = (
-                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
-                if time_val is not None else ""
-                )
+                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S") if time_val is not None else ""
+            )
             date_str = (
-                pd.Timestamp(time_val).strftime("%Y-%m-%d, %H:%M")
-                if time_val is not None else ""
-                )
+                pd.Timestamp(time_val).strftime("%Y-%m-%d, %H:%M") if time_val is not None else ""
+            )
             if vlevel_str:
                 date_str = f"{date_str} - {vlevel_str}" if date_str else vlevel_str
 
@@ -1514,32 +1440,26 @@ class PlotOceanModel(_PlotDataBase):
             dlon = da.lon.max() - da.lon.min()
             aspect_ratio = 3 / 2 * dlat / dlon
             fig, axes = create_subplots(
-                    nrows=1,
-                    figsize=(8 / aspect_ratio, 8),
-                    x_label='Date', y_label=None,
-                    projection=ccrs.PlateCarree()
-                )
+                nrows=1,
+                figsize=(8 / aspect_ratio, 8),
+                x_label='Date',
+                y_label=None,
+                projection=ccrs.PlateCarree(),
+            )
             ax = axes[0]
             if ("npts" in da.dims) or (da.lon.dims != ("y", "x")):
-                m0 = ax.scatter(
-                    da.lon, da.lat,
-                    c=da,
-                    vmin=vmin,
-                    vmax=vmax,
-                    cmap=CMAP_VARS[var]
-                    )
+                m0 = ax.scatter(da.lon, da.lat, c=da, vmin=vmin, vmax=vmax, cmap=CMAP_VARS[var])
             else:
-                m0 = ax.pcolormesh(
-                    da.lon, da.lat, da,
-                    vmin=vmin,
-                    vmax=vmax,
-                    cmap=CMAP_VARS[var]
-                    )
+                m0 = ax.pcolormesh(da.lon, da.lat, da, vmin=vmin, vmax=vmax, cmap=CMAP_VARS[var])
 
             fig.colorbar(
-                m0, ax=ax, orientation='vertical', label=f"{var}, {units}",
-                fraction=0.05, shrink=0.5
-                )
+                m0,
+                ax=ax,
+                orientation='vertical',
+                label=f"{var}, {units}",
+                fraction=0.05,
+                shrink=0.5,
+            )
 
             ax.set_title(f"{var} ({data_name})")
             self._style_mapseries_axes(ax, date_str)
@@ -1554,7 +1474,7 @@ class PlotOceanModel(_PlotDataBase):
             figname = (
                 f"data/plot/{self.metazone}/"
                 f"mapseries_{var}_{data_name}_{time_str}{vlevel_suffix}.png"
-                )
+            )
             self.save_figure(fig, figname)
 
         return None
@@ -1580,9 +1500,7 @@ class PlotOceanModel(_PlotDataBase):
         vlevel_str = f"{vlevel}m" if vlevel is not None else ""
         vlevel_suffix = f"_{vlevel}" if vlevel is not None else ""
 
-        squeeze_dims = [
-            d for d, s in ds_data_all["u"].sizes.items() if s == 1 and d != "time"
-            ]
+        squeeze_dims = [d for d, s in ds_data_all["u"].sizes.items() if s == 1 and d != "time"]
         u_all = ds_data_all["u"].squeeze(dim=squeeze_dims) if squeeze_dims else ds_data_all["u"]
         v_all = ds_data_all["v"].squeeze(dim=squeeze_dims) if squeeze_dims else ds_data_all["v"]
 
@@ -1603,7 +1521,7 @@ class PlotOceanModel(_PlotDataBase):
 
         # Always displayed in knots (forecaster convention for wind/current
         # speed), independent of vector_scale which only tunes arrow glyphs.
-        speed_all = np.sqrt(u_all ** 2 + v_all ** 2) * MS_TO_KNOTS
+        speed_all = np.sqrt(u_all**2 + v_all**2) * MS_TO_KNOTS
 
         if "cspeed" in self.vminmax:
             vmin, vmax = self.vminmax["cspeed"]
@@ -1621,15 +1539,13 @@ class PlotOceanModel(_PlotDataBase):
         for time_val in times:
             u = u_all.sel(time=time_val) if time_val is not None else u_all
             v = v_all.sel(time=time_val) if time_val is not None else v_all
-            speed = np.sqrt(u ** 2 + v ** 2) * MS_TO_KNOTS
+            speed = np.sqrt(u**2 + v**2) * MS_TO_KNOTS
             time_str = (
-                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S")
-                if time_val is not None else ""
-                )
+                pd.Timestamp(time_val).strftime("%Y%m%dT%H%M%S") if time_val is not None else ""
+            )
             date_str = (
-                pd.Timestamp(time_val).strftime("%Y-%m-%d, %H:%M")
-                if time_val is not None else ""
-                )
+                pd.Timestamp(time_val).strftime("%Y-%m-%d, %H:%M") if time_val is not None else ""
+            )
             if vlevel_str:
                 date_str = f"{date_str} - {vlevel_str}" if date_str else vlevel_str
 
@@ -1637,23 +1553,22 @@ class PlotOceanModel(_PlotDataBase):
             dlon = u.lon.max() - u.lon.min()
             aspect_ratio = 3 / 2 * dlat / dlon
             fig, axes = create_subplots(
-                    nrows=1,
-                    figsize=(8 / aspect_ratio, 8),
-                    x_label='Date', y_label=None,
-                    projection=ccrs.PlateCarree()
-                )
+                nrows=1,
+                figsize=(8 / aspect_ratio, 8),
+                x_label='Date',
+                y_label=None,
+                projection=ccrs.PlateCarree(),
+            )
             ax = axes[0]
             is_cloud = ("npts" in u.dims) or (u.lon.dims != ("y", "x"))
             if is_cloud:
                 m0 = ax.scatter(
-                    u.lon, u.lat, c=speed,
-                    vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
-                    )
+                    u.lon, u.lat, c=speed, vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
+                )
             else:
                 m0 = ax.pcolormesh(
-                    u.lon, u.lat, speed,
-                    vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
-                    )
+                    u.lon, u.lat, speed, vmin=vmin, vmax=vmax, cmap=CMAP_VARS["cspeed"]
+                )
 
             if u.lon.dims == ("y", "x"):
                 u_r = u.isel(y=slice(None, None, rarification), x=slice(None, None, rarification))
@@ -1666,30 +1581,36 @@ class PlotOceanModel(_PlotDataBase):
 
             if vector_style == "barbs":
                 ax.barbs(
-                    u_r.lon, u_r.lat,
-                    u_r * MS_TO_KNOTS * vector_scale, v_r * MS_TO_KNOTS * vector_scale,
-                    length=barbs_length, linewidth=barbs_linewidth,
+                    u_r.lon,
+                    u_r.lat,
+                    u_r * MS_TO_KNOTS * vector_scale,
+                    v_r * MS_TO_KNOTS * vector_scale,
+                    length=barbs_length,
+                    linewidth=barbs_linewidth,
                     transform=ccrs.PlateCarree(),
-                    )
+                )
             else:
                 ax.quiver(
-                    u_r.lon, u_r.lat,
-                    u_r * MS_TO_KNOTS * vector_scale, v_r * MS_TO_KNOTS * vector_scale,
-                    scale=quiver_scale, color="black",
+                    u_r.lon,
+                    u_r.lat,
+                    u_r * MS_TO_KNOTS * vector_scale,
+                    v_r * MS_TO_KNOTS * vector_scale,
+                    scale=quiver_scale,
+                    color="black",
                     transform=ccrs.PlateCarree(),
-                    )
+                )
 
             fig.colorbar(
-                m0, ax=ax, orientation='vertical', label="speed, kt",
-                fraction=0.05, shrink=0.5
-                )
+                m0, ax=ax, orientation='vertical', label="speed, kt", fraction=0.05, shrink=0.5
+            )
 
             ax.set_title(f"speed ({data_name})")
             self._style_mapseries_axes(ax, date_str)
             self._add_minmax_table(
-                ax, ["data"],
+                ax,
+                ["data"],
                 [[f"{float(speed.min()):.2f}", f"{float(speed.max()):.2f}"]],
-                )
+            )
 
             figname = self._vector_figname(data_name, time_str, vlevel_suffix)
             self.save_figure(fig, figname)
@@ -1698,9 +1619,8 @@ class PlotOceanModel(_PlotDataBase):
 
     def _vector_figname(self, data_name, time_str, vlevel_suffix):
         return (
-            f"data/plot/{self.metazone}/"
-            f"mapseries_current_{data_name}_{time_str}{vlevel_suffix}.png"
-            )
+            f"data/plot/{self.metazone}/mapseries_current_{data_name}_{time_str}{vlevel_suffix}.png"
+        )
 
 
 class PlotEddies(_PlotDataBase):
@@ -1729,10 +1649,7 @@ class PlotMeteo(PlotOceanModel):
         super()._mapseries_vector(ds_data_all, {**attrs, "vector_style": "barbs"})
 
     def _vector_figname(self, data_name, time_str, vlevel_suffix):
-        return (
-            f"data/plot/{self.metazone}/"
-            f"mapseries_wind_{time_str}{vlevel_suffix}.png"
-            )
+        return f"data/plot/{self.metazone}/mapseries_wind_{time_str}{vlevel_suffix}.png"
 
 
 DataOceanModel.plotter_cls = PlotOceanModel
@@ -1834,11 +1751,13 @@ def main_plot(ncins, metazones, cfg_outputs=None, kw_dask=None):
     # "fork() after OpenMP" crash and inherited memory bloat.
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(num_workers) as pool:
-        results = list(tqdm(
-            pool.imap_unordered(_plot_task_star, task_args),
-            total=len(task_args),
-            desc="Plotting figures",
-            ))
+        results = list(
+            tqdm(
+                pool.imap_unordered(_plot_task_star, task_args),
+                total=len(task_args),
+                desc="Plotting figures",
+            )
+        )
     png_paths = [p for task_result in results for p in (task_result or [])]
     logger.info(f"Generated {len(png_paths)} PNG file(s)")
     return png_paths

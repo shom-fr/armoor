@@ -5,6 +5,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
 def to_netcdf_ref_prods(dss, parent_dir, ncpat):
     """Save in netcdf files reference and products from data.
 

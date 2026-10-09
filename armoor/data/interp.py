@@ -30,7 +30,7 @@ class TimeInterpolation(AbstractInterpolation):
     xarray_obj : xarray.Dataset
         Product dataset to subset.
     """
-    
+
     def __init__(self, ds: xr.Dataset, tbound: tuple) -> None:
         self.ds = ds
         self.methods = {}
@@ -39,13 +39,13 @@ class TimeInterpolation(AbstractInterpolation):
 
     def tfreq(self, tfreq: str) -> xr.Dataset:
         """Subset dataset selecting elements at specific terms.
-    
+
         Parameters
         ----------
         freq : str
             See :ref:`here <pandas:timeseries.offset_aliases>` for a list of
             frequency aliases.
-            
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
@@ -74,7 +74,7 @@ class HorizontalInterpolation(AbstractInterpolation):
     ds : xarray.Dataset
         Dataset to resample.
     """
-    
+
     def __init__(self, ds: xr.Dataset) -> None:
         self.ds = ds
         self.methods = {}
@@ -93,7 +93,7 @@ class HorizontalInterpolation(AbstractInterpolation):
             Dataset with elements located at specific coordinates.
         """
         return grid2loc(self.ds, coords)
-    
+
     def section(self, args: dict) -> Union[xr.Dataset, dict]:
         """Interpolate datasets over one or more named broken-line sections.
 
@@ -115,18 +115,19 @@ class HorizontalInterpolation(AbstractInterpolation):
             ``distance`` coordinate (metres from the first waypoint).
         """
         named_sections = {
-            name: subargs for name, subargs in args.items()
-            if isinstance(subargs, dict)
-            }
+            name: subargs for name, subargs in args.items() if isinstance(subargs, dict)
+        }
         if not named_sections:
             return grid2section(self.ds, args["coords"], args["dx"])
         dx = args["dx"]
         return {
             name: grid2section(self.ds, subargs["coords"], dx)
             for name, subargs in named_sections.items()
-            }
-    
-    def regrid_from_latlon(self, lon_grid: Tuple[float, float, float], lat_grid: Tuple[float, float, float]) -> xr.Dataset:
+        }
+
+    def regrid_from_latlon(
+        self, lon_grid: Tuple[float, float, float], lat_grid: Tuple[float, float, float]
+    ) -> xr.Dataset:
         """Regrid dataset on extra grid specified via lat/lon coordinates.
 
         Parameters
@@ -142,14 +143,8 @@ class HorizontalInterpolation(AbstractInterpolation):
             New grid
         """
         lat_mean = 0.5 * (lat_grid[0] + lat_grid[1])
-        lat_grid[2] = m2deg(
-            lat_grid[-1] * 1e3,
-            lat=lat_mean
-            )
-        lon_grid[2] = m2deg(
-            lon_grid[-1] * 1e3,
-            lat=lat_mean
-            )
+        lat_grid[2] = m2deg(lat_grid[-1] * 1e3, lat=lat_mean)
+        lon_grid[2] = m2deg(lon_grid[-1] * 1e3, lat=lat_mean)
         lat = np.arange(*lat_grid)
         lon = np.arange(*lon_grid)
         lon, lat = np.meshgrid(lon, lat)
@@ -163,7 +158,7 @@ class HorizontalInterpolation(AbstractInterpolation):
             ),
         )
         return self.regrid(new_grid)
-    
+
     def regrid_from_nc(self, ncin: str) -> xr.Dataset:
         """Regrid dataset on extra grid defined in a netcdf file.
 
@@ -179,7 +174,7 @@ class HorizontalInterpolation(AbstractInterpolation):
         """
         new_grid = xr.open_dataset(ncin)[["lon", "lat"]]
         return self.regrid(new_grid)
-    
+
     def regrid(self, new_grid: xr.DataArray) -> xr.Dataset:
         """Regrid a dataset on extra grid.
 
@@ -198,7 +193,7 @@ class HorizontalInterpolation(AbstractInterpolation):
         if "mask" in self.ds:
             self.ds = self.ds.drop_vars("mask")
         return self.ds
-    
+
     def coarsen(self, factor: int, boundary: str = "trim", method: str = "mean") -> xr.Dataset:
         """Coarsen the dataset by aggregating over spatial blocks.
 
@@ -235,12 +230,12 @@ class VerticalInterpolation(AbstractInterpolation):
     xarray_obj : xarray.Dataset
         Product dataset to interpolate.
     """
-    
+
     def __init__(self, ds: xr.Dataset) -> None:
         self.ds = ds
         self.methods = {}
         self.logger = logging.getLogger(__name__)
-        
+
     def vlevel(self, args: dict) -> Optional[xr.Dataset]:
         """Interpolate datasets to specified vertical levels.
 
@@ -275,23 +270,19 @@ class VerticalInterpolation(AbstractInterpolation):
         """
         vname = args["vname"]
         vfreq = float(args["step"])
-        vlevels = np.arange(
-            self.ds[vname].min(),
-            self.ds[vname].max(),
-            vfreq
-            )
+        vlevels = np.arange(self.ds[vname].min(), self.ds[vname].max(), vfreq)
         return self._vinterp_(vname, vlevels)
-        
+
     def _vinterp_(self, vname, vlevels):
         """Interpolate datasets by specifying vertical levels and vertical coordinate name.
-        
+
         Parameters
         ----------
         vname: str
             Name of the vertical coordinate.
         vlevels: list
             Vertical levels.
-        
+
         Returns
         -------
         xarray.Dataset, xarray.Dataset
@@ -313,7 +304,7 @@ class VerticalInterpolation(AbstractInterpolation):
 
 def process_time_interpolation(ds: xr.Dataset, param: list, tbound: tuple) -> xr.Dataset:
     """Process interpolation for time dimension.
-    
+
     Parameters
     ----------
     ds: xr.Dataset
@@ -322,7 +313,7 @@ def process_time_interpolation(ds: xr.Dataset, param: list, tbound: tuple) -> xr
         Parameters for time interpolation.
     tbound: list
         Time bounds for interpolation.
-    
+
     Returns
     -------
     tuple
@@ -333,17 +324,18 @@ def process_time_interpolation(ds: xr.Dataset, param: list, tbound: tuple) -> xr
     interp.__post_init__()
     ds = interp.call(*param)
     return ds
-    
+
+
 def process_horizontal_interpolation(ds: xr.Dataset, param: list) -> xr.Dataset:
     """Process interpolation for horizontal dimensions.
-    
+
     Parameters
     ----------
     ds: xr.Dataset
         Product dataset.
     param: list
         Parameters for horizontal interpolation.
-    
+
     Returns
     -------
     tuple
@@ -355,16 +347,17 @@ def process_horizontal_interpolation(ds: xr.Dataset, param: list) -> xr.Dataset:
     ds = interp.call(*param)
     return ds
 
+
 def process_vertical_interpolation(ds: xr.Dataset, param: list) -> Optional[xr.Dataset]:
     """Process interpolation for vertical dimensions.
-    
+
     Parameters
     ----------
     ds: xr.Dataset
         Product dataset.
     param: list
         Parameters for vertical interpolation.
-    
+
     Returns
     -------
     tuple

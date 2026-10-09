@@ -4,7 +4,9 @@ Heavy imports (dask.distributed, cartopy, scipy, xoa, …) are deferred to
 the functions that actually need them so that CLI startup is fast even on
 slow HPC parallel file-systems.
 """
+
 import os
+
 # Limit OpenMP/BLAS/numba to 1 thread per process. Must happen before
 # numpy/numba are imported anywhere: numba's threading layer in particular
 # is a lazily-initialized, process-wide singleton sized by NUMBA_NUM_THREADS
@@ -32,18 +34,20 @@ from armoor import ArmoorError
 from armoor.misc import comma_separated, parse_coords, parse_qc_tuple
 
 
-class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter,
-                                 ArgumentDefaultsHelpFormatter):
-    pass
 from armoor.cli import FILTERS_INI, COMP_INI, DATA_INI, METAZONES_INI, BULL_INI
-from armoor.cli.io import (add_dask_parser_arguments, get_dask_args,
-                           add_comp_parser_arguments, add_tbound_parser_arguments)
+from armoor.cli.io import add_dask_parser_arguments, get_dask_args, add_comp_parser_arguments
 from armoor.cli.log import add_logging_parser_arguments, main_setup_logging
+
+
+class ArmoorArgumentHelpFormatter(RawDescriptionHelpFormatter, ArgumentDefaultsHelpFormatter):
+    pass
+
 
 logger = logging.getLogger(__name__)
 
 
 _heavy_done = False
+
 
 def _init_heavy():
     """One-time lazy initialisation of heavy dependencies."""
@@ -52,12 +56,14 @@ def _init_heavy():
         return
     _heavy_done = True
     import os
+
     for var in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMBA_NUM_THREADS'):
-         os.environ.setdefault(var, '1')
+        os.environ.setdefault(var, '1')
 
     logging.getLogger('distributed').setLevel(logging.ERROR)
     import armoor  # noqa: F401 — registers all xarray accessors
     from xoa.cfgm import register_validation_functions
+
     register_validation_functions(coordinates=parse_coords)
 
 
@@ -71,7 +77,9 @@ _SUBSECTION_PRIMARY_KEY = {
 }
 
 
-def check_metazones_in(metazones_arg: list, metazones_cfg: dict, func_param: Optional[list] = None, **kwargs) -> dict:
+def check_metazones_in(
+    metazones_arg: list, metazones_cfg: dict, func_param: Optional[list] = None, **kwargs
+) -> dict:
     """Check if all metazone-names given in command-line are present in cfgfile.
 
     This function checks if all elements of the first list are present in the
@@ -94,15 +102,13 @@ def check_metazones_in(metazones_arg: list, metazones_cfg: dict, func_param: Opt
     metazones_bad = []
     for metazone in metazones_arg:
         if metazone not in metazones_cfg:
-            metazones_bad.append(metazone)           
+            metazones_bad.append(metazone)
     if len(metazones_bad) > 0:
-        raise ArmoorError(
-            f"Missing metazones in cfgfile: {metazones_bad}."
-            )
+        raise ArmoorError(f"Missing metazones in cfgfile: {metazones_bad}.")
     if kwargs:
         for metazone in metazones_arg:
             for k, v in kwargs.items():
-                if v != None:
+                if v is not None:
                     metazones_cfg[metazone].update({k: v})
     metazones = {}
     for metazone in metazones_arg:
@@ -119,12 +125,16 @@ def check_metazones_in(metazones_arg: list, metazones_cfg: dict, func_param: Opt
                     del metazones_cfg[metazone][key]
                 else:
                     metazones_cfg[metazone][key] = dict(value)
-        if (metazones_cfg[metazone].get("tfreq") != None) & (metazones_cfg[metazone].get("thours") != None):
+        if (metazones_cfg[metazone].get("tfreq") is not None) & (
+            metazones_cfg[metazone].get("thours") is not None
+        ):
             raise ArmoorError(f"`tfreq` and `thours` cannot be configured together in {metazone}")
-        if (metazones_cfg[metazone].get("trange_seq") != None) & (metazones_cfg[metazone].get("tbound") == None):
+        if (metazones_cfg[metazone].get("trange_seq") is not None) & (
+            metazones_cfg[metazone].get("tbound") is None
+        ):
             raise ArmoorError(f"`trange_seq` argument needs `tbound` in {metazone}.")
         for k, v in metazones_cfg[metazone].items():
-            if v == None:
+            if v is None:
                 del metazones_cfg[metazone][k]
         metazones[metazone] = metazones_cfg[metazone]
     if func_param:
@@ -143,39 +153,31 @@ def check_metazones_in(metazones_arg: list, metazones_cfg: dict, func_param: Opt
                 #     del metazones[metazone_name]["polygon"]
     return metazones
 
+
 def get_parser_filters() -> ArgumentParser:
     """Get parser for filtering."""
     # Setup argument parser
     parser = ArgumentParser(
         description="Apply filters over metazones.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
+    parser.add_argument('metazones', type=comma_separated, help="List of metazone to be processed.")
+    parser.add_argument('cfgfile', type=Path, help="Path of the configuration file.")
     parser.add_argument(
-        'metazones',
-        type=comma_separated,
-        help="List of metazone to be processed."
-        )
-    parser.add_argument(
-        'cfgfile',
-        type=Path,
-        help="Path of the configuration file."
-        )
-    parser.add_argument(
-        '-m', '--metazonesfile',
+        '-m',
+        '--metazonesfile',
         type=Path,
         help="Path of the configuration file dedicated to the description of metazones.",
-        default="metazones.cfg"
-        )
+        default="metazones.cfg",
+    )
     parser.add_argument(
-        '--jsonfile',
-        type=Path,
-        help="Path of the output json file.",
-        default='ncs_filter.json'
-        )
-    
+        '--jsonfile', type=Path, help="Path of the output json file.", default='ncs_filter.json'
+    )
+
     return parser
+
 
 def main_filters() -> None:
     """Apply filters over metazones."""
@@ -183,13 +185,16 @@ def main_filters() -> None:
     from xoa.cfgm import ConfigManager
     from armoor.io import zarrs2netcdfs
     from armoor.data.load import load_datasets
+
     _init_heavy()
 
-    dask.config.set({
-        'scheduler': 'threads',
-        'array.slicing.split_large_chunks': True,
-        'optimization.fuse.active': True,
-    })
+    dask.config.set(
+        {
+            'scheduler': 'threads',
+            'array.slicing.split_large_chunks': True,
+            'optimization.fuse.active': True,
+        }
+    )
 
     # Get parser
     parser = get_parser_filters()
@@ -202,17 +207,12 @@ def main_filters() -> None:
 
     # Load configuration
     if not args.cfgfile.exists():
-        raise ArmoorError(
-            f"File not found: {args.cfgfile}."
-            )
+        raise ArmoorError(f"File not found: {args.cfgfile}.")
 
     cfg = ConfigManager(FILTERS_INI).load(str(args.cfgfile))
     metazones = ConfigManager(METAZONES_INI).load(str(args.metazonesfile))
 
-    metazones = check_metazones_in(
-       args.metazones,
-       metazones
-       )
+    metazones = check_metazones_in(args.metazones, metazones)
 
     logger.info(f"Processing {len(cfg['data'])} datasets × {len(metazones)} metazones")
 
@@ -224,13 +224,14 @@ def main_filters() -> None:
 
     logger.info(f"Find the list of NetCDF files in: {args.jsonfile}")
 
+
 def get_parser_data() -> ArgumentParser:
     """Get parser for data."""
     # Setup argument parser
     parser = ArgumentParser(
         description="Plot and compute on data.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser, has_coloc=False, default_jsonfile='ncs_filter.json')
@@ -238,10 +239,20 @@ def get_parser_data() -> ArgumentParser:
     return parser
 
 
-def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], jsonfile: Path,
-                        ofilter: bool, no_plot: bool, plot_only: Optional[str], input_json: Optional[Path],
-                        kw_dask: tuple, data_args: dict = {}, load_only: Optional[str] = None,
-                        input_zarrs: Optional[list[str]] = None) -> None:
+def main_data_pipeline(
+    cfgfile: Path,
+    metafile: Path,
+    metazones: list[str],
+    jsonfile: Path,
+    ofilter: bool,
+    no_plot: bool,
+    plot_only: Optional[str],
+    input_json: Optional[Path],
+    kw_dask: tuple,
+    data_args: dict = {},
+    load_only: Optional[str] = None,
+    input_zarrs: Optional[list[str]] = None,
+) -> None:
     """Run (a stage of) the armoor-data pipeline: load, output, plot.
 
     Also serves as the per-wave worker entry point for the HPC pipeline
@@ -312,6 +323,7 @@ def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], json
             logger.warning("--plot-only requested but 'png' not in outputs fmt — nothing to do.")
             return
         from armoor.data.plot import main_plot as plot_data
+
         metas = ConfigManager(METAZONES_INI).load(str(metafile))
         metazones = check_metazones_in(metazones, metas, **data_args)
         with open(input_json) as f:
@@ -321,7 +333,7 @@ def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], json
             return
         png_paths = plot_data(
             {plot_only: zarr_outputs[plot_only]}, metazones, cfg.get("outputs"), kw_dask=kw_dask
-            )
+        )
         if png_paths:
             _write_json(jsonfile, png_paths)
             logger.info(f"Find the list of generated files in: {jsonfile}")
@@ -339,7 +351,7 @@ def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], json
         logger.info(f"Wave 0: loading dataset '{load_only}' × {len(metazones)} metazone(s)")
         ncouts = load_datasets(dataset_cfg, metazones, "data")
         mz_paths = {}
-        for nc in (ncouts or []):
+        for nc in ncouts or []:
             if nc is None:
                 continue
             mz_name = getattr(nc, "metazone", None) or Path(nc).parts[2]
@@ -360,7 +372,7 @@ def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], json
                 zarr.extend(
                     StagedDataset(p, metazone=mz_name, comp_func="data", stage="load")
                     for p in paths.get(mz_name, [])
-                    )
+                )
             except FileNotFoundError:
                 logger.warning(f"Input zarr JSON not found (skipping): {zarr_json}")
     else:
@@ -373,6 +385,7 @@ def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], json
         return
 
     from armoor.data.output import main_output as output_data
+
     zarr_outputs = output_data(zarr, metazones, cfg.get("outputs", {}).copy())
 
     if not zarr_outputs:
@@ -384,8 +397,7 @@ def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], json
             )
         else:
             logger.info(
-                "No output sub-section defined. "
-                "Interpolated data is available in data/interp/"
+                "No output sub-section defined. Interpolated data is available in data/interp/"
             )
         return
 
@@ -396,9 +408,8 @@ def main_data_pipeline(cfgfile: Path, metafile: Path, metazones: list[str], json
         png_paths = []
         if "png" in ofmt:
             from armoor.data.plot import main_plot as plot_data
-            png_paths = plot_data(
-                zarr_outputs, metazones, cfg.get("outputs"), kw_dask=kw_dask
-                )
+
+            png_paths = plot_data(zarr_outputs, metazones, cfg.get("outputs"), kw_dask=kw_dask)
 
         zarr_outputs = dict_to_list(zarr_outputs)
         if "png" in ofmt and png_paths:
@@ -429,25 +440,48 @@ def _dispatch_data(parser):
 
     hosts_cfg = getattr(args, "hosts_cfg", None)
     scheduler, host = _detect_scheduler(hosts_cfg)
-    if scheduler != "background" \
-            and not args.filters_only \
-            and not args.no_plot \
-            and args.plot_only is None \
-            and getattr(args, "load_only", None) is None:
+    if (
+        scheduler != "background"
+        and not args.filters_only
+        and not args.no_plot
+        and args.plot_only is None
+        and getattr(args, "load_only", None) is None
+    ):
         from armoor.cli.hpc import run_hpc
         import sys
-        run_hpc(host, scheduler, args.cfgfile, args.metazonesfile, args.metazones,
-                "data", args.jsonfile, args.filters_only, False,
-                data_args, kw_dask, sys.argv, ini_schema=DATA_INI, stage1_label="output")
+
+        run_hpc(
+            host,
+            scheduler,
+            args.cfgfile,
+            args.metazonesfile,
+            args.metazones,
+            "data",
+            args.jsonfile,
+            args.filters_only,
+            False,
+            data_args,
+            kw_dask,
+            sys.argv,
+            ini_schema=DATA_INI,
+            stage1_label="output",
+        )
         return
 
     main_data_pipeline(
-        args.cfgfile, args.metazonesfile, args.metazones, args.jsonfile,
-        args.filters_only, args.no_plot, args.plot_only, args.input_json,
-        kw_dask, data_args=data_args,
+        args.cfgfile,
+        args.metazonesfile,
+        args.metazones,
+        args.jsonfile,
+        args.filters_only,
+        args.no_plot,
+        args.plot_only,
+        args.input_json,
+        kw_dask,
+        data_args=data_args,
         load_only=getattr(args, "load_only", None),
         input_zarrs=getattr(args, "input_zarrs", None),
-        )
+    )
 
 
 def main_data() -> None:
@@ -458,12 +492,14 @@ def main_data() -> None:
 
 def _write_json(path, data):
     """Serialize data to JSON, converting Path objects to strings."""
+
     def _to_str(obj):
         if isinstance(obj, dict):
             return {k: _to_str(v) for k, v in obj.items()}
         if isinstance(obj, list):
             return [_to_str(x) for x in obj]
         return str(obj)
+
     with open(path, 'w') as f:
         json.dump(_to_str(data), f, indent=4)
 
@@ -490,6 +526,7 @@ def _detect_scheduler(hosts_cfg=None):
 
     import fnmatch
     import socket
+
     fqdn = socket.getfqdn()
     hostname = socket.gethostname()
     logger.info(f"Detected FQDN: {fqdn!r}  (gethostname: {hostname!r})")
@@ -546,10 +583,22 @@ def _detect_scheduler(hosts_cfg=None):
     return scheduler, host
 
 
-def main_comp(cfgfile: Path, metafile: Path, metazones: list[str], func_comp: str, jsonfile: Path,
-              ofilter: bool, ocoloc: bool, no_plot: bool, plot_only: Optional[str], input_json: Optional[Path],
-              kw_dask: tuple, comp_args: dict = {}, load_only: Optional[str] = None,
-              input_zarrs: Optional[list[str]] = None) -> None:
+def main_comp(
+    cfgfile: Path,
+    metafile: Path,
+    metazones: list[str],
+    func_comp: str,
+    jsonfile: Path,
+    ofilter: bool,
+    ocoloc: bool,
+    no_plot: bool,
+    plot_only: Optional[str],
+    input_json: Optional[Path],
+    kw_dask: tuple,
+    comp_args: dict = {},
+    load_only: Optional[str] = None,
+    input_zarrs: Optional[list[str]] = None,
+) -> None:
     """Run (a stage of) the armoor-comp-* pipeline: load, colocate, output, plot.
 
     Also serves as the per-wave worker entry point for the HPC pipeline
@@ -630,17 +679,23 @@ def main_comp(cfgfile: Path, metafile: Path, metazones: list[str], func_comp: st
             logger.warning("--plot-only requested but 'png' not in outputs fmt — nothing to do.")
             return
         from armoor.comp.plot import main_plot as plot_comp
+
         metas = ConfigManager(METAZONES_INI).load(str(metafile))
-        metazones = check_metazones_in(metazones, metas, func_param=get_comparison(func_comp).metazone_params)
+        metazones = check_metazones_in(
+            metazones, metas, func_param=get_comparison(func_comp).metazone_params
+        )
         with open(input_json) as f:
             zarr_outputs = json.load(f)
         if plot_only not in zarr_outputs:
             logger.warning(f"otype '{plot_only}' not found in {input_json} — skipping.")
             return
         png_paths = plot_comp(
-            {plot_only: zarr_outputs[plot_only]}, metazones, func_comp,
-            cfg_outputs=cfg["outputs"], kw_dask=kw_dask
-            )
+            {plot_only: zarr_outputs[plot_only]},
+            metazones,
+            func_comp,
+            cfg_outputs=cfg["outputs"],
+            kw_dask=kw_dask,
+        )
         if png_paths:
             _write_json(jsonfile, png_paths)
             logger.info(f"Find the list of generated files in: {jsonfile}")
@@ -651,11 +706,8 @@ def main_comp(cfgfile: Path, metafile: Path, metazones: list[str], func_comp: st
     # --- Normal pipeline ---
     metas = ConfigManager(METAZONES_INI).load(str(metafile))
     metazones = check_metazones_in(
-        metazones,
-        metas,
-        func_param=get_comparison(func_comp).metazone_params,
-        **comp_args
-        )
+        metazones, metas, func_param=get_comparison(func_comp).metazone_params, **comp_args
+    )
 
     if load_only is not None:
         # Wave 0 mode: load a single dataset for all metazones.
@@ -663,7 +715,7 @@ def main_comp(cfgfile: Path, metafile: Path, metazones: list[str], func_comp: st
         logger.info(f"Wave 0: loading dataset '{load_only}' × {len(metazones)} metazone(s)")
         ncouts = load_datasets(dataset_cfg, metazones, func_comp)
         mz_paths = {}
-        for nc in (ncouts or []):
+        for nc in ncouts or []:
             if nc is None:
                 continue
             mz_name = getattr(nc, "metazone", None) or Path(nc).parts[2]
@@ -687,7 +739,7 @@ def main_comp(cfgfile: Path, metafile: Path, metazones: list[str], func_comp: st
                 zarr.extend(
                     StagedDataset(p, metazone=mz_name, comp_func=func_comp, stage="load")
                     for p in paths.get(mz_name, [])
-                    )
+                )
             except FileNotFoundError:
                 logger.warning(f"Input zarr JSON not found (skipping): {zarr_json}")
     else:
@@ -709,7 +761,10 @@ def main_comp(cfgfile: Path, metafile: Path, metazones: list[str], func_comp: st
 
         else:
             from armoor.comp.output import main_output as output_comp
-            zarr_outputs = output_comp(zarr_coloc, metazones, cfg.get("outputs"), func_comp, **comp_args)
+
+            zarr_outputs = output_comp(
+                zarr_coloc, metazones, cfg.get("outputs"), func_comp, **comp_args
+            )
 
             if no_plot:
                 # HPC sub-job: save nested dict {otype: {mz: [paths]}} for merge step
@@ -718,10 +773,14 @@ def main_comp(cfgfile: Path, metafile: Path, metazones: list[str], func_comp: st
                 png_paths = []
                 if "png" in ofmt:
                     from armoor.comp.plot import main_plot as plot_comp
+
                     png_paths = plot_comp(
-                        zarr_outputs, metazones, func_comp,
-                        cfg_outputs=cfg.get("outputs"), kw_dask=kw_dask
-                        )
+                        zarr_outputs,
+                        metazones,
+                        func_comp,
+                        cfg_outputs=cfg.get("outputs"),
+                        kw_dask=kw_dask,
+                    )
 
                 zarr_outputs = dict_to_list(zarr_outputs)
                 if "png" in ofmt and png_paths:
@@ -755,25 +814,48 @@ def _dispatch_comp(func_comp, parser, kw_comp_factory):
 
     hosts_cfg = getattr(args, "hosts_cfg", None)
     scheduler, host = _detect_scheduler(hosts_cfg)
-    if scheduler != "background" \
-            and not args.filters_only \
-            and not args.coloc_only \
-            and not args.no_plot \
-            and args.plot_only is None \
-            and getattr(args, "load_only", None) is None:
+    if (
+        scheduler != "background"
+        and not args.filters_only
+        and not args.coloc_only
+        and not args.no_plot
+        and args.plot_only is None
+        and getattr(args, "load_only", None) is None
+    ):
         from armoor.cli.hpc import run_hpc
         import sys
-        run_hpc(host, scheduler, args.cfgfile, args.metazonesfile, args.metazones,
-                func_comp, args.jsonfile, args.filters_only, args.coloc_only,
-                kw_comp, kw_dask, sys.argv, ini_schema=COMP_INI, stage1_label="comp")
+
+        run_hpc(
+            host,
+            scheduler,
+            args.cfgfile,
+            args.metazonesfile,
+            args.metazones,
+            func_comp,
+            args.jsonfile,
+            args.filters_only,
+            args.coloc_only,
+            kw_comp,
+            kw_dask,
+            sys.argv,
+            ini_schema=COMP_INI,
+            stage1_label="comp",
+        )
         return
 
     main_comp(
-        args.cfgfile, args.metazonesfile, args.metazones,
-        func_comp, args.jsonfile,
-        args.filters_only, args.coloc_only,
-        args.no_plot, args.plot_only, args.input_json,
-        kw_dask, comp_args=kw_comp,
+        args.cfgfile,
+        args.metazonesfile,
+        args.metazones,
+        func_comp,
+        args.jsonfile,
+        args.filters_only,
+        args.coloc_only,
+        args.no_plot,
+        args.plot_only,
+        args.input_json,
+        kw_dask,
+        comp_args=kw_comp,
         load_only=getattr(args, "load_only", None),
         input_zarrs=getattr(args, "input_zarrs", None),
     )
@@ -785,17 +867,18 @@ def get_parser_comp_models() -> ArgumentParser:
     parser = ArgumentParser(
         description="Compare models ouputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
 
     return parser
 
+
 def main_comp_models() -> None:
     """Compare a model reference with other products."""
-    _dispatch_comp("comp_models", get_parser_comp_models(),
-                   lambda args: {"tbound": args.tbound})
+    _dispatch_comp("comp_models", get_parser_comp_models(), lambda args: {"tbound": args.tbound})
+
 
 def get_parser_comp_clim() -> ArgumentParser:
     """Get parser for climatology comparison."""
@@ -811,8 +894,8 @@ def get_parser_comp_clim() -> ArgumentParser:
 
 def main_comp_clim() -> None:
     """Compare model outputs with an observed climatology."""
-    _dispatch_comp("comp_clim", get_parser_comp_clim(),
-                   lambda args: {"tbound": args.tbound})
+    _dispatch_comp("comp_clim", get_parser_comp_clim(), lambda args: {"tbound": args.tbound})
+
 
 def get_parser_comp_hydrosection() -> ArgumentParser:
     """Get parser for hydrological-section comparison."""
@@ -832,15 +915,19 @@ def get_parser_comp_hydrosection() -> ArgumentParser:
             "normal to the section, i.e. the depth at which the "
             "geostrophic velocity is assumed to be zero. "
             "Default: 0 dbar (referenced to the sea surface)."
-        )
-        )
+        ),
+    )
     return parser
 
 
 def main_comp_hydrosection() -> None:
     """Compare model outputs with observed hydrological sections (gliders)."""
-    _dispatch_comp("comp_hydrosection", get_parser_comp_hydrosection(),
-                   lambda args: {"tbound": args.tbound, "cgeo_ref": args.cgeo_ref})
+    _dispatch_comp(
+        "comp_hydrosection",
+        get_parser_comp_hydrosection(),
+        lambda args: {"tbound": args.tbound, "cgeo_ref": args.cgeo_ref},
+    )
+
 
 def get_parser_comp_sst() -> ArgumentParser:
     """Get parser for sst comparison."""
@@ -848,7 +935,7 @@ def get_parser_comp_sst() -> ArgumentParser:
     parser = ArgumentParser(
         description="Compare sst satellite with model ouputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
@@ -856,14 +943,16 @@ def get_parser_comp_sst() -> ArgumentParser:
         '--qc',
         type=parse_qc_tuple,
         default=None,
-        help="Tuple specifying quality tresholds, ex: ptemp,1,7"
-        )
+        help="Tuple specifying quality tresholds, ex: ptemp,1,7",
+    )
     return parser
+
 
 def main_comp_sst() -> None:
     """Compare sst reference with other products."""
-    _dispatch_comp("comp_sst", get_parser_comp_sst(),
-                   lambda args: {"qc": args.qc, "tbound": args.tbound})
+    _dispatch_comp(
+        "comp_sst", get_parser_comp_sst(), lambda args: {"qc": args.qc, "tbound": args.tbound}
+    )
 
 
 def get_parser_comp_argo() -> ArgumentParser:
@@ -872,28 +961,33 @@ def get_parser_comp_argo() -> ArgumentParser:
     parser = ArgumentParser(
         description="Compare argo data with model ouputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
         'radius',
         type=float,
-        help="Radius (in km) of disk to filter model point around observation."
-        )
+        help="Radius (in km) of disk to filter model point around observation.",
+    )
     parser.add_argument(
         '--qc',
         type=parse_qc_tuple,
         default=None,
-        help="Tuple specifying quality tresholds, ex: ptemp,1,7"
-        )
-    
+        help="Tuple specifying quality tresholds, ex: ptemp,1,7",
+    )
+
     return parser
+
 
 def main_comp_argo() -> None:
     """Compare argo with other products."""
-    _dispatch_comp("comp_argo", get_parser_comp_argo(),
-                   lambda args: {"radius": args.radius, "qc": args.qc, "tbound": args.tbound})
+    _dispatch_comp(
+        "comp_argo",
+        get_parser_comp_argo(),
+        lambda args: {"radius": args.radius, "qc": args.qc, "tbound": args.tbound},
+    )
+
 
 def get_parser_comp_mooring() -> ArgumentParser:
     """Get parser for mooring comparison."""
@@ -901,28 +995,33 @@ def get_parser_comp_mooring() -> ArgumentParser:
     parser = ArgumentParser(
         description="Compare mooring data with model ouputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
         'radius',
         type=float,
-        help="Radius (in km) of disk to filter model point around observation."
-        )
+        help="Radius (in km) of disk to filter model point around observation.",
+    )
     parser.add_argument(
         '--qc',
         type=dict,
         default=None,
-        help="Dictionnary specifying quality tresholds, ex: ptemp:1,7"
-        )
-    
+        help="Dictionnary specifying quality tresholds, ex: ptemp:1,7",
+    )
+
     return parser
+
 
 def main_comp_mooring() -> None:
     """Compare mooring with other products."""
-    _dispatch_comp("comp_mooring", get_parser_comp_mooring(),
-                   lambda args: {"radius": args.radius, "qc": args.qc, "tbound": args.tbound})
+    _dispatch_comp(
+        "comp_mooring",
+        get_parser_comp_mooring(),
+        lambda args: {"radius": args.radius, "qc": args.qc, "tbound": args.tbound},
+    )
+
 
 def get_parser_comp_drifter() -> ArgumentParser:
     """Get parser for drifter comparison."""
@@ -930,28 +1029,31 @@ def get_parser_comp_drifter() -> ArgumentParser:
     parser = ArgumentParser(
         description="Compare drifter data with model ouputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     add_comp_parser_arguments(parser)
     parser.add_argument(
         'period',
         type=str,
-        help="Time period of the particle integration (pandas period string). Ex: 1h, 6h, 1d"
-        )
+        help="Time period of the particle integration (pandas period string). Ex: 1h, 6h, 1d",
+    )
     parser.add_argument(
         'freq',
         type=str,
-        help="Time frequency of trajectory comparison (pandas frequency string). Ex: 1h, 6h, 1d"
-        )
+        help="Time frequency of trajectory comparison (pandas frequency string). Ex: 1h, 6h, 1d",
+    )
     return parser
+
 
 def main_comp_drifter() -> None:
     """Compare drifter trajectory with other products."""
-    _dispatch_comp("comp_drifter", get_parser_comp_drifter(),
-                   lambda args: {"period_drift": args.period,
-                                 "freq_drift": args.freq,
-                                 "tbound": args.tbound})
+    _dispatch_comp(
+        "comp_drifter",
+        get_parser_comp_drifter(),
+        lambda args: {"period_drift": args.period, "freq_drift": args.freq, "tbound": args.tbound},
+    )
+
 
 def get_parser_bull() -> ArgumentParser:
     """Get parser for building bull."""
@@ -959,33 +1061,22 @@ def get_parser_bull() -> ArgumentParser:
     parser = ArgumentParser(
         description="Build bull",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
-    parser.add_argument(
-        'bullname',
-        type=str,
-        help="Name of html file generated."
-        )
-    parser.add_argument(
-        'cfgfile',
-        type=Path,
-        help="Path of the configuration file."
-        )
-    parser.add_argument(
-        '--period',
-        type=str,
-        help="Period covering bull."
-        )
+    parser.add_argument('bullname', type=str, help="Name of html file generated.")
+    parser.add_argument('cfgfile', type=Path, help="Path of the configuration file.")
+    parser.add_argument('--period', type=str, help="Period covering bull.")
     parser.add_argument(
         '--fmt',
         type=str,
         default="html",
         choices=("html", "pdf"),
         nargs="*",
-        help="Format of file generated."
-        )
-    
+        help="Format of file generated.",
+    )
+
     return parser
+
 
 def main_bull() -> None:
     """Build bull."""
@@ -1021,7 +1112,7 @@ def main_bull() -> None:
                 bull.generate_html(file)
             else:
                 bull.generate_pdf(file)
-    
+
 
 # Diagnostic helper to monitor system performance
 def monitor_performance() -> None:
@@ -1033,8 +1124,8 @@ def monitor_performance() -> None:
         memory = psutil.virtual_memory()
         swap = psutil.swap_memory()
 
-        logger.info(f"Memory: {memory.percent:.1f}% used ({memory.available/1e9:.1f}GB free)")
-        logger.info(f"Swap: {swap.percent:.1f}% used ({swap.free/1e9:.1f}GB free)")
+        logger.info(f"Memory: {memory.percent:.1f}% used ({memory.available / 1e9:.1f}GB free)")
+        logger.info(f"Swap: {swap.percent:.1f}% used ({swap.free / 1e9:.1f}GB free)")
 
         # CPU
         cpu_percent = psutil.cpu_percent(interval=1)

@@ -69,7 +69,7 @@ class StatsComp:
         self.dims = self._filter_dims(dims, self.mparams, is_climatology=is_climatology)
         self.extra_dims = extra_dims
         self.exclude_dims = exclude_dims
-        
+
         # "prod/data" keeps the raw, member-resolved dataset -- some outputs
         # (e.g. mvprofiles/uvprofiles) plot one line per matched member on
         # purpose. But the diff/stats math below (self.dsprod) must use the
@@ -78,22 +78,16 @@ class StatsComp:
         # difference against that mean, not a per-member value, regardless
         # of whether further stats dims follow.
         self.dtref = xr.DataTree(name="ref")
-        self.dtref.update(
-            xr.DataTree.from_dict({"data": dsref})
-        )
+        self.dtref.update(xr.DataTree.from_dict({"data": dsref}))
         self.dtprod = xr.DataTree(name="prod")
-        self.dtprod.update(
-            xr.DataTree.from_dict({"data": dsprod})
-        )
+        self.dtprod.update(xr.DataTree.from_dict({"data": dsprod}))
         self.dtcomps = xr.DataTree(name="comps")
 
         if "member" in dsprod.dims:
             logger.info("Averaging product dataset across 'member' dimension.")
             dsprod = (
-                dsprod.reset_coords(["lon", "lat"])
-                .mean(dim="member")
-                .set_coords(["lon", "lat"])
-                )
+                dsprod.reset_coords(["lon", "lat"]).mean(dim="member").set_coords(["lon", "lat"])
+            )
         self.dsprod = dsprod
 
     # -------------------------------------------------------------------------
@@ -199,15 +193,13 @@ class StatsComp:
         prod_mean = self.dsprod.mean(dim=dims)
         prod_std = self.dsprod.std(dim=dims)
         comp_bias = diff.mean(dim=dims)
-        comp_rmse = np.sqrt((diff ** 2).mean(dim=dims))
+        comp_rmse = np.sqrt((diff**2).mean(dim=dims))
         cdiff = (self.dsprod - prod_mean) - (self.dsref - ref_mean)
-        comp_rmsec = np.sqrt((cdiff ** 2).mean(dim=dims))
+        comp_rmsec = np.sqrt((cdiff**2).mean(dim=dims))
 
         # Single dask.compute() call for all stats
-        (ref_mean, ref_std, prod_mean, prod_std,
-         comp_bias, comp_rmse, comp_rmsec) = dask.compute(
-            ref_mean, ref_std, prod_mean, prod_std,
-            comp_bias, comp_rmse, comp_rmsec
+        (ref_mean, ref_std, prod_mean, prod_std, comp_bias, comp_rmse, comp_rmsec) = dask.compute(
+            ref_mean, ref_std, prod_mean, prod_std, comp_bias, comp_rmse, comp_rmsec
         )
 
         # Update trees with computed results
@@ -287,10 +279,10 @@ class StatsComp:
             ds = ds.drop_vars("time")
 
         ds = ds.expand_dims("time")
-        
+
         t1, t2 = [pd.to_datetime(t) for t in timestamp.strip('[').split('_')]
-        med_time = t1+0.5*(t2-t1)
-        
+        med_time = t1 + 0.5 * (t2 - t1)
+
         ds = ds.assign_coords(time=[med_time.as_unit("ns")])
         return ds
 
@@ -322,7 +314,8 @@ class StatsComp:
                 logger.debug(
                     "get_diff: no common time steps between prod (%d) and ref (%d) — "
                     "reducing both over time before diff",
-                    dsprod.sizes["time"], dsref.sizes["time"],
+                    dsprod.sizes["time"],
+                    dsref.sizes["time"],
                 )
                 dsprod_mean = self._mean_preserving_coords(dsprod, "time")
                 dsref_mean = self._mean_preserving_coords(dsref, "time")

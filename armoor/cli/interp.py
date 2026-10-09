@@ -4,11 +4,12 @@ This module provides command-line interfaces for applying various types of inter
 (temporal, horizontal, vertical) to oceanographic data files.
 The interpolation operations are optimized for large datasets using Dask distributed computing.
 """
+
 import logging
 from argparse import ArgumentParser
 
 from armoor.io import ArmoorArgumentHelpFormatter
-from armoor.misc import parse_date, is_dict_empty, parse_coords
+from armoor.misc import parse_coords
 from armoor.cli.io import (
     add_io_parser_arguments,
     add_dask_parser_arguments,
@@ -27,82 +28,83 @@ logging.getLogger('distributed').setLevel(logging.ERROR)
 
 class InterpError(Exception):
     """Exception raised for errors in the interpolation module.
-    
+
     This exception is raised when there are issues with interpolation configuration
     or execution, such as incompatible parameters, missing required arguments,
     or invalid interpolation specifications.
     """
+
     pass
 
 
 def get_parser_interp_time() -> ArgumentParser:
     """Create argument parser for temporal interpolation operations.
-    
+
     Returns
     -------
     ArgumentParser
         Configured argument parser with temporal interpolation options including
         time frequency specification for resampling operations.
-    
+
     Examples
     --------
     >>> parser = get_parser_interp_time()
     >>> args = parser.parse_args(['1H', 'input.nc', 'output.zarr'])
     >>> print(args.tfreq)
     '1H'
-    
+
     Notes
     -----
     Time frequency follows pandas frequency strings format:
     - '1H' : hourly
-    - '6H' : 6-hourly  
+    - '6H' : 6-hourly
     - '1D' : daily
     - '1M' : monthly
     """
     parser = ArgumentParser(
         description="Apply time interpolation over a list of input files.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     parser.add_argument(
         'tfreq',
         type=str,
-        help="Time frequency for interpolation (pandas frequency string). Ex: 1H, 6H, 1D"
-        )
+        help="Time frequency for interpolation (pandas frequency string). Ex: 1H, 6H, 1D",
+    )
 
     return parser
 
 
 def main_interp_time() -> None:
     """Apply temporal interpolation to input files via command line interface.
-    
+
     This function serves as the main entry point for temporal interpolation operations.
     It parses command line arguments, configures temporal interpolation parameters,
     and processes input files using Dask distributed computing for optimal performance.
-    
+
     The interpolation is performed over the full time range present in the input data,
     resampling to the specified frequency using advanced interpolation methods.
-    
+
     Positional Arguments
     --------------------
     tfreq : str
         Time frequency for interpolation using pandas frequency strings.
         Common values: '1H' (hourly), '6H' (6-hourly), '1D' (daily), '1M' (monthly).
-    
+
     Examples
     --------
     Command line usage:
-    
+
     .. code-block:: bash
-    
+
         # Interpolate to hourly frequency
         armoor-interp-time input.nc output.nc 1H --ifmt croco
-        
-        # Interpolate to daily frequency  
+
+        # Interpolate to daily frequency
         armoor-interp-time input.nc output.nc 1D --ifmt croco
-    
+
     Notes
     -----
     - Temporal interpolation preserves data quality while providing regular time sampling
@@ -132,18 +134,18 @@ def main_interp_time() -> None:
 
 def get_parser_interp_horizontal() -> ArgumentParser:
     """Create argument parser for horizontal spatial interpolation operations.
-    
+
     Returns
     -------
     ArgumentParser
         Configured argument parser with horizontal interpolation options including
         cloud points, sections, regular grids, and NetCDF grid specifications.
-    
+
     Examples
     --------
     >>> parser = get_parser_interp_horizontal()
     >>> args = parser.parse_args(['--cloud', '45.0,2.0', '46.0,3.0', 'input.nc', 'output.zarr'])
-    
+
     Notes
     -----
     Horizontal interpolation methods (mutually exclusive):
@@ -157,67 +159,67 @@ def get_parser_interp_horizontal() -> ArgumentParser:
     parser = ArgumentParser(
         description="Apply horizontal interpolation over a list of input files.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
     add_dask_parser_arguments(parser)
     parser.add_argument(
         '--cloud',
         type=parse_coords,
-        help="String of comma-separated coordinates (lat,lon) tuples. Ex: '(45.0,2.0),(46.0,3.0),(44.0,4.0)'"
-        )
+        help="String of comma-separated coordinates (lat,lon) tuples. Ex: '(45.0,2.0),(46.0,3.0),(44.0,4.0)'",
+    )
     parser.add_argument(
         '--section',
         nargs="*",
         type=float,
-        help="Linear section definition: lat0 lon0 lat1 lon1 .... step_km"
-        )
+        help="Linear section definition: lat0 lon0 lat1 lon1 .... step_km",
+    )
     parser.add_argument(
         '--lon-grid',
         nargs=3,
         type=float,
-        help="Longitude grid specification: lon_min lon_max lon_step"
-        )
+        help="Longitude grid specification: lon_min lon_max lon_step",
+    )
     parser.add_argument(
         '--lat-grid',
         nargs=3,
         type=float,
-        help="Latitude grid specification: lat_min lat_max lat_step"
-        )
+        help="Latitude grid specification: lat_min lat_max lat_step",
+    )
     parser.add_argument(
         '--ncgrid',
         type=str,
-        help="NetCDF file in armoor format containing target grid lat/lon coordinates."
-        )
+        help="NetCDF file in armoor format containing target grid lat/lon coordinates.",
+    )
     parser.add_argument(
         '--coarsen-factor',
         type=int,
         metavar='FACTOR',
-        help="Coarsening factor applied to both x and y dimensions (e.g. 4 degrades a 1/12° grid to ~1/3°)."
-        )
+        help="Coarsening factor applied to both x and y dimensions (e.g. 4 degrades a 1/12° grid to ~1/3°).",
+    )
     parser.add_argument(
         '--coarsen-boundary',
         choices=["trim", "pad"],
         default="trim",
-        help="How to handle sizes not divisible by the coarsening factor (default: trim)."
-        )
+        help="How to handle sizes not divisible by the coarsening factor (default: trim).",
+    )
     parser.add_argument(
         '--coarsen-method',
         choices=["mean", "median", "min", "max"],
         default="mean",
-        help="Block aggregation method (default: mean)."
-        )
+        help="Block aggregation method (default: mean).",
+    )
 
     return parser
 
 
 def main_interp_horizontal() -> None:
     """Apply horizontal spatial interpolation to input files via command line interface.
-    
+
     This function serves as the main entry point for horizontal interpolation operations.
     It parses command line arguments, validates interpolation parameters, and processes
     input files using various spatial interpolation methods.
-    
+
     Command Line Arguments
     ----------------------
     --cloud : list of tuples
@@ -226,7 +228,7 @@ def main_interp_horizontal() -> None:
         Linear section from (lat0,lon0) to (lat1,lon1) with step size in kilometers.
     --lon-grid : float, float, float
         Regular longitude grid: minimum, maximum, and step size in km.
-    --lat-grid : float, float, float  
+    --lat-grid : float, float, float
         Regular latitude grid: minimum, maximum, and step size in km.
         Required when --lon-grid is specified.
     --ncgrid : str
@@ -298,24 +300,18 @@ def main_interp_horizontal() -> None:
     coarsen_factor = args.coarsen_factor
 
     if lon_grid and not lat_grid:
-        raise InterpError(
-            "--lat-grid is mandatory since --lon-grid is specified."
-            )
+        raise InterpError("--lat-grid is mandatory since --lon-grid is specified.")
     if lat_grid and not lon_grid:
-        raise InterpError(
-            "--lon-grid is mandatory since --lat-grid is specified."
-            )
+        raise InterpError("--lon-grid is mandatory since --lat-grid is specified.")
     if section:
         if len(section) % 2 == 0:
-            raise InterpError(
-                "--section expects a odd length of arguments"
-                )
+            raise InterpError("--section expects a odd length of arguments")
 
     check = sum(1 for x in (cloud, section, lon_grid, ncgrid, coarsen_factor) if x is not None)
     if check > 1:
         raise InterpError(
             "--cloud, --section, --lon-grid, --ncgrid and --coarsen-factor are not compatible."
-            )
+        )
     elif check == 0:
         raise InterpError("No horizontal interpolation to be performed.")
 
@@ -350,29 +346,29 @@ def main_interp_horizontal() -> None:
 
 def get_parser_interp_vertical() -> ArgumentParser:
     """Create argument parser for vertical interpolation operations.
-    
+
     Returns
     -------
     ArgumentParser
         Configured argument parser with vertical interpolation options including
         specific vertical levels and regular vertical spacing.
-    
+
     Examples
     --------
     >>> parser = get_parser_interp_vertical()
     >>> args = parser.parse_args(['--vlevel', '0', '10', '20', '50', 'input.nc', 'output.zarr'])
-    
+
     Notes
     -----
     Vertical interpolation methods (mutually exclusive):
-    
+
     - **Specific levels**: Interpolate to user-defined depth/height levels
     - **Regular spacing**: Interpolate to regularly spaced vertical levels
     """
     parser = ArgumentParser(
         description="Apply vertical interpolation over a list of input files.",
         formatter_class=ArmoorArgumentHelpFormatter,
-        )
+    )
     add_logging_parser_arguments(parser)
     add_io_parser_arguments(parser)
     add_dask_parser_arguments(parser)
@@ -380,29 +376,27 @@ def get_parser_interp_vertical() -> ArgumentParser:
         '--vlevel',
         nargs="*",
         type=float,
-        help="List of specific vertical levels for interpolation."
-        )
+        help="List of specific vertical levels for interpolation.",
+    )
     parser.add_argument(
-        '--vfreq',
-        type=float,
-        help="Vertical spacing for regular level interpolation."
-        )
+        '--vfreq', type=float, help="Vertical spacing for regular level interpolation."
+    )
     parser.add_argument(
         '--vname',
         default="depth",
         type=str,
-        help="Name of vertical coordinate variable in input data."
-        )
+        help="Name of vertical coordinate variable in input data.",
+    )
     return parser
 
 
 def main_interp_vertical() -> None:
     """Apply vertical interpolation to input files via command line interface.
-    
+
     This function serves as the main entry point for vertical interpolation operations.
     It parses command line arguments, validates vertical interpolation parameters,
     and processes input files using depth/height-based interpolation methods.
-    
+
     Command Line Arguments
     ----------------------
     --vlevel : list of float
@@ -414,32 +408,32 @@ def main_interp_vertical() -> None:
     --vname : str, default 'depth'
         Name of the vertical coordinate variable in input files.
         Common names: 'depth', 'height', 'level', 'z'.
-    
+
     Raises
     ------
     InterpError
         If both --vlevel and --vfreq are specified (incompatible), or if neither
         is provided (no interpolation to perform).
-    
+
     Examples
     --------
     Command line usage:
-    
+
     .. code-block:: bash
-    
+
         # Interpolate to specific depth levels
         armoor-interp-vertical input.nc output.zarr \\
                                 --vlevel 0 10 20 50 100 200 500 \\
                                 --vname depth
-                                         
-        
+
+
         # Regular 25-meter spacing interpolation
         armoor-interp-vertical input.nc output.zarr \\
                                 --vfreq 25.0 --vname depth
-    
+
     Notes
     -----
-    - Vertical interpolation preserves horizontal structure while resampling vertically  
+    - Vertical interpolation preserves horizontal structure while resampling vertically
     - Extrapolation beyond data bounds is handled according to interpolation method
     - Regular spacing (--vfreq) automatically determines levels within data range
     - Specific levels (--vlevel) allow targeting particular depths/heights of interest
@@ -457,9 +451,7 @@ def main_interp_vertical() -> None:
 
     check = sum(1 for x in (vlevel, vfreq) if x is not None)
     if check > 1:
-        raise InterpError(
-            "--vlevel and --vfreq are not compatible."
-            )
+        raise InterpError("--vlevel and --vfreq are not compatible.")
     elif check == 0:
         raise InterpError("No vertical interpolation to be performed.")
 

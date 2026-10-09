@@ -42,22 +42,31 @@ def create_app(test_config=None, render_mode: str | None = None) -> Flask:
 
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    from armoor.viewer.api.basemap    import bp as basemap_bp
-    from armoor.viewer.api.colormap   import bp as colormap_bp
-    from armoor.viewer.api.config     import bp as config_bp
-    from armoor.viewer.api.datasets   import bp as datasets_bp
-    from armoor.viewer.api.grid       import bp as grid_bp
-    from armoor.viewer.api.metadata   import bp as metadata_bp
+    from armoor.viewer.api.basemap import bp as basemap_bp
+    from armoor.viewer.api.colormap import bp as colormap_bp
+    from armoor.viewer.api.config import bp as config_bp
+    from armoor.viewer.api.datasets import bp as datasets_bp
+    from armoor.viewer.api.grid import bp as grid_bp
+    from armoor.viewer.api.metadata import bp as metadata_bp
     from armoor.viewer.api.operations import bp as operations_bp
-    from armoor.viewer.api.point      import bp as point_bp
-    from armoor.viewer.api.section    import bp as section_bp
-    from armoor.viewer.api.tiles      import bp as tiles_bp
+    from armoor.viewer.api.point import bp as point_bp
+    from armoor.viewer.api.section import bp as section_bp
+    from armoor.viewer.api.tiles import bp as tiles_bp
     from armoor.viewer.api.timeseries import bp as timeseries_bp
-    from armoor.viewer.api.wind       import bp as wind_bp
+    from armoor.viewer.api.wind import bp as wind_bp
 
     for blueprint in (
-        basemap_bp, config_bp, datasets_bp, grid_bp, metadata_bp, tiles_bp,
-        wind_bp, operations_bp, colormap_bp, timeseries_bp, section_bp,
+        basemap_bp,
+        config_bp,
+        datasets_bp,
+        grid_bp,
+        metadata_bp,
+        tiles_bp,
+        wind_bp,
+        operations_bp,
+        colormap_bp,
+        timeseries_bp,
+        section_bp,
         point_bp,
     ):
         app.register_blueprint(blueprint)
@@ -113,6 +122,7 @@ def setup_basemap(src: str | None = None) -> None:
         )
 
     import sys
+
     conda_prefix = os.environ.get("CONDA_PREFIX") or sys.prefix
     if not conda_prefix or conda_prefix == "/usr":
         raise RuntimeError(
@@ -133,22 +143,26 @@ def main() -> None:
         prog="armoor-viewer",
         description="Interactive web viewer for armoor / xarray ocean datasets.",
     )
-    parser.add_argument("--host",  default="127.0.0.1", help="Bind address (default 127.0.0.1)")
-    parser.add_argument("--port",  default=5000, type=int, help="TCP port (default 5000)")
+    parser.add_argument("--host", default="127.0.0.1", help="Bind address (default 127.0.0.1)")
+    parser.add_argument("--port", default=5000, type=int, help="TCP port (default 5000)")
     parser.add_argument("--debug", action="store_true", help="Enable Flask debug mode")
     parser.add_argument(
-        "--render-mode", choices=["auto", "2d", "3d"], default=None,
+        "--render-mode",
+        choices=["auto", "2d", "3d"],
+        default=None,
         help="Frontend render mode: 'auto' (client-side WebGL2 detection, "
-             "default), '2d' (Leaflet planisphere, no GPU required), "
-             "'3d' (iTowns globe, requires WebGL2). Overrides "
-             "$ARMOOR_VIEWER_RENDER_MODE.",
+        "default), '2d' (Leaflet planisphere, no GPU required), "
+        "'3d' (iTowns globe, requires WebGL2). Overrides "
+        "$ARMOOR_VIEWER_RENDER_MODE.",
     )
     parser.add_argument(
-        "--setup-basemap", action="store_true",
+        "--setup-basemap",
+        action="store_true",
         help="Install the Blue Marble basemap image into the active conda env and exit.",
     )
     parser.add_argument(
-        "--src", default=None,
+        "--src",
+        default=None,
         help="Source path for --setup-basemap (auto-detected if omitted).",
     )
     args = parser.parse_args()
