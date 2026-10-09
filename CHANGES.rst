@@ -1,6 +1,34 @@
 What's new
 ##########
 
+Develop
+=======
+
+New features
+------------
+
+- ``open_decode_croco(..., fmt="croco_xios")`` decodes the XIOS outputs of
+  CROCO with the new ``open_decode_croco_xios``, instead of decoding them as
+  native outputs, which failed on the XIOS dimension names. The files of an
+  output are concatenated in time and the outputs merged (same points, same
+  times); the domain dimensions (``x``/``y``, ``x_<domain>``/``y_<domain>``)
+  are located at the rho, u or v points, including the extraction domains
+  of sloop (``<zone>_T``, ``<zone>_U``, ``<zone>_V``) whose u and v points
+  are the faces of their rho cells. The velocities (``u``/``v``,
+  ``u_surf``/``v_surf``) are averaged on the rho points (NaN where a face
+  is missing at a boundary of the grid) and rotated with ``angle``; the
+  rho points of outputs on the u and v points only are rebuilt from the
+  faces. ``h``, ``angle`` and ``mask_rho``, when not written by XIOS, are
+  taken from a CROCO grid file given with the outputs, located with the
+  coordinates. The depth of the levels is computed with the s-coordinates
+  of xoa (``ocean_s_coordinate_g2`` with ``Vtransform = 2``, else
+  ``ocean_s_coordinate_g1``, as ``set_depth.F``) from ``h``, ``zeta``, the
+  ``s_rho`` axis, ``Cs_rho`` and ``hc``, ``Vtransform``, ``theta_s`` and
+  ``theta_b`` written as fields by XIOS or as global attributes
+  (``VertCoordType``); ``Cs_rho`` is computed with the stretching curves of
+  CROCO, not available in xoa, if absent. The decoded dataset has the same variables and
+  dimensions as with the native outputs.
+
 2026.10.0
 =========
 

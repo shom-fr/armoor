@@ -20,6 +20,7 @@ import xoa
 import xoa.meta as xmeta
 from xoa.meta.general import MetaSpecs
 import xoa.geo as xgeo
+import xoa.sigma as xsigma
 from xoa.grid import dz2depth, shift
 
 from armoor import ROOTDIR, ArmoorError
@@ -471,8 +472,8 @@ class CrocoDecoder(Decoder):
         path_files : list of str
             Absolute paths to the input files.
         fmt : str
-            The exact fmt requested (``"croco"`` or ``"croco_xios"``);
-            forwarded for routing but not consumed internally.
+            The exact fmt requested: native outputs (``"croco"``) or XIOS
+            outputs (``"croco_xios"``) of CROCO.
         platform : str, optional
             Unused.
 
@@ -1481,6 +1482,119 @@ def open_decode_odar(path_files):
     return dss
 
 
+#: Variables removed from the decoded CROCO outputs
+_CROCO_DROP_VARS = (
+    "sig_rho",
+    "sig_w",
+    "cs_r",
+    "cs_w",
+    "sc_r",
+    "sc_w",
+    "time_centered_bounds",
+    "time_counter_bounds",
+    "hc",
+    "theta_s",
+    "theta_b",
+    "Tcline",
+    "Vtransform",
+    "corio",
+    "ex",
+    "ey",
+    "akv",
+    "akt",
+    "ubar",
+    "vbar",
+    "w",
+    "sustr",
+    "svstr",
+    "spherical",
+    "xl",
+    "el",
+    "tke",
+    "gls",
+    "time_step",
+    "depth_w",
+    "s_w",
+    "cs_rho",
+    "sst_skin",
+    "hbl",
+)
+
+
+def _finalize_croco(ds):
+    """Last decoding steps shared by the native and XIOS outputs of CROCO.
+
+    Rename the coordinates, use ``x`` and ``y`` dimensions, rotate the
+    velocities to east and north, mask the land, put the surface first along
+    ``z`` with a positive depth and rechunk.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset decoded by xoa, on the rho points (``x_rho`` and ``y_rho``
+        dimensions, ``z`` vertical dimension from the bottom).
+
+    Returns
+    -------
+    xarray.Dataset
+    """
+    if "depth_rho" in ds.coords:
+        ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat", "depth_rho": "depth"})
+    else:
+        ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat"})
+
+    for dim in ("x_u", "y_v"):
+        if dim in ds.dims:
+            ds = ds.drop_dims(dim)
+
+    ds = ds.swap_dims({"x_rho": "x", "y_rho": "y"})
+    for coord in ("x_rho", "y_rho"):
+        if coord in ds.coords:
+            ds = ds.drop_vars(coord)
+
+    pairs = [pair for pair in _CROCO_VELOCITY_PAIRS if set(pair).issubset(ds.data_vars)]
+    if "angle" in ds and pairs:
+        angle = ds["angle"]
+        for uname, vname in pairs:
+            da_u = ds[uname] * np.cos(angle) - ds[vname] * np.sin(angle)
+            da_v = ds[vname] * np.cos(angle) + ds[uname] * np.sin(angle)
+            ds = ds.drop_vars([uname, vname])
+            ds[uname] = da_u
+            ds[vname] = da_v
+        ds = ds.drop_vars("angle")
+
+    logger.info(f"Dataset: {ds}")
+
+    if "mask_rho" in ds:
+        ds = ds.where(ds["mask_rho"] > 0, drop=False)
+        ds = ds.rename({"mask_rho": "mask"})
+
+    if "z" in ds.dims:
+        ds = ds.isel(z=slice(None, None, -1))
+        if "depth" in ds.coords:
+            ds = ds.assign_coords(depth=-ds.depth)
+
+    # Final rechunk: large spatial chunks now that sigma coords are decoded
+    good_var = None
+    for var in ["depth", "ptemp", "sal"]:
+        if var in ds:
+            good_var = ds[var]
+            break
+    if good_var is None and ds.data_vars:
+        good_var = next(iter(ds.data_vars.values()))
+    if good_var is not None and good_var.chunks:
+        chunk_dict = {}
+        for dim, dim_chunks in zip(good_var.dims, good_var.chunks):
+            dim_size = good_var.sizes[dim]
+            if dim == "time":
+                chunk_dict[dim] = dim_chunks[0]
+            else:
+                chunk_dict[dim] = min(dim_size, max(dim_chunks[0], 512))
+        ds = ds.chunk(chunk_dict)
+
+    return ds
+
+
 def open_decode_croco(path_file, fmt="croco"):
     """
     Open netcdf file from CROCO model.
@@ -1488,12 +1602,18 @@ def open_decode_croco(path_file, fmt="croco"):
     ----------
     path_file : list of str
         List of the file to decode.
+    fmt : {"croco", "croco_xios"}
+        Native outputs of CROCO, or XIOS outputs (see
+        `open_decode_croco_xios`).
 
     Returns
     -------
     croco : xarray.Dataset
          Model dataset decoded.
     """
+    if fmt == "croco_xios":
+        return open_decode_croco_xios(path_file)
+
     cfspecs = xmeta.get_meta_specs("croco")
 
     def _find_grid_file(files):
@@ -1643,44 +1763,7 @@ def open_decode_croco(path_file, fmt="croco"):
     logger.info(f"  [timing] unify_chunks:     {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
-    for v in [
-        "sig_rho",
-        "sig_w",
-        "cs_r",
-        "cs_w",
-        "sc_r",
-        "sc_w",
-        "time_centered_bounds",
-        "time_counter_bounds",
-        "hc",
-        "theta_s",
-        "theta_b",
-        "Tcline",
-        "Vtransform",
-        "corio",
-        "ex",
-        "ey",
-        "akv",
-        "akt",
-        "ubar",
-        "vbar",
-        "w",
-        "sustr",
-        "svstr",
-        "spherical",
-        "xl",
-        "el",
-        "tke",
-        "gls",
-        "time_step",
-        "depth_w",
-        "s_w",
-        "cs_rho",
-        "sst_skin",
-        "hbl",
-    ]:
-        if v in ds:
-            ds = ds.drop_vars(v)
+    ds = ds.drop_vars([v for v in _CROCO_DROP_VARS if v in ds])
 
     for coord in list(ds.coords):
         if "nav_" in coord:
@@ -1712,56 +1795,552 @@ def open_decode_croco(path_file, fmt="croco"):
     logger.info(f"  [timing] u/v shift:        {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
-    if "z" in ds.dims:
-        ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat", "depth_rho": "depth"})
+    ds = _finalize_croco(ds)
+    logger.info(f"  [timing] finalize:         {time.perf_counter()-_t:.1f}s")
+
+    return ds
+
+
+#: CROCO fields at the u and v points, to locate the fields of the XIOS
+#: files written on a single domain (``x`` and ``y`` dimensions)
+_CROCO_XIOS_U_FIELDS = ("u", "u_surf", "ubar", "sustr", "bustr")
+_CROCO_XIOS_V_FIELDS = ("v", "v_surf", "vbar", "svstr", "bvstr")
+
+#: Velocities of CROCO (u and v components) decoded on the rho points and
+#: rotated to east and north
+_CROCO_VELOCITY_PAIRS = (("u", "v"), ("u_surf", "v_surf"))
+
+#: Location of the points of the XIOS domains of CROCO: base domains and
+#: points of the extraction domains (``<domain>_<points>``)
+_CROCO_XIOS_POINTS = {
+    "rho": "rho",
+    "w": "rho",
+    "T": "rho",
+    "W": "rho",
+    "u": "u",
+    "U": "u",
+    "v": "v",
+    "V": "v",
+}
+
+#: Static fields of CROCO, that XIOS may write at every record
+_CROCO_STATIC_FIELDS = (
+    "h",
+    "angle",
+    "mask_rho",
+    "mask_u",
+    "mask_v",
+    "pm",
+    "pn",
+    "f",
+    "Cs_rho",
+    "Cs_w",
+    "hc",
+    "theta_s",
+    "theta_b",
+    "Vtransform",
+)
+
+#: Fields taken from the grid file when they are not in the XIOS outputs
+_CROCO_GRID_FIELDS = ("h", "angle", "mask_rho")
+
+
+def _croco_xios_location(domain, names):
+    """Get the location of the points of an XIOS domain of CROCO.
+
+    Parameters
+    ----------
+    domain : str or None
+        Domain id, as in the dimension names ``x_<domain>`` and
+        ``y_<domain>``; None for the ``x`` and ``y`` dimensions of a file
+        written on a single domain, then located with the field names.
+    names : list of str
+        Names of the fields of the domain.
+
+    Returns
+    -------
+    str or None
+        ``"rho"``, ``"u"`` or ``"v"``; None for the other points (psi,
+        sediment, scalar).
+    """
+    if domain is None:
+        if set(names) & set(_CROCO_XIOS_U_FIELDS):
+            return "u"
+        if set(names) & set(_CROCO_XIOS_V_FIELDS):
+            return "v"
+        return "rho"
+    return _CROCO_XIOS_POINTS.get(domain.rsplit("_", 1)[-1])
+
+
+def _normalize_croco_xios(ds):
+    """Name the dimensions and coordinates of an XIOS output as in CROCO.
+
+    The horizontal dimensions ``x_<domain>`` and ``y_<domain>`` (``x`` and
+    ``y`` for a file written on a single domain) become ``xi_<loc>`` and
+    ``eta_<loc>``, the coordinates ``nav_lon_<domain>`` and
+    ``nav_lat_<domain>`` become ``lon_<loc>`` and ``lat_<loc>``, with
+    ``<loc>`` the location of the points (rho, u or v), and ``time_counter``
+    becomes ``time``. The fields on other points, on vertical axes other
+    than ``s_rho``, and the other time axes are removed.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        One XIOS output file.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
+    drop = [
+        name
+        for name in ds.variables
+        if name.startswith(("time_instant", "time_centered")) or name.endswith("_bounds")
+    ]
+    # lon_rho, lon_u... fields duplicate the nav_lon* coordinates of the domains
+    drop.extend(f"{c}_{loc}" for c in ("lon", "lat") for loc in ("rho", "u", "v"))
+    ds = ds.drop_vars(drop, errors="ignore")
+
+    renames = {"time_counter": "time"}
+    navs = {}
+    drop = []
+    for xdim in [dim for dim in ds.dims if dim == "x" or dim.startswith("x_")]:
+        domain = xdim[2:] or None
+        suffix = f"_{domain}" if domain else ""
+        names = [name for name in ds.data_vars if xdim in ds[name].dims]
+        nav = [f"nav_lon{suffix}", f"nav_lat{suffix}"]
+        loc = _croco_xios_location(domain, names)
+        if loc is None:
+            logger.info(f"Fields on the XIOS domain {domain} ignored: {names}")
+            drop.extend(names + nav)
+            continue
+        renames[xdim] = f"xi_{loc}"
+        renames[f"y{suffix}"] = f"eta_{loc}"
+        if loc in navs:  # T and W points of an extraction
+            drop.extend(nav)
+        else:
+            navs[loc] = dict(zip(nav, (f"lon_{loc}", f"lat_{loc}")))
+            renames.update(navs[loc])
+    for name in ds.data_vars:
+        vdims = [dim for dim in ds[name].dims if dim.startswith(("s_", "N_"))]
+        if vdims and vdims != ["s_rho"]:
+            logger.info(f"Field {name} on the vertical axis {vdims[0]} ignored")
+            drop.append(name)
+    ds = ds.drop_vars(drop, errors="ignore")
+
+    def rename(var):
+        return xr.Variable(
+            [renames.get(dim, dim) for dim in var.dims],
+            var.data,
+            attrs=var.attrs,
+            encoding=var.encoding,
+        )
+
+    try:
+        return xr.Dataset(
+            {renames.get(name, name): rename(ds[name].variable) for name in ds.data_vars},
+            coords={renames.get(name, name): rename(ds[name].variable) for name in ds.coords},
+            attrs=ds.attrs,
+        )
+    except ValueError as exc:
+        raise ArmoorError(
+            f"Several XIOS domains with the same points and different sizes in a file: {exc}"
+        ) from exc
+
+
+def _croco_xios_file_id(path):
+    """Get the XIOS file id of an output: ``name`` attribute or file name."""
+    import netCDF4 as _nc4
+
+    with _nc4.Dataset(path) as nc:
+        if "name" in nc.ncattrs():
+            return nc.getncattr("name")
+    return re.sub(r"_\d{8,}(-\d{8,})?$", "", Path(path).stem)
+
+
+def _locate_croco_xios_grid(ds, grid):
+    """Get the grid fields on the rho points of an XIOS output.
+
+    The rho points of the output, the whole grid or an extraction, are
+    located in the grid file with their coordinates.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Normalized XIOS output, with ``lon_rho`` and ``lat_rho``.
+    grid : xarray.Dataset
+        CROCO grid file (``eta_rho`` and ``xi_rho`` dimensions).
+
+    Returns
+    -------
+    xarray.Dataset
+        The fields of `_CROCO_GRID_FIELDS` found in the grid file, on the
+        rho points of the output.
+    """
+    lon = ds["lon_rho"].values
+    lat = ds["lat_rho"].values
+    glon = grid["lon_rho"].values
+    glat = grid["lat_rho"].values
+    j0, i0 = np.unravel_index(
+        np.argmin((glon - lon[0, 0]) ** 2 + (glat - lat[0, 0]) ** 2), glon.shape
+    )
+    ny, nx = lon.shape
+    box = (slice(j0, j0 + ny), slice(i0, i0 + nx))
+    if (
+        glon[box].shape != lon.shape
+        or not np.allclose(glon[box], lon, atol=1e-4)
+        or not np.allclose(glat[box], lat, atol=1e-4)
+    ):
+        raise ArmoorError("The rho points of the XIOS outputs are not found in the grid file")
+    logger.info(f"XIOS outputs on the rho points [{i0}:{i0 + nx}, {j0}:{j0 + ny}] of the grid")
+    fields = [name for name in _CROCO_GRID_FIELDS if name in grid]
+    return (
+        grid[fields]
+        .isel(eta_rho=box[0], xi_rho=box[1])
+        .drop_vars(list(grid.coords), errors="ignore")
+    )
+
+
+def _croco_xios_face_start(ds, loc, nrho):
+    """Get the position of the first u (v) face relative to the rho points.
+
+    On the C grid of CROCO, the u point ``k`` of a whole grid is the east
+    face of the rho cell ``k`` (the v point ``k``, its north face). An
+    extraction of sloop has the faces of all its rho cells (one more face
+    than rho points), unless it touches a boundary of the grid: the
+    position of the first face is then found with the coordinates of the
+    rho points, or else of the other faces (the v points are at the xi of
+    the rho points, the u points at their eta).
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Normalized XIOS output.
+    loc : {"u", "v"}
+    nrho : int
+        Number of rho points along xi (u) or eta (v).
+
+    Returns
+    -------
+    int
+        0 if the first face is the east (north) face of the first rho
+        cell, -1 if it is its west (south) face.
+    """
+    dim = "xi_u" if loc == "u" else "eta_v"
+    nface = ds.sizes[dim]
+    if nface == nrho + 1:
+        return -1
+    if nface == nrho - 1 or nrho == 1:
+        return 0
+    if nface != nrho:
+        raise ArmoorError(f"{nface} {loc} points for {nrho} rho points along {dim}")
+    # one face missing at a boundary of the grid: west (south) or east (north)?
+    if loc == "u":
+        face, sel_face = "u", {"eta_u": 0, "xi_u": 0}
+        ref, sel_ref = ("rho", {"eta_rho": 0, "xi_rho": [0, 1]})
+        if "lon_rho" not in ds.coords:
+            ref, sel_ref = ("v", {"eta_v": 0, "xi_v": [0, 1]})
     else:
-        ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat"})
+        face, sel_face = "v", {"xi_v": 0, "eta_v": 0}
+        ref, sel_ref = ("rho", {"xi_rho": 0, "eta_rho": [0, 1]})
+        if "lon_rho" not in ds.coords:
+            ref, sel_ref = ("u", {"xi_u": 0, "eta_u": [0, 1]})
+    if f"lon_{ref}" not in ds.coords:
+        raise ArmoorError(f"Cannot locate the {loc} points of the XIOS outputs")
+    ref = np.array([ds[f"{c}_{ref}"].isel(sel_ref).values for c in ("lon", "lat")])
+    face = np.array([ds[f"{c}_{face}"].isel(sel_face).values for c in ("lon", "lat")])
+    east = 0.5 * (ref[:, 0] + ref[:, 1])
+    west = 1.5 * ref[:, 0] - 0.5 * ref[:, 1]
+    return 0 if ((face - east) ** 2).sum() < ((face - west) ** 2).sum() else -1
 
-    for dim in ("x_u", "y_v"):
-        if dim in ds.dims:
-            ds = ds.drop_dims(dim)
 
-    ds = ds.swap_dims({"x_rho": "x", "y_rho": "y"})
-    for coord in ("x_rho", "y_rho"):
-        if coord in ds.coords:
-            ds = ds.drop_vars(coord)
+def _croco_xios_faces(da, loc, start, nrho):
+    """Get the two u (v) faces of the rho cells.
 
-    if "angle" in ds and (set(("u", "v")).issubset(ds.data_vars)):
-        angle = ds["angle"]
-        da_u = ds["u"] * np.cos(angle) - ds["v"] * np.sin(angle)
-        da_v = ds["v"] * np.cos(angle) + ds["u"] * np.sin(angle)
-        ds = ds.drop_vars(["u", "v", "angle"])
-        ds["u"] = da_u
-        ds["v"] = da_v
+    Parameters
+    ----------
+    da : xarray.DataArray
+        Field on the u (v) points of a normalized XIOS output.
+    loc : {"u", "v"}
+    start : int
+        See `_croco_xios_face_start`.
+    nrho : int
+        Number of rho points along xi (u) or eta (v).
 
-    logger.info(f"Dataset: {ds}")
+    Returns
+    -------
+    list of xarray.DataArray
+        West and east (south and north) faces on the rho points, NaN where
+        a face is missing (rho points on a boundary of the grid).
+    """
+    if loc == "u":
+        dim, other, dim_rho, other_rho = "xi_u", "eta_u", "xi_rho", "eta_rho"
+    else:
+        dim, other, dim_rho, other_rho = "eta_v", "xi_v", "eta_rho", "xi_rho"
+    da = da.reset_coords(drop=True)
+    da = da.assign_coords({dim: np.arange(da.sizes[dim]) + start})
+    faces = np.arange(nrho)
+    return [
+        da.reindex({dim: faces + shift}).drop_vars(dim).rename({dim: dim_rho, other: other_rho})
+        for shift in (-1, 0)
+    ]
 
-    if "mask_rho" in ds:
-        ds = ds.where(ds["mask_rho"] > 0, drop=False)
-        ds = ds.rename({"mask_rho": "mask"})
 
-    if "z" in ds.dims:
-        ds = ds.isel(z=slice(None, None, -1))
-        ds = ds.assign_coords(depth=-ds.depth)
+def _croco_xios_rho_points(ds):
+    """Add the rho points to XIOS outputs on the u and v points only.
 
-    # Final rechunk: large spatial chunks now that sigma coords are decoded
-    good_var = None
-    for var in ["depth", "ptemp", "sal"]:
-        if var in ds:
-            good_var = ds[var]
-            break
-    if good_var is None and ds.data_vars:
-        good_var = next(iter(ds.data_vars.values()))
-    if good_var is not None and good_var.chunks:
-        chunk_dict = {}
-        for dim, dim_chunks in zip(good_var.dims, good_var.chunks):
-            dim_size = good_var.sizes[dim]
-            if dim == "time":
-                chunk_dict[dim] = dim_chunks[0]
-            else:
-                chunk_dict[dim] = min(dim_size, max(dim_chunks[0], 512))
-        ds = ds.chunk(chunk_dict)
-    logger.info(f"  [timing] final rechunk:    {time.perf_counter() - _t:.1f}s")
+    The coordinates of a rho point are the middle of its u faces, or else
+    of its v faces, or else the mean of its faces.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Normalized XIOS output, with fields on the u and v points.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
+    if "xi_v" not in ds.dims or "eta_u" not in ds.dims:
+        raise ArmoorError(
+            "XIOS outputs without rho points need both u and v points:"
+            " decode them with the outputs on the rho points"
+        )
+    nrho = {"u": ds.sizes["xi_v"], "v": ds.sizes["eta_u"]}
+    starts = {loc: _croco_xios_face_start(ds, loc, nrho[loc]) for loc in ("u", "v")}
+    coords = {}
+    for c in ("lon", "lat"):
+        sides = {
+            loc: _croco_xios_faces(ds[f"{c}_{loc}"], loc, starts[loc], nrho[loc])
+            for loc in ("u", "v")
+        }
+        mean_u, mean_v = (0.5 * (sides[loc][0] + sides[loc][1]) for loc in ("u", "v"))
+        mean_all = xr.concat(sides["u"] + sides["v"], "side").mean("side")
+        coords[f"{c}_rho"] = mean_u.fillna(mean_v).fillna(mean_all)
+    return ds.assign_coords(coords)
+
+
+def _croco_s_curves(sc, theta_s, theta_b, new):
+    """Get the S-coordinate stretching curves of CROCO (``set_scoord.F``).
+
+    Parameters
+    ----------
+    sc : numpy.ndarray
+        S-coordinate in [-1, 0].
+    theta_s, theta_b : float
+        Surface and bottom control parameters.
+    new : bool
+        NEW_S_COORD stretching (``VertCoordType = "NEW"``).
+
+    Returns
+    -------
+    numpy.ndarray
+    """
+    if new:
+        if theta_s > 0:
+            csrf = (1 - np.cosh(theta_s * sc)) / (np.cosh(theta_s) - 1)
+        else:
+            csrf = -(sc**2)
+        if theta_b > 0:
+            return (np.exp(theta_b * csrf) - 1) / (1 - np.exp(-theta_b))
+        return csrf
+    return (1 - theta_b) * np.sinh(theta_s * sc) / np.sinh(theta_s) + theta_b * (
+        0.5 * np.tanh(theta_s * (sc + 0.5)) / np.tanh(0.5 * theta_s) - 0.5
+    )
+
+
+def _croco_xios_depth(ds):
+    """Get the height of the rho points of an XIOS output.
+
+    As ``set_depth.F`` of CROCO, with the s-coordinates of xoa: generic form
+    2 (`xoa.sigma.ocean_s_coordinate_g2`) with the new vertical coordinate
+    (``Vtransform = 2``), else generic form 1. The stretching curves of
+    CROCO, not those of xoa, are computed when ``Cs_rho`` is not written.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Normalized XIOS output with ``h``, the ``s_rho`` axis and the
+        parameters of the vertical coordinate, written by XIOS (``hc``,
+        ``Vtransform``, ``theta_s``, ``theta_b``) or global attributes of
+        CROCO (``hc``, ``VertCoordType``, ``theta_s``, ``theta_b``).
+        ``Cs_rho`` is computed if absent, and the free surface ``zeta``
+        taken as zero if absent.
+
+    Returns
+    -------
+    xarray.DataArray or None
+        Height of the rho points (negative below the surface, as xoa), None
+        if the vertical coordinate cannot be computed.
+    """
+    attrs = ds.attrs
+
+    def param(name):
+        return float(ds[name]) if name in ds else attrs.get(name)
+
+    if "h" not in ds:
+        logger.warning("No bathymetry h in the XIOS outputs nor grid file: depth not computed")
+        return None
+    hc = param("hc")
+    vtransform = param("Vtransform")
+    if vtransform is not None:
+        new = int(vtransform) == 2
+    else:
+        new = attrs.get("VertCoordType") == "NEW"
+    theta_s, theta_b = param("theta_s"), param("theta_b")
+    sc = ds["s_rho"]
+    if hc is None:
+        logger.warning("No hc in the XIOS outputs: depth not computed")
+        return None
+    if "Cs_rho" in ds:
+        cs = ds["Cs_rho"]
+    elif theta_s is None or theta_b is None:
+        logger.warning(
+            "No Cs_rho, theta_s nor theta_b in the XIOS outputs: depth not computed"
+        )
+        return None
+    else:
+        cs = xr.DataArray(
+            _croco_s_curves(sc.values, theta_s, theta_b, new),
+            dims="s_rho",
+        )
+    h = ds["h"]
+    if "zeta" in ds:
+        zeta = ds["zeta"]
+    else:
+        logger.warning("No free surface zeta in the XIOS outputs: depth computed with zeta = 0")
+        zeta = xr.zeros_like(h)
+    sc = sc.drop_vars("s_rho")
+    sigma = xsigma.ocean_s_coordinate_g2 if new else xsigma.ocean_s_coordinate_g1
+    z = sigma(sc, zeta, h, hc, cs=cs.drop_vars("s_rho", errors="ignore"))
+    return z.transpose(*[dim for dim in ("time", "s_rho", "eta_rho", "xi_rho") if dim in z.dims])
+
+
+def open_decode_croco_xios(path_file):
+    """Open the XIOS outputs of CROCO.
+
+    The files of an XIOS output (one per period) are concatenated along
+    time, then the outputs merged: they must be on the same rho points (the
+    whole grid or the same extraction) and at the same times. The decoded
+    dataset is as with `open_decode_croco`: ``u`` and ``v`` at the rho
+    points, rotated to east and north if ``angle`` is available, with the
+    depth of the levels.
+
+    The grid fields missing from the outputs (``h``, ``angle``,
+    ``mask_rho``) are taken from a CROCO grid file given with the outputs,
+    as the file ``croco_grd.nc`` of the run, located with the coordinates.
+    The stretching curves are computed with the global attributes of the
+    outputs if ``Cs_rho`` is not written.
+
+    Parameters
+    ----------
+    path_file : list of str
+        XIOS output files, and optionally a CROCO grid file.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
+    import netCDF4 as _nc4
+
+    cfspecs = xmeta.get_meta_specs("croco")
+    _t = time.perf_counter()
+
+    grid_file = None
+    groups = {}
+    for path in path_file:
+        with _nc4.Dataset(path) as nc:
+            is_grid = "time_counter" not in nc.dimensions and "lon_rho" in nc.variables
+        if is_grid:
+            if grid_file is not None:
+                raise ArmoorError(f"Several grid files: {grid_file}, {path}")
+            grid_file = path
+        else:
+            groups.setdefault(_croco_xios_file_id(path), []).append(path)
+    if not groups:
+        raise ArmoorError("No XIOS output in the input files")
+    logger.info(f"XIOS outputs: {', '.join(groups)}")
+
+    dss = []
+    for file_id, files in groups.items():
+        ds = xr.open_mfdataset(
+            sorted(files),
+            preprocess=_normalize_croco_xios,
+            combine="nested",
+            concat_dim="time",
+            chunks={},
+            parallel=len(files) > 1,
+            data_vars="minimal",
+            coords="minimal",
+            compat="override",
+            engine="netcdf4",
+        )
+        ds = ds.sel(time=~ds.get_index("time").duplicated())
+        static = [name for name in _CROCO_STATIC_FIELDS if name in ds and "time" in ds[name].dims]
+        if static:
+            ds = ds.assign({name: ds[name].isel(time=0, drop=True) for name in static})
+        dss.append(ds)
+    times = [ds.get_index("time") for ds in dss]
+    if any(not index.equals(times[0]) for index in times[1:]):
+        raise ArmoorError(
+            "The XIOS outputs are not at the same times, decode them separately: "
+            + ", ".join(groups)
+        )
+    try:
+        ds = xr.merge(dss, compat="override", join="override", combine_attrs="override")
+    except ValueError as exc:
+        raise ArmoorError(
+            f"The XIOS outputs are not on the same points, decode them separately: {exc}"
+        ) from exc
+    logger.info(f"  [timing] open XIOS:        {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
+
+    face_dims = {"u": ("xi_u", "xi_rho"), "v": ("eta_v", "eta_rho")}
+    has_faces = any(dim in ds.dims for dim, _ in face_dims.values())
+    if has_faces and "xi_rho" not in ds.dims:
+        ds = _croco_xios_rho_points(ds)
+
+    if grid_file is not None:
+        logger.info(f"Grid file: {grid_file}")
+        with xr.open_dataset(grid_file) as grid:
+            missing = [name for name in _CROCO_GRID_FIELDS if name not in ds]
+            if missing:
+                ds = ds.assign(_locate_croco_xios_grid(ds, grid)[missing].load())
+
+    if has_faces:
+        for pair in _CROCO_VELOCITY_PAIRS:
+            for loc, name in zip(("u", "v"), pair):
+                if name in ds:
+                    dim, dim_rho = face_dims[loc]
+                    nrho = ds.sizes[dim_rho]
+                    start = _croco_xios_face_start(ds, loc, nrho)
+                    da = ds[name].where((ds[name] != 0) & (ds[name] != -999))
+                    west, east = _croco_xios_faces(da, loc, start, nrho)
+                    ds[name] = 0.5 * (west + east)
+        if "angle" not in ds and any(set(pair) <= set(ds) for pair in _CROCO_VELOCITY_PAIRS):
+            logger.warning("No angle in the XIOS outputs nor grid file: velocities not rotated")
+        dims = [dim for dim in ("xi_u", "eta_u", "xi_v", "eta_v") if dim in ds.dims]
+        dropped = [name for name in ds.data_vars if set(ds[name].dims) & set(dims)]
+        if dropped:
+            logger.info(f"Fields on the u and v points ignored: {dropped}")
+        ds = ds.drop_dims(dims)
+
+    if "s_rho" in ds.dims:
+        depth = _croco_xios_depth(ds)
+        if depth is not None:
+            ds = ds.assign_coords(depth_rho=depth)
+    for name in ("Cs_rho", "s_rho"):
+        if name in ds:
+            ds = ds.drop_vars(name)
+    logger.info(f"  [timing] u/v and depth:    {time.perf_counter()-_t:.1f}s")
+    _t = time.perf_counter()
+
+    ds = cfspecs.decode(ds)
+    ds = ds.drop_vars([v for v in _CROCO_DROP_VARS if v in ds])
+    if "sig_rho" in ds.dims:
+        ds = ds.rename_dims({"sig_rho": "z"})
+    ds = _finalize_croco(ds)
+    logger.info(f"  [timing] finalize:         {time.perf_counter()-_t:.1f}s")
 
     return ds
 
