@@ -1,0 +1,34 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.com/platform/en/stable/config-file/v2.html
+#
+# armoor's dependencies (xoa, esmf/esmpy/xesmf, cartopy, parcels, ...) come
+# from conda-forge, so the doc is built in the same conda environment as the
+# CI (environment.yml), then armoor itself is pip-installed with its [doc]
+# extras. sphinx-gallery executes tutorials/*.py at build time, using the
+# sample data shipped in the repository.
+
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "miniforge3-latest"
+  jobs:
+    pre_build:
+      # Force cartopy's Natural Earth shapefile download before the
+      # tutorials plot maps.
+      - python -c "import cartopy.feature as cfeature; list(cfeature.LAND.geometries())"
+
+conda:
+  environment: environment.yml
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - doc
+
+sphinx:
+  configuration: doc/conf.py
+  fail_on_warning: false
