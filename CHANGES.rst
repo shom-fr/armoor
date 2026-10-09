@@ -28,10 +28,16 @@ New features
   (``VertCoordType``); ``Cs_rho`` is computed with the stretching curves of
   CROCO, not available in xoa, if absent. The decoded dataset has the same variables and
   dimensions as with the native outputs.
+- ``ArmoorFilters.tidal_filter`` accepts ``errors="raise"`` to raise the
+  error of a variable that cannot be filtered (data less than hourly
+  sampled...), instead of logging a warning and keeping it unfiltered
+  (``errors="warn"``, default).
 
 Bug fixes
 ---------
 
+- ``ArmoorFilters.tsmooth`` failed on a dataset without ``depth``
+  (``KeyError``).
 - ``open_decode_croco``: the velocities rotated to east and north have the
   standard names ``eastward_sea_water_velocity`` and
   ``northward_sea_water_velocity`` instead of those of the grid axes

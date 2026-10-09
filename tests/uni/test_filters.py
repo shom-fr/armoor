@@ -309,6 +309,22 @@ class TestArmoorFilters:
         assert result is not None
         assert isinstance(result, xr.Dataset)
 
+    def test_tidal_filter_errors(self, sample_ds):
+        """A tidal filter of data sampled less than hourly: warning or error."""
+        daily = sample_ds[["var1"]].assign_coords(
+            time=pd.date_range("2020-01-01", periods=sample_ds.sizes["time"], freq="1D")
+        )
+        result = ArmoorFilters.tidal_filter(daily.copy(), filter_name="demerliac")
+        xr.testing.assert_identical(result, daily)
+        with pytest.raises(Exception, match="less than hourly"):
+            ArmoorFilters.tidal_filter(daily.copy(), filter_name="demerliac", errors="raise")
+
+    def test_tsmooth_without_depth(self, sample_ds_with_depth):
+        """tsmooth of a dataset without depth."""
+        ds = sample_ds_with_depth[["var1"]].drop_vars("depth")
+        result = ArmoorFilters.tsmooth(ds, freq="6h").compute()
+        assert result["var1"].shape == ds["var1"].shape
+
     def test_tresample(self, sample_ds):
         """Test tresample static method."""
         # Note: Since tresample is @dask.delayed, we need to call .compute()

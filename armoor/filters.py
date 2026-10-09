@@ -228,7 +228,7 @@ class ArmoorFilters:
         return ds
 
     @staticmethod
-    def tidal_filter(ds, filter_name="demerliac"):
+    def tidal_filter(ds, filter_name="demerliac", errors="warn"):
         """
         Apply a tidal filter to time-dependent variables in the dataset.
 
@@ -241,6 +241,9 @@ class ArmoorFilters:
         filter_name : str, default "demerliac"
             Name of the tidal filter to apply. The default "demerliac" filter is commonly
             used for removing tidal variations from oceanographic time series data.
+        errors : {"warn", "raise"}, default "warn"
+            When the filter fails for a variable: log a warning and keep the
+            variable unfiltered, or raise the error.
 
         Notes
         -----
@@ -272,6 +275,8 @@ class ArmoorFilters:
                 try:
                     ds[vname] = xfilter.tidal_filter(dai, filter_name)
                 except Exception as e:
+                    if errors == "raise":
+                        raise
                     logger.warning(f"xoa: {e}")
                     logger.info("Tide filter ignored")
         return ds
@@ -305,7 +310,7 @@ class ArmoorFilters:
         logger.info(f"Apply a time smoothing at frequency: {freq}")
         varscoord = []
         for var in ["lon", "lat", "depth"]:
-            if "time" in ds[var].dims:
+            if var in ds and "time" in ds[var].dims:
                 varscoord.append(var)
         ds = ds.reset_coords(varscoord)
         if ds.attrs.get("data_name"):
