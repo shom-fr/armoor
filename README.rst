@@ -33,8 +33,8 @@ Armoor is a python library for helping analysis of regional modelised and observ
 
 - Documentation
 
-        The documentation is generated and hosted by GitHub Pages:
-        https://shom-fr.github.io/armoor/
+        The documentation is generated and hosted by ReadtheDocs:
+        https://armoor.readthedocs.io/en/latest/
 
 - Sources and help
 
