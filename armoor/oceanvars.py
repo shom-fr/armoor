@@ -575,7 +575,7 @@ class OceanVars(MethodRegistry):
             return self.ds[target_var]
 
         logger.warning(
-            f"{target_var.upper()} cannot be inferred or computed from " f"{source_var.upper()}"
+            f"{target_var.upper()} cannot be inferred or computed from {source_var.upper()}"
         )
         return None
 
