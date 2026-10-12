@@ -26,6 +26,11 @@ dependencies = [
     "woom @ git+https://github.com/shom-fr/woom.git",
     "shoot @ git+https://github.com/shom-fr/shoot.git@develop",
     "python-gitlab",
+    # argopy is an unused transitive dependency of shoot. pip lets it upgrade
+    # the conda-pinned xarray: argopy 1.4 caps it at 2025.9, which still works
+    # with zarr 2.18; argopy 1.5 lifts the cap and the newest xarray calls
+    # zarr.open_group(zarr_format=...), which zarr 2.18 rejects.
+    "argopy<1.5",
 ]
 [project.optional-dependencies]
 
