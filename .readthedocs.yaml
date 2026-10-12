@@ -3,8 +3,8 @@
 #
 # armoor's dependencies (xoa, esmf/esmpy/xesmf, cartopy, parcels, ...) come
 # from conda-forge, so the doc is built in the same conda environment as the
-# CI (environment.yml), then armoor itself is pip-installed with its [doc]
-# extras. sphinx-gallery executes tutorials/*.py at build time, using the
+# CI (environment.yml), then armoor itself is pip-installed (editable) with
+# its [doc] extras. sphinx-gallery executes tutorials/*.py at build time, using the
 # sample data shipped in the repository.
 
 version: 2
@@ -14,6 +14,12 @@ build:
   tools:
     python: "miniforge3-latest"
   jobs:
+    post_install:
+      # Editable install: the tutorials (and the armoor-* CLIs they run)
+      # read sample data from armoor/_samples/, which is not shipped as
+      # package data -- armoor must resolve to the checkout, not to
+      # site-packages (same as PYTHONPATH=$PWD in the CI).
+      - python -m pip install --no-cache-dir -e ".[doc]"
     pre_build:
       # Force cartopy's Natural Earth shapefile download before the
       # tutorials plot maps.
@@ -21,13 +27,6 @@ build:
 
 conda:
   environment: environment.yml
-
-python:
-  install:
-    - method: pip
-      path: .
-      extra_requirements:
-        - doc
 
 sphinx:
   configuration: doc/conf.py
