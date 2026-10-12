@@ -80,6 +80,11 @@ html_theme_options = {
     "use_issues_button": True,
     "use_source_button": True,
     "path_to_docs": "doc/",
+    # The left sidebar is re-rendered for every page; with ~1000 autosummary
+    # pages, a fully expanded 4-level tree made HTML writing take minutes
+    # (Read the Docs build timeout). Only render the current page's branch.
+    "collapse_navbar": True,
+    "max_navbar_depth": 2,
 }
 
 # %% Autosumarry
