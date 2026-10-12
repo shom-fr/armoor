@@ -5,6 +5,7 @@ __pycache__/
 /doc/_build/
 /doc/tutorials/
 /doc/sg_execution_times.rst
+/doc/_static/logo/
 build/
 .eggs/
 armoor.egg-info/

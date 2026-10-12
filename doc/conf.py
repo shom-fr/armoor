@@ -10,8 +10,8 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
+import os
+import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
 # %% Project information -----------------------------------------------------
@@ -69,10 +69,20 @@ html_theme = 'sphinx_book_theme'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+# The logo is drawn with matplotlib by _logo/armoor_logo.py (see logo.rst).
+# Its images are written to _static/logo/ (not versioned) at each build,
+# and only redrawn when the script or its font has changed.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '_logo'))
+import armoor_logo  # noqa: E402
+
+armoor_logo.build_doc_assets(os.path.join(os.path.dirname(os.path.abspath(__file__)), '_static', 'logo'))
+
+html_favicon = '_static/logo/armoor-favicon.png'
+
 html_theme_options = {
     "logo": {
-        "image_light": "images/armoor.png",
-        "image_dark": "images/armoor.png",
+        "image_light": "_static/logo/armoor-logo.png",
+        "image_dark": "_static/logo/armoor-logo-dark.png",
     },
     "repository_url": "https://github.com/shom-fr/armoor",
     "repository_branch": "develop",
