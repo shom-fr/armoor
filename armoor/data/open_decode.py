@@ -265,7 +265,11 @@ def _format_cf_attrs(da, spec):
         if isinstance(values, (list, tuple)):
             if not values:
                 continue
-            attrs[attr] = values[index] if attr in ("standard_name", "long_name") and index < len(values) else values[0]
+            attrs[attr] = (
+                values[index]
+                if attr in ("standard_name", "long_name") and index < len(values)
+                else values[0]
+            )
         else:
             attrs[attr] = values
     return attrs
@@ -1941,7 +1945,7 @@ def open_decode_croco(path_file, fmt="croco"):
     _t = time.perf_counter()
 
     ds = _finalize_croco(ds)
-    logger.info(f"  [timing] finalize:         {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] finalize:         {time.perf_counter() - _t:.1f}s")
 
     return ds
 
@@ -2339,9 +2343,7 @@ def _croco_xios_depth(ds):
     if "Cs_rho" in ds:
         cs = ds["Cs_rho"]
     elif theta_s is None or theta_b is None:
-        logger.warning(
-            "No Cs_rho, theta_s nor theta_b in the XIOS outputs: depth not computed"
-        )
+        logger.warning("No Cs_rho, theta_s nor theta_b in the XIOS outputs: depth not computed")
         return None
     else:
         cs = xr.DataArray(
@@ -2437,7 +2439,7 @@ def open_decode_croco_xios(path_file):
         raise ArmoorError(
             f"The XIOS outputs are not on the same points, decode them separately: {exc}"
         ) from exc
-    logger.info(f"  [timing] open XIOS:        {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] open XIOS:        {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     face_dims = {"u": ("xi_u", "xi_rho"), "v": ("eta_v", "eta_rho")}
@@ -2477,7 +2479,7 @@ def open_decode_croco_xios(path_file):
     for name in ("Cs_rho", "s_rho"):
         if name in ds:
             ds = ds.drop_vars(name)
-    logger.info(f"  [timing] u/v and depth:    {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] u/v and depth:    {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     ds = cfspecs.decode(ds)
@@ -2485,7 +2487,7 @@ def open_decode_croco_xios(path_file):
     if "sig_rho" in ds.dims:
         ds = ds.rename_dims({"sig_rho": "z"})
     ds = _finalize_croco(ds)
-    logger.info(f"  [timing] finalize:         {time.perf_counter()-_t:.1f}s")
+    logger.info(f"  [timing] finalize:         {time.perf_counter() - _t:.1f}s")
 
     return ds
 

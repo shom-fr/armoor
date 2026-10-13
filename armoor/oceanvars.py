@@ -19,6 +19,7 @@ def _gsw_ufunc(func, *args):
         output_dtypes=[np.float32],
     )
 
+
 def _set_attrs(da, name=None, **attrs):
     """Replace the attributes of a computed variable.
 
@@ -131,7 +132,7 @@ class OceanVars(MethodRegistry):
         if "cspeed" in self.ds:
             return self.ds["cspeed"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
-            return _set_attrs((self.ds.u ** 2 + self.ds.v ** 2) ** 0.5, "cspeed")
+            return _set_attrs((self.ds.u**2 + self.ds.v**2) ** 0.5, "cspeed")
         else:
             logger.warning("cspeed cannot be infered or computed")
 

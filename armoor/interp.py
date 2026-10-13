@@ -486,7 +486,8 @@ def regrid(dsi, dso) -> xr.Dataset:
     of the sigma levels...) are regridded too.
     """
     coords = [
-        name for name in dsi.coords
+        name
+        for name in dsi.coords
         if name not in ("lon", "lat") and {"x", "y"} <= set(dsi[name].dims)
     ]
     dsi = dsi.reset_coords(coords)
