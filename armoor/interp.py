@@ -480,14 +480,24 @@ def create_regridder(dsi, dso, method="bilinear"):
 
 
 def regrid(dsi, dso) -> xr.Dataset:
-    """Regrid a variable."""
+    """Regrid the variables on the x and y dimensions.
+
+    The coordinates on the x and y dimensions other than lon and lat (depth
+    of the sigma levels...) are regridded too.
+    """
+    coords = [
+        name
+        for name in dsi.coords
+        if name not in ("lon", "lat") and {"x", "y"} <= set(dsi[name].dims)
+    ]
+    dsi = dsi.reset_coords(coords)
     vars2sub = geo_vars(dsi)
 
     with create_regridder(dsi, dso) as regridder:
         dsi_subset = dsi[vars2sub]
         dsio = regridder(dsi_subset, keep_attrs=True)
 
-    return dsio
+    return dsio.set_coords(coords)
 
 
 def coarsen(
@@ -554,7 +564,7 @@ def coarsen(
 _VERTICAL_COORD_CANDIDATES = ("depth", "dens", "pdens")
 
 
-def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
+def vinterp(ds, vname, vlevels, method="linear", extrap="both"):  # noqa: E501
     """Interpolate an xarray Dataset over specified vertical levels.
 
     Parameters
@@ -569,6 +579,11 @@ def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
         List of vertical levels to interpolate to.
     method: str (optional)
         The interpolation method to use. Default is "linear".
+    extrap: str (optional)
+        Extrapolation mode of :func:`xoa.regrid.regrid1d`, relative to the
+        values of the vertical coordinate: ``"both"`` (default), ``"no"``,
+        ``"bottom"`` (toward the smaller values: with a positive depth, toward
+        the surface, without values below the deepest level) or ``"top"``.
 
     Returns
     -------
@@ -597,7 +612,7 @@ def vinterp(ds, vname, vlevels, method="linear"):  # noqa: E501
                 ds[var],  # .chunk(dict(z=-1)),
                 vlevels,
                 method=method,
-                extrap="both",
+                extrap=extrap,
                 dim="z",
                 coord_in_name=vname,
             )

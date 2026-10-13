@@ -20,6 +20,23 @@ def _gsw_ufunc(func, *args):
     )
 
 
+def _set_attrs(da, name=None, **attrs):
+    """Replace the attributes of a computed variable.
+
+    The attributes of a variable computed from others are those of the
+    first input by default (``xr.apply_ufunc``, arithmetic): they are
+    replaced by the CF attributes of ``name`` in the generic CF specs of
+    armoor (see `armoor.data.open_decode.format_cf`), updated with ``attrs``.
+    """
+    da.attrs = {}
+    if name is not None:
+        from armoor.data.open_decode import format_cf
+
+        da.attrs = format_cf(da.rename(name)).attrs
+    da.attrs.update(attrs)
+    return da
+
+
 class OceanVars(MethodRegistry):
     """
     Sel or compute ocean variable from a dataset in a user-friendly format.
@@ -102,7 +119,11 @@ class OceanVars(MethodRegistry):
         if "cdir" in self.ds:
             return self.ds["cdir"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
-            return np.arctan2(self.ds.v, self.ds.u)
+            return _set_attrs(
+                np.arctan2(self.ds.v, self.ds.u),
+                long_name="Current direction, counterclockwise from east",
+                units="radian",
+            )
         else:
             logger.warning("cdir cannot be infered or computed")
 
@@ -111,7 +132,7 @@ class OceanVars(MethodRegistry):
         if "cspeed" in self.ds:
             return self.ds["cspeed"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
-            return (self.ds.u**2 + self.ds.v**2) ** 0.5
+            return _set_attrs((self.ds.u**2 + self.ds.v**2) ** 0.5, "cspeed")
         else:
             logger.warning("cspeed cannot be infered or computed")
 
@@ -187,8 +208,7 @@ class OceanVars(MethodRegistry):
             ptemp = self.sel_ptemp()
             cons_temp = _gsw_ufunc(gsw.CT_from_pt, sal, ptemp)
             temp = _gsw_ufunc(gsw.t_from_CT, sal, cons_temp, pres)
-            temp.attrs["units"] = "degC"
-            return temp
+            return _set_attrs(temp, "temp")
 
     def sel_sal(self):
         """
@@ -244,7 +264,7 @@ class OceanVars(MethodRegistry):
                 logger.warning("pressure cannot be computed")
                 return None
             lat = float(self.ds.lat.mean())
-            pres = gsw.conversions.p_from_z(-self.ds.depth, lat)
+            pres = _set_attrs(gsw.conversions.p_from_z(-self.ds.depth, lat), "pres")
             # Cache to avoid recomputing (sel_pdens calls sel_pres
             # multiple times via sel_ptemp / SA_from_SP).
             self.ds["pres"] = pres
@@ -303,8 +323,12 @@ class OceanVars(MethodRegistry):
                 elif ref_dens == 4000:
                     func = gsw.sigma4
                 pdens = _gsw_ufunc(func, asal, ctemp)
+                pres_ref = 0 if func is gsw.sigma0 else ref_dens
+                pdens = _set_attrs(pdens, "pdens", reference_pressure=f"{pres_ref} dbar")
+                if pres_ref != 0:  # sea_water_sigma_theta is referenced to 0 dbar
+                    del pdens.attrs["standard_name"]
+                    pdens.attrs["long_name"] += f" referenced to {pres_ref} dbar"
                 self.ds["pdens"] = pdens
-                self.ds["pdens"] = self.ds["pdens"].assign_attrs({"units": "kg/m3"})
             else:
                 logger.warning(
                     "Caution, potential density could not be computed, ptemp or sal are missing."
@@ -340,8 +364,7 @@ class OceanVars(MethodRegistry):
             self.ds.lon,
             self.ds.lat,
         )
-        snd_speed = _gsw_ufunc(gsw.sound_speed, sal, cons_temp, pres)
-        snd_speed.attrs["units"] = "m/s"
+        snd_speed = _set_attrs(_gsw_ufunc(gsw.sound_speed, sal, cons_temp, pres), "sndspeed")
         self.ds["sndspeed"] = snd_speed
         return self.ds["sndspeed"]
 
@@ -377,8 +400,7 @@ class OceanVars(MethodRegistry):
             # so the depth coordinate is always recognized.
             ptemp = ptemp.copy()
             ptemp.encoding["meta_specs"] = "default"
-            mld = mixed_layer_depth(ptemp, method='deltatemp')
-            mld.attrs["units"] = "m"
+            mld = _set_attrs(mixed_layer_depth(ptemp, method='deltatemp'), "mld")
             self.ds["mld"] = mld
 
         return self.ds["mld"]

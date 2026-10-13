@@ -419,7 +419,7 @@ The viewer understands the same formats as armoor's ``open_decode`` function:
    * - ``croco``
      - CROCO (Coastal and Regional Ocean COmmunity model)
    * - ``croco_xios``
-     - CROCO output via XIOS
+     - CROCO output via XIOS (whole grid or extraction domains, with an optional CROCO grid file)
    * - ``woa18``
      - World Ocean Atlas 2018
 

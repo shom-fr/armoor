@@ -78,6 +78,11 @@ def generate_kernel_from_freq(
     return kernel, kernel_size
 
 
+def _time_coords(ds):
+    """Coordinates other than time that depend on time (depth, lon, lat...)."""
+    return [name for name in ds.coords if name != "time" and "time" in ds[name].dims]
+
+
 class ArmoorFilters:
     """
     Select a subset of the original object filtering elements with conditions across certain dimensions.
@@ -228,7 +233,7 @@ class ArmoorFilters:
         return ds
 
     @staticmethod
-    def tidal_filter(ds, filter_name="demerliac"):
+    def tidal_filter(ds, filter_name="demerliac", errors="warn"):
         """
         Apply a tidal filter to time-dependent variables in the dataset.
 
@@ -241,6 +246,9 @@ class ArmoorFilters:
         filter_name : str, default "demerliac"
             Name of the tidal filter to apply. The default "demerliac" filter is commonly
             used for removing tidal variations from oceanographic time series data.
+        errors : {"warn", "raise"}, default "warn"
+            When the filter fails for a variable: log a warning and keep the
+            variable unfiltered, or raise the error.
 
         Notes
         -----
@@ -266,26 +274,41 @@ class ArmoorFilters:
         import xoa.filter as xfilter
 
         logger.info(f"Apply tidal filter: {filter_name}")
+        # the coordinates that depend on time (depth...) are filtered too
+        coords = _time_coords(ds)
+        ds = ds.reset_coords(coords)
         for vname in ds.data_vars:
             dai = ds[vname]
             if "time" in dai.dims:
                 try:
                     ds[vname] = xfilter.tidal_filter(dai, filter_name)
                 except Exception as e:
+                    if errors == "raise":
+                        raise
                     logger.warning(f"xoa: {e}")
                     logger.info("Tide filter ignored")
-        return ds
+        return ds.set_coords(coords)
 
     @staticmethod
     def tresample(ds, freq):
-        """ """
+        """Average the dataset over each period of freq.
+
+        The coordinates that depend on time (depth, lon, lat...) are
+        averaged too.
+
+        Parameters
+        ----------
+        freq : str
+            Pandas frequency of the periods (e.g., '1D').
+
+        Returns
+        -------
+        xr.Dataset
+        """
         logger.info(f"Apply a time resampling at frequency: {freq}")
-        if "time" in ds.lon.dims:
-            ds = ds.reset_coords(["lon", "lat"])
-        ds = ds.resample(time=freq).mean()
-        if "time" in ds.lon.dims:
-            ds = ds.set_coords(["lon", "lat"])
-        return ds
+        coords = _time_coords(ds)
+        ds = ds.reset_coords(coords).resample(time=freq).mean()
+        return ds.set_coords(coords)
 
     @staticmethod
     def tsmooth(ds, freq: str) -> xr.Dataset:
@@ -305,7 +328,7 @@ class ArmoorFilters:
         logger.info(f"Apply a time smoothing at frequency: {freq}")
         varscoord = []
         for var in ["lon", "lat", "depth"]:
-            if "time" in ds[var].dims:
+            if var in ds and "time" in ds[var].dims:
                 varscoord.append(var)
         ds = ds.reset_coords(varscoord)
         if ds.attrs.get("data_name"):
