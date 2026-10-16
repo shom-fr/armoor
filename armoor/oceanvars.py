@@ -156,7 +156,7 @@ class OceanVars(MethodRegistry):
             )
             return
 
-        logger.warning(f"Compute {u_name} and {v_name} from {source}")
+        logger.info(f"Compute {u_name} and {v_name} from {source}")
 
         from shoot.dyn import get_geos
 
@@ -193,59 +193,6 @@ class OceanVars(MethodRegistry):
         self._compute_geos("sla", "gosa")
         return self.ds.get("vgosa")
 
-    # def sel_ugos(self):
-    #     """compute the geostrophic zonal current component (ugos) from ssh."""
-    #     if "ssh" in self.ds:
-    #         logger.warning("compute ugos from ssh")
-    #         from shoot.dyn import get_geos
-    #         ugos, vgos = get_geos(self.ds["ssh"])
-    #         ugos.name = "ugos"
-    #         ugos.attrs["units"] = "m s-1"
-    #         self.ds["ugos"] = ugos
-    #         return self.ds["ugos"]
-    #     else:
-    #         logger.warning("ugos cannot be infered or computed")
-
-    # def sel_vgos(self):
-    #     """compute the geostrophic meridional current component (vgos) from ssh."""
-    #     if "ssh" in self.ds:
-    #         logger.warning("compute vgos from ssh")
-    #         from shoot.dyn import get_geos
-    #         ugos, vgos = get_geos(self.ds["ssh"])
-    #         vgos.name = "vgos"
-    #         vgos.attrs["units"] = "m s-1"
-    #         self.ds["vgos"] = vgos
-    #         return self.ds["vgos"]
-    #     else:
-    #         logger.warning("vgos cannot be infered or computed")
-
-    # def sel_ugosa(self):
-    #     """compute the geostrophic zonal current anomaly component (ugosa) from sla."""
-    #     sla = self.sel_sla()
-    #     if "sla" in self.ds or isinstance(self.sel_sla(), xr.DataArray):
-    #         logger.warning("compute ugosa from sla")
-    #         from shoot.dyn import get_geos
-    #         ugosa, vgosa = get_geos(self.ds["sla"])
-    #         ugosa.name = "ugosa"
-    #         ugosa.attrs["units"] = "m s-1"
-    #         self.ds["ugosa"] = ugosa
-    #         return self.ds["ugosa"]
-    #     else:
-    #         logger.warning("ugosa cannot be infered or computed")
-
-    # def sel_vgosa(self):
-    #     """compute the geostrophic meridional current anomaly component (vgos) from sla."""
-    #     sla = self.sel_sla()
-    #     if "sla" in self.ds or isinstance(self.sel_sla(), xr.DataArray):
-    #         logger.warning("compute vgosa from sla")
-    #         from shoot.dyn import get_geos
-    #         ugosa, vgosa = get_geos(self.ds["sla"])
-    #         vgosa.name = "vgosa"
-    #         vgosa.attrs["units"] = "m s-1"
-    #         self.ds["vgosa"] = vgosa
-    #         return self.ds["vgosa"]
-    #     else:
-    #         logger.warning("vgosa cannot be infered or computed")
 
     def sel_ptemp(self):
         """Select or compute potential temperature from the dataset.
@@ -663,7 +610,7 @@ class OceanVars(MethodRegistry):
             logger.info("SLA ALREADY EXISTS")
             return self.ds["sla"]
         elif "ssh" in self.ds.data_vars:
-            logger.warning("SLA COMPUTED FROM SSH")
+            logger.info("SLA COMPUTED FROM SSH")
             sla = self.ds["ssh"] - self.ds["ssh"].mean("time")
             sla.attrs["standard_name"] = "sea_level_anomaly"
             sla.attrs["long_name"] = "Sea level anomaly computed from adt or ssh"
@@ -676,14 +623,14 @@ class OceanVars(MethodRegistry):
         return None
 
     def _compute_kinetic_energy(self, velocity_type="current"):
-        """Compute kinetic energy from current or geostrophic velocities.
+        """Compute kinetic energy from total current or geostrophic velocities.
 
         Parameters
         ----------
         velocity_type : str
             "current"     : uses u and v.
-            "geostrophic" : uses ugos and vgos.
-            "eke"         : uses ugosa and vgosa.
+            "geostrophic" : uses ugos and vgos computed from ssh.
+            "eke"         : uses ugosa and vgosa computed from sla.
 
         Returns
         -------
@@ -701,7 +648,7 @@ class OceanVars(MethodRegistry):
             "geostrophic": {
                 "u": "ugos",
                 "v": "vgos",
-                "ke": "ke_geostrophic",
+                "ke": "ke_geos",
                 "long_name": "geostrophic kinetic energy computed from SSH",
                 "selectors": ("sel_ugos", "sel_vgos"),
             },
@@ -754,7 +701,8 @@ class OceanVars(MethodRegistry):
                 f"'{u_name}' and '{v_name}' must be xarray.DataArray objects."
             )
             return None
-        logger.warning(f"compute {ke_name} from {u_name} and {v_name}")
+
+        logger.info(f"compute {ke_name} from {u_name} and {v_name}")
         # Compute kinetic energy per unit mass
         ke = 0.5 * (u**2 + v**2)
         ke.name = ke_name
