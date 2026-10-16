@@ -193,7 +193,6 @@ class OceanVars(MethodRegistry):
         self._compute_geos("sla", "gosa")
         return self.ds.get("vgosa")
 
-
     def sel_ptemp(self):
         """Select or compute potential temperature from the dataset.
 
@@ -616,6 +615,7 @@ class OceanVars(MethodRegistry):
             sla.attrs["long_name"] = "Sea level anomaly computed from adt or ssh"
             sla.attrs["units"] = "m"
             self.ds["sla"] = sla
+            return self.ds["sla"]
 
         else:
             logger.warning("sla cannot be infered or computed")

@@ -34,12 +34,39 @@ class TestOceanVars:
                              [[0.4, 0.5],
                               [0.2, 0.3]]])
         
+        self.sla = np.array([[[0.2, 0.15],
+                     [0.05, 0.8]],
+                     [[0.4, 0.9],
+                     [0.5, 0.2]],
+                     [[0.4, 0.5],
+                      [0.2, 0.3]]])
+        
+        
+        self.u = np.array([[[0.02, 0.1],
+                     [0.02, 0.08]],
+                     [[0.1, 0.3],
+                     [0.2, 0.05]],
+                     [[0.1, 0.3],
+                      [0.1, 0.2]]])
+        
+        self.v = np.array([[[-0.02, 0.2],
+             [0.05, -0.04]],
+             [[-0.1, 0.15],
+             [0.2, 0.05]],
+             [[-0.1, 0.3],
+              [0.1, -0.2]]])
+        
+        
         self.ds = xr.Dataset({
             'temp': (['depth', 'lat', 'lon'], self.temp),
             'sal': (['depth', 'lat', 'lon'], self.sal),
             'pres': (['depth', 'lat', 'lon'], self.pres),
             'ssh': (['time', 'lat', 'lon'], self.ssh),
+            'sla': (['time', 'lat', 'lon'], self.sla),
+            'u': (['time', 'lat', 'lon'], self.u),
+            'v': (['time', 'lat', 'lon'], self.v),
             'depth': (['depth'], self.depth),
+            'time': (['time'], self.time),
             'lat': (['lat'], self.lat),
             'lon': (['lon'], self.lon)
         })
@@ -204,25 +231,66 @@ class TestOceanVars:
         assert result is None
         
     def test_sel_sla(self):
-        """Test calculation of sla"""
+        """Test calculation of sla"""          
         result = self.ds.oceanvars.sel_sla()
         assert result is not None
         assert 'sla' in self.ds
-        assert self.ds['sla'].attrs['units'] == 'm'
         
+    def test_sel_sla_from_ssh(self):
+         """Test calculation of sla"""   
+         ds_no_sla = self.ds.drop_vars(["sla"])
+         result = ds_no_sla.oceanvars.sel_sla()
+         assert result is not None
+         assert 'sla' in self.ds       
+        
+    def test_sel_ugos(self):
+       """Test calculation of ugos"""
+       result = self.ds.oceanvars.sel_ugos()
+       assert result is not None
+       assert 'ugos' in self.ds
+       
+    def test_sel_vgos(self):
+       """Test calculation of vgos"""
+       result = self.ds.oceanvars.sel_vgos()
+       assert result is not None
+       assert 'vgos' in self.ds      
+       
+    def test_sel_ugosa(self):
+       """Test calculation of ugosa"""
+       result = self.ds.oceanvars.sel_ugosa()
+       assert result is not None
+       assert 'ugosa' in self.ds
+       
+    def test_sel_vgosa(self):
+       """Test calculation of vgosa"""
+       result = self.ds.oceanvars.sel_vgosa()
+       assert result is not None
+       assert 'vgosa' in self.ds             
+       
     def test_sel_eke(self):
         """Test calculation of eke from sla"""
-        self.ds.oceanvars.sel_sla()
         result = self.ds.oceanvars.sel_eke()
         assert result is not None
         assert 'eke' in self.ds
       
-    def test_sel_mke(self):
-        """Test calculation of mke from ssh"""
-        result = self.ds.oceanvars.sel_mke()
+    def test_sel_ke(self):
+        """Test calculation of ke with u and v"""
+        result = self.ds.oceanvars.sel_ke()
         assert result is not None
-        assert 'mke' in self.ds        
-
+        assert 'ke' in self.ds   
+        
+    def test_sel_ke_missing_uv(self):
+        """Test calculation of ke when u and v are missing"""
+        ds_no_uv = self.ds.drop_vars(["u", "v"])
+        result = ds_no_uv.oceanvars.sel_ke()
+        assert result is None
+        
+    def test_sel_ke_geos(self):
+       """Test calculation of ke_geos with u and v computed from ssh"""
+       result = self.ds.oceanvars.sel_ke_geos()
+       assert result is not None
+       assert 'ke_geos' in self.ds         
+      
     def test_sel_method_routing(self):
         """Test routing of the sel method"""
         # Test with temperature

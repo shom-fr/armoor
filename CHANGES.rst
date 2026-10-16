@@ -9,11 +9,11 @@ New features
 
 - Added ``armoor-comp-alti``: new comparison for model ``ssh`` output altimetry
   products (``fmt=cmems_alti_duacs``) -- 
-  Comparison by computing Eddy Kinetic Energy (EKE) and Mean Kinetic Energy 
-  (MKE) respectively from sea level anomaly (sla) and sea surface height 
-  (ssh or adt) (new ``armoor.base.oceanvars.OceanVars.sel_eke`` and 
-  ``armoor.base.oceanvars.OceanVars.sel_mke`` via the function
-  ``get_geos`` from ``shoot``). 
+  Comparison by computing Eddy Kinetic Energy from sla (eke), Kinetic Energy from u and v
+  (ke) and Kinetic Energy from u and v computed from ssh or adt (ke_geos)
+  (new ``armoor.base.oceanvars.OceanVars.sel_eke``, 
+  ``armoor.base.oceanvars.OceanVars.sel_ke`` and  ``armoor.base.oceanvars.OceanVars.sel_ke_geos`` 
+  via the function ``get_geos`` from ``shoot``). 
   sla is computed as the anomaly of ssh (for the model) or adt 
   (for the satellite) over the period defined by ``tbound`` 
   (``armoor.base.oceanvars.OceanVars.sel_sla``).
