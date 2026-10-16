@@ -141,54 +141,111 @@ class OceanVars(MethodRegistry):
         else:
             logger.warning("v cannot be infered or computed")
 
+    def _compute_geos(self, source, prefix):
+        """Compute geostrophic current components from a sea level variable."""
+        u_name = f"u{prefix}"
+        v_name = f"v{prefix}"
+
+        # If both components are already available, do nothing.
+        if u_name in self.ds and v_name in self.ds:
+            return
+
+        if source not in self.ds:
+            logger.warning(
+                f"Cannot compute {u_name} and {v_name}: {source} is unavailable"
+            )
+            return
+
+        logger.warning(f"Compute {u_name} and {v_name} from {source}")
+
+        from shoot.dyn import get_geos
+
+        u, v = get_geos(self.ds[source])
+
+        u.name = u_name
+        u.attrs["units"] = "m s-1"
+
+        v.name = v_name
+        v.attrs["units"] = "m s-1"
+
+        self.ds[u_name] = u
+        self.ds[v_name] = v
+
     def sel_ugos(self):
-        """compute the geostrophic zonal current component (ugos) from ssh."""
-        if set(("ssh")).issubset(self.ds.data_vars):
-            from shoot.dyn import get_geos
-            ugos, vgos = get_geos(self.ds["ssh"])
-            ugos.name = "ugos"
-            ugos.attrs["units"] = "m s-1"
-            self.ds["ugos"] = ugos
-            return self.ds["ugos"]
-        else:
-            logger.warning("ugos cannot be infered or computed")
+        """Compute or retrieve the geostrophic zonal current from ssh."""
+        self._compute_geos("ssh", "gos")
+        return self.ds.get("ugos")
 
     def sel_vgos(self):
-        """compute the geostrophic meridional current component (vgos) from ssh."""
-        if set(("ssh")).issubset(self.ds.data_vars):
-            from shoot.dyn import get_geos
-            ugos, vgos = get_geos(self.ds["ssh"])
-            vgos.name = "vgos"
-            vgos.attrs["units"] = "m s-1"
-            self.ds["vgos"] = vgos
-            return self.ds["vgos"]
-        else:
-            logger.warning("vgos cannot be infered or computed")
-            
+        """Compute or retrieve the geostrophic meridional current from ssh."""
+        self._compute_geos("ssh", "gos")
+        return self.ds.get("vgos")
+
     def sel_ugosa(self):
-        """compute the geostrophic zonal current anomaly component (ugosa) from sla."""
-        if set(("sla")).issubset(self.ds.data_vars):
-            from shoot.dyn import get_geos
-            ugosa, vgosa = get_geos(self.ds["sla"])
-            ugosa.name = "ugos"
-            ugosa.attrs["units"] = "m s-1"
-            self.ds["ugosa"] = ugosa
-            return self.ds["ugosa"]
-        else:
-            logger.warning("ugosa cannot be infered or computed")
+        """Compute or retrieve the geostrophic zonal current anomaly from sla."""
+        self.sel_sla()
+        self._compute_geos("sla", "gosa")
+        return self.ds.get("ugosa")
 
     def sel_vgosa(self):
-        """compute the geostrophic meridional current anomaly component (vgos) from sla."""
-        if set(("sla")).issubset(self.ds.data_vars):
-            from shoot.dyn import get_geos
-            ugosa, vgosa = get_geos(self.ds["sla"])
-            vgosa.name = "vgosa"
-            vgosa.attrs["units"] = "m s-1"
-            self.ds["vgosa"] = vgosa
-            return self.ds["vgosa"]
-        else:
-            logger.warning("vgosa cannot be infered or computed")            
-            
+        """Compute or retrieve the geostrophic meridional current anomaly from sla."""
+        self.sel_sla()
+        self._compute_geos("sla", "gosa")
+        return self.ds.get("vgosa")
+
+    # def sel_ugos(self):
+    #     """compute the geostrophic zonal current component (ugos) from ssh."""
+    #     if "ssh" in self.ds:
+    #         logger.warning("compute ugos from ssh")
+    #         from shoot.dyn import get_geos
+    #         ugos, vgos = get_geos(self.ds["ssh"])
+    #         ugos.name = "ugos"
+    #         ugos.attrs["units"] = "m s-1"
+    #         self.ds["ugos"] = ugos
+    #         return self.ds["ugos"]
+    #     else:
+    #         logger.warning("ugos cannot be infered or computed")
+
+    # def sel_vgos(self):
+    #     """compute the geostrophic meridional current component (vgos) from ssh."""
+    #     if "ssh" in self.ds:
+    #         logger.warning("compute vgos from ssh")
+    #         from shoot.dyn import get_geos
+    #         ugos, vgos = get_geos(self.ds["ssh"])
+    #         vgos.name = "vgos"
+    #         vgos.attrs["units"] = "m s-1"
+    #         self.ds["vgos"] = vgos
+    #         return self.ds["vgos"]
+    #     else:
+    #         logger.warning("vgos cannot be infered or computed")
+
+    # def sel_ugosa(self):
+    #     """compute the geostrophic zonal current anomaly component (ugosa) from sla."""
+    #     sla = self.sel_sla()
+    #     if "sla" in self.ds or isinstance(self.sel_sla(), xr.DataArray):
+    #         logger.warning("compute ugosa from sla")
+    #         from shoot.dyn import get_geos
+    #         ugosa, vgosa = get_geos(self.ds["sla"])
+    #         ugosa.name = "ugosa"
+    #         ugosa.attrs["units"] = "m s-1"
+    #         self.ds["ugosa"] = ugosa
+    #         return self.ds["ugosa"]
+    #     else:
+    #         logger.warning("ugosa cannot be infered or computed")
+
+    # def sel_vgosa(self):
+    #     """compute the geostrophic meridional current anomaly component (vgos) from sla."""
+    #     sla = self.sel_sla()
+    #     if "sla" in self.ds or isinstance(self.sel_sla(), xr.DataArray):
+    #         logger.warning("compute vgosa from sla")
+    #         from shoot.dyn import get_geos
+    #         ugosa, vgosa = get_geos(self.ds["sla"])
+    #         vgosa.name = "vgosa"
+    #         vgosa.attrs["units"] = "m s-1"
+    #         self.ds["vgosa"] = vgosa
+    #         return self.ds["vgosa"]
+    #     else:
+    #         logger.warning("vgosa cannot be infered or computed")
 
     def sel_ptemp(self):
         """Select or compute potential temperature from the dataset.
@@ -219,7 +276,9 @@ class OceanVars(MethodRegistry):
                 ptemp.attrs["long_name"] = "Potential temperature"
                 return ptemp
             else:
-                logger.warning("No salinity found, potential temperature cannot be computed.")
+                logger.warning(
+                    "No salinity found, potential temperature cannot be computed."
+                )
                 return None
 
     def sel_temp(self):
@@ -268,7 +327,9 @@ class OceanVars(MethodRegistry):
         if "conduct" in self.ds and "temp" in self.ds:
             pres = self.sel_pres()
             if not isinstance(pres, xr.DataArray):
-                logger.warning("No pressure found, salinity cannot be computed from conductivity.")
+                logger.warning(
+                    "No pressure found, salinity cannot be computed from conductivity."
+                )
                 return None
             sal = _gsw_ufunc(gsw.SP_from_C, self.ds.conduct, self.ds.temp, pres)
             sal.attrs["standard_name"] = "sea_water_salinity"
@@ -420,7 +481,9 @@ class OceanVars(MethodRegistry):
                 logger.warning("Potential temperature cannot be computed")
                 return None
             if "depth" not in self.ds:
-                logger.warning("No depth coordinate found, mixed layer depth cannot be computed")
+                logger.warning(
+                    "No depth coordinate found, mixed layer depth cannot be computed"
+                )
                 return None
             # armoor.data.open_decode.register_cf() registers per-format CF
             # specs (cmems_argo, cmems_model, ...) into xoa's global meta
@@ -434,7 +497,7 @@ class OceanVars(MethodRegistry):
             # so the depth coordinate is always recognized.
             ptemp = ptemp.copy()
             ptemp.encoding["meta_specs"] = "default"
-            mld = mixed_layer_depth(ptemp, method='deltatemp')
+            mld = mixed_layer_depth(ptemp, method="deltatemp")
             mld.attrs["units"] = "m"
             self.ds["mld"] = mld
 
@@ -474,7 +537,9 @@ class OceanVars(MethodRegistry):
             available.
         """
         if "time" not in self.ds.dims or self.ds.sizes["time"] < 2:
-            logger.warning("Fewer than 2 stations, geostrophic velocity cannot be computed.")
+            logger.warning(
+                "Fewer than 2 stations, geostrophic velocity cannot be computed."
+            )
             return None
         sal = self.sel_sal()
         ptemp = self.sel_ptemp()
@@ -512,7 +577,9 @@ class OceanVars(MethodRegistry):
         sa = gsw.SA_from_SP(sal_vals, pres_vals, lon[np.newaxis, :], lat[np.newaxis, :])
         ct = gsw.CT_from_pt(sa, ptemp_vals)
         geo_strf = gsw.geo_strf_dyn_height(sa, ct, pres_vals, p_ref=p_ref, axis=0)
-        vel, mid_lon, mid_lat = gsw.geostrophic_velocity(geo_strf, lon, lat, p=pres_vals)
+        vel, mid_lon, mid_lat = gsw.geostrophic_velocity(
+            geo_strf, lon, lat, p=pres_vals
+        )
         depth_pair = 0.5 * (depth_vals[:, :-1] + depth_vals[:, 1:])
 
         coords = {"lon": ("pair", mid_lon), "lat": ("pair", mid_lat)}
@@ -596,7 +663,7 @@ class OceanVars(MethodRegistry):
             logger.info("SLA ALREADY EXISTS")
             return self.ds["sla"]
         elif "ssh" in self.ds.data_vars:
-            logger.info("SLA COMPUTED FROM SSH")
+            logger.warning("SLA COMPUTED FROM SSH")
             sla = self.ds["ssh"] - self.ds["ssh"].mean("time")
             sla.attrs["standard_name"] = "sea_level_anomaly"
             sla.attrs["long_name"] = "Sea level anomaly computed from adt or ssh"
@@ -607,43 +674,17 @@ class OceanVars(MethodRegistry):
             logger.warning("sla cannot be infered or computed")
 
         return None
-    
-    
-    # def _compute_kinetic_energy(self, source_var, target_var):
-    #     """Compute kinetic energy from a velocity-producing variable."""
-    #     if target_var in self.ds:
-    #         logger.info(f"{target_var.upper()} EXISTS")
-    #         return self.ds[target_var]
-        
-    #     if source_var in self.ds.data_vars:
-    #         logger.info(f"{target_var.upper()} COMPUTED FROM {source_var.upper()}")
 
-    #         from shoot.dyn import get_geos
-
-    #         u, v = get_geos(self.ds[source_var])
-    #         ke = 0.5 * (u**2 + v**2)
-
-    #         ke.name = target_var
-    #         ke.attrs["units"] = "m2 s-2"
-
-    #         self.ds[target_var] = ke
-    #         return self.ds[target_var]
-
-    #     logger.warning(
-    #         f"{target_var.upper()} cannot be inferred or computed from {source_var.upper()}"
-    #     )
-    #     return None
-              
     def _compute_kinetic_energy(self, velocity_type="current"):
         """Compute kinetic energy from current or geostrophic velocities.
-    
+
         Parameters
         ----------
         velocity_type : str
             "current"     : uses u and v.
             "geostrophic" : uses ugos and vgos.
             "eke"         : uses ugosa and vgosa.
-    
+
         Returns
         -------
         xr.DataArray or None
@@ -672,34 +713,30 @@ class OceanVars(MethodRegistry):
                 "selectors": ("sel_ugosa", "sel_vgosa"),
             },
         }
-    
+
         if velocity_type not in configs:
             raise ValueError(
                 f"Unknown velocity_type '{velocity_type}'. "
                 f"Choose from {list(configs)}."
             )
-    
+
         config = configs[velocity_type]
         u_name = config["u"]
         v_name = config["v"]
         ke_name = config["ke"]
-    
+
         # Return cached kinetic energy if available
         if ke_name in self.ds:
             logger.info(f"{ke_name} EXISTS")
             return self.ds[ke_name]
-    
+
         # Retrieve or compute velocity components
         if config["selectors"] is not None:
-            for var_name, selector_name in zip(
-                (u_name, v_name), config["selectors"]
-            ):
+            for var_name, selector_name in zip((u_name, v_name), config["selectors"]):
                 if var_name not in self.ds:
-                    logger.info(
-                        f"Retrieving {var_name} using {selector_name}()"
-                    )
+                    logger.info(f"Retrieving {var_name} using {selector_name}()")
                     getattr(self, selector_name)()
-    
+
         # Check that velocity components are available
         if u_name not in self.ds or v_name not in self.ds:
             logger.warning(
@@ -707,38 +744,39 @@ class OceanVars(MethodRegistry):
                 f"'{u_name}' or '{v_name}' is missing from the dataset."
             )
             return None
-    
+
         u = self.ds[u_name]
         v = self.ds[v_name]
-    
+
         if not isinstance(u, xr.DataArray) or not isinstance(v, xr.DataArray):
             logger.warning(
                 f"Cannot compute {ke_name}: "
                 f"'{u_name}' and '{v_name}' must be xarray.DataArray objects."
             )
             return None
-    
+        logger.warning(f"compute {ke_name} from {u_name} and {v_name}")
         # Compute kinetic energy per unit mass
         ke = 0.5 * (u**2 + v**2)
         ke.name = ke_name
-    
-        ke.attrs.update({
-            "standard_name": (
-                "specific_eddy_kinetic_energy"
-                if velocity_type == "eke"
-                else "specific_kinetic_energy"
-            ),
-            "long_name": config["long_name"],
-            "units": "m2 s-2",
-        })
-    
+
+        ke.attrs.update(
+            {
+                "standard_name": (
+                    "specific_eddy_kinetic_energy"
+                    if velocity_type == "eke"
+                    else "specific_kinetic_energy"
+                ),
+                "long_name": config["long_name"],
+                "units": "m2 s-2",
+            }
+        )
+
         self.ds[ke_name] = ke
-    
+
         logger.info(f"{ke_name} successfully computed")
-    
+
         return self.ds[ke_name]
-    
-    
+
     def sel_eke(self):
         """
         Compute Eddy Kinetic Energy (EKE) from SLA.
@@ -752,7 +790,7 @@ class OceanVars(MethodRegistry):
 
     def sel_ke(self):
         """
-        Compute Kinetic Energy (KE) from u and v.
+        Compute Kinetic Energy (KE) from u and v (ie. total current).
 
         Returns
         -------
@@ -760,7 +798,7 @@ class OceanVars(MethodRegistry):
             KE data array.
         """
         return self._compute_kinetic_energy("current")
-        
+
     def sel_ke_geos(self):
         """
         Compute Kinetic Energy (KE) from geostrophic u and v.
@@ -771,4 +809,3 @@ class OceanVars(MethodRegistry):
             KE data array.
         """
         return self._compute_kinetic_energy("geostrophic")
-        
