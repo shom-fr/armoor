@@ -556,6 +556,33 @@ class SstSatelliteDecoder(Decoder):
         logger.info("Opening/decoding sst satellite files")
         return open_decode_sst_satellite(path_files, fmt)
 
+class SshSatelliteDecoder(Decoder):
+    """Satellite SSH products (cmems_alti_duacs)."""
+
+    name = "ssh_satellite"
+    fmts = ("cmems_alti_duacs")
+
+    def decode(self, path_files, fmt, platform=None):
+        """Decode satellite SSH files.
+
+        Parameters
+        ----------
+        path_files : list of str
+            Absolute paths to the input files.
+        fmt : str
+            The exact fmt requested (``"cmems_alti_duacs"``)
+            ; used to look up the matching CF meta
+            specs.
+        platform : str, optional
+            Unused.
+
+        Returns
+        -------
+        xarray.Dataset
+            See `open_decode_sst_satellite`.
+        """
+        logger.info("Opening/decoding altimetry satellite files")
+        return open_decode_alti_satellite(path_files, fmt)
 
 class HycomDecoder(Decoder):
     """HYCOM ocean-model output (hycom, hycom3d)."""
@@ -945,6 +972,51 @@ def open_decode_sst_satellite(path_files, fmt):
         ds = ds[["ptemp", "ptemp_qc", "lon", "lat"]]
     else:
         ds = ds[["ptemp", "lon", "lat"]]
+    return ds
+
+
+def open_decode_alti_satellite(path_files, fmt):
+    """
+    Open altimetry satellite netcdf file(s) and store it into a ready-to-use dataset.
+    Parameters
+    ----------
+    path_files : str, list of str
+        Path to the netcdf files.
+    Returns
+    -------
+    xarray.Dataset
+        CMEMS dataset.
+    """
+    # Open
+    # path = os.path.join(ROOTDIR, "config", f"{fmt}.cfg")
+    cfspecs = xmeta.get_meta_specs(f"{fmt}")
+    ds = cfspecs.decode(xr.open_mfdataset(path_files).chunk(chunks={}))
+    
+    for v in [
+        "err_sla",
+        "err_ugosa",
+        "err_vgosa",
+        "flag_ice",
+    ]:
+        if v in ds:
+            ds = ds.drop_vars(v)
+
+    if "depth" in ds.dims:
+        ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
+    else:
+        ds = ds.swap_dims({"lon": "x", "lat": "y"})
+
+    if len(ds.lon.dims) == 1:
+        lat, lon = xr.broadcast(ds["lat"], ds["lon"])
+        ds = ds.drop_vars(["lon", "lat"])
+        ds["lon"] = lon
+        ds["lat"] = lat
+        ds = ds.set_coords(["lon", "lat"])
+    if "depth" in ds.dims:
+        var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
+        ds["depth"] = ds["depth"].broadcast_like(ds[var])
+    else:
+        var = [var for var in ds.data_vars if len(ds[var].dims) == 3][0]
     return ds
 
 
