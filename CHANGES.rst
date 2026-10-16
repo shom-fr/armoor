@@ -1,81 +1,8 @@
 What's new
 ##########
 
-Develop
-=======
-
-New features
-------------
-
-- ``open_decode_croco(..., fmt="croco_xios")`` decodes the XIOS outputs of
-  CROCO with the new ``open_decode_croco_xios``, instead of decoding them as
-  native outputs, which failed on the XIOS dimension names. The files of an
-  output are concatenated in time and the outputs merged (same points, same
-  times); the domain dimensions (``x``/``y``, ``x_<domain>``/``y_<domain>``)
-  are located at the rho, u or v points, including the extraction domains
-  of sloop (``<zone>_T``, ``<zone>_U``, ``<zone>_V``) whose u and v points
-  are the faces of their rho cells. The velocities (``u``/``v``,
-  ``u_surf``/``v_surf``) are averaged on the rho points (NaN where a face
-  is missing at a boundary of the grid) and rotated with ``angle``; the
-  rho points of outputs on the u and v points only are rebuilt from the
-  faces. ``h``, ``angle`` and ``mask_rho``, when not written by XIOS, are
-  taken from a CROCO grid file given with the outputs, located with the
-  coordinates. The depth of the levels is computed with the s-coordinates
-  of xoa (``ocean_s_coordinate_g2`` with ``Vtransform = 2``, else
-  ``ocean_s_coordinate_g1``, as ``set_depth.F``) from ``h``, ``zeta``, the
-  ``s_rho`` axis, ``Cs_rho`` and ``hc``, ``Vtransform``, ``theta_s`` and
-  ``theta_b`` written as fields by XIOS or as global attributes
-  (``VertCoordType``); ``Cs_rho`` is computed with the stretching curves of
-  CROCO, not available in xoa, if absent. The decoded dataset has the same variables and
-  dimensions as with the native outputs.
-- ``armoor.interp.vinterp`` accepts ``extrap``, the extrapolation mode of
-  ``xoa.regrid.regrid1d`` (default ``"both"``): ``"bottom"`` extrapolates a
-  positive depth toward the surface only, without values below the deepest
-  level of each column.
-- ``ArmoorFilters.tidal_filter`` accepts ``errors="raise"`` to raise the
-  error of a variable that cannot be filtered (data less than hourly
-  sampled...), instead of logging a warning and keeping it unfiltered
-  (``errors="warn"``, default).
-
-Bug fixes
----------
-
-- ``open_decode`` sets the CF attributes of the decoded datasets of every
-  format with the generic CF specs (``cf_generic.cfg``) through the new
-  ``format_cf``: the attributes of the variables known by name or alternate
-  name are the first values of their specs, except the standard names
-  relative to the grid (velocities not rotated), and the bookkeeping
-  attributes of the models (``online_operation``, ``interval_write``...)
-  are removed. ``cf_generic.cfg``: ``degree_celsius``,
-  ``sea_surface_height_above_geoid``, ``sea_water_sigma_theta``,
-  ``ocean_mixed_layer_thickness``, ``sea_water_pressure``, ``depth``
-  positive down, ``sea_binary_mask`` (mask of CROCO), eastward and
-  northward velocities first, and alternate names of the ``OceanVars``
-  names (``sndspeed``, ``cspeed``, ``u_surf``, ``v_surf``).
-- ``open_decode`` accepts a list of paths or patterns.
-- ``OceanVars``: the computed variables (``pdens``, ``sndspeed``, ``mld``,
-  ``temp``, ``pres``, ``cspeed``) have the CF attributes of the generic CF
-  specs (``reference_pressure`` for ``pdens``), and ``cdir`` its own (radian,
-  counterclockwise from east), instead of those of an input (``pdens`` was a
-  "Salinity", ``pres`` a "Depth"...).
-- ``armoor.interp.regrid`` regrids the coordinates on the ``x`` and ``y``
-  dimensions other than ``lon`` and ``lat`` (``depth`` of the sigma
-  levels...), which were removed.
-- ``ArmoorFilters.tsmooth`` failed on a dataset without ``depth``
-  (``KeyError``).
-- ``ArmoorFilters.tidal_filter`` and ``ArmoorFilters.tresample`` filter the
-  coordinates that depend on time (``depth`` of the sigma levels...) with
-  the variables: ``tidal_filter`` left them unfiltered and ``tresample``
-  removed them.
-- ``open_decode_croco``: the velocities rotated to east and north have the
-  standard names ``eastward_sea_water_velocity`` and
-  ``northward_sea_water_velocity`` instead of those of the grid axes
-  (``sea_water_x_velocity``...), and the depth of the levels the attributes
-  of a positive depth (``standard_name = "depth"``, ``positive = "down"``)
-  instead of those of the height computed by xoa.
-
-2026.10.0
-=========
+v2026.10.0
+==========
 
 New features
 ------------
@@ -201,6 +128,38 @@ New features
   svg, gif), and ``[summary]`` declares a ``period`` entry (overridden by
   ``--period``). Empty summary entries are no longer shown.
 
+- ``open_decode_croco(..., fmt="croco_xios")`` decodes the XIOS outputs of
+  CROCO with the new ``open_decode_croco_xios``, instead of decoding them as
+  native outputs, which failed on the XIOS dimension names. The files of an
+  output are concatenated in time and the outputs merged (same points, same
+  times); the domain dimensions (``x``/``y``, ``x_<domain>``/``y_<domain>``)
+  are located at the rho, u or v points, including the extraction domains
+  of sloop (``<zone>_T``, ``<zone>_U``, ``<zone>_V``) whose u and v points
+  are the faces of their rho cells. The velocities (``u``/``v``,
+  ``u_surf``/``v_surf``) are averaged on the rho points (NaN where a face
+  is missing at a boundary of the grid) and rotated with ``angle``; the
+  rho points of outputs on the u and v points only are rebuilt from the
+  faces. ``h``, ``angle`` and ``mask_rho``, when not written by XIOS, are
+  taken from a CROCO grid file given with the outputs, located with the
+  coordinates. The depth of the levels is computed with the s-coordinates
+  of xoa (``ocean_s_coordinate_g2`` with ``Vtransform = 2``, else
+  ``ocean_s_coordinate_g1``, as ``set_depth.F``) from ``h``, ``zeta``, the
+  ``s_rho`` axis, ``Cs_rho`` and ``hc``, ``Vtransform``, ``theta_s`` and
+  ``theta_b`` written as fields by XIOS or as global attributes
+  (``VertCoordType``); ``Cs_rho`` is computed with the stretching curves of
+  CROCO, not available in xoa, if absent. The decoded dataset has the same variables and
+  dimensions as with the native outputs.
+
+- ``armoor.interp.vinterp`` accepts ``extrap``, the extrapolation mode of
+  ``xoa.regrid.regrid1d`` (default ``"both"``): ``"bottom"`` extrapolates a
+  positive depth toward the surface only, without values below the deepest
+  level of each column.
+
+- ``ArmoorFilters.tidal_filter`` accepts ``errors="raise"`` to raise the
+  error of a variable that cannot be filtered (data less than hourly
+  sampled...), instead of logging a warning and keeping it unfiltered
+  (``errors="warn"``, default).
+
 Breaking changes
 ----------------
 
@@ -229,6 +188,10 @@ Breaking changes
   ``armoor.base.X`` import. ``armoor/tests/`` also moved to a top-level
   ``tests/`` directory.
 
+- ``armoor-bull``: Jinja2 autoescape is now enabled on the HTML template,
+  so raw HTML in config descriptions (zones, sections, ``[ocean-features]``,
+  ...) is rendered as plain text.
+
 Deprecations
 ------------
 
@@ -250,6 +213,11 @@ Refactoring
   remaining French text (code, docstrings, log messages,
   ``doc/tick.rst``'s issue-field table) to English, and removed dead/
   commented-out code (~590 unused lines in ``armoor/comp/io.py`` alone).
+
+- Replaced the legacy ``[tool.black]``/``[tool.flake8]`` configuration with
+  an equivalent ``[tool.ruff]`` one (line-length 100, quote-style preserve)
+  and applied ruff (lint + format) and bandit to the whole ``armoor/``
+  package through pre-commit.
 
 Bug fixes
 ---------
@@ -315,6 +283,52 @@ Bug fixes
   logged as warnings, and the image modal no longer relies on the
   deprecated global ``event``.
 
+- ``open_decode`` sets the CF attributes of the decoded datasets of every
+  format with the generic CF specs (``cf_generic.cfg``) through the new
+  ``format_cf``: the attributes of the variables known by name or alternate
+  name are the first values of their specs, except the standard names
+  relative to the grid (velocities not rotated), and the bookkeeping
+  attributes of the models (``online_operation``, ``interval_write``...)
+  are removed. ``cf_generic.cfg``: ``degree_celsius``,
+  ``sea_surface_height_above_geoid``, ``sea_water_sigma_theta``,
+  ``ocean_mixed_layer_thickness``, ``sea_water_pressure``, ``depth``
+  positive down, ``sea_binary_mask`` (mask of CROCO), eastward and
+  northward velocities first, and alternate names of the ``OceanVars``
+  names (``sndspeed``, ``cspeed``, ``u_surf``, ``v_surf``).
+
+- ``open_decode`` accepts a list of paths or patterns.
+
+- ``OceanVars``: the computed variables (``pdens``, ``sndspeed``, ``mld``,
+  ``temp``, ``pres``, ``cspeed``) have the CF attributes of the generic CF
+  specs (``reference_pressure`` for ``pdens``), and ``cdir`` its own (radian,
+  counterclockwise from east), instead of those of an input (``pdens`` was a
+  "Salinity", ``pres`` a "Depth"...).
+
+- ``armoor.interp.regrid`` regrids the coordinates on the ``x`` and ``y``
+  dimensions other than ``lon`` and ``lat`` (``depth`` of the sigma
+  levels...), which were removed.
+
+- ``ArmoorFilters.tsmooth`` failed on a dataset without ``depth``
+  (``KeyError``).
+
+- ``ArmoorFilters.tidal_filter`` and ``ArmoorFilters.tresample`` filter the
+  coordinates that depend on time (``depth`` of the sigma levels...) with
+  the variables: ``tidal_filter`` left them unfiltered and ``tresample``
+  removed them.
+
+- ``open_decode_croco``: the velocities rotated to east and north have the
+  standard names ``eastward_sea_water_velocity`` and
+  ``northward_sea_water_velocity`` instead of those of the grid axes
+  (``sea_water_x_velocity``...), and the depth of the levels the attributes
+  of a positive depth (``standard_name = "depth"``, ``positive = "down"``)
+  instead of those of the height computed by xoa.
+
+- Capped ``argopy`` below 1.5. This unused transitive dependency of
+  ``shoot`` is installed by pip on top of the conda environment: argopy 1.5
+  lifts its cap on ``xarray``, whose newest version calls
+  ``zarr.open_group(zarr_format=...)``, rejected by the pinned zarr 2.18.
+  This broke every ``to_zarr()`` call (tests, CLI tutorials, doc build).
+
 Documentation
 -------------
 
@@ -349,6 +363,20 @@ Documentation
   ``PULL_REQUEST_TEMPLATE.md``, ``dependabot.yml``, and a
   ``workflows/ci.yml`` translating the GitLab CI pipeline's lint/test/doc
   stages), matching the ``shom-fr/xoa``/``shom-fr/woom`` convention.
+
+- Added a Read the Docs configuration (``.readthedocs.yaml``, with an
+  editable install so the tutorials find ``armoor/_samples``) and collapsed
+  the sidebar navigation to keep the HTML build under the Read the Docs
+  timeout.
+
+- New ARMOOR logo (two interlaced O's comparing observations with a
+  model), drawn with matplotlib at doc-build time by
+  ``doc/_logo/armoor_logo.py`` (header logo in light and dark, favicon, and
+  a new "Logo" appendix page). Lettering is Manrope Bold, shipped with its
+  SIL OFL licence.
+
+- Added a GitHub Actions host to the woom integration test configuration
+  (``tests/integration/woom/hosts.cfg``).
 
 2026.7.0
 ========
