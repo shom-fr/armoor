@@ -427,10 +427,10 @@ class SstSatelliteDecoder(Decoder):
         return open_decode_sst_satellite(path_files, fmt)
 
 class SshSatelliteDecoder(Decoder):
-    """Satellite SSH products (cmems_alti_duacs, cmems_alti_globcurrent)."""
+    """Satellite SSH products (cmems_alti_duacs)."""
 
     name = "ssh_satellite"
-    fmts = ("cmems_alti_duacs", "cmems_alti_globcurrent")
+    fmts = ("cmems_alti_duacs")
 
     def decode(self, path_files, fmt, platform=None):
         """Decode satellite SSH files.
@@ -440,7 +440,7 @@ class SshSatelliteDecoder(Decoder):
         path_files : list of str
             Absolute paths to the input files.
         fmt : str
-            The exact fmt requested (``"cmems_alti_duacs"``, ``"cmems_alti_globcurrent"``)
+            The exact fmt requested (``"cmems_alti_duacs"``)
             ; used to look up the matching CF meta
             specs.
         platform : str, optional
@@ -844,13 +844,11 @@ def open_decode_sst_satellite(path_files, fmt):
 
 def open_decode_alti_satellite(path_files, fmt):
     """
-    Open SST satellite netcdf file(s) and store it into a ready-to-use dataset.
+    Open altimetry satellite netcdf file(s) and store it into a ready-to-use dataset.
     Parameters
     ----------
     path_files : str, list of str
         Path to the netcdf files.
-    steps : float
-       Horizontal and vertical steps
     Returns
     -------
     xarray.Dataset
@@ -861,6 +859,15 @@ def open_decode_alti_satellite(path_files, fmt):
     cfspecs = xmeta.get_meta_specs(f"{fmt}")
     ds = cfspecs.decode(xr.open_mfdataset(path_files).chunk(chunks={}))
     
+    for v in [
+        "err_sla",
+        "err_ugosa",
+        "err_vgosa",
+        "flag_ice",
+    ]:
+        if v in ds:
+            ds = ds.drop_vars(v)
+
     if "depth" in ds.dims:
         ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
     else:
@@ -868,7 +875,7 @@ def open_decode_alti_satellite(path_files, fmt):
 
     if len(ds.lon.dims) == 1:
         lat, lon = xr.broadcast(ds["lat"], ds["lon"])
-        ds = ds.drop(["lon", "lat"])
+        ds = ds.drop_vars(["lon", "lat"])
         ds["lon"] = lon
         ds["lat"] = lat
         ds = ds.set_coords(["lon", "lat"])

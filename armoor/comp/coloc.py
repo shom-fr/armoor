@@ -709,12 +709,15 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
         "sndspeed": {"ptemp", "temp", "sal", "pres"},
         "u": {"cdir", "cspeed"},
         "v": {"cdir", "cspeed"},
+        "ugos": {"ssh"},
+        "vgos": {"ssh"},
         "cdir": {"u", "v"},
         "cspeed": {"u", "v"},
         "mld": {"ptemp", "temp", "sal", "pres"},
-        "sla": {"ssh", "adt"},
-        "eke": {"sla"},
-        "mke": {"ssh"},
+        "sla": {"sla", "ssh"},
+        "eke": {"sla", "ugosa", "vgosa"},
+        "ke": {"ssh", "sla", "u", "v"},
+        "ke_geos": {"ssh", "ugos", "vgos"},
     }
     needed = set(COMP_VARS[comp_func])
     vars_to_keep = needed & set(ds.data_vars)
