@@ -237,7 +237,7 @@ class TestOceanVars:
         assert 'sla' in self.ds
         
     def test_sel_sla_from_ssh(self):
-         """Test calculation of sla"""   
+         """Test calculation of sla from ssh"""   
          ds_no_sla = self.ds.drop_vars(["sla"])
          result = ds_no_sla.oceanvars.sel_sla()
          assert result is not None
