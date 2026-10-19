@@ -45,6 +45,10 @@ class OceanVars(MethodRegistry):
         "v": "sel_current_meridional",
         "ugos": "sel_ugos",
         "vgos": "sel_vgos",
+        "u_mean_time": "sel_current_zonal_mean_time",
+        "v_mean_time": "sel_current_meridional_mean_time",
+        "ugos_mean_time": "sel_ugos_mean_time",
+        "vgos_mean_time": "sel_vgos_mean_time",       
         "ugosa": "sel_ugosa",
         "vgosa": "sel_vgosa",
         "ptemp": "sel_ptemp",
@@ -61,6 +65,8 @@ class OceanVars(MethodRegistry):
         "eke": "sel_eke",
         "ke": "sel_ke",
         "ke_geos": "sel_ke_geos",
+        "mke": "sel_mke",
+        "mke_geos": "sel_mke_geos",       
     }
 
     def __init__(self, ds):
@@ -140,6 +146,26 @@ class OceanVars(MethodRegistry):
             return self.ds.cspeed * np.sin(self.ds.cdir * np.pi / 180.0)
         else:
             logger.warning("v cannot be infered or computed")
+            
+    def sel_current_zonal_mean_time(self):
+        """Select or compute the mean zonal current component (u) along time."""
+        u = self.sel_current_zonal()
+        if u is not None:
+            u_mean_time = self.ds["u"].mean('time')
+            self.ds["u_mean_time"] = u_mean_time
+            return self.ds["u_mean_time"]
+        else:
+            logger.warning("u_mean_time cannot be infered or computed")
+
+    def sel_current_meridional_mean(self):
+        """Select or compute the mean meridional current component (v) along time."""
+        v = self.sel_current_meridional()
+        if v is not None:
+            v_mean_time = self.ds["v"].mean('time')
+            self.ds["v_mean_time"] = v_mean_time
+            return self.ds["v_mean_time"]
+        else:
+            logger.warning("v_mean_time cannot be infered or computed")      
 
     def _compute_geos(self, source, prefix):
         """Compute geostrophic current components from a sea level variable."""
@@ -180,6 +206,26 @@ class OceanVars(MethodRegistry):
         """Compute or retrieve the geostrophic meridional current from ssh."""
         self._compute_geos("ssh", "gos")
         return self.ds.get("vgos")
+    
+    def sel_ugos_mean_time(self):
+        """Compute or retrieve the mean geostrophic zonal current from ssh along time."""
+        u = self._compute_geos("ssh", "gos")
+        if u is not None:
+            ugos_mean_time = self.ds["u"].mean('time')
+            self.ds["ugos_mean_time"] = ugos_mean_time
+            return self.ds["ugos_mean_time"]
+        else:
+            logger.warning("ugos_mean_time cannot be infered or computed")
+
+    def sel_vgos_mean_time(self):
+        """Compute or retrieve the mean geostrophic meridional current from ssh along time."""
+        v = self._compute_geos("ssh", "gos")
+        if v is not None:
+            vgos_mean_time = self.ds["v"].mean('time')
+            self.ds["vgos_mean_time"] = vgos_mean_time
+            return self.ds["vgos_mean_time"]
+        else:
+            logger.warning("vgos_mean_time cannot be infered or computed")
 
     def sel_ugosa(self):
         """Compute or retrieve the geostrophic zonal current anomaly from sla."""
@@ -622,13 +668,13 @@ class OceanVars(MethodRegistry):
 
         return None
 
-    def _compute_kinetic_energy(self, velocity_type="current"):
+    def _compute_kinetic_energy(self, velocity_type="total"):
         """Compute kinetic energy from total current or geostrophic velocities.
 
         Parameters
         ----------
         velocity_type : str
-            "current"     : uses u and v.
+            "total"     : uses u and v.
             "geostrophic" : uses ugos and vgos computed from ssh.
             "eke"         : uses ugosa and vgosa computed from sla.
 
@@ -638,7 +684,7 @@ class OceanVars(MethodRegistry):
             Kinetic energy per unit mass in m2 s-2.
         """
         configs = {
-            "current": {
+            "total": {
                 "u": "u",
                 "v": "v",
                 "ke": "ke",
@@ -659,6 +705,13 @@ class OceanVars(MethodRegistry):
                 "long_name": "eddy kinetic energy computed from SLA",
                 "selectors": ("sel_ugosa", "sel_vgosa"),
             },
+            "mke": {
+                "u": "u_mean_time",
+                "v": "v_mean_time",
+                "ke": "mke",
+                "long_name": "mean kinetic energy computed from u and v",
+                "selectors": ("sel_u_mean_time", "sel_v_mean_time"),
+            },            
         }
 
         if velocity_type not in configs:
@@ -745,8 +798,8 @@ class OceanVars(MethodRegistry):
         xarray.DataArray or None
             KE data array.
         """
-        return self._compute_kinetic_energy("current")
-
+        return self._compute_kinetic_energy("total")
+    
     def sel_ke_geos(self):
         """
         Compute Kinetic Energy (KE) from geostrophic u and v.
@@ -757,3 +810,18 @@ class OceanVars(MethodRegistry):
             KE data array.
         """
         return self._compute_kinetic_energy("geostrophic")
+    
+    
+    def sel_mke(self):
+        """
+        Compute Mean Kinetic Energy (MKE) from u and v (ie. total current).
+
+        Returns
+        -------
+        xarray.DataArray or None
+            MKE data array.
+        """
+        return self._compute_kinetic_energy("mke")    
+    
+    
+    
