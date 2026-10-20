@@ -5,7 +5,7 @@ import xarray as xr
 import pandas as pd
 import logging
 from armoor import ArmoorError
-from armoor.filters import ArmoorFilters  # Replace with actual import
+from armoor.filters import ArmoorFilters, generate_kernel_from_freq
 
 # Fixtures
 @pytest.fixture
@@ -106,6 +106,39 @@ class TestArmoorFilters:
         af = ArmoorFilters(sample_ds)
         mask = af.get_mask(coords)
         assert mask is None
+
+    def test_get_mask_values(self, sample_ds):
+        """The points inside a (lat, lon) polygon are selected on a grid."""
+        coords = [(2.05, 3.05), (2.05, 7.05), (6.05, 7.05), (6.05, 3.05)]
+        mask = ArmoorFilters(sample_ds).get_mask(coords)
+        lat, lon = sample_ds.lat, sample_ds.lon
+        expected = (lat > 2.05) & (lat < 6.05) & (lon > 3.05) & (lon < 7.05)
+        np.testing.assert_array_equal(mask.values, expected.values)
+        assert mask.dims == ("y", "x")
+
+    def test_get_mask_scattered_points(self):
+        """Scattered points, like a drifter track, are masked too."""
+        ds = xr.Dataset(
+            {"temp": ("time", np.arange(4.0))},
+            coords={
+                "time": pd.date_range("2020-01-01", periods=4),
+                "lon": ("time", [1.0, 5.0, 9.0, 5.0]),
+                "lat": ("time", [5.0, 5.0, 5.0, 20.0]),
+            },
+        )
+        mask = ArmoorFilters(ds).get_mask([(0, 2), (10, 2), (10, 8), (0, 8)])
+        np.testing.assert_array_equal(mask.values, [False, True, False, False])
+
+    def test_get_mask_dateline(self):
+        """A polygon that crosses the dateline selects the points near it only."""
+        lon = np.array([175.0, -175.0, 0.0, 100.0, -100.0])
+        ds = xr.Dataset(
+            {"temp": ("npts", np.zeros(5))},
+            coords={"lon": ("npts", lon), "lat": ("npts", np.zeros(5))},
+        )
+        coords = [(-10.0, 170.0), (10.0, 170.0), (10.0, -170.0), (-10.0, -170.0)]
+        mask = ArmoorFilters(ds).get_mask(coords)
+        np.testing.assert_array_equal(mask.values, [True, True, False, False, False])
 
     def test__get_quality_mask(self, sample_ds):
         """Test _get_quality_mask with min and max."""
@@ -465,3 +498,17 @@ class TestArmoorFilters:
         
     #     assert result is not None
     #     assert isinstance(result, xr.Dataset)
+
+@pytest.mark.parametrize("freq, step, size", [("7D", "1D", 7), ("12h", "1h", 13), ("2h", "1h", 3)])
+def test_generate_kernel_from_freq_gaussian(freq, step, size):
+    """A normalized gaussian window with a standard deviation of a sixth of its
+    size, that does not change from a call to another."""
+    from scipy.signal.windows import gaussian
+
+    time = pd.date_range("2020-01-01", periods=100, freq=step)
+    expected = gaussian(size, size / 6)
+    expected /= expected.sum()
+    for _ in range(3):
+        kernel, ksize = generate_kernel_from_freq(freq, time)
+        assert ksize == size
+        np.testing.assert_allclose(kernel, expected)

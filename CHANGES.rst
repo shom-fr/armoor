@@ -55,9 +55,17 @@ Refactoring
   ``ds.oceanvars`` are computed by ``xoa.dyn`` instead of ``shoot.dyn``, with
   the same values, so ``shoot`` and its ``argopy`` pin are no longer
   dependencies. The ``eddy_shoot`` format is still read.
+- The gaussian kernel of the ``tsmooth`` filter comes from
+  ``xoa.filter.get_window_func``, with the same values.
 
 Bug fixes
 ---------
+
+- The ``polygon`` filter selects the points with ``xoa.core.mask.polygon_mask``
+  instead of ``matplotlib.path``, which fixes the polygons that cross the
+  dateline. The points that are exactly on the edges of a polygon may be
+  selected differently: for a rectangle, they are now those of the southern
+  and western edges, instead of the southern and eastern ones.
 
 - The potential and in situ temperatures and the sound speed computed by
   ``ds.oceanvars`` convert the practical salinity to absolute salinity, as
