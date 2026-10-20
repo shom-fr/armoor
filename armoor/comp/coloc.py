@@ -718,6 +718,8 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
         "eke": {"sla", "ugosa", "vgosa"},
         "ke": {"ssh", "sla", "u", "v"},
         "ke_geos": {"ssh", "ugos", "vgos"},
+        "mke": {"ssh", "u", "v"},
+        "mke_geos": {"ssh", "ugos", "vgos"},
     }
     needed = set(COMP_VARS[comp_func])
     vars_to_keep = needed & set(ds.data_vars)
