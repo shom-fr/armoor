@@ -51,9 +51,19 @@ Refactoring
   not depend on time, and the coordinates that are not horizontal are kept.
 - ``grid2track`` and ``armoor.diags.parcels`` import ``grid2loc`` from
   ``xoa.interp``, where it is defined, instead of ``xoa.regrid``.
+- The divergence, relative vorticity and Okubo-Weiss parameter of
+  ``ds.oceanvars`` are computed by ``xoa.dyn`` instead of ``shoot.dyn``, with
+  the same values, so ``shoot`` and its ``argopy`` pin are no longer
+  dependencies. The ``eddy_shoot`` format is still read.
 
 Bug fixes
 ---------
+
+- The potential and in situ temperatures and the sound speed computed by
+  ``ds.oceanvars`` convert the practical salinity to absolute salinity, as
+  TEOS-10 expects, instead of using it as an absolute salinity: the
+  temperatures change by up to about 1e-3 °C and the sound speed by about
+  0.01 m/s. The conversions are made by ``xoa.thermdyn``.
 
 - ``open_decode_croco`` and ``open_decode_croco_xios`` accept the ``z_rho``
   and ``z_w`` heights of the sigma levels, which is how xoa names them since

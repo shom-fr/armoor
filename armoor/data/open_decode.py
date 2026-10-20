@@ -27,10 +27,10 @@ from armoor import ROOTDIR, ArmoorError
 
 logger = logging.getLogger(__name__)
 
-# argopy is an unused transitive dependency (pulled in by the "shoot" eddy
-# decoder) that registers an xarray backend; xarray imports it eagerly to
-# build its plugin registry on the first open_dataset/open_mfdataset call,
-# which logs noise even though the backend then fails to load.
+# argopy, when installed (it was a transitive dependency of shoot), registers
+# an xarray backend; xarray imports it eagerly to build its plugin registry on
+# the first open_dataset/open_mfdataset call, which logs noise even though the
+# backend then fails to load.
 logging.getLogger("argopy").setLevel(logging.WARNING)
 
 xoa.register_accessors(meta=True, decode_sigma=True)
