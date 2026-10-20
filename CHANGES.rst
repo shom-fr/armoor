@@ -29,6 +29,19 @@ Breaking changes
   The time of the destination grid is still ignored, the regridded data
   stay lazy with dask and keep their floating point type, like with xESMF.
 
+Refactoring
+-----------
+
+- ``armoor.interp.grid2loc`` (and so ``grid2section``, the ``cloud`` colocation
+  and ``armoor-interp-horizontal --cloud/--section``) interpolates with
+  ``xoa.interp.Interpolator`` instead of ``xoa.regrid.grid2loc``, chunk by chunk:
+  the result stays lazy with dask, so the memory no longer grows with the size
+  of the files, and the values are the same. The vertical dimension may have
+  any name, a depth on the horizontal grid is interpolated even when it does
+  not depend on time, and the coordinates that are not horizontal are kept.
+- ``grid2track`` and ``armoor.diags.parcels`` import ``grid2loc`` from
+  ``xoa.interp``, where it is defined, instead of ``xoa.regrid``.
+
 Bug fixes
 ---------
 

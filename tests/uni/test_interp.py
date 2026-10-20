@@ -988,3 +988,39 @@ def test_regrid_dask_weights_file(tmp_path):
     out = regrid(dsi.chunk(time=1), dso, weights_file=str(weights_file))
     assert weights_file.exists()
     np.testing.assert_allclose(out.temp.isel(time=0).values, dso.lon + 2 * dso.lat)
+
+
+def test_grid2loc_dask_lazy():
+    """Dask arrays stay lazy, keep their floating point type and give the same
+    result as numpy arrays, and the points outside the grid are missing."""
+    dsi, _ = _regrid_case()
+    dsi["temp"] = dsi.temp.astype("f4")
+    coords = [(42.0, 3.5), (45.5, 8.25), (30.0, 3.0)]
+    out = grid2loc(dsi.chunk(time=1, x=4), coords)
+    assert out.temp.chunks is not None
+    assert out.temp.dtype == np.float32
+    assert out.temp.dims == ("time", "npts")
+    np.testing.assert_allclose(out.temp.values, grid2loc(dsi, coords).temp.values, rtol=1e-6)
+    np.testing.assert_allclose(out.temp.isel(time=0, npts=[0, 1]), [3.5 + 2 * 42.0, 8.25 + 2 * 45.5])
+    assert out.temp.isel(npts=2).isnull().all()
+
+
+def test_grid2loc_depth_on_grid():
+    """A depth on the horizontal grid is interpolated, whatever the name of
+    the vertical dimension, and other coordinates are kept."""
+    lon, lat = np.meshgrid(np.linspace(0, 4, 5), np.linspace(40, 43, 4))
+    depth = np.stack([lon * 0 + 1.0, lon + 10.0])
+    dsi = xr.Dataset(
+        {"temp": (("s_rho", "y", "x"), np.stack([lon, lat]))},
+        coords={
+            "lon": (("y", "x"), lon),
+            "lat": (("y", "x"), lat),
+            "depth": (("s_rho", "y", "x"), depth),
+            "s_rho": ("s_rho", [-0.75, -0.25]),
+        },
+    )
+    out = grid2loc(dsi, [(41.5, 2.5)])
+    assert out.depth.dims == ("s_rho", "npts")
+    np.testing.assert_allclose(out.depth.values.ravel(), [1.0, 12.5])
+    np.testing.assert_allclose(out.temp.values.ravel(), [2.5, 41.5])
+    np.testing.assert_array_equal(out.s_rho.values, [-0.75, -0.25])
