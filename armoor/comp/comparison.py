@@ -327,7 +327,7 @@ class CompAlti(Comparison):
         "timeseries": {"concat": ["time"], "stat": ["time", "x", "y"], "output": "merge"},
         "maps": {"sort": ["time"], "stat": ["time"]},
     }
-    comp_vars = ["sla", "ke", "ke_geos", "eke"]
+    comp_vars = ["sla", "ke", "ke_geos", "eke", "mke", "mke_geos"]
 
     def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
         """Return the dataset lists unchanged.
