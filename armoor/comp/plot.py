@@ -1463,6 +1463,10 @@ class PlotComp(MethodRegistry):
                 for var in dscomp_all.data_vars:
                     if var not in CMAP_VARS:
                         continue
+                    if dscomp_all[var].isnull().all():
+                        # e.g. a correlation with too few samples everywhere
+                        logger.info("maps: skipping %s of %s — missing everywhere", comp, var)
+                        continue
                     dscomp = dscomp_all[[var]]
                     dsref = dsref_all[[var]]
                     dsprod = dsprod_all[[var]]

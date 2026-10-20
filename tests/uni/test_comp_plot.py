@@ -211,6 +211,25 @@ class TestMapsCorr:
         assert (kwargs["vmin"], kwargs["vmax"], kwargs["cmap"]) == (-1, 1, "cmo.balance")
         assert "/map_ptemp_corr_prod1" in save_figure.call_args[0][1]
 
+    def test_missing_statistic_is_skipped(self, tmp_path):
+        nc = _make_map_datatree(tmp_path)
+        dt = xr.open_datatree(nc)
+        nodes = {
+            "model1/ref/data": dt["model1/ref/data"].to_dataset(),
+            "model1/prod/data": dt["model1/prod/data"].to_dataset(),
+            "model1/comp/diff": dt["model1/ref/data"].to_dataset() * np.nan,
+        }
+        dt.close()
+        path = tmp_path / "nan.zarr"
+        xr.DataTree.from_dict(nodes).to_zarr(path, mode="w")
+        plotcomp = PlotComp(str(path), "comp_sst", "mz1")
+        try:
+            with patch.object(plotcomp, "save_figure") as save_figure:
+                plotcomp.maps()
+        finally:
+            plotcomp.clean()
+        save_figure.assert_not_called()
+
 
 class TestPlotTaskThreadsVminmax:
 

@@ -278,7 +278,7 @@ class CompSst(Comparison):
     outputs_params = {
         "diagdisp_glob": {"concat": ["time"]},
         "diagdisp_sel": {"sort": ["time"], "concat": ["time"]},
-        "taylor": {"concat": ["time"]},
+        "taylor": {"concat": ["time"], "output": "merge"},
         "timeseries": {"concat": ["time"], "stat": ["time", "x", "y"], "output": "merge"},
         "maps": {"sort": ["time"], "stat": ["time"]},
     }
@@ -344,6 +344,7 @@ class CompArgo(Comparison):
         "taylor": {
             "concat": ["time"],
             "mparams_pro": {"vertical": ["vlevel", "vrange"]},
+            "output": "merge",
         },
         "diagdisp_sel": {
             "sort": ["time", "z"],
@@ -688,7 +689,7 @@ class CompModels(Comparison):
         },
         "diagdisp_glob": {"concat": ["time"]},
         "diagdisp_sel": {"sort": ["time", "z"]},
-        "taylor": {"concat": ["time"]},
+        "taylor": {"concat": ["time"], "output": "merge"},
         "timeseries": {
             "sort": ["z"],
             "concat": ["time"],

@@ -153,12 +153,13 @@ def crms(dsprod, dsref, dim):
     return np.sqrt((cdiff(dsprod, dsref, dim) ** 2).mean(dim=dim))
 
 
-def corr(dsprod, dsref, dim):
+def corr(dsprod, dsref, dim, min_count=3):
     """
     Calculate the Pearson correlation between reference and product datasets.
 
     Only the samples that are valid in both datasets are used, and the
-    correlation is missing where a dataset is constant.
+    correlation is missing where a dataset is constant or where there are
+    fewer than `min_count` of them: with two samples, it is always 1 or -1.
 
     Parameters
     ----------
@@ -168,15 +169,21 @@ def corr(dsprod, dsref, dim):
         Reference dataset.
     dim : str or list of str
         Dimension(s) along which to compute the correlation.
+    min_count : int
+        Minimal number of samples that are valid in both datasets.
 
     Returns
     -------
     xarray.Dataset
         Correlation of the variables that are in both datasets.
     """
-    return xr.Dataset(
-        {var: xr.corr(dsprod[var], dsref[var], dim=dim) for var in dsprod.data_vars if var in dsref}
-    )
+    out = {}
+    for var in dsprod.data_vars:
+        if var not in dsref:
+            continue
+        count = (dsprod[var].notnull() & dsref[var].notnull()).sum(dim=dim)
+        out[var] = xr.corr(dsprod[var], dsref[var], dim=dim).where(count >= min_count)
+    return xr.Dataset(out)
 
 
 def pdf(ds, vars):

@@ -95,6 +95,10 @@ def test_corr():
     out = corr(dsprod, dsref, dim="time")
     assert np.isclose(out["a"].item(), expected)
     assert np.isnan(corr(dsprod * 0 + 1, dsref, dim="time")["a"].item())
+    # Not enough samples that are valid in both datasets
+    dsprod["a"][1] = np.nan
+    assert np.isnan(corr(dsprod, dsref, dim="time")["a"].item())
+    assert np.isfinite(corr(dsprod, dsref, dim="time", min_count=2)["a"].item())
 
 
 def test_pdf():
