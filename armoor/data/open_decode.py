@@ -1012,6 +1012,27 @@ def open_decode_cmems_model(path_files):
     return ds
 
 
+def _dz2depth_lazy(dz, zdim, **kwargs):
+    """:func:`xoa.grid.dz2depth` chunk by chunk, so that a dask array stays lazy
+
+    xoa loads dask arrays in memory to integrate the layer thicknesses, which
+    are a whole 4D field for HYCOM. Each chunk keeps the whole vertical
+    dimension.
+    """
+    if dz.chunks is None:
+        return dz2depth(dz, zdim=zdim, **kwargs)
+    dz = dz.chunk({zdim: -1})
+    # The name, attributes and type of the output, from the first profile
+    sample = dz2depth(
+        dz.isel({dim: slice(0, 1) for dim in dz.dims if dim != zdim}).compute(),
+        zdim=zdim,
+        **kwargs,
+    )
+    template = dz.astype(sample.dtype).rename(sample.name)
+    template.attrs = sample.attrs
+    return xr.map_blocks(lambda block: dz2depth(block, zdim=zdim, **kwargs), dz, template=template)
+
+
 def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
     """
     Fast and memory-efficient HyCOM NetCDF reader.
@@ -1171,7 +1192,7 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
     if bathy is not None:
         ds = xr.merge([ds, bathy.to_dataset(name="bathy")])
     if "dz" in ds:
-        depth = dz2depth(ds.dz, centered=True)
+        depth = _dz2depth_lazy(ds.dz, "z", centered=True)
         ds = ds.assign_coords(depth=depth).drop_vars(["dz", "z"])
     logger.info(f"  [timing] dz2depth:       {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
@@ -1658,6 +1679,7 @@ _CROCO_DROP_VARS = (
     "gls",
     "time_step",
     "depth_w",
+    "z_w",
     "s_w",
     "cs_rho",
     "sst_skin",
@@ -1682,10 +1704,14 @@ def _finalize_croco(ds):
     -------
     xarray.Dataset
     """
-    if "depth_rho" in ds.coords:
-        ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat", "depth_rho": "depth"})
-    else:
-        ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat"})
+    renames = {"lon_rho": "lon", "lat_rho": "lat"}
+    # xoa names the heights of the sigma levels z_rho since 2026.7.1, and
+    # depth_rho before, both negative below the sea level
+    for zname in ("z_rho", "depth_rho"):
+        if zname in ds.coords:
+            renames[zname] = "depth"
+            break
+    ds = ds.rename(renames)
 
     for dim in ("x_u", "y_v"):
         if dim in ds.dims:

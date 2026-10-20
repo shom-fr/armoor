@@ -24,8 +24,23 @@ Breaking changes
   are added to the conda environment. The results differ from xESMF
   by about 1e-5 relative, since the bilinear interpolation is made in
   longitude/latitude instead of on the sphere, and the masked points are the
-  same. The time of the destination grid is still ignored, the regridded data
+  same, except the destination points that lie exactly on the edge of the
+  source grid, which xoa interpolates while ESMF left them missing.
+  The time of the destination grid is still ignored, the regridded data
   stay lazy with dask and keep their floating point type, like with xESMF.
+
+Bug fixes
+---------
+
+- ``open_decode_croco`` and ``open_decode_croco_xios`` accept the ``z_rho``
+  and ``z_w`` heights of the sigma levels, which is how xoa names them since
+  its develop branch, instead of ``depth_rho`` and ``depth_w``.
+- ``open_decode_hycom`` integrates the layer thicknesses chunk by chunk:
+  ``xoa.grid.dz2depth`` loads dask arrays in memory since xoa's develop
+  branch, so the depth was no longer lazy and the final rechunk failed.
+- The ``depth`` of the ``generic`` specs of ``cf.cfg`` is ``positive=down``,
+  like in ``cf_generic.cfg`` and xoa. Both files keep ``z`` as an alternate
+  name of ``level``, unlike xoa, since it is armoor's vertical dimension.
 
 v2026.10.0
 ==========
