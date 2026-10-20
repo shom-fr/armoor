@@ -256,7 +256,7 @@ requires no changes.
     # Vertical interpolation (list is auto-wrapped in a DataArray)
     ds2 = ds.interp.vertical("depth", [0, 10, 50, 100, 200, 500])
 
-    # Horizontal regridding (requires xesmf)
+    # Horizontal regridding (bilinear, bicubic or conservative)
     ds2 = ds.interp.regrid(ds_target_grid)
 
 .. list-table::
@@ -276,7 +276,7 @@ requires no changes.
    * - ``.vertical(vname, vlevels)``
      - 1-D vertical interpolation via ``xoa.regrid.regrid1d``
    * - ``.regrid(ds_target)``
-     - Horizontal regridding between two grids using xESMF
+     - Horizontal regridding between two grids via ``xoa.regrid.Regridder``
 
 
 .. _accessor-range:

@@ -5,7 +5,6 @@
 # when the whole armoor package is imported at startup.
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 import re
 import numpy as np
 import pandas as pd
@@ -455,36 +454,56 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     return ds
 
 
-@contextmanager
-def create_regridder(dsi, dso, method="bilinear"):
-    """Context manager for safe regridder creation and cleanup."""
-    import xesmf as xe
+def _get_grid(ds):
+    """Horizontal grid of `ds`, made of its ``lon`` and ``lat`` only.
 
-    regridder = None
-    try:
-        regridder = xe.Regridder(
-            dsi,
-            dso,
-            method,
-            parallel=False,
-            ignore_degenerate=True,
-            unmapped_to_nan=True,
-        )
-        yield regridder
-    finally:
-        if regridder is not None:
-            del regridder
-        import gc
-
-        gc.collect()
+    Other variables are left out because the longitude and latitude are
+    searched by xoa, which may then pick another one, like a "mask" variable.
+    """
+    return xr.Dataset(coords={"lon": ds["lon"].variable, "lat": ds["lat"].variable})
 
 
-def regrid(dsi, dso) -> xr.Dataset:
+def _get_grid_mask(ds):
+    """Valid points of the horizontal grid of `ds`, from its "mask" variable if any.
+
+    Missing values are invalid, since a masked dataset (``ds.where(ds.mask)``)
+    has a missing mask where it was zero.
+    """
+    if "mask" in ds and set(ds["mask"].dims) == set(ds["lon"].dims) | set(ds["lat"].dims):
+        return ds["mask"].fillna(0).astype(bool)
+    return None
+
+
+def regrid(dsi, dso, method="bilinear", weights_file=None) -> xr.Dataset:
     """Regrid the variables on the x and y dimensions.
 
     The coordinates on the x and y dimensions other than lon and lat (depth
     of the sigma levels...) are regridded too.
+    The result is lazy with dask arrays, which are regridded chunk by chunk
+    after their x and y dimensions are merged in a single chunk, and the
+    floating point types are kept.
+
+    Parameters
+    ----------
+    dsi: xr.Dataset
+        Dataset to regrid, with ``lon`` and ``lat`` coordinates.
+    dso: xr.Dataset, xr.DataArray
+        Destination grid, with 1D or 2D ``lon`` and ``lat`` coordinates.
+        Its other coordinates (time...) are ignored.
+    method: str
+        Method of :class:`xoa.regrid.Regridder`: ``"bilinear"`` (default),
+        ``"bicubic"`` or ``"conservative"``.
+    weights_file: str, None
+        NetCDF file where the weights are loaded from if already there, and saved
+        to otherwise, to be reused by later calls on the same grids.
+
+    Returns
+    -------
+    xr.Dataset
     """
+    import xoa.regrid as xregrid
+    import xoa.weights as xweights
+
     coords = [
         name
         for name in dsi.coords
@@ -493,11 +512,69 @@ def regrid(dsi, dso) -> xr.Dataset:
     dsi = dsi.reset_coords(coords)
     vars2sub = geo_vars(dsi)
 
-    with create_regridder(dsi, dso) as regridder:
-        dsi_subset = dsi[vars2sub]
-        dsio = regridder(dsi_subset, keep_attrs=True)
+    # The grids are reduced to their lon and lat, so that a time coordinate of
+    # the destination (like the reference's own one in a colocation) does not
+    # make xoa interpolate in time
+    src_mask = _get_grid_mask(dsi)
+    dst_mask = _get_grid_mask(dso)
+    regridder = xregrid.Regridder(
+        _get_grid(dsi),
+        _get_grid(dso),
+        method,
+        weights_file=weights_file,
+        src_mask=None if src_mask is None else src_mask.values,
+        dst_mask=None if dst_mask is None else dst_mask.values,
+    )
+    # Computed once here, and not by each dask task
+    if not regridder.core_regridder.has_weights:
+        regridder.compute_weights()
+    if weights_file and not xweights.has_group(weights_file, regridder.weights_group):
+        regridder.save_weights(weights_file)
+
+    # xoa only uses the source mask when skipping NaNs, and the destination
+    # mask with the conservative method: both are applied here, so that the
+    # cells that touch a masked point are missing, like with ESMF
+    dsin = dsi[vars2sub]
+    if src_mask is not None:
+        dsin = dsin.where(src_mask.variable)
+    dsio = xr.Dataset(
+        {name: _regrid_var(regridder, da) for name, da in dsin.data_vars.items()},
+        coords={"lon": regridder.ds_dst_grid["lon"], "lat": regridder.ds_dst_grid["lat"]},
+    )
+    if dst_mask is not None:
+        dsio = dsio.where(dst_mask.variable)
 
     return dsio.set_coords(coords)
+
+
+def _regrid_var(regridder, da):
+    """Regrid a variable with the core regridder of a :class:`xoa.regrid.Regridder`.
+
+    :meth:`xoa.regrid.Regridder.regrid` loads dask arrays in memory, so the core
+    regridder is applied here chunk by chunk, and the result stays lazy.
+    It keeps the floating point type of the variable, while xoa computes in double
+    precision.
+    """
+    core = regridder.core_regridder
+    src_dims = list(core.src_grid["dims"])
+    dst_dims = list(core.dst_grid["dims"])
+    # Temporary names, since the source and destination dimensions may be the same
+    tmp_dims = [f"_{dim}_dst" for dim in dst_dims]
+    dtype = da.dtype if np.issubdtype(da.dtype, np.floating) else np.dtype("f8")
+    if da.chunks is not None:
+        da = da.chunk(dict.fromkeys(src_dims, -1))
+    out = xr.apply_ufunc(
+        lambda arr: core.regrid(arr).astype(dtype, copy=False),
+        da,
+        input_core_dims=[src_dims],
+        output_core_dims=[tmp_dims],
+        exclude_dims=set(src_dims),
+        dask="parallelized",
+        output_dtypes=[dtype],
+        dask_gufunc_kwargs={"output_sizes": dict(zip(tmp_dims, core.dst_grid["lon"].shape))},
+        keep_attrs=True,
+    )
+    return out.rename(dict(zip(tmp_dims, dst_dims)))
 
 
 def coarsen(
@@ -546,7 +623,7 @@ def coarsen(
 
     See Also
     --------
-    regrid : bilinear regridding via xesmf (handles curvilinear grids).
+    regrid : bilinear, bicubic or conservative regridding (handles curvilinear grids).
     """
     spatial_dims = {dim: factor for dim in ("x", "y") if dim in dsi.dims}
     if not spatial_dims:

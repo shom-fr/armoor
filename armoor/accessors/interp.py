@@ -13,7 +13,7 @@ shadows that method on ``xr.Dataset``, so we restore it via ``__call__``:
     ds.interp.coarsen(factor)               # → data.interp.process_horizontal_interpolation
     ds.interp.vertical(vname, vlevels)      # → data.interp.process_vertical_interpolation
     ds.interp.vfreq(vname, step)            # → data.interp.process_vertical_interpolation
-    ds.interp.regrid(ds_target)             # → base.interp.regrid (needs xesmf)
+    ds.interp.regrid(ds_target)             # → base.interp.regrid
 
 All business logic lives in ``data/interp.py`` (TimeInterpolation,
 HorizontalInterpolation, VerticalInterpolation) and ``base/interp.py``.
@@ -49,7 +49,7 @@ class InterpAccessor:
     >>> ds2 = ds.interp.regrid_from_nc("grid.nc")
     >>> ds2 = ds.interp.vertical("depth", [0, 10, 50, 200])
     >>> ds2 = ds.interp.vfreq("depth", step=25.0)
-    >>> ds2 = ds.interp.regrid(ds_target)             # needs xesmf
+    >>> ds2 = ds.interp.regrid(ds_target)
     """
 
     def __init__(self, obj):
@@ -188,8 +188,8 @@ class InterpAccessor:
             self._obj, ("section", {"coords": coords, "dx": dx})
         )
 
-    def regrid_from_latlon(self, lon_grid, lat_grid):
-        """Horizontal regrid onto a regular lon/lat grid (requires xesmf).
+    def regrid_from_latlon(self, lon_grid, lat_grid, method="bilinear", weights_file=None):
+        """Horizontal regrid onto a regular lon/lat grid.
 
         Delegates to :func:`armoor.data.interp.process_horizontal_interpolation`
         with strategy ``"regrid_from_latlon"``.
@@ -200,17 +200,21 @@ class InterpAccessor:
             ``[lon_min, lon_max, step_km]``
         lat_grid : list of float
             ``[lat_min, lat_max, step_km]``
+        method : str
+            ``"bilinear"`` (default), ``"bicubic"`` or ``"conservative"``.
+        weights_file : str, optional
+            NetCDF file where the regridding weights are loaded from, or saved to.
 
         Returns
         -------
         xr.Dataset
         """
         return process_horizontal_interpolation(
-            self._obj, ("regrid_from_latlon", lon_grid, lat_grid)
+            self._obj, ("regrid_from_latlon", lon_grid, lat_grid, method, weights_file)
         )
 
-    def regrid_from_nc(self, ncin):
-        """Horizontal regrid onto a grid defined in a NetCDF file (requires xesmf).
+    def regrid_from_nc(self, ncin, method="bilinear", weights_file=None):
+        """Horizontal regrid onto a grid defined in a NetCDF file.
 
         Delegates to :func:`armoor.data.interp.process_horizontal_interpolation`
         with strategy ``"regrid_from_nc"``.
@@ -219,15 +223,21 @@ class InterpAccessor:
         ----------
         ncin : str
             Path to the NetCDF file containing the target grid.
+        method : str
+            ``"bilinear"`` (default), ``"bicubic"`` or ``"conservative"``.
+        weights_file : str, optional
+            NetCDF file where the regridding weights are loaded from, or saved to.
 
         Returns
         -------
         xr.Dataset
         """
-        return process_horizontal_interpolation(self._obj, ("regrid_from_nc", ncin))
+        return process_horizontal_interpolation(
+            self._obj, ("regrid_from_nc", ncin, method, weights_file)
+        )
 
-    def regrid(self, ds_target):
-        """Horizontal regridding onto an arbitrary target grid (requires xesmf).
+    def regrid(self, ds_target, method="bilinear", weights_file=None):
+        """Horizontal regridding onto an arbitrary target grid.
 
         Delegates to :func:`armoor.interp.regrid`.
 
@@ -235,19 +245,23 @@ class InterpAccessor:
         ----------
         ds_target : xr.Dataset
             Dataset defining the target grid (must have ``lon`` / ``lat`` coords).
+        method : str
+            ``"bilinear"`` (default), ``"bicubic"`` or ``"conservative"``.
+        weights_file : str, optional
+            NetCDF file where the regridding weights are loaded from, or saved to.
 
         Returns
         -------
         xr.Dataset
         """
-        return regrid(self._obj, ds_target)
+        return regrid(self._obj, ds_target, method=method, weights_file=weights_file)
 
     def coarsen(self, factor, boundary="trim", method="mean"):
         """Horizontal coarsening by spatial block aggregation.
 
         Delegates to :func:`armoor.data.interp.process_horizontal_interpolation`
         with strategy ``"coarsen"``.  Works on structured grids with ``x`` and
-        ``y`` dimensions; does **not** require xesmf.
+        ``y`` dimensions.
 
         Parameters
         ----------

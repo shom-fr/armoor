@@ -1,4 +1,5 @@
 import gc
+import os
 
 import numpy as np
 import pandas as pd
@@ -863,3 +864,127 @@ def test_regrid_depth():
     assert "depth" in out.coords and out.depth.dims == ("z", "lat", "lon")
     np.testing.assert_allclose(out.depth.values[:, 0, 0], [1.0, 10.0])
     np.testing.assert_allclose(out.temp.values, 12.0)
+
+
+def _regrid_case(mask=None, dst_mask=None, dst_time=None):
+    """A linear field on a 2D source grid and a destination inside it."""
+    lon, lat = np.meshgrid(np.linspace(0, 9, 10), np.linspace(40, 46, 7))
+    dsi = xr.Dataset(
+        {"temp": (("time", "y", "x"), np.stack([lon + 2 * lat, lon + 2 * lat + 1]))},
+        coords={
+            "time": pd.date_range("2024-01-01", periods=2),
+            "lon": (("y", "x"), lon),
+            "lat": (("y", "x"), lat),
+        },
+    )
+    if mask is not None:
+        dsi["mask"] = (("y", "x"), mask)
+    lono, lato = np.meshgrid(np.arange(0.5, 8.6, 1.0), np.arange(40.5, 45.6, 1.0))
+    dso = xr.Dataset(coords={"lon": (("y", "x"), lono), "lat": (("y", "x"), lato)})
+    if dst_mask is not None:
+        dso["mask"] = (("y", "x"), dst_mask)
+    if dst_time is not None:
+        dso = dso.assign_coords(time=dst_time)
+    return dsi, dso
+
+
+def test_regrid_linear_field():
+    """The bilinear regridding of a linear field is exact."""
+    dsi, dso = _regrid_case()
+    out = regrid(dsi, dso)
+    np.testing.assert_allclose(out.temp.isel(time=0).values, dso.lon + 2 * dso.lat)
+
+
+def test_regrid_ignores_destination_time():
+    """The time of the destination grid does not interpolate in time."""
+    dsi, dso = _regrid_case(dst_time=pd.date_range("2030-01-01", periods=3))
+    out = regrid(dsi, dso)
+    np.testing.assert_array_equal(out.time.values, dsi.time.values)
+
+
+def test_regrid_source_mask():
+    """The destination cells that touch a masked source point are missing,
+    whatever the hash seed: xoa may pick a "mask" variable as longitude."""
+    mask = np.ones((7, 10), dtype="i")
+    mask[:, :3] = 0
+    dsi, dso = _regrid_case(mask=mask)
+    out = regrid(dsi, dso)
+    assert out.temp.isel(time=0, x=slice(None, 2)).isnull().all()
+    assert out.temp.isel(time=0, x=slice(3, None)).notnull().all()
+
+
+def test_regrid_croco_mask():
+    """A "mask" variable is never taken for the longitude.
+
+    With a CROCO dataset, xoa may find the longitude in a "mask" variable,
+    depending on the hash seed, and then no destination point is valid.
+    """
+    import xoa
+
+    path = os.path.join(os.path.dirname(xoa.__file__), "data_samples", "croco.south-africa.surf.nc")
+    if not os.path.exists(path):
+        pytest.skip("xoa CROCO sample not available")
+    ds = xr.open_dataset(path)
+    ds = ds.rename({"lon_rho": "lon", "lat_rho": "lat", "eta_rho": "y", "xi_rho": "x"})[["zeta"]]
+    mask = ds.lon > ds.lon.mean()
+    dsi = ds.where(mask).assign(mask=mask.astype("i"))
+    lon, lat = np.meshgrid(
+        np.arange(float(ds.lon.min()), float(ds.lon.max()), 0.1),
+        np.arange(float(ds.lat.min()), float(ds.lat.max()), 0.1),
+    )
+    dso = xr.Dataset(coords={"lon": (("y", "x"), lon), "lat": (("y", "x"), lat)})
+    out = regrid(dsi, dso)
+    east = dso.lon > float(ds.lon.mean()) + 0.5
+    assert out.zeta.where(east).notnull().sum() == east.sum()
+
+
+def test_regrid_destination_mask():
+    """The masked destination points are missing, even when the mask is
+    missing itself instead of zero, as after ``ds.where(ds.mask)``."""
+    dst_mask = np.ones((6, 9))
+    dst_mask[:2] = 0
+    dst_mask[2] = np.nan
+    dsi, dso = _regrid_case(dst_mask=dst_mask)
+    out = regrid(dsi, dso)
+    assert out.temp.isel(y=slice(None, 3)).isnull().all()
+    assert out.temp.isel(y=slice(3, None)).notnull().all()
+
+
+@pytest.mark.parametrize("method", ["bilinear", "bicubic", "conservative"])
+def test_regrid_methods(method):
+    """All the xoa methods keep a constant field."""
+    dsi, dso = _regrid_case()
+    dsi["temp"][:] = 12.0
+    out = regrid(dsi, dso, method=method)
+    np.testing.assert_allclose(out.temp.values[np.isfinite(out.temp.values)], 12.0)
+    assert np.isfinite(out.temp.values).any()
+
+
+def test_regrid_weights_file(tmp_path):
+    """The weights are saved to a file, then reused."""
+    dsi, dso = _regrid_case()
+    weights_file = str(tmp_path / "weights.nc")
+    out0 = regrid(dsi, dso, weights_file=weights_file)
+    assert (tmp_path / "weights.nc").exists()
+    out1 = regrid(dsi, dso, weights_file=weights_file)
+    xr.testing.assert_allclose(out0, out1)
+
+
+def test_regrid_dask_lazy():
+    """Dask arrays stay lazy, even when chunked horizontally, keep their
+    floating point type, and give the same result as numpy arrays."""
+    dsi, dso = _regrid_case()
+    dsi["temp"] = dsi.temp.astype("f4")
+    out = regrid(dsi.chunk(time=1, x=4), dso)
+    assert out.temp.chunks is not None
+    assert out.temp.dtype == np.float32
+    np.testing.assert_allclose(out.temp.values, regrid(dsi, dso).temp.values, rtol=1e-6)
+
+
+def test_regrid_dask_weights_file(tmp_path):
+    """The weights are saved before the lazy result is computed."""
+    dsi, dso = _regrid_case()
+    weights_file = tmp_path / "weights.nc"
+    out = regrid(dsi.chunk(time=1), dso, weights_file=str(weights_file))
+    assert weights_file.exists()
+    np.testing.assert_allclose(out.temp.isel(time=0).values, dso.lon + 2 * dso.lat)

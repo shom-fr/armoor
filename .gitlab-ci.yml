@@ -24,6 +24,10 @@ setup:
     - conda info -a
     - test -d armoor_env || (conda create -p armoor_env python=3.11; source activate ./armoor_env; conda install -c conda-forge mamba; mamba install -c conda-forge --file requirements.txt; pip install .; conda deactivate)
     - source activate ./armoor_env
+    # Run at each pipeline, not only when armoor_env/ is created, so that the
+    # git-based dependencies (xoa, woom and shoot) follow their branches
+    # instead of staying at the commit of the cached environment.
+    - pip install .
     # Force cartopy's Natural Earth shapefile download now (into
     # $XDG_DATA_HOME/cartopy, i.e. inside the cached armoor_env/) rather
     # than lazily the first time a doc-build notebook plots a map.

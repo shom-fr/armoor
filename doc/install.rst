@@ -42,8 +42,6 @@ armoor requires ``python>3.11`` and depends on the following packages:
    * - `xarray <http://xarray.pydata.org/en/stable/>`_
      - xarray is an open source project and Python package that makes working
        with labelled multi-dimensional arrays simple, efficient, and fun!
-   * - `xesmf <https://xesmf.readthedocs.io/en/stable/>`_
-     - xESMF is a Python package for regridding.
 
 
 

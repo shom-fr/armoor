@@ -116,8 +116,8 @@ _ = ds_zi.isel(time=0, y=8, x=10).plot.profiles(var="temp", dim="depth", marker=
 # Horizontal operations
 # ------------------------
 #
-# ``ds.interp.coarsen`` block-averages a structured grid (no ``xesmf``
-# required); ``ds.interp.grid2loc`` samples the grid at scattered points --
+# ``ds.interp.coarsen`` block-averages a structured grid;
+# ``ds.interp.grid2loc`` samples the grid at scattered points --
 # **coordinates are ``(lat, lon)`` tuples, in that order** -- and
 # ``ds.interp.grid2section`` interpolates along a broken-line geodesic
 # section, adding a ``distance`` coordinate (metres from the first

@@ -63,11 +63,12 @@ class HorizontalInterpolation(AbstractInterpolation):
 
     * ``"cloud"`` — bilinear interpolation at scattered (lat, lon) points.
     * ``"section"`` — interpolation along a geodesic, broken-line section.
-    * ``"regrid_from_latlon"`` — bilinear regrid onto a regular lon/lat grid.
-    * ``"regrid_from_nc"`` — bilinear regrid onto a grid defined in a NetCDF
-      file.
-    * ``"coarsen"`` — block aggregation onto a coarser structured grid
-      (no xesmf required).
+    * ``"regrid_from_latlon"`` — regrid onto a regular lon/lat grid.
+    * ``"regrid_from_nc"`` — regrid onto a grid defined in a NetCDF file.
+    * ``"coarsen"`` — block aggregation onto a coarser structured grid.
+
+    The regridding is made by :func:`armoor.interp.regrid`, with a bilinear,
+    bicubic or conservative method.
 
     Parameters
     ----------
@@ -126,7 +127,11 @@ class HorizontalInterpolation(AbstractInterpolation):
         }
 
     def regrid_from_latlon(
-        self, lon_grid: Tuple[float, float, float], lat_grid: Tuple[float, float, float]
+        self,
+        lon_grid: Tuple[float, float, float],
+        lat_grid: Tuple[float, float, float],
+        method: str = "bilinear",
+        weights_file: Optional[str] = None,
     ) -> xr.Dataset:
         """Regrid dataset on extra grid specified via lat/lon coordinates.
 
@@ -136,6 +141,10 @@ class HorizontalInterpolation(AbstractInterpolation):
             lon_min, lon_max, lon_step
         lat_grid : tuple
             lat_min, lat_max, lat_step
+        method : str
+            ``"bilinear"`` (default), ``"bicubic"`` or ``"conservative"``.
+        weights_file : str, optional
+            NetCDF file of the regridding weights, see :func:`armoor.interp.regrid`.
 
         Returns
         -------
@@ -157,15 +166,21 @@ class HorizontalInterpolation(AbstractInterpolation):
                 lat=(["y", "x"], lat),
             ),
         )
-        return self.regrid(new_grid)
+        return self.regrid(new_grid, method=method, weights_file=weights_file)
 
-    def regrid_from_nc(self, ncin: str) -> xr.Dataset:
+    def regrid_from_nc(
+        self, ncin: str, method: str = "bilinear", weights_file: Optional[str] = None
+    ) -> xr.Dataset:
         """Regrid dataset on extra grid defined in a netcdf file.
 
         Parameters
         ----------
         ncin: str
             Path of netcdf file containing the new grid.
+        method : str
+            ``"bilinear"`` (default), ``"bicubic"`` or ``"conservative"``.
+        weights_file : str, optional
+            NetCDF file of the regridding weights, see :func:`armoor.interp.regrid`.
 
         Returns
         -------
@@ -173,15 +188,24 @@ class HorizontalInterpolation(AbstractInterpolation):
             New grid
         """
         new_grid = xr.open_dataset(ncin)[["lon", "lat"]]
-        return self.regrid(new_grid)
+        return self.regrid(new_grid, method=method, weights_file=weights_file)
 
-    def regrid(self, new_grid: xr.DataArray) -> xr.Dataset:
+    def regrid(
+        self,
+        new_grid: xr.DataArray,
+        method: str = "bilinear",
+        weights_file: Optional[str] = None,
+    ) -> xr.Dataset:
         """Regrid a dataset on extra grid.
 
         Parameters
         ----------
         new_grid: xr.DataArray
             New grid defined by new lat/lon coordinates.
+        method : str
+            ``"bilinear"`` (default), ``"bicubic"`` or ``"conservative"``.
+        weights_file : str, optional
+            NetCDF file of the regridding weights, see :func:`armoor.interp.regrid`.
 
         Returns
         -------
@@ -189,7 +213,7 @@ class HorizontalInterpolation(AbstractInterpolation):
         """
         if "depth" in self.ds.coords:
             self.ds = self.ds.reset_coords("depth")
-        self.ds = regrid(self.ds, new_grid)
+        self.ds = regrid(self.ds, new_grid, method=method, weights_file=weights_file)
         if "mask" in self.ds:
             self.ds = self.ds.drop_vars("mask")
         return self.ds

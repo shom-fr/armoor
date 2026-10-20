@@ -1,6 +1,32 @@
 What's new
 ##########
 
+Unreleased
+==========
+
+New features
+------------
+
+- ``armoor.interp.regrid`` (and ``ds.interp.regrid*``) take a ``method``
+  (``"bilinear"``, the default, ``"bicubic"`` or ``"conservative"``) and a
+  ``weights_file``, where the weights are loaded from if already there and
+  saved to otherwise. ``armoor-interp-horizontal`` exposes them with
+  ``--regrid-method`` and ``--regrid-weights``.
+
+Breaking changes
+----------------
+
+- The horizontal regridding is made by ``xoa.regrid.Regridder`` instead of
+  xESMF, so ``xesmf``, ``esmf`` and ``esmpy`` are no longer dependencies.
+  Since no xoa release has it yet, xoa is installed with pip from its
+  develop branch on GitHub, like woom and shoot, instead of conda-forge,
+  and xoa's own dependencies (``netcdf4``, ``platformdirs``, ``pooch``)
+  are added to the conda environment. The results differ from xESMF
+  by about 1e-5 relative, since the bilinear interpolation is made in
+  longitude/latitude instead of on the sphere, and the masked points are the
+  same. The time of the destination grid is still ignored, the regridded data
+  stay lazy with dask and keep their floating point type, like with xESMF.
+
 v2026.10.0
 ==========
 
