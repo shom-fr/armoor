@@ -153,6 +153,32 @@ def crms(dsprod, dsref, dim):
     return np.sqrt((cdiff(dsprod, dsref, dim) ** 2).mean(dim=dim))
 
 
+def corr(dsprod, dsref, dim):
+    """
+    Calculate the Pearson correlation between reference and product datasets.
+
+    Only the samples that are valid in both datasets are used, and the
+    correlation is missing where a dataset is constant.
+
+    Parameters
+    ----------
+    dsprod : xarray.Dataset
+        Product dataset.
+    dsref : xarray.Dataset
+        Reference dataset.
+    dim : str or list of str
+        Dimension(s) along which to compute the correlation.
+
+    Returns
+    -------
+    xarray.Dataset
+        Correlation of the variables that are in both datasets.
+    """
+    return xr.Dataset(
+        {var: xr.corr(dsprod[var], dsref[var], dim=dim) for var in dsprod.data_vars if var in dsref}
+    )
+
+
 def pdf(ds, vars):
     """
     Calculate the probability density function of a variable.

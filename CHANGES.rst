@@ -12,6 +12,15 @@ New features
   ``weights_file``, where the weights are loaded from if already there and
   saved to otherwise. ``armoor-interp-horizontal`` exposes them with
   ``--regrid-method`` and ``--regrid-weights``.
+- The comparisons compute the Pearson correlation (``corr``), next to the
+  bias, rmse and centered rmse, with the samples that are valid in both
+  datasets: in the ``comp/corr`` group of the outputs, in the ``maps``
+  (between -1 and 1), with ``ds.stats.corr`` and in ``armoor-comp``
+  (``corr_*`` variables).
+- New ``taylor`` output for ``comp_sst``, ``comp_argo`` and ``comp_models``:
+  a Taylor diagram per variable with a point per product, made with xoa
+  (``xoa.core.stats.taylor_stats`` and ``xoa.core.plot.plot_taylor``), the
+  standard deviations being normalized by the one of the reference.
 
 Breaking changes
 ----------------

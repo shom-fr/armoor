@@ -104,6 +104,7 @@ outputs
 
     - ``diagdisp_glob``
     - ``diagdisp_sel``
+    - ``taylor``
     - ``timeseries``
     - ``maps``
     - ``mvprofiles``

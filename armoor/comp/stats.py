@@ -15,7 +15,7 @@ class StatsComp:
     """
     Statistical comparison engine for model vs reference datasets.
 
-    Computes summary statistics (mean, std, bias, RMSE, centered RMSE)
+    Computes summary statistics (mean, std, bias, RMSE, centered RMSE, correlation)
     over specified dimensions and organizes results into `xarray.DataTree` objects.
 
     Parameters
@@ -196,10 +196,13 @@ class StatsComp:
         comp_rmse = np.sqrt((diff**2).mean(dim=dims))
         cdiff = (self.dsprod - prod_mean) - (self.dsref - ref_mean)
         comp_rmsec = np.sqrt((cdiff**2).mean(dim=dims))
+        comp_corr = stats.corr(self.dsprod, self.dsref, dims)
 
         # Single dask.compute() call for all stats
-        (ref_mean, ref_std, prod_mean, prod_std, comp_bias, comp_rmse, comp_rmsec) = dask.compute(
-            ref_mean, ref_std, prod_mean, prod_std, comp_bias, comp_rmse, comp_rmsec
+        (ref_mean, ref_std, prod_mean, prod_std, comp_bias, comp_rmse, comp_rmsec, comp_corr) = (
+            dask.compute(
+                ref_mean, ref_std, prod_mean, prod_std, comp_bias, comp_rmse, comp_rmsec, comp_corr
+            )
         )
 
         # Update trees with computed results
@@ -210,6 +213,7 @@ class StatsComp:
         self._update_tree(self.dtcomps, "bias", comp_bias)
         self._update_tree(self.dtcomps, "rmse", comp_rmse)
         self._update_tree(self.dtcomps, "rmsec", comp_rmsec)
+        self._update_tree(self.dtcomps, "corr", comp_corr)
 
         # Handle time aggregation for trange view
         if "trange_seq" in self.mparams and "time" in dims:

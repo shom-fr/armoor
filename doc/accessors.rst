@@ -206,8 +206,9 @@ return an :class:`xarray.Dataset` and can be chained with ``.plot``.
     # Reduced metrics
     ds.stats.bias(ds_ref, dim="time")
     ds.stats.rmse(ds_ref, dim="time")
+    ds.stats.corr(ds_ref, dim="time")
 
-    # Full bias/RMSE/RMSEc DataTree workflow
+    # Full bias/RMSE/RMSEc/correlation DataTree workflow
     dtprod, dtref, dtcomps = ds_prod.stats.compare(
         ds_ref,
         dims=["time"],
