@@ -216,25 +216,20 @@ class TestOceanVarsAccessor:
                 }
             )
 
-    # div/okuboweiss/relvort are computed via the optional `shoot` package
-    # (git+https://github.com/shom-fr/shoot.git, see pyproject.toml) --
-    # skip gracefully in environments where it isn't installed.
+    # div/okuboweiss/relvort are computed with xoa.dyn
     def test_sel_div(self, sample_velocity_field):
-        pytest.importorskip("shoot")
         div = sample_velocity_field.oceanvars.sel_divergence()
         assert div.shape == sample_velocity_field.u.shape
         assert div.dims == ('lon', 'lat')
         assert np.round(np.mean(div), 3) == pytest.approx(1e-3)
 
     def test_sel_okuboweiss(self, sample_velocity_field):
-        pytest.importorskip("shoot")
         OW = sample_velocity_field.oceanvars.sel_okuboweiss()
         assert OW.shape == sample_velocity_field.u.shape
         assert OW.dims == ('lon', 'lat')
         assert np.round(np.mean(OW), 7) == pytest.approx(1e-6)
 
     def test_sel_relvort(self, sample_velocity_field):
-        pytest.importorskip("shoot")
         relvort = sample_velocity_field.oceanvars.sel_relvort()
         assert relvort.shape == sample_velocity_field.u.shape
         assert relvort.dims == ('lon', 'lat')
@@ -334,6 +329,17 @@ class TestStatsAccessor:
         result = ds_prod.stats.rmsec(ds_ref, dim="time")
         assert float(result["a"]) == pytest.approx(expected)
 
+    def test_corr_against_itself(self, ds_prod):
+        result = ds_prod.stats.corr(ds_prod, dim="time")
+        assert float(result["a"]) == pytest.approx(1.0)
+
+    def test_corr_known_value(self, ds_prod, ds_ref):
+        prod_vals = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+        ref_vals = np.array([0.5, 2.0, 2.5, 5.0, 4.5, 7.0])
+        expected = float(np.corrcoef(prod_vals, ref_vals)[0, 1])
+        result = ds_prod.stats.corr(ds_ref, dim="time")
+        assert float(result["a"]) == pytest.approx(expected)
+
     def test_stats_result_is_dataset(self, ds_prod, ds_ref):
         for method in ("mean", "std"):
             out = getattr(ds_prod.stats, method)(dim="time")
@@ -353,6 +359,9 @@ class TestStatsAccessor:
         assert "bias" in dtcomps.children
         assert "rmse" in dtcomps.children
         assert "rmsec" in dtcomps.children
+        assert "corr" in dtcomps.children
+        expected = float(ds_prod.stats.corr(ds_ref, dim="time")["a"])
+        assert float(dtcomps["corr"]["a"]) == pytest.approx(expected)
 
     def test_chaining_with_plot(self, ds_prod):
         """stats result can be passed to .plot (accessor is present)."""

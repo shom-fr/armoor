@@ -37,6 +37,19 @@ def _set_attrs(da, name=None, **attrs):
     return da
 
 
+def _convert(kind, *args, **kwargs):
+    """Call :func:`xoa.thermdyn.convert_temp` or :func:`xoa.thermdyn.convert_sal`
+
+    The result keeps the floating point type of the converted array.
+    """
+    import xoa.thermdyn as xthermdyn
+
+    out = getattr(xthermdyn, f"convert_{kind}")(*args, **kwargs)
+    if np.issubdtype(args[0].dtype, np.floating):
+        out = out.astype(args[0].dtype, copy=False)
+    return out
+
+
 class OceanVars(MethodRegistry):
     """
     Sel or compute ocean variable from a dataset in a user-friendly format.
@@ -171,13 +184,10 @@ class OceanVars(MethodRegistry):
         elif "temp" in self.ds:
             sal = self.sel_sal()
             if isinstance(sal, xr.DataArray):
-                pres = self.sel_pres()
-                ptemp = _gsw_ufunc(
-                    gsw.conversions.pt0_from_t,
-                    sal,
-                    self.ds.temp,
-                    pres,
+                ptemp = _convert(
+                    "temp", self.ds.temp, "ptemp", "temp", sal, "psal", **self._get_location()
                 )
+                ptemp.attrs = {}
                 ptemp.attrs["standard_name"] = "sea_water_potential_temperature"
                 ptemp.attrs["units"] = "degrees_celsius"
                 ptemp.attrs["long_name"] = "Potential temperature"
@@ -206,8 +216,7 @@ class OceanVars(MethodRegistry):
                 )
                 return None
             ptemp = self.sel_ptemp()
-            cons_temp = _gsw_ufunc(gsw.CT_from_pt, sal, ptemp)
-            temp = _gsw_ufunc(gsw.t_from_CT, sal, cons_temp, pres)
+            temp = _convert("temp", ptemp, "temp", "ptemp", sal, "psal", **self._get_location())
             return _set_attrs(temp, "temp")
 
     def sel_sal(self):
@@ -239,6 +248,24 @@ class OceanVars(MethodRegistry):
             sal.attrs["units"] = "1e-3"
             return sal
         return None
+
+    def _get_location(self):
+        """Heights, latitudes and longitudes for :mod:`xoa.thermdyn`
+
+        The heights are computed from the pressure of :meth:`sel_pres`, measured or
+        computed from the depth, so that xoa, which computes the pressure from the
+        heights, finds it back.
+
+        Returns
+        -------
+        dict
+            ``z``, ``lat`` and ``lon`` keyword arguments, when available.
+        """
+        location = {name: self.ds[name] for name in ("lat", "lon") if name in self.ds}
+        pres = self.sel_pres()
+        if isinstance(pres, xr.DataArray) and "lat" in location:
+            location["z"] = _gsw_ufunc(gsw.z_from_p, pres, location["lat"])
+        return location
 
     def sel_pres(self):
         """Select or compute sea pressure from the dataset.
@@ -289,14 +316,9 @@ class OceanVars(MethodRegistry):
                 logger.warning("Potential density cannot be computed")
                 return None
             ptemp = self.sel_ptemp()
-            asal = _gsw_ufunc(
-                gsw.conversions.SA_from_SP,
-                sal,
-                pres,
-                self.ds.lon,
-                self.ds.lat,
-            )
-            ctemp = _gsw_ufunc(gsw.CT_from_pt, asal, ptemp)
+            location = self._get_location()
+            asal = _convert("sal", sal, "asal", "psal", **location)
+            ctemp = _convert("temp", ptemp, "ctemp", "ptemp", sal, "psal", **location)
             del ptemp
             if asal is not None and ctemp is not None:
                 if ref_dens is None or ref_dens not in [
@@ -354,17 +376,11 @@ class OceanVars(MethodRegistry):
         if not isinstance(sal, xr.DataArray):
             logger.warning("Potential density cannot be computed")
             return None
-        cons_temp = _gsw_ufunc(gsw.CT_from_pt, sal, ptemp)
-
         pres = self.sel_pres()
-        sal = _gsw_ufunc(
-            gsw.conversions.SA_from_SP,
-            self.sel_sal(),
-            pres,
-            self.ds.lon,
-            self.ds.lat,
-        )
-        snd_speed = _set_attrs(_gsw_ufunc(gsw.sound_speed, sal, cons_temp, pres), "sndspeed")
+        location = self._get_location()
+        cons_temp = _convert("temp", ptemp, "ctemp", "ptemp", sal, "psal", **location)
+        asal = _convert("sal", sal, "asal", "psal", **location)
+        snd_speed = _set_attrs(_gsw_ufunc(gsw.sound_speed, asal, cons_temp, pres), "sndspeed")
         self.ds["sndspeed"] = snd_speed
         return self.ds["sndspeed"]
 
@@ -505,7 +521,7 @@ class OceanVars(MethodRegistry):
         if "div" in self.ds:
             return self.ds["div"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
-            from shoot.dyn import get_div
+            from xoa.dyn import get_div
 
             return get_div(self.ds.u, self.ds.v)
         else:
@@ -523,7 +539,7 @@ class OceanVars(MethodRegistry):
         if "okuboweiss" in self.ds:
             return self.ds["okuboweiss"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
-            from shoot.dyn import get_okuboweiss
+            from xoa.dyn import get_okuboweiss
 
             return get_okuboweiss(self.ds.u, self.ds.v)
         else:
@@ -541,7 +557,7 @@ class OceanVars(MethodRegistry):
         if "relvort" in self.ds:
             return self.ds["relvort"]
         elif set(("u", "v")).issubset(self.ds.data_vars):
-            from shoot.dyn import get_relvort
+            from xoa.dyn import get_relvort
 
             return get_relvort(self.ds.u, self.ds.v)
         else:

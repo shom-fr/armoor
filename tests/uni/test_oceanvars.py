@@ -67,6 +67,18 @@ class TestOceanVars:
         assert result.attrs['standard_name'] == 'sea_water_potential_temperature'
         assert result.attrs['units'] == 'degrees_celsius'
 
+    def test_sel_ptemp_uses_absolute_salinity(self):
+        """The practical salinity is converted to absolute salinity before
+        computing the potential temperature, from the measured pressure."""
+        import gsw
+        p = self.pres
+        lat = self.lat[None, :, None]
+        lon = self.lon[None, None, :]
+        sa = gsw.SA_from_SP(self.sal, p, lon, lat)
+        expected = gsw.pt_from_CT(sa, gsw.CT_from_t(sa, self.temp, p))
+        result = self.ds.oceanvars.sel_ptemp()
+        np.testing.assert_allclose(result.values, expected, atol=1e-10)
+
     def test_sel_ptemp_missing_sal(self):
         """Test potential temperature without salinity"""
         ds_no_sal = self.ds.drop_vars('sal')

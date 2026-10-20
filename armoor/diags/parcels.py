@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import parcels
-from xoa.regrid import grid2loc
+from xoa.interp import grid2loc
 
 
 TMP_OFILE = "ptc_tmp.zarr"

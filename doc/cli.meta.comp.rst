@@ -42,7 +42,7 @@ ouputs
 
             .. grid-item-card:: Maps of statistics (``maps``)
 
-                Maps of statistical metrics (bias, rmse, rmsec) or deviation (difference).
+                Maps of statistical metrics (bias, rmse, rmsec, corr) or deviation (difference).
 
                 .. image:: images/comp_maps.png
                 
@@ -63,6 +63,12 @@ ouputs
                 .. image:: images/comp_diagdisp_sel.png
                 
                 :download:`Download <images/comp_diagdisp_sel.png>`
+
+            .. grid-item-card:: Taylor diagrams (``taylor``)
+
+                One Taylor diagram per variable, with a point per product:
+                standard deviation normalized by the one of the reference,
+                correlation and centered rmse, over all the colocated data.
                 
             .. grid-item-card:: Time series (``timeseries``)
 

@@ -23,4 +23,10 @@ OUTPUTS_PARAMS = {c.name: c.outputs_params for c in _REGISTRY.values()}
 COMP_VARS = {c.name: c.comp_vars for c in _REGISTRY.values()}
 TITLE_PLOTS = {c.name: c.title for c in _REGISTRY.values()}
 
-METRIC_LABELS = {"diff": "Difference", "bias": "Bias", "rmse": "Rmse", "rmsec": "Ce.Rmse"}
+METRIC_LABELS = {
+    "diff": "Difference",
+    "bias": "Bias",
+    "rmse": "Rmse",
+    "rmsec": "Ce.Rmse",
+    "corr": "Correlation",
+}

@@ -9,6 +9,7 @@ onto xr.Dataset and handles the ``dim=None`` (point-wise) fallback.
     ds.stats.bias(ds_ref, dim="time")    # base.stats.bias
     ds.stats.rmse(ds_ref, dim="time")    # base.stats.rms
     ds.stats.rmsec(ds_ref, dim="time")   # base.stats.crms
+    ds.stats.corr(ds_ref, dim="time")    # base.stats.corr
     ds.stats.compare(ds_ref, dims=[...]) # comp.stats.StatsComp
 """
 
@@ -25,7 +26,7 @@ class StatsAccessor:
     Simple reductions (mean, std) return an xr.Dataset and support chaining
     (e.g. ``ds.stats.mean(dim="time").plot.maps()``).
 
-    Comparison metrics (bias, rmse, rmsec) accept a reference dataset.
+    Comparison metrics (bias, rmse, rmsec, corr) accept a reference dataset.
     When *dim* is omitted they return a point-wise result (same shape as the
     input); when *dim* is given they reduce along that dimension.
 
@@ -88,6 +89,13 @@ class StatsAccessor:
             d = _stats.diff(self._obj - self._obj.mean(), ds_ref - ds_ref.mean())
             return np.sqrt(d**2)
         return _stats.crms(self._obj, ds_ref, dim)
+
+    def corr(self, ds_ref: xr.Dataset, dim=None) -> xr.Dataset:
+        """Pearson correlation with the reference over *dim* (all dims if omitted).
+
+        Delegates to :func:`armoor.stats.corr`.
+        """
+        return _stats.corr(self._obj, ds_ref, dim)
 
     # ------------------------------------------------------------------
     # Full comparison workflow

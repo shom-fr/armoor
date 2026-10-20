@@ -1,7 +1,7 @@
 # Read the Docs configuration file
 # See https://docs.readthedocs.com/platform/en/stable/config-file/v2.html
 #
-# armoor's dependencies (xoa, esmf/esmpy/xesmf, cartopy, parcels, ...) come
+# armoor's dependencies (cartopy, parcels, ...) come
 # from conda-forge, so the doc is built in the same conda environment as the
 # CI (environment.yml), then armoor itself is pip-installed (editable) with
 # its [doc] extras. sphinx-gallery executes tutorials/*.py at build time, using the

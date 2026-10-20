@@ -123,6 +123,114 @@ class TestMapsVminmaxOverride:
         assert kwargs["vmin"] is not None and kwargs["vmax"] is not None
 
 
+def _make_taylor_datatree(tmp_path):
+    """Two products against noisy copies of the same reference, the second
+    product being worse and with twice the variance."""
+    rng = np.random.default_rng(0)
+    time = pd.date_range("2020-01-01", periods=200)
+    ref = np.sin(np.arange(200) / 10.0)
+    nodes = {}
+    for prod_name, noise, scale in (("model1", 0.1, 1.0), ("model2", 0.8, 2.0)):
+        for path, values, data_name in (
+            ("ref/data", ref, "obs"),
+            ("prod/data", scale * ref + noise * rng.standard_normal(200), prod_name),
+        ):
+            ds = xr.Dataset({"ptemp": (["time"], values)}, coords={"time": time})
+            ds.attrs["data_name"] = data_name
+            nodes[f"{prod_name}/{path}"] = ds
+    path = tmp_path / "taylor.zarr"
+    xr.DataTree.from_dict(nodes).to_zarr(path, mode="w")
+    return str(path)
+
+
+class TestTaylor:
+    def test_one_diagram_per_variable_with_a_point_per_product(self, tmp_path):
+        nc = _make_taylor_datatree(tmp_path)
+        dt = xr.open_datatree(nc)
+        expected_stds, expected_corrs = [], []
+        for prod_name in ("model1", "model2"):
+            prod = dt[f"{prod_name}/prod/data"]["ptemp"].values
+            ref = dt[f"{prod_name}/ref/data"]["ptemp"].values
+            expected_stds.append(prod.std() / ref.std())
+            expected_corrs.append(np.corrcoef(prod, ref)[0, 1])
+        dt.close()
+        plotcomp = PlotComp(nc, "comp_sst", "mz1")
+        try:
+            with patch.object(plotcomp, "save_figure") as save_figure, \
+                 patch("xoa.core.plot.plot_taylor") as plot_taylor:
+                plotcomp.taylor()
+        finally:
+            plotcomp.clean()
+        assert save_figure.call_count == 1
+        assert save_figure.call_args[0][1].endswith("/taylor_ptemp.png")
+        (stds, corrs), kwargs = plot_taylor.call_args
+        assert kwargs["labels"] == ["model1", "model2"]
+        assert kwargs["ref_label"] == "obs"
+        # Standard deviations normalized by the reference
+        np.testing.assert_allclose(stds, expected_stds)
+        np.testing.assert_allclose(corrs, expected_corrs)
+
+    def test_renders(self, tmp_path):
+        plotcomp = PlotComp(_make_taylor_datatree(tmp_path), "comp_sst", "mz1")
+        try:
+            with patch.object(plotcomp, "save_figure") as save_figure:
+                plotcomp.taylor()
+        finally:
+            plotcomp.clean()
+        fig = save_figure.call_args[0][0]
+        legend = fig.axes[0].get_legend()
+        assert [t.get_text() for t in legend.get_texts()] == ["obs", "model1", "model2"]
+
+
+class TestMapsCorr:
+    def test_corr_map_uses_a_fixed_symmetric_scale(self, tmp_path):
+        """The correlation map is drawn between -1 and 1 next to the standard
+        deviations."""
+        nc = _make_map_datatree(tmp_path)
+        dt = xr.open_datatree(nc)
+        data = dt["model1/ref/data"].to_dataset()
+        nodes = {
+            "model1/ref/data": data,
+            "model1/ref/std": data,
+            "model1/prod/data": dt["model1/prod/data"].to_dataset(),
+            "model1/prod/std": dt["model1/prod/data"].to_dataset(),
+            "model1/comp/corr": data * 0 + 0.5,
+        }
+        dt.close()
+        path = tmp_path / "corr.zarr"
+        xr.DataTree.from_dict(nodes).to_zarr(path, mode="w")
+        axes = [MagicMock(), MagicMock(), MagicMock()]
+        plotcomp = PlotComp(str(path), "comp_sst", "mz1")
+        try:
+            with patch("armoor.comp.plot.create_subplots", return_value=(MagicMock(), axes)), \
+                 patch.object(plotcomp, "save_figure") as save_figure:
+                plotcomp.maps()
+        finally:
+            plotcomp.clean()
+        _, kwargs = axes[2].pcolormesh.call_args
+        assert (kwargs["vmin"], kwargs["vmax"], kwargs["cmap"]) == (-1, 1, "cmo.balance")
+        assert "/map_ptemp_corr_prod1" in save_figure.call_args[0][1]
+
+    def test_missing_statistic_is_skipped(self, tmp_path):
+        nc = _make_map_datatree(tmp_path)
+        dt = xr.open_datatree(nc)
+        nodes = {
+            "model1/ref/data": dt["model1/ref/data"].to_dataset(),
+            "model1/prod/data": dt["model1/prod/data"].to_dataset(),
+            "model1/comp/diff": dt["model1/ref/data"].to_dataset() * np.nan,
+        }
+        dt.close()
+        path = tmp_path / "nan.zarr"
+        xr.DataTree.from_dict(nodes).to_zarr(path, mode="w")
+        plotcomp = PlotComp(str(path), "comp_sst", "mz1")
+        try:
+            with patch.object(plotcomp, "save_figure") as save_figure:
+                plotcomp.maps()
+        finally:
+            plotcomp.clean()
+        save_figure.assert_not_called()
+
+
 class TestPlotTaskThreadsVminmax:
 
     def test_plot_task_forwards_vminmax_to_plotcomp(self, tmp_path):

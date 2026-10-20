@@ -149,6 +149,7 @@ def process_stat(dsref: xr.Dataset, dsprod: xr.Dataset, dim: str | list[str]) ->
         - Variables prefixed with `bias_` : mean difference (ref - prod)
         - Variables prefixed with `rms_` : root mean square difference
         - Variables prefixed with `crms_` : centered root mean square difference
+        - Variables prefixed with `corr_` : correlation
 
     Notes
     -----
@@ -165,6 +166,7 @@ def process_stat(dsref: xr.Dataset, dsprod: xr.Dataset, dim: str | list[str]) ->
             rename_stat_var(dsprod.stats.bias(dsref, dim), "bias"),
             rename_stat_var(dsprod.stats.rmse(dsref, dim), "rms"),
             rename_stat_var(dsprod.stats.rmsec(dsref, dim), "crms"),
+            rename_stat_var(dsprod.stats.corr(dsref, dim), "corr"),
         ]
     )
     if "trange" in ds.sizes:

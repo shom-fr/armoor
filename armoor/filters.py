@@ -11,7 +11,7 @@ import xarray as xr
 
 # Heavy optional imports — deferred to first use to avoid the multi-second NFS
 # stat overhead on HPC cluster filesystems when `import armoor` is called.
-# xoa.filter, xoa.geo, matplotlib.path, scipy.signal, scipy.ndimage
+# xoa.filter, xoa.geo, xoa.core.mask and scipy.ndimage
 # are imported lazily inside the functions that need them.
 
 from armoor import ArmoorError
@@ -67,10 +67,11 @@ def generate_kernel_from_freq(
     if kernel_type == "boxcar":
         kernel = np.ones(kernel_size) / kernel_size
     elif kernel_type == "gaussian":
-        from scipy.signal.windows import gaussian
+        from xoa.filter import get_window_func
 
-        std = kernel_size / 6
-        kernel = gaussian(kernel_size, std)
+        # The standard deviation is a fraction of the size, 1/6 by default. The window
+        # function is created at each call, since it changes when it is called again.
+        kernel = get_window_func("gaussian")(kernel_size)
         kernel /= kernel.sum()
     else:
         raise ValueError(f"Unknown kernel_type: {kernel_type}")
@@ -99,25 +100,26 @@ class ArmoorFilters:
     def get_mask(self, coords: [(float, float)]) -> xr.Dataset:
         """Subset dataset selecting elements located within the polygon geometry.
 
+        A point is selected when it is inside the polygon, as computed by
+        :func:`xoa.core.mask.polygon_mask`, which supports polygons that cross
+        the dateline. A point that is exactly on an edge of the polygon may be
+        selected or not, depending on the edge.
+
         Parameters
         ----------
         coords : list of tuples
-           Set of points coordinates defining the geometry of the polygon.
+           Set of points coordinates defining the geometry of the polygon,
+           as (lat, lon) pairs.
 
         Returns
         -------
         xarray.Dataset
            Dataset with elements included inside the polygon.
-
-        See Also
-        --------
-        https://matplotlib.org/stable/api/path_api.html
         """
         logger.info("getting mask for horizontal_selection_polygon")
-        from matplotlib import path
+        from xoa.core.mask import polygon_mask
 
-        # Create the polygon where to subset
-        polygon = path.Path(coords)
+        polygon = np.array([(lon, lat) for lat, lon in coords], dtype="d")
 
         # Use .values to avoid creating intermediate arrays
         lons, lats = self.ds.lon.values.flatten(), self.ds.lat.values.flatten()
@@ -129,11 +131,11 @@ class ArmoorFilters:
                 dims_name += (dim,)
                 dims_nb += (self.ds.sizes[dim],)
 
-        # Stack coordinates more efficiently
-        coords = np.column_stack((lats, lons))
+        # xoa expects 2D arrays of points
+        flags = polygon_mask(
+            polygon, lons.astype("d").reshape(-1, 1), lats.astype("d").reshape(-1, 1)
+        ).ravel()
         del lats, lons
-
-        flags = polygon.contains_points(coords)
         if not np.any(flags):  # More efficient than np.all(flags == False)
             return None
 

@@ -154,7 +154,7 @@ def get_parser_interp_horizontal() -> ArgumentParser:
     - **Section**: Linear transect between two geographic points with specified spacing
     - **Regular grid**: Rectangular lat/lon grid with uniform spacing
     - **NetCDF grid**: Grid coordinates read from existing NetCDF file
-    - **Coarsen**: Block aggregation onto a coarser structured grid (no xesmf required)
+    - **Coarsen**: Block aggregation onto a coarser structured grid
     """
     parser = ArgumentParser(
         description="Apply horizontal interpolation over a list of input files.",
@@ -190,6 +190,18 @@ def get_parser_interp_horizontal() -> ArgumentParser:
         '--ncgrid',
         type=str,
         help="NetCDF file in armoor format containing target grid lat/lon coordinates.",
+    )
+    parser.add_argument(
+        '--regrid-method',
+        choices=["bilinear", "bicubic", "conservative"],
+        default="bilinear",
+        help="Regridding method of --lon-grid and --ncgrid.",
+    )
+    parser.add_argument(
+        '--regrid-weights',
+        metavar='FILE',
+        help="NetCDF file where the regridding weights are loaded from if already there, "
+        "and saved to otherwise, to be reused by later runs on the same grids.",
     )
     parser.add_argument(
         '--coarsen-factor',
@@ -233,6 +245,10 @@ def main_interp_horizontal() -> None:
         Required when --lon-grid is specified.
     --ncgrid : str
         Path to NetCDF file containing target grid coordinates.
+    --regrid-method : {"bilinear", "bicubic", "conservative"}
+        Regridding method of --lon-grid and --ncgrid (default: bilinear).
+    --regrid-weights : str
+        NetCDF file of the regridding weights, reused when already there.
     --coarsen-factor : int
         Coarsening factor applied to both x and y dimensions.
     --coarsen-boundary : {"trim", "pad"}
@@ -269,6 +285,11 @@ def main_interp_horizontal() -> None:
         # Use existing grid from NetCDF file
         armoor-interp-horizontal input.nc output.zarr \\
                                 --ncgrid target_grid.nc
+
+        # Conservative regridding, with weights reused across runs
+        armoor-interp-horizontal input.nc output.zarr \\
+                                --ncgrid target_grid.nc --regrid-method conservative \\
+                                --regrid-weights weights.nc
 
         # Coarsen by a factor of 4 (mean aggregation)
         armoor-interp-horizontal input.nc output.zarr \\
@@ -326,9 +347,13 @@ def main_interp_horizontal() -> None:
                 coords_pairs = list(zip(it, it))
                 ds = ds.interp.grid2section(coords_pairs, dx=section[-1])
             elif lon_grid:
-                ds = ds.interp.regrid_from_latlon(lon_grid, lat_grid)
+                ds = ds.interp.regrid_from_latlon(
+                    lon_grid, lat_grid, method=args.regrid_method, weights_file=args.regrid_weights
+                )
             elif ncgrid:
-                ds = ds.interp.regrid_from_nc(ncgrid)
+                ds = ds.interp.regrid_from_nc(
+                    ncgrid, method=args.regrid_method, weights_file=args.regrid_weights
+                )
             elif coarsen_factor:
                 ds = ds.interp.coarsen(
                     coarsen_factor,

@@ -20,7 +20,7 @@ jobs:
           python-version: "3.11"
       - uses: pre-commit/action@v3.0.1
 
-  # armoor's own dependencies (xoa, esmf/esmpy/xesmf, cartopy, parcels, ...)
+  # armoor's own dependencies (xoa, cartopy, parcels, ...)
   # are conda-forge/git installs, not all published on PyPI, so tests run
   # against the same conda environment as the GitLab CI pipeline
   # (environment.yml), not a plain pip matrix.

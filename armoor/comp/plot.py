@@ -297,6 +297,67 @@ class PlotComp(MethodRegistry):
             dsref_all.close()
         return None
 
+    def taylor(self):
+        """Plot a Taylor diagram per variable, with a point per product.
+
+        The standard deviations and correlations are computed over all the
+        colocated samples that are valid for both the product and the reference
+        (:func:`xoa.core.stats.taylor_stats`), and the standard deviations are
+        divided by the one of the reference, since each product has its own
+        colocated reference.
+        """
+        from xoa.core.plot import plot_taylor
+        from xoa.core.stats import taylor_stats
+
+        # {var: [(prod_name, normalized std, corr), ...]}
+        points = {}
+        ref_names = {}
+        for node_prod in self.dt.children.values():
+            dsprod_all = node_prod["prod/data"].to_dataset()
+            dsref_all = node_prod["ref/data"].to_dataset()
+            prod_name = dsprod_all.attrs["data_name"]
+            ref_name = dsref_all.attrs["data_name"]
+
+            for var in dsprod_all.data_vars:
+                if var not in dsref_all:
+                    continue
+                # Same member and group-suffix handling as diagdisp_glob
+                dsref = _drop_group_suffix(dsref_all[[var]])
+                dsprod = _drop_group_suffix(dsprod_all[[var]])
+                if "member" in dsprod.dims:
+                    dsprod = dsprod.mean(dim="member", keep_attrs=True)
+                if "member" in dsref.dims:
+                    dsref = dsref.mean(dim="member", keep_attrs=True)
+                daprod, daref = xr.broadcast(dsprod[var], dsref[var])
+                std, std_ref, corr, _ = taylor_stats(
+                    daprod.values.ravel(), daref.transpose(*daprod.dims).values.ravel()
+                )
+                if not std_ref[0] > 0:
+                    logger.info(f"taylor: skipping {var} of {prod_name}, constant or no samples")
+                    continue
+                points.setdefault(var, []).append((prod_name, std[0] / std_ref[0], corr[0]))
+                ref_names.setdefault(var, ref_name)
+
+            dsprod_all.close()
+            dsref_all.close()
+
+        for var, var_points in points.items():
+            prod_names, stds, corrs = zip(*var_points)
+            fig = plt.figure(figsize=(8, 6))
+            plot_taylor(
+                stds,
+                corrs,
+                fig=fig,
+                labels=list(prod_names),
+                markers=["o", "s", "^", "D", "v", "P", "X"],
+                colors=[LINE_COLORS[i % len(LINE_COLORS)] for i in range(len(stds))],
+                ref_label=ref_names[var],
+                std_label="Normalized standard deviation",
+            )
+            fig.suptitle(f"{self.plot_title}\n{self.metazone}\n{var}")
+            figname = f"{self.staged.output_dir('plot', ref_name=ref_names[var])}/taylor_{var}.png"
+            self.save_figure(fig, figname)
+
     def _mdiagts(self, dsref, dsprod, figtitle, figname):
         if dsref.depth.size == 0 or dsprod.depth.size == 0:
             logger.warning(f"Empty depth array, skipping mdiagts plot: {figname}")
@@ -1370,7 +1431,7 @@ class PlotComp(MethodRegistry):
                 if comp == "bias":
                     data = "mean"
                     field = "Mean"
-                elif comp in ("rmse", "rmsec"):
+                elif comp in ("rmse", "rmsec", "corr"):
                     data = "std"
                     field = "St.D"
                 else:
@@ -1402,6 +1463,10 @@ class PlotComp(MethodRegistry):
                 for var in dscomp_all.data_vars:
                     if var not in CMAP_VARS:
                         continue
+                    if dscomp_all[var].isnull().all():
+                        # e.g. a correlation with too few samples everywhere
+                        logger.info("maps: skipping %s of %s — missing everywhere", comp, var)
+                        continue
                     dscomp = dscomp_all[[var]]
                     dsref = dsref_all[[var]]
                     dsprod = dsprod_all[[var]]
@@ -1432,6 +1497,8 @@ class PlotComp(MethodRegistry):
                     cstd = cmean + 1.75 * dscomp.std()
                     if comp in ["rmse", 'rmsec']:
                         cmin, cmax = 0, cstd
+                    elif comp == "corr":
+                        cmin, cmax = -1, 1
                     else:
                         cmin, cmax = -cstd, cstd
                     if self.vminmax and var in self.vminmax:
@@ -1469,6 +1536,8 @@ class PlotComp(MethodRegistry):
                     )
                     if (comp == "bias") or (comp == "diff"):
                         cmap_comp = "cmo.diff"
+                    elif comp == "corr":
+                        cmap_comp = "cmo.balance"
                     else:
                         cmap_comp = "cmo.amp"
                     dsprod = dsprod.squeeze()

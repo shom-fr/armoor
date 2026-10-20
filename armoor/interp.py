@@ -1,11 +1,9 @@
 """Interpolation functions."""
 
-# pyproj and xoa.regrid are imported lazily (inside the functions that need
-# them) to avoid the significant NFS stat overhead on HPC cluster filesystems
-# when the whole armoor package is imported at startup.
+# pyproj, xoa.interp and xoa.regrid are imported lazily (inside the functions
+# that need them) to avoid the significant NFS stat overhead on HPC cluster
+# filesystems when the whole armoor package is imported at startup.
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 import re
 import numpy as np
 import pandas as pd
@@ -219,61 +217,27 @@ def _crop_to_bbox(ds, coords, margin_deg=1.0):
     return ds.isel(**slices)
 
 
-def _grid2loc_var(var, ds, dsi, loc):
-    """Interpolate one variable at `loc`'s scattered points.
-
-    Split out from grid2loc() so each variable's (materialize + interpolate)
-    work -- the actual cost of grid2loc(), see xoa.interp.grid2loc's
-    ``da_tmp.values`` -- can run concurrently across variables instead of
-    blocking one after another (that serial loop was leaving allocated
-    CPUs idle: dask's own scheduler only parallelizes within one
-    variable's chunks, and xoa's interpolation core runs single-threaded
-    on already-materialized numpy).
-    """
-    import xoa.regrid as xregrid
-
-    da = ds[var]
-    if ("time" in da.dims) and ("z" in da.dims):
-        da = xregrid.grid2loc(da, loc)
-        dims = ["time", "z", "npts"]
-        da = da.transpose(*dims)
-        arr = da.data
-        del da
-        coords = dict(time=dsi.time, **loc.coords)
-    elif ("time" in da.dims) and ("z" not in da.dims):
-        da = xregrid.grid2loc(da, loc)
-        dims = ["time", "npts"]
-        da = da.transpose(*dims)
-        arr = da.data
-        del da
-        coords = dict(time=dsi.time, **loc.coords)
-    else:
-        arr = xregrid.grid2loc(dsi[var], loc)
-        dims = ["npts"]
-        coords = dict(**loc.coords)
-        if isinstance(arr, xr.DataArray):
-            arr = arr.data
-    dsvar = xr.Dataset(data_vars={var: (dims, arr)}, coords=coords)
-    dsvar[var] = dsvar[var].assign_attrs(**dsi[var].attrs)
-    return dsvar
-
-
 def grid2loc(ds, coords: [(float, float)]):
     """Interpolate a dataset at specific coordinates.
+
+    The variables on the horizontal grid are interpolated bilinearly with
+    :class:`xoa.interp.Interpolator`, chunk by chunk, so that the result
+    stays lazy with dask arrays.
 
     Parameters
     ----------
     ds: xr.Dataset
         Gridded dataset to interpolate at specific coordinates.
     coordinates : list of tuples
-        Set of points coordinates (lon, lat) defining the coordinates to select.
+        Set of points coordinates (lat, lon) defining the coordinates to select.
 
     Returns
     -------
-    xarray.Dataset, xarray.Dataset
-        Dataset with elements located at specific coordinates.
+    xarray.Dataset
+        Dataset with elements located at specific coordinates, along a
+        ``npts`` dimension.
     """
-    import dask
+    import xoa.interp as xinterp
 
     lat, lon = zip(*coords)
     loc = xr.Dataset(
@@ -290,32 +254,27 @@ def grid2loc(ds, coords: [(float, float)]):
             ),
         }
     )
-    dsi = ds.copy()
-    if "time" in ds:
-        dso = xr.Dataset(coords=dict(time=dsi.time, **loc.coords))
-    else:
-        dso = xr.Dataset(coords=loc.coords)
-    if "depth" in dsi.coords:
-        if "time" in dsi.depth.dims:
-            dsi = dsi.reset_coords("depth")
-    vars_grid2loc = [var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)]
-    # One thread per variable, capped at the --dask-nworkers the caller
-    # already configured (armoor.cli.io.configure_dask_scheduler) -- reuses
-    # the existing knob instead of adding a new one. Threads, not
-    # processes: each variable's work is dominated by dask chunk
-    # computation and numpy/compiled interpolation, both of which release
-    # the GIL, and threads avoid having to pickle `ds`/`dsi` across
-    # processes.
-    n_workers = max(dask.config.get('num_workers', default=1), 1)
-    logger.debug(f"grid2loc: {len(vars_grid2loc)} variable(s), n_workers={n_workers}")
-    with ThreadPoolExecutor(max_workers=n_workers) as pool:
-        dss = list(pool.map(lambda var: _grid2loc_var(var, ds, dsi, loc), vars_grid2loc))
-    dso = xr.merge(dss)
-    if "depth" in dso:
+    hdims = set(ds.lon.dims) | set(ds.lat.dims)
+    # A depth on the horizontal grid (sigma levels...) is interpolated too
+    depth_on_grid = "depth" in ds.coords and bool(hdims & set(ds.depth.dims))
+    dsi = ds.reset_coords("depth") if depth_on_grid else ds
+    names = [name for name in dsi.data_vars if hdims <= set(dsi[name].dims)]
+
+    interpolator = xinterp.Interpolator(_get_grid(dsi), loc.lon, loc.lat, "bilinear")
+    core = interpolator.core_interp
+    if not core.has_weights:
+        interpolator.compute_weights()
+    dso = xr.Dataset(
+        {
+            name: _apply_core(core.interp, dsi[name], core.src_grid["dims"], ["npts"])
+            for name in names
+        },
+        coords=loc.coords,
+    )
+    if depth_on_grid:
         dso = dso.set_coords("depth")
-    elif ("depth" in dsi.coords) and ("time" not in dsi["depth"].dims):
-        dso["depth"] = dsi.depth
-        dso = dso.set_coords("depth")
+    elif "depth" in ds.coords:
+        dso = dso.assign_coords(depth=ds.depth)
     return dso
 
 
@@ -329,7 +288,7 @@ def grid2track(ds, ds_ref):
     output keeps a single "time" dim of the same length as `ds_ref.time`,
     not a "time" x "npts" grid.
 
-    The pairing relies on `xoa.regrid.grid2loc` detecting a "time"
+    The pairing relies on `xoa.interp.grid2loc` detecting a "time"
     coordinate on `loc` that shares `ds`'s own "time" dim name: it then
     interpolates in space *and* time together, point by point, instead of
     broadcasting space across every time step.
@@ -348,7 +307,7 @@ def grid2track(ds, ds_ref):
         `ds` interpolated at each of `ds_ref`'s (time, lon, lat) points,
         indexed by "time" (and "z" when present).
     """
-    import xoa.regrid as xregrid
+    import xoa.interp as xinterp
 
     loc = xr.Dataset(
         coords={
@@ -371,7 +330,7 @@ def grid2track(ds, ds_ref):
     dss = []
     vars_grid2track = [var for var in dsi.data_vars if set(dsi.lon.dims).issubset(dsi[var].dims)]
     for var in vars_grid2track:
-        da = xregrid.grid2loc(ds[var], loc)
+        da = xinterp.grid2loc(ds[var], loc)
         if "z" in da.dims:
             da = da.transpose("time", "z")
         else:
@@ -455,36 +414,56 @@ def grid2section(ds, coords: [(float, float), (float, float)], dx: float):
     return ds
 
 
-@contextmanager
-def create_regridder(dsi, dso, method="bilinear"):
-    """Context manager for safe regridder creation and cleanup."""
-    import xesmf as xe
+def _get_grid(ds):
+    """Horizontal grid of `ds`, made of its ``lon`` and ``lat`` only.
 
-    regridder = None
-    try:
-        regridder = xe.Regridder(
-            dsi,
-            dso,
-            method,
-            parallel=False,
-            ignore_degenerate=True,
-            unmapped_to_nan=True,
-        )
-        yield regridder
-    finally:
-        if regridder is not None:
-            del regridder
-        import gc
-
-        gc.collect()
+    Other variables are left out because the longitude and latitude are
+    searched by xoa, which may then pick another one, like a "mask" variable.
+    """
+    return xr.Dataset(coords={"lon": ds["lon"].variable, "lat": ds["lat"].variable})
 
 
-def regrid(dsi, dso) -> xr.Dataset:
+def _get_grid_mask(ds):
+    """Valid points of the horizontal grid of `ds`, from its "mask" variable if any.
+
+    Missing values are invalid, since a masked dataset (``ds.where(ds.mask)``)
+    has a missing mask where it was zero.
+    """
+    if "mask" in ds and set(ds["mask"].dims) == set(ds["lon"].dims) | set(ds["lat"].dims):
+        return ds["mask"].fillna(0).astype(bool)
+    return None
+
+
+def regrid(dsi, dso, method="bilinear", weights_file=None) -> xr.Dataset:
     """Regrid the variables on the x and y dimensions.
 
     The coordinates on the x and y dimensions other than lon and lat (depth
     of the sigma levels...) are regridded too.
+    The result is lazy with dask arrays, which are regridded chunk by chunk
+    after their x and y dimensions are merged in a single chunk, and the
+    floating point types are kept.
+
+    Parameters
+    ----------
+    dsi: xr.Dataset
+        Dataset to regrid, with ``lon`` and ``lat`` coordinates.
+    dso: xr.Dataset, xr.DataArray
+        Destination grid, with 1D or 2D ``lon`` and ``lat`` coordinates.
+        Its other coordinates (time...) are ignored.
+    method: str
+        Method of :class:`xoa.regrid.Regridder`: ``"bilinear"`` (default),
+        ``"bicubic"`` or ``"conservative"``.
+    weights_file: str, None
+        NetCDF file where the weights are loaded from if already there, and saved
+        to otherwise, to be reused by later calls on the same grids.
+
+    Returns
+    -------
+    xr.Dataset
     """
+    import xoa.regrid as xregrid
+    import xoa.weights as xweights
+
     coords = [
         name
         for name in dsi.coords
@@ -493,11 +472,90 @@ def regrid(dsi, dso) -> xr.Dataset:
     dsi = dsi.reset_coords(coords)
     vars2sub = geo_vars(dsi)
 
-    with create_regridder(dsi, dso) as regridder:
-        dsi_subset = dsi[vars2sub]
-        dsio = regridder(dsi_subset, keep_attrs=True)
+    # The grids are reduced to their lon and lat, so that a time coordinate of
+    # the destination (like the reference's own one in a colocation) does not
+    # make xoa interpolate in time
+    src_mask = _get_grid_mask(dsi)
+    dst_mask = _get_grid_mask(dso)
+    regridder = xregrid.Regridder(
+        _get_grid(dsi),
+        _get_grid(dso),
+        method,
+        weights_file=weights_file,
+        src_mask=None if src_mask is None else src_mask.values,
+        dst_mask=None if dst_mask is None else dst_mask.values,
+    )
+    # Computed once here, and not by each dask task
+    if not regridder.core_regridder.has_weights:
+        regridder.compute_weights()
+    if weights_file and not xweights.has_group(weights_file, regridder.weights_group):
+        regridder.save_weights(weights_file)
+
+    # xoa only uses the source mask when skipping NaNs, and the destination
+    # mask with the conservative method: both are applied here, so that the
+    # cells that touch a masked point are missing, like with ESMF
+    dsin = dsi[vars2sub]
+    if src_mask is not None:
+        dsin = dsin.where(src_mask.variable)
+    dsio = xr.Dataset(
+        {name: _regrid_var(regridder, da) for name, da in dsin.data_vars.items()},
+        coords={"lon": regridder.ds_dst_grid["lon"], "lat": regridder.ds_dst_grid["lat"]},
+    )
+    if dst_mask is not None:
+        dsio = dsio.where(dst_mask.variable)
 
     return dsio.set_coords(coords)
+
+
+def _regrid_var(regridder, da):
+    """Regrid a variable with the core regridder of a :class:`xoa.regrid.Regridder`.
+
+    :meth:`xoa.regrid.Regridder.regrid` loads dask arrays in memory, so the core
+    regridder is applied with :func:`_apply_core`.
+    """
+    core = regridder.core_regridder
+    return _apply_core(core.regrid, da, core.src_grid["dims"], core.dst_grid["dims"])
+
+
+def _apply_core(func, da, src_dims, dst_dims):
+    """Apply a core function of xoa that replaces the horizontal dimensions
+
+    :class:`xoa.regrid.Regridder` and :class:`xoa.interp.Interpolator` load dask
+    arrays in memory, so their core function is applied here chunk by chunk, after
+    the source dimensions are merged in a single chunk, and the result stays lazy.
+    It keeps the floating point type of the variable, while xoa computes in double
+    precision.
+
+    Parameters
+    ----------
+    func: callable
+        Core function, like ``core_regridder.regrid`` or ``core_interp.interp``,
+        that takes an array of shape ``(..., *src_shape)`` and returns an array of
+        shape ``(..., *dst_shape)``.
+    da: xr.DataArray
+    src_dims, dst_dims: list of str
+        Source and destination dimensions, which may have the same names.
+    """
+    src_dims, dst_dims = list(src_dims), list(dst_dims)
+    # The output sizes, from a single profile
+    dst_shape = func(np.zeros([da.sizes[dim] for dim in src_dims])).shape
+    # Temporary names, since the source and destination dimensions may be the same
+    tmp_dims = [f"_{dim}_dst" for dim in dst_dims]
+    dtype = da.dtype if np.issubdtype(da.dtype, np.floating) else np.dtype("f8")
+    if da.chunks is not None:
+        da = da.chunk(dict.fromkeys(src_dims, -1))
+    out = xr.apply_ufunc(
+        lambda arr: func(arr).astype(dtype, copy=False),
+        da,
+        input_core_dims=[src_dims],
+        output_core_dims=[tmp_dims],
+        exclude_dims=set(src_dims),
+        dask="parallelized",
+        output_dtypes=[dtype],
+        dask_gufunc_kwargs={"output_sizes": dict(zip(tmp_dims, dst_shape))},
+        keep_attrs=True,
+    )
+    return out.rename(dict(zip(tmp_dims, dst_dims)))
 
 
 def coarsen(
@@ -546,7 +604,7 @@ def coarsen(
 
     See Also
     --------
-    regrid : bilinear regridding via xesmf (handles curvilinear grids).
+    regrid : bilinear, bicubic or conservative regridding (handles curvilinear grids).
     """
     spatial_dims = {dim: factor for dim in ("x", "y") if dim in dsi.dims}
     if not spatial_dims:

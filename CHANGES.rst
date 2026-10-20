@@ -1,6 +1,88 @@
 What's new
 ##########
 
+Unreleased
+==========
+
+New features
+------------
+
+- ``armoor.interp.regrid`` (and ``ds.interp.regrid*``) take a ``method``
+  (``"bilinear"``, the default, ``"bicubic"`` or ``"conservative"``) and a
+  ``weights_file``, where the weights are loaded from if already there and
+  saved to otherwise. ``armoor-interp-horizontal`` exposes them with
+  ``--regrid-method`` and ``--regrid-weights``.
+- The comparisons compute the Pearson correlation (``corr``), next to the
+  bias, rmse and centered rmse, with the samples that are valid in both
+  datasets, and only where there are at least 3 of them: in the
+  ``comp/corr`` group of the outputs, in the ``maps`` (between -1 and 1),
+  with ``ds.stats.corr`` and in ``armoor-comp`` (``corr_*`` variables).
+  The ``maps`` skip a statistic that is missing everywhere.
+- New ``taylor`` output for ``comp_sst``, ``comp_argo`` and ``comp_models``:
+  a Taylor diagram per variable with a point per product, made with xoa
+  (``xoa.core.stats.taylor_stats`` and ``xoa.core.plot.plot_taylor``), the
+  standard deviations being normalized by the one of the reference.
+
+Breaking changes
+----------------
+
+- The horizontal regridding is made by ``xoa.regrid.Regridder`` instead of
+  xESMF, so ``xesmf``, ``esmf`` and ``esmpy`` are no longer dependencies.
+  Since no xoa release has it yet, xoa is installed with pip from its
+  develop branch on GitHub, like woom and shoot, instead of conda-forge,
+  and xoa's own dependencies (``netcdf4``, ``platformdirs``, ``pooch``)
+  are added to the conda environment. The results differ from xESMF
+  by about 1e-5 relative, since the bilinear interpolation is made in
+  longitude/latitude instead of on the sphere, and the masked points are the
+  same, except the destination points that lie exactly on the edge of the
+  source grid, which xoa interpolates while ESMF left them missing.
+  The time of the destination grid is still ignored, the regridded data
+  stay lazy with dask and keep their floating point type, like with xESMF.
+
+Refactoring
+-----------
+
+- ``armoor.interp.grid2loc`` (and so ``grid2section``, the ``cloud`` colocation
+  and ``armoor-interp-horizontal --cloud/--section``) interpolates with
+  ``xoa.interp.Interpolator`` instead of ``xoa.regrid.grid2loc``, chunk by chunk:
+  the result stays lazy with dask, so the memory no longer grows with the size
+  of the files, and the values are the same. The vertical dimension may have
+  any name, a depth on the horizontal grid is interpolated even when it does
+  not depend on time, and the coordinates that are not horizontal are kept.
+- ``grid2track`` and ``armoor.diags.parcels`` import ``grid2loc`` from
+  ``xoa.interp``, where it is defined, instead of ``xoa.regrid``.
+- The divergence, relative vorticity and Okubo-Weiss parameter of
+  ``ds.oceanvars`` are computed by ``xoa.dyn`` instead of ``shoot.dyn``, with
+  the same values, so ``shoot`` and its ``argopy`` pin are no longer
+  dependencies. The ``eddy_shoot`` format is still read.
+- The gaussian kernel of the ``tsmooth`` filter comes from
+  ``xoa.filter.get_window_func``, with the same values.
+
+Bug fixes
+---------
+
+- The ``polygon`` filter selects the points with ``xoa.core.mask.polygon_mask``
+  instead of ``matplotlib.path``, which fixes the polygons that cross the
+  dateline. The points that are exactly on the edges of a polygon may be
+  selected differently: for a rectangle, they are now those of the southern
+  and western edges, instead of the southern and eastern ones.
+
+- The potential and in situ temperatures and the sound speed computed by
+  ``ds.oceanvars`` convert the practical salinity to absolute salinity, as
+  TEOS-10 expects, instead of using it as an absolute salinity: the
+  temperatures change by up to about 1e-3 °C and the sound speed by about
+  0.01 m/s. The conversions are made by ``xoa.thermdyn``.
+
+- ``open_decode_croco`` and ``open_decode_croco_xios`` accept the ``z_rho``
+  and ``z_w`` heights of the sigma levels, which is how xoa names them since
+  its develop branch, instead of ``depth_rho`` and ``depth_w``.
+- ``open_decode_hycom`` integrates the layer thicknesses chunk by chunk:
+  ``xoa.grid.dz2depth`` loads dask arrays in memory since xoa's develop
+  branch, so the depth was no longer lazy and the final rechunk failed.
+- The ``depth`` of the ``generic`` specs of ``cf.cfg`` is ``positive=down``,
+  like in ``cf_generic.cfg`` and xoa. Both files keep ``z`` as an alternate
+  name of ``level``, unlike xoa, since it is armoor's vertical dimension.
+
 v2026.10.0
 ==========
 

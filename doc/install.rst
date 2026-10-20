@@ -42,8 +42,12 @@ armoor requires ``python>3.11`` and depends on the following packages:
    * - `xarray <http://xarray.pydata.org/en/stable/>`_
      - xarray is an open source project and Python package that makes working
        with labelled multi-dimensional arrays simple, efficient, and fun!
-   * - `xesmf <https://xesmf.readthedocs.io/en/stable/>`_
-     - xESMF is a Python package for regridding.
+   * - `xoa <https://github.com/shom-fr/xoa>`_
+     - xoa is the xarray-based ocean analysis library that armoor relies on
+       for the decoding, interpolation, regridding, dynamics, thermodynamics,
+       masks, filters and part of the plots. It is installed from its
+       ``develop`` branch on GitHub until a release has the horizontal
+       regridding.
 
 
 
@@ -92,10 +96,13 @@ From sources
     $ mamba install -n base -c conda-forge -y --file requirements.txt
     $ pip install .
 
-Alternatively, use ``environment.yml``::
+Alternatively, use ``environment.yml``, then install armoor and its
+GitHub dependencies in this environment::
 
     $ cd armoor
     $ mamba env create -f environment.yml
+    $ mamba activate armoor-env
+    $ pip install .
 
 \3. Then, run tests::
 

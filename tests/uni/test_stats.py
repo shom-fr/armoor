@@ -4,7 +4,7 @@ import xarray as xr
 import pytest
 from scipy.stats import gaussian_kde
 
-from armoor.stats import diff, cdiff, mean, std, bias, rms, crms, pdf
+from armoor.stats import diff, cdiff, mean, std, bias, rms, crms, corr, pdf
 
 
 def _make_test_data():
@@ -84,6 +84,21 @@ def test_crms():
 
     out = crms(dsref, dsprod, dim="time")
     assert np.isclose(out["a"].item(), expected)
+
+
+def test_corr():
+    """Only the samples that are valid in both datasets are used, and the
+    correlation is missing for a constant dataset."""
+    dsref, dsprod = _make_test_data()
+    expected = np.corrcoef(dsref.a.values[1:], dsprod.a.values[1:])[0, 1]
+    dsprod["a"][0] = np.nan
+    out = corr(dsprod, dsref, dim="time")
+    assert np.isclose(out["a"].item(), expected)
+    assert np.isnan(corr(dsprod * 0 + 1, dsref, dim="time")["a"].item())
+    # Not enough samples that are valid in both datasets
+    dsprod["a"][1] = np.nan
+    assert np.isnan(corr(dsprod, dsref, dim="time")["a"].item())
+    assert np.isfinite(corr(dsprod, dsref, dim="time", min_count=2)["a"].item())
 
 
 def test_pdf():
