@@ -713,6 +713,7 @@ class OutputProcessor:
         Concatenated dataset
         """
         # Handle multi-time datasets by splitting into individual time slices
+        datasets = [ds for ds in datasets if "time" in ds.sizes]
         if any(ds.sizes["time"] > 1 for ds in datasets):
             time_slices = []
             for ds in datasets:

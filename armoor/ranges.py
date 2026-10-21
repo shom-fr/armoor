@@ -36,8 +36,6 @@ def timegroups_to_list(grouped, label="trange"):
         if label == "time":
             tlabel = pd.to_datetime(name)
             dso.attrs[label] = f"{tlabel:%Y-%m-%dT%H:%M:%S}"
-        elif label == "tbound":
-            dso.attrs["time"] = dso.attrs['tbound']
         else:
             dso.attrs[label] = f"[{name.left:%Y-%m-%dT%H:%M:%S}_{name.right:%Y-%m-%dT%H:%M:%S}["
         dss.append(dso)
@@ -60,21 +58,6 @@ def tfreq(ds):
     grouped = ds.groupby("time")
     return timegroups_to_list(grouped, label="time")
 
-def tbound(ds):
-    """Split a dataset into one subset per native time step.
-
-    Parameters
-    ----------
-    ds : xarray.Dataset
-
-    Returns
-    -------
-    list of xarray.Dataset
-        One dataset per unique "time" value, each tagged with its own
-        timestamp (see `timegroups_to_list`).
-    """
-    grouped = ds.groupby("tbound")
-    return timegroups_to_list(grouped, label="tbound")
 
 def trange_seq(ds, tstart, tend, tbin):
     """Split a dataset into sequential time bins.
