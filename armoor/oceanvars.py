@@ -672,30 +672,31 @@ class OceanVars(MethodRegistry):
 
         return None
 
-    def _compute_kinetic_energy(self, velocity_type="total"):
+    def _compute_kinetic_energy(self, velocity_type="ke"):
         """Compute kinetic energy from total current or geostrophic velocities.
 
         Parameters
         ----------
         velocity_type : str
-            "total"     : uses u and v.
-            "geostrophic" : uses ugos and vgos computed from ssh.
+            "ke"     : uses u and v.
+            "ke_geos" : uses ugos and vgos computed from ssh.
             "eke"         : uses ugosa and vgosa computed from sla.
-
+            "mke"     : uses u_mean_time and v_mean_time.
+            "mke_geos" : uses ugos_mean_time and vgos_mean_time computed from ssh.
         Returns
         -------
         xr.DataArray or None
             Kinetic energy per unit mass in m2 s-2.
         """
         configs = {
-            "total": {
+            "ke": {
                 "u": "u",
                 "v": "v",
                 "ke": "ke",
                 "long_name": "kinetic energy computed from u and v",
                 "selectors": None,
             },
-            "geostrophic": {
+            "ke_geos": {
                 "u": "ugos",
                 "v": "vgos",
                 "ke": "ke_geos",
@@ -809,7 +810,7 @@ class OceanVars(MethodRegistry):
         xarray.DataArray or None
             KE data array.
         """
-        return self._compute_kinetic_energy("total")
+        return self._compute_kinetic_energy("ke")
     
     def sel_ke_geos(self):
         """
@@ -820,7 +821,7 @@ class OceanVars(MethodRegistry):
         xarray.DataArray or None
             KE data array.
         """
-        return self._compute_kinetic_energy("geostrophic")
+        return self._compute_kinetic_energy("ke_geos")
     
     def sel_mke(self):
         """

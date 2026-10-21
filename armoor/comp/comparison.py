@@ -328,7 +328,7 @@ class CompAlti(Comparison):
         "maps": {"sort": ["time"], "stat": ["time"]},
     }
     comp_vars = ["sla", "ke", "ke_geos", "eke", "mke", "mke_geos"]
-
+    
     def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
         """Return the dataset lists unchanged.
 
