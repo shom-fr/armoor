@@ -152,6 +152,7 @@ class OceanVars(MethodRegistry):
         u = self.sel_current_zonal()
         if u is not None:
             u_mean_time = self.ds["u"].mean('time')
+            u_mean_time = u_mean_time.expand_dims(dim={"tbound": [self.ds.time.mean().values]})   
             self.ds["u_mean_time"] = u_mean_time
             return self.ds["u_mean_time"]
         else:
@@ -162,6 +163,7 @@ class OceanVars(MethodRegistry):
         v = self.sel_current_meridional()
         if v is not None:
             v_mean_time = self.ds["v"].mean('time')
+            v_mean_time = v_mean_time.expand_dims(dim={"tbound": [self.ds.time.mean().values]})   
             self.ds["v_mean_time"] = v_mean_time
             return self.ds["v_mean_time"]
         else:
@@ -212,6 +214,7 @@ class OceanVars(MethodRegistry):
         u = self.sel_ugos()
         if u is not None:
             ugos_mean_time = u.mean('time')
+            ugos_mean_time = ugos_mean_time.expand_dims(dim={"tbound": [self.ds.time.mean().values]})   
             self.ds["ugos_mean_time"] = ugos_mean_time
             return self.ds["ugos_mean_time"]
         else:
@@ -221,8 +224,9 @@ class OceanVars(MethodRegistry):
         """Compute or retrieve the mean geostrophic meridional current from ssh along time."""
         v = self.sel_vgos()    
         if v is not None:        
-            vgos_mean_time = v.mean('time')
-            self.ds["vgos_mean_time"] = vgos_mean_time
+            vgos_mean_time = v.mean('time')            
+            vgos_mean_time = vgos_mean_time.expand_dims(dim={"tbound": [self.ds.time.mean().values]})       
+            self.ds["vgos_mean_time"] = vgos_mean_time         
             return self.ds["vgos_mean_time"]
         else:
             logger.warning("vgos_mean_time cannot be infered or computed")
