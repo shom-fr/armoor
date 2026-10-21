@@ -37,8 +37,8 @@ Scope
 -----
 
 Comparison with altimetry products (L4 product : ``fmt=cmems_alti_duacs``) by computing
-Eddy Kinetic Energy (eke), Kinetic Energy from total u and v (ke) and kinetic Energy from geostrophic u and v computed from
-and sea surface height (ssh or adt).
+Eddy Kinetic Energy (``eke``), Kinetic Energy from total u and v (``ke``), kinetic Energy from geostrophic u and v computed from
+and sea surface height (ssh or adt) (``ke_geos``), Mean Kinetic energy from total and geostrophic current (``mke`` and ``mke_geos``).
 sla is computed as the anomaly of ssh (for the model) or adt (for the satellite) over the period defined by ``tbound``
 
 
