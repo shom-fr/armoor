@@ -65,6 +65,9 @@ class TimeColocation(AbstractColocation):
         time = pd.date_range(start=self.start, end=self.end, freq=tfreq)
         self.dsref = interp_time(self.dsref, time)
         self.dsprod = interp_time(self.dsprod, time)
+        tt = pd.to_datetime(self.dsref.time)
+        self.dsref.attrs['tbound'] =  f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}]"
+        self.dsprod.attrs['tbound'] =  f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}]"
         return self.dsref, self.dsprod
 
     def tmonth(self) -> Tuple[xr.Dataset, xr.Dataset]:
@@ -113,10 +116,16 @@ class TimeColocation(AbstractColocation):
             self.dsprod = interp_time(self.dsprod, self.dsref.time, method=method)
             self.dsprod["time"].encoding = self.dsref.time.encoding
             self.dsprod["time"].attrs = self.dsref.time.attrs
+            tt = pd.to_datetime(self.dsref.time)
+            self.dsref.attrs['tbound'] =  f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}]"
+            self.dsprod.attrs['tbound'] =  f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}]"
         elif ref == "product":
             self.dsref = interp_time(self.dsref, self.dsprod.time, method=method)
             self.dsref["time"].encoding = self.dsprod.time.encoding
             self.dsref["time"].attrs = self.dsprod.time.attrs
+            tt = pd.to_datetime(self.dsprod.time)
+            self.dsref.attrs['tbound'] =  f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}]"
+            self.dsprod.attrs['tbound'] =  f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}]"
         else:
             raise ArmoorError(
                 "Use 'reference' or 'product' to specify the reference timefor ranging then."
@@ -816,16 +825,24 @@ def _apply_time_ranges(dsref, dsprod, params, tbound):
     if time_coloc is None:
         return [dsref], [dsprod]
 
-    if "tfreq" in time_coloc[0]:
-        return ranges.tfreq(dsref), ranges.tfreq(dsprod)
-
-    if "trange_seq" in time_coloc[0]:
-        tfreq = time_coloc[1]["tfreq"]
-        if tfreq != "*":
-            return (
-                ranges.trange_seq(dsref, *tbound, tfreq),
-                ranges.trange_seq(dsprod, *tbound, tfreq),
-            )
+    if 'tbound' in dsref.dims:
+        return (
+            ranges.tbound(dsref),
+            ranges.tbound(dsprod),
+        )   
+    
+    else:
+        if "tfreq" in time_coloc[0]:
+            return ranges.tfreq(dsref), ranges.tfreq(dsprod)
+    
+        if "trange_seq" in time_coloc[0]:
+            tfreq = time_coloc[1]["tfreq"]
+                        
+            if tfreq != "*":
+                return (
+                    ranges.trange_seq(dsref, *tbound, tfreq),
+                    ranges.trange_seq(dsprod, *tbound, tfreq),
+                )
 
     return [dsref], [dsprod]
 
@@ -1018,8 +1035,8 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
 
             if sub_ref is None or sub_prod is None:
                 continue
-
-            if "time" in sub_ref.dims:
+            
+            if "time" in sub_ref.dims or 'tbound' in sub_ref.dims:
                 sub_ref_list, sub_prod_list = _apply_time_ranges(sub_ref, sub_prod, params, tbound)
             else:
                 sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]
