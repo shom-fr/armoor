@@ -90,6 +90,11 @@ def _merge_zless_into_shallowest(pooled, merge_fn):
     shallowest sibling key are left pointing at the same merged value, so
     either can look it up.
 
+    A prefix with depth-resolved groups only also gets its z-less key,
+    pointing at the shallowest group: a z-less source then finds the
+    surface value of a depth-resolved one, e.g. the surface min/max of a
+    WOA18 "clim" for a satellite SST or a model's 2D SST.
+
     Parameters
     ----------
     pooled : dict
@@ -109,14 +114,15 @@ def _merge_zless_into_shallowest(pooled, merge_fn):
         prefixes.setdefault((metazone, name), []).append(level_key)
 
     for (metazone, name), level_keys in prefixes.items():
-        if None not in level_keys:
-            continue
         depth_keys = [lk for lk in level_keys if lk is not None]
         if not depth_keys:
             continue
         shallowest = min(depth_keys, key=_level_depth)
         orphan_key = (metazone, name, None)
         target_key = (metazone, name, shallowest)
+        if None not in level_keys:
+            pooled[orphan_key] = pooled[target_key]
+            continue
         merged = merge_fn(pooled[target_key], pooled[orphan_key])
         pooled[target_key] = merged
         pooled[orphan_key] = merged

@@ -1,6 +1,17 @@
 What's new
 ##########
 
+Develop
+=======
+
+Bug fixes
+---------
+
+- ``mapseries``: a source without depth (satellite SST, a model's 2D
+  SST/SSS) now gets the "clim" row of a depth-resolved climatology (e.g.
+  WOA18 with ``vlevel``), from its shallowest level. It was missing, with
+  the warning ``clim='woa18' configured but not resolved``.
+
 v2026.10.0
 ==========
 

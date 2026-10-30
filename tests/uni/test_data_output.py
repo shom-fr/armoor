@@ -853,16 +853,19 @@ class TestMergeZlessIntoShallowest:
         assert pooled[("mz1", "g", ("vrange", "0-100"))]["v"] == (1.0, 4.0)
         assert pooled[("mz1", "g", ("vrange", "100-500"))]["v"] == (10.0, 12.0)
 
-    def test_no_op_without_zless_group(self):
+    def test_zless_key_added_without_zless_group(self):
+        """A z-less source (e.g. a 2D SST) looking up a depth-resolved
+        "clim" (e.g. WOA18) finds its shallowest level."""
         pooled = {
-            ("mz1", "sst", ("vlevel", "0.0")): {"ptemp": (18.0, 21.0)},
-            ("mz1", "sst", ("vlevel", "100.0")): {"ptemp": (5.0, 8.0)},
+            ("mz1", "woa18", ("vlevel", "100.0")): {"ptemp": (5.0, 8.0)},
+            ("mz1", "woa18", ("vlevel", "0.0")): {"ptemp": (18.0, 21.0)},
         }
-        original = {k: dict(v) for k, v in pooled.items()}
 
         _merge_zless_into_shallowest(pooled, _merge_minmax_dicts)
 
-        assert pooled == original
+        assert pooled[("mz1", "woa18", None)]["ptemp"] == (18.0, 21.0)
+        assert pooled[("mz1", "woa18", ("vlevel", "0.0"))]["ptemp"] == (18.0, 21.0)
+        assert pooled[("mz1", "woa18", ("vlevel", "100.0"))]["ptemp"] == (5.0, 8.0)
 
     def test_no_op_without_depth_resolved_siblings(self):
         pooled = {("mz1", "sst", None): {"ptemp": (18.0, 21.0)}}
