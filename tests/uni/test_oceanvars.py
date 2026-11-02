@@ -268,6 +268,20 @@ class TestOceanVars:
          assert result is not None
          assert 'sla' in self.ds       
         
+    def test_sel_sla_single_time_step_warns(self, caplog):
+        """With one time step, sla = ssh - mean(ssh) is 0: warn about it."""
+        ds = self.ds.drop_vars(["sla"]).isel(time=[0])
+        with caplog.at_level("WARNING", logger="armoor.oceanvars"):
+            result = ds.oceanvars.sel_sla()
+        np.testing.assert_allclose(result.values, 0.0)
+        assert "single time step" in caplog.text
+
+    def test_sel_sla_several_time_steps_no_warning(self, caplog):
+        ds = self.ds.drop_vars(["sla"])
+        with caplog.at_level("WARNING", logger="armoor.oceanvars"):
+            ds.oceanvars.sel_sla()
+        assert "single time step" not in caplog.text
+
     def test_sel_ugos(self):
        """Test calculation of ugos"""
        result = self.ds.oceanvars.sel_ugos()

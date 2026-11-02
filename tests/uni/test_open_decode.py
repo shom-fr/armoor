@@ -253,7 +253,7 @@ class TestOpenDecodeSSH:
         assert 'time' in result.dims
         # DUACS geostrophic currents are ignored (recomputed from adt like for
         # the models) and must never pose as a total u/v either.
-        for var in ('ugos', 'vgos', 'ugosa', 'vgosa', 'u', 'v'):
+        for var in ('sla', 'slaref', 'ugos', 'vgos', 'ugosa', 'vgosa', 'u', 'v'):
             assert var not in result
         assert 'ssh' in result
 

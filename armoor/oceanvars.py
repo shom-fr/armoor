@@ -711,6 +711,13 @@ class OceanVars(MethodRegistry):
             return self.ds["sla"]
         elif "ssh" in self.ds.data_vars:
             logger.info("SLA COMPUTED FROM SSH")
+            if self.ds["ssh"].sizes.get("time", 0) < 2:
+                # The anomaly is taken against the mean over the available
+                # time steps: with a single one, sla (and so eke) is 0.
+                logger.warning(
+                    "sla computed from ssh over a single time step: "
+                    "sla and eke will be zero everywhere"
+                )
             sla = self.ds["ssh"] - self.ds["ssh"].mean("time")
             sla.attrs["standard_name"] = "sea_level_anomaly"
             sla.attrs["long_name"] = "Sea level anomaly computed from adt or ssh"
