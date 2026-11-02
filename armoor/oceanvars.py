@@ -90,6 +90,9 @@ class OceanVars(MethodRegistry):
     def __init__(self, ds):
         self.ds = ds
         self.methods = {}
+        # Geostrophic currents are intermediates: kept here rather than in
+        # self.ds, so they are neither saved nor compared (see _compute_geos).
+        self._geos_cache = {}
         self.__post_init__()
 
     def sel(self, varname: str):
@@ -208,25 +211,54 @@ class OceanVars(MethodRegistry):
         return self._mean_over_period(self.sel_current_meridional(), "v_mean_time")
 
     def _compute_geos(self, source, prefix):
-        """Compute geostrophic current components from a sea level variable."""
+        """Compute geostrophic current components from a sea level variable.
+
+        The components are returned, not stored in the dataset: they are
+        intermediates of ke_geos/mke_geos/eke, which must not end up in the
+        colocation files nor be compared themselves. They are cached on this
+        accessor instead, so computing several energies from the same sea
+        level only calls `shoot.dyn.get_geos` once. The cache is keyed on the
+        source's underlying array (not its Variable, which xarray re-wraps on
+        every dataset assignment), so replacing the source invalidates it.
+
+        Parameters
+        ----------
+        source : {"ssh", "sla"}
+            Sea level variable to derive the currents from ("sla" is itself
+            derived from "ssh" if needed, see `sel_sla`).
+        prefix : str
+            Suffix of the returned names ("gos" -> ugos/vgos, "gosa" ->
+            ugosa/vgosa).
+
+        Returns
+        -------
+        tuple of (xarray.DataArray or None, xarray.DataArray or None)
+            ``(u, v)``; components already present in the dataset are
+            returned as is.
+        """
         u_name = f"u{prefix}"
         v_name = f"v{prefix}"
 
-        # If both components are already available, do nothing.
+        # Components provided by the dataset itself are used as is.
         if u_name in self.ds and v_name in self.ds:
-            return
+            return self.ds[u_name], self.ds[v_name]
 
-        if source not in self.ds:
+        src = self.sel_sla() if source == "sla" else self.ds.get(source)
+        if src is None:
             logger.warning(
                 f"Cannot compute {u_name} and {v_name}: {source} is unavailable"
             )
-            return
+            return None, None
+
+        cached = self._geos_cache.get(prefix)
+        if cached is not None and cached[0] is src.variable._data:
+            return cached[1], cached[2]
 
         logger.info(f"Compute {u_name} and {v_name} from {source}")
 
         from shoot.dyn import get_geos
 
-        u, v = get_geos(self.ds[source])
+        u, v = get_geos(src)
 
         u.name = u_name
         u.attrs["units"] = "m s-1"
@@ -234,18 +266,16 @@ class OceanVars(MethodRegistry):
         v.name = v_name
         v.attrs["units"] = "m s-1"
 
-        self.ds[u_name] = u
-        self.ds[v_name] = v
+        self._geos_cache[prefix] = (src.variable._data, u, v)
+        return u, v
 
     def sel_ugos(self):
-        """Compute or retrieve the geostrophic zonal current from ssh."""
-        self._compute_geos("ssh", "gos")
-        return self.ds.get("ugos")
+        """Compute or retrieve the geostrophic zonal current from ssh (not stored)."""
+        return self._compute_geos("ssh", "gos")[0]
 
     def sel_vgos(self):
-        """Compute or retrieve the geostrophic meridional current from ssh."""
-        self._compute_geos("ssh", "gos")
-        return self.ds.get("vgos")
+        """Compute or retrieve the geostrophic meridional current from ssh (not stored)."""
+        return self._compute_geos("ssh", "gos")[1]
     
     def sel_ugos_mean_time(self):
         """Compute the geostrophic zonal current (from ssh) averaged over the whole period."""
@@ -256,16 +286,12 @@ class OceanVars(MethodRegistry):
         return self._mean_over_period(self.sel_vgos(), "vgos_mean_time")
 
     def sel_ugosa(self):
-        """Compute or retrieve the geostrophic zonal current anomaly from sla."""
-        self.sel_sla()
-        self._compute_geos("sla", "gosa")
-        return self.ds.get("ugosa")
+        """Compute or retrieve the geostrophic zonal current anomaly from sla (not stored)."""
+        return self._compute_geos("sla", "gosa")[0]
 
     def sel_vgosa(self):
-        """Compute or retrieve the geostrophic meridional current anomaly from sla."""
-        self.sel_sla()
-        self._compute_geos("sla", "gosa")
-        return self.ds.get("vgosa")
+        """Compute or retrieve the geostrophic meridional current anomaly from sla (not stored)."""
+        return self._compute_geos("sla", "gosa")[1]
 
     def sel_ptemp(self):
         """Select or compute potential temperature from the dataset.

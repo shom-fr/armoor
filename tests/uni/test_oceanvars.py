@@ -272,25 +272,25 @@ class TestOceanVars:
        """Test calculation of ugos"""
        result = self.ds.oceanvars.sel_ugos()
        assert result is not None
-       assert 'ugos' in self.ds
+       assert 'ugos' not in self.ds  # intermediate: returned, not stored
        
     def test_sel_vgos(self):
        """Test calculation of vgos"""
        result = self.ds.oceanvars.sel_vgos()
        assert result is not None
-       assert 'vgos' in self.ds      
+       assert 'vgos' not in self.ds  # intermediate: returned, not stored
        
     def test_sel_ugosa(self):
        """Test calculation of ugosa"""
        result = self.ds.oceanvars.sel_ugosa()
        assert result is not None
-       assert 'ugosa' in self.ds
+       assert 'ugosa' not in self.ds  # intermediate: returned, not stored
        
     def test_sel_vgosa(self):
        """Test calculation of vgosa"""
        result = self.ds.oceanvars.sel_vgosa()
        assert result is not None
-       assert 'vgosa' in self.ds             
+       assert 'vgosa' not in self.ds  # intermediate: returned, not stored
        
     def test_sel_eke(self):
         """Test calculation of eke from sla"""
@@ -349,6 +349,26 @@ class TestOceanVars:
         assert result is not None
         assert result.sizes["period"] == 1
         assert "ugos_mean_time" not in self.ds
+
+    def test_geos_intermediates_not_stored_and_computed_once(self):
+        """ke_geos + mke_geos share one get_geos(ssh) call; nothing but the
+        energies themselves lands in the dataset."""
+        from shoot.dyn import get_geos
+
+        with patch("shoot.dyn.get_geos", side_effect=get_geos) as mock_geos:
+            self.ds.oceanvars.sel_ke_geos()
+            self.ds.oceanvars.sel_mke_geos()
+        assert mock_geos.call_count == 1
+        assert "ke_geos" in self.ds and "mke_geos" in self.ds
+        for var in ("ugos", "vgos", "ugos_mean_time", "vgos_mean_time"):
+            assert var not in self.ds
+
+    def test_geos_cache_follows_source_variable(self):
+        """Replacing ssh must not reuse currents computed from the old one."""
+        u_before = self.ds.oceanvars.sel_ugos()
+        self.ds["ssh"] = self.ds["ssh"] * 2
+        u_after = self.ds.oceanvars.sel_ugos()
+        np.testing.assert_allclose(u_after.values, 2 * u_before.values)
 
     def test_sel_method_routing(self):
         """Test routing of the sel method"""
