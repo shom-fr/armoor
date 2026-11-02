@@ -752,7 +752,7 @@ class OceanVars(MethodRegistry):
                 "v": "v",
                 "ke": "ke",
                 "long_name": "kinetic energy computed from u and v",
-                "selectors": None,
+                "selectors": ("sel_current_zonal", "sel_current_meridional"),
             },
             "ke_geos": {
                 "u": "ugos",

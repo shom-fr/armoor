@@ -764,11 +764,14 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
         "cdir": {"u", "v"},
         "cspeed": {"u", "v"},
         "mld": {"ptemp", "temp", "sal", "pres"},
-        "sla": {"sla", "ssh"},
-        "eke": {"sla", "ugosa", "vgosa"},
-        "ke": {"ssh", "sla", "u", "v"},
+        # What each comp var actually reads (see armoor.oceanvars.OceanVars):
+        # sla <- ssh; eke <- ugosa/vgosa <- sla <- ssh; ke/mke <- u/v
+        # (or cdir/cspeed); ke_geos/mke_geos <- ugos/vgos <- ssh.
+        "sla": {"ssh"},
+        "eke": {"ssh", "sla", "ugosa", "vgosa"},
+        "ke": {"u", "v", "cdir", "cspeed"},
         "ke_geos": {"ssh", "ugos", "vgos"},
-        "mke": {"ssh", "u", "v"},
+        "mke": {"u", "v", "cdir", "cspeed"},
         "mke_geos": {"ssh", "ugos", "vgos"},
     }
     needed = set(COMP_VARS[comp_func])

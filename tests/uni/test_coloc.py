@@ -1963,3 +1963,25 @@ def test_period_group_gets_its_own_suffix(
     assert "trange" not in period_ref.attrs
     assert period_ref.range.suffix == "_period_2023-01-01T00:00:00_2023-01-03T00:00:00"
     assert period_prod.attrs["data_name"] == "prod"
+
+
+@pytest.mark.parametrize(
+    "raw_vars, expected",
+    [
+        # model with total currents: everything comp_alti needs is derivable
+        (("ssh", "u", "v", "temp"), {"ssh", "u", "v"}),
+        # currents given as direction/speed instead of u/v
+        (("ssh", "cdir", "cspeed", "sal"), {"ssh", "cdir", "cspeed"}),
+        # altimetry: only adt (decoded as ssh) is left
+        (("ssh", "flag"), {"ssh"}),
+    ],
+)
+def test_prepare_dataset_comp_alti_keeps_raw_inputs(raw_vars, expected):
+    """_prepare_dataset keeps exactly the raw inputs comp_alti derives from."""
+    time = pd.date_range("2023-01-01", periods=2)
+    ds = xr.Dataset(
+        {v: (("time", "y", "x"), np.ones((2, 2, 2))) for v in raw_vars},
+        coords={"time": time},
+    )
+    result = _prepare_dataset(ds, "comp_alti")
+    assert set(result.data_vars) == expected
