@@ -571,16 +571,15 @@ class SshSatelliteDecoder(Decoder):
         path_files : list of str
             Absolute paths to the input files.
         fmt : str
-            The exact fmt requested (``"cmems_alti_duacs"``)
-            ; used to look up the matching CF meta
-            specs.
+            The exact fmt requested (``"cmems_alti_duacs"``); used to look
+            up the matching CF meta specs.
         platform : str, optional
             Unused.
 
         Returns
         -------
         xarray.Dataset
-            See `open_decode_sst_satellite`.
+            See `open_decode_alti_satellite`.
         """
         logger.info("Opening/decoding altimetry satellite files")
         return open_decode_alti_satellite(path_files, fmt)
@@ -982,19 +981,23 @@ def open_decode_sst_satellite(path_files, fmt):
 
 
 def open_decode_alti_satellite(path_files, fmt):
-    """
-    Open altimetry satellite netcdf file(s) and store it into a ready-to-use dataset.
+    """Open gridded altimetry netcdf file(s) into a ready-to-use dataset.
+
     Parameters
     ----------
     path_files : str, list of str
         Path to the netcdf files.
+    fmt : str
+        Format name (e.g. ``"cmems_alti_duacs"``), used to look up the
+        matching CF meta specs (``cf_<fmt>.cfg``).
+
     Returns
     -------
     xarray.Dataset
-        CMEMS dataset.
+        Surface dataset on ``(time, y, x)`` with 2D ``lon``/``lat``
+        coordinates, holding ``ssh`` (decoded from adt). The product's own
+        sla and geostrophic currents are dropped, see below.
     """
-    # Open
-    # path = os.path.join(ROOTDIR, "config", f"{fmt}.cfg")
     cfspecs = xmeta.get_meta_specs(f"{fmt}")
     ds = cfspecs.decode(xr.open_mfdataset(path_files).chunk(chunks={}))
 
@@ -1016,10 +1019,8 @@ def open_decode_alti_satellite(path_files, fmt):
         if v in ds:
             ds = ds.drop_vars(v)
 
-    if "depth" in ds.dims:
-        ds = ds.swap_dims({"depth": "z", "lon": "x", "lat": "y"})
-    else:
-        ds = ds.swap_dims({"lon": "x", "lat": "y"})
+    # Altimetry is a surface product: no vertical dimension to handle.
+    ds = ds.swap_dims({"lon": "x", "lat": "y"})
 
     if len(ds.lon.dims) == 1:
         lat, lon = xr.broadcast(ds["lat"], ds["lon"])
@@ -1027,11 +1028,6 @@ def open_decode_alti_satellite(path_files, fmt):
         ds["lon"] = lon
         ds["lat"] = lat
         ds = ds.set_coords(["lon", "lat"])
-    if "depth" in ds.dims:
-        var = [var for var in ds.data_vars if len(ds[var].dims) == 4][0]
-        ds["depth"] = ds["depth"].broadcast_like(ds[var])
-    else:
-        var = [var for var in ds.data_vars if len(ds[var].dims) == 3][0]
     return ds
 
 

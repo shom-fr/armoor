@@ -1,4 +1,5 @@
 import logging
+from typing import ClassVar
 
 import gsw
 import xarray as xr
@@ -84,7 +85,55 @@ class OceanVars(MethodRegistry):
         "ke": "sel_ke",
         "ke_geos": "sel_ke_geos",
         "mke": "sel_mke",
-        "mke_geos": "sel_mke_geos",       
+        "mke_geos": "sel_mke_geos",
+    }
+
+    #: Kinetic energy variants computed by `_compute_kinetic_energy`:
+    #: velocity component names, the selectors that provide them, and attrs.
+    #: Only the total-current ke has a CF standard name
+    #: (specific_kinetic_energy_of_sea_water); the geostrophic/mean/eddy
+    #: variants have none, so they only carry a long_name.
+    _KE_CONFIGS: ClassVar[dict] = {
+        "ke": {
+            "u": "u",
+            "v": "v",
+            "ke": "ke",
+            "long_name": "kinetic energy computed from u and v",
+            "standard_name": "specific_kinetic_energy_of_sea_water",
+            "selectors": ("sel_current_zonal", "sel_current_meridional"),
+        },
+        "ke_geos": {
+            "u": "ugos",
+            "v": "vgos",
+            "ke": "ke_geos",
+            "long_name": "geostrophic kinetic energy computed from SSH",
+            "standard_name": None,
+            "selectors": ("sel_ugos", "sel_vgos"),
+        },
+        "eke": {
+            "u": "ugosa",
+            "v": "vgosa",
+            "ke": "eke",
+            "long_name": "eddy kinetic energy computed from SLA",
+            "standard_name": None,
+            "selectors": ("sel_ugosa", "sel_vgosa"),
+        },
+        "mke": {
+            "u": "u_mean_time",
+            "v": "v_mean_time",
+            "ke": "mke",
+            "long_name": "mean kinetic energy computed from u and v",
+            "standard_name": None,
+            "selectors": ("sel_u_mean_time", "sel_v_mean_time"),
+        },
+        "mke_geos": {
+            "u": "ugos_mean_time",
+            "v": "vgos_mean_time",
+            "ke": "mke_geos",
+            "long_name": "mean geostrophic kinetic energy computed from SSH",
+            "standard_name": None,
+            "selectors": ("sel_ugos_mean_time", "sel_vgos_mean_time"),
+        },
     }
 
     def __init__(self, ds):
@@ -697,20 +746,23 @@ class OceanVars(MethodRegistry):
             logger.warning("Relative vorticity cannot be infered or computed")
 
     def sel_sla(self):
-        """
-        Select sla from the dataset.
+        """Select the sea level anomaly, or compute it from ssh.
+
+        When computed, sla is the anomaly of ssh against its mean over the
+        dataset's whole time axis (the colocated period), and is stored in
+        the dataset since it is a compared variable.
 
         Returns
         -------
-        xarray.DataArray
-            Data array containing temperature.
+        xarray.DataArray or None
+            Sea level anomaly in m, or None if neither sla nor ssh is
+            available.
         """
-
         if "sla" in self.ds.data_vars:
-            logger.info("SLA ALREADY EXISTS")
+            logger.debug("sla already in the dataset")
             return self.ds["sla"]
-        elif "ssh" in self.ds.data_vars:
-            logger.info("SLA COMPUTED FROM SSH")
+        if "ssh" in self.ds.data_vars:
+            logger.debug("Compute sla from ssh")
             if self.ds["ssh"].sizes.get("time", 0) < 2:
                 # The anomaly is taken against the mean over the available
                 # time steps: with a single one, sla (and so eke) is 0.
@@ -724,10 +776,7 @@ class OceanVars(MethodRegistry):
             sla.attrs["units"] = "m"
             self.ds["sla"] = sla
             return self.ds["sla"]
-
-        else:
-            logger.warning("sla cannot be infered or computed")
-
+        logger.warning("sla cannot be infered or computed")
         return None
 
     def _compute_kinetic_energy(self, velocity_type="ke"):
@@ -746,58 +795,20 @@ class OceanVars(MethodRegistry):
         xr.DataArray or None
             Kinetic energy per unit mass in m2 s-2.
         """
-        configs = {
-            "ke": {
-                "u": "u",
-                "v": "v",
-                "ke": "ke",
-                "long_name": "kinetic energy computed from u and v",
-                "selectors": ("sel_current_zonal", "sel_current_meridional"),
-            },
-            "ke_geos": {
-                "u": "ugos",
-                "v": "vgos",
-                "ke": "ke_geos",
-                "long_name": "geostrophic kinetic energy computed from SSH",
-                "selectors": ("sel_ugos", "sel_vgos"),
-            },
-            "eke": {
-                "u": "ugosa",
-                "v": "vgosa",
-                "ke": "eke",
-                "long_name": "eddy kinetic energy computed from SLA",
-                "selectors": ("sel_ugosa", "sel_vgosa"),
-            },
-            "mke": {
-                "u": "u_mean_time",
-                "v": "v_mean_time",
-                "ke": "mke",
-                "long_name": "mean kinetic energy computed from u and v",
-                "selectors": ("sel_u_mean_time", "sel_v_mean_time"),
-            },       
-            "mke_geos": {
-               "u": "ugos_mean_time",
-               "v": "vgos_mean_time",
-               "ke": "mke_geos",
-               "long_name": "mean geostrophic kinetic energy computed from SSH",
-               "selectors": ("sel_ugos_mean_time", "sel_vgos_mean_time"),
-           },                      
-        }
-
-        if velocity_type not in configs:
+        if velocity_type not in self._KE_CONFIGS:
             raise ValueError(
                 f"Unknown velocity_type '{velocity_type}'. "
-                f"Choose from {list(configs)}."
+                f"Choose from {list(self._KE_CONFIGS)}."
             )
 
-        config = configs[velocity_type]
+        config = self._KE_CONFIGS[velocity_type]
         u_name = config["u"]
         v_name = config["v"]
         ke_name = config["ke"]
 
         # Return cached kinetic energy if available
         if ke_name in self.ds:
-            logger.info(f"{ke_name} EXISTS")
+            logger.debug(f"{ke_name} already in the dataset")
             return self.ds[ke_name]
 
         # Retrieve or compute velocity components. Use the selectors' return
@@ -833,17 +844,9 @@ class OceanVars(MethodRegistry):
         ke = 0.5 * (u**2 + v**2)
         ke.name = ke_name
 
-        ke.attrs.update(
-            {
-                "standard_name": (
-                    "specific_eddy_kinetic_energy"
-                    if velocity_type == "eke"
-                    else "specific_kinetic_energy"
-                ),
-                "long_name": config["long_name"],
-                "units": "m2 s-2",
-            }
-        )
+        ke.attrs = {"long_name": config["long_name"], "units": "m2 s-2"}
+        if config["standard_name"]:
+            ke.attrs["standard_name"] = config["standard_name"]
 
         self.ds[ke_name] = ke
 
