@@ -998,7 +998,12 @@ def open_decode_alti_satellite(path_files, fmt):
     cfspecs = xmeta.get_meta_specs(f"{fmt}")
     ds = cfspecs.decode(xr.open_mfdataset(path_files).chunk(chunks={}))
 
+    # The product's own geostrophic currents are dropped on purpose: they are
+    # recomputed from adt with shoot's get_geos, exactly as for the models
+    # (from their ssh), so that ke_geos/mke_geos/eke compare like with like.
     for v in [
+        "ugos",
+        "vgos",
         "ugosa",
         "vgosa",
         "err_sla",

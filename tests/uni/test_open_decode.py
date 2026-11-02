@@ -246,11 +246,16 @@ class TestOpenDecodeSSH:
         """
         filepath = setup_test_data['cmems_alti_duacs']
         result = open_decode_alti_satellite([filepath], fmt="cmems_alti_duacs")
-        
+
         assert isinstance(result, xr.Dataset)
         assert 'x' in result.dims
         assert 'y' in result.dims
         assert 'time' in result.dims
+        # DUACS geostrophic currents are ignored (recomputed from adt like for
+        # the models) and must never pose as a total u/v either.
+        for var in ('ugos', 'vgos', 'ugosa', 'vgosa', 'u', 'v'):
+            assert var not in result
+        assert 'ssh' in result
 
 # ============================================================================
 # Test open_decode_cmems_model

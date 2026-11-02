@@ -233,6 +233,7 @@ class StagedDataset(str):
         vrange=None,
         trange=None,
         time=None,
+        period=None,
     ):
         """Create a str instance carrying extra pipeline-context attributes.
 
@@ -265,6 +266,9 @@ class StagedDataset(str):
         time : str, optional
             The ``ds.range.time`` value, when produced by a per-time-step
             split.
+        period : str, optional
+            The ``ds.range.period`` value, when produced by a whole-window
+            average (see `armoor.ranges.tag_period`).
 
         Returns
         -------
@@ -281,6 +285,7 @@ class StagedDataset(str):
         obj.vrange = vrange
         obj.trange = trange
         obj.time = time
+        obj.period = period
         return obj
 
     def output_dir(self, stage, ref_name=None, prod_name=None, output=None):
@@ -316,9 +321,9 @@ class StagedDataset(str):
         return Path(*[p for p in parts if p])
 
     def with_range(self, ds, path=None, stage=None):
-        """Return a new StagedDataset carrying `ds`'s vlevel/vrange/trange/time.
+        """Return a new StagedDataset carrying `ds`'s vlevel/vrange/trange/time/period.
 
-        Reads `ds.range.vlevel`/`.vrange_value`/`.trange`/`.time` (set by
+        Reads `ds.range.vlevel`/`.vrange_value`/`.trange`/`.time`/`.period` (set by
         `armoor.ranges`' split functions) so a later stage can recover
         them from the path alone, without reopening the dataset just for
         this metadata (e.g. `armoor.io.sort_ncs_by_suffix`).
@@ -336,7 +341,7 @@ class StagedDataset(str):
         -------
         StagedDataset
             A new instance with metazone/comp_func/fmt/platform carried over
-            unchanged, and vlevel/vrange/trange/time set from `ds.range`.
+            unchanged, and vlevel/vrange/trange/time/period set from `ds.range`.
         """
         return StagedDataset(
             path if path is not None else str(self),
@@ -349,6 +354,7 @@ class StagedDataset(str):
             vrange=ds.range.vrange_value,
             trange=ds.range.trange,
             time=ds.range.time,
+            period=ds.range.period,
         )
 
 

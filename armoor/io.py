@@ -667,6 +667,8 @@ def output_suffix(attrs):
     attrs take priority over the range-like ones when both happen to be set.
     `trange` is a bracketed range (e.g. ``"[2020-01-01T00:00:00_2020-01-31T00:00:00["``)
     -- the brackets aren't filename-safe, so they're stripped here.
+    A ``period`` attr (set by `armoor.ranges.tag_period`) takes priority
+    over both and gives a ``_period_<t0>_<tN>`` suffix.
 
     Parameters
     ----------
@@ -676,10 +678,14 @@ def output_suffix(attrs):
     Returns
     -------
     str
-        Empty string if none of the four attrs is present.
+        Empty string if none of these attrs is present.
     """
     parts = []
-    if "time" in attrs:
+    if "period" in attrs:
+        # Whole-window average (see armoor.ranges.tag_period): must never
+        # share a filename with the "time"-dependent file of the same window.
+        parts.append(f"period_{attrs['period']}")
+    elif "time" in attrs:
         parts.append(attrs["time"])
     elif "trange" in attrs:
         parts.append(re.sub(r"[\[\]]", "", attrs["trange"]))
@@ -731,6 +737,12 @@ def extract_suffix_from_filename(filename):
     if match_z and not result['time']:  # Only if time not already found
         result['z'] = match_z.group(2)
 
+    # ref_period_[t0_tN][_z].zarr (see armoor.ranges.tag_period): keep the
+    # "period_" marker so it never sorts with the "time"-dependent file of
+    # the same window -- the patterns above just read "period" as a prefix.
+    if result['time'] and f"_period_{result['time']}" in filename:
+        result['time'] = f"period_{result['time']}"
+
     return result
 
 
@@ -744,15 +756,16 @@ def _range_info_from_staged(nc):
     Parameters
     ----------
     nc : str or armoor.data.load.StagedDataset
-        A path, possibly carrying `.time`/`.trange`/`.vlevel`/`.vrange`.
+        A path, possibly carrying `.period`/`.time`/`.trange`/`.vlevel`/`.vrange`.
 
     Returns
     -------
     dict or None
         ``{"time": ..., "z": ...}`` (matching `extract_suffix_from_filename`'s
-        shape) if any of the four attrs is set, else None.
+        shape) if any of these attrs is set, else None.
     """
-    time_val = getattr(nc, "time", None)
+    period_val = getattr(nc, "period", None)
+    time_val = f"period_{period_val}" if period_val else getattr(nc, "time", None)
     if time_val is None:
         trange_val = getattr(nc, "trange", None)
         # trange is bracketed (e.g. "[t1_t2["); strip to match the
@@ -762,6 +775,23 @@ def _range_info_from_staged(nc):
     if time_val is None and z_val is None:
         return None
     return {"time": time_val, "z": z_val}
+
+
+def is_period_file(nc):
+    """Whether `nc` is a whole-window coloc file (see `armoor.ranges.tag_period`).
+
+    Parameters
+    ----------
+    nc : str or armoor.data.load.StagedDataset
+
+    Returns
+    -------
+    bool
+    """
+    if getattr(nc, "period", None):
+        return True
+    res = extract_suffix_from_filename(str(nc))
+    return bool(res["time"]) and res["time"].startswith("period_")
 
 
 def sort_ncs_by_suffix(ncs: List[str], sort_dim=["time", "z"]) -> Dict[str, List[str]]:

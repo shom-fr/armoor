@@ -6,6 +6,7 @@ import numpy as np
 
 from armoor import ArmoorError
 from armoor.dispatch import MethodRegistry
+from armoor.ranges import PERIOD_DIM
 
 logger = logging.getLogger(__name__)
 
@@ -168,27 +169,43 @@ class OceanVars(MethodRegistry):
         else:
             logger.warning("v cannot be infered or computed")
             
+    def _mean_over_period(self, da, name):
+        """Average `da` over its whole "time" axis, onto a size-1 `period` dim.
+
+        The result is not stored in the dataset: it lives on the
+        `armoor.ranges.PERIOD_DIM` dimension (one value: the mid-time of the
+        averaged window), which cannot share a dataset with the "time"-
+        dependent variables without being split apart downstream (see
+        `armoor.comp.coloc._process_single_product`).
+
+        Parameters
+        ----------
+        da : xarray.DataArray or None
+            Variable to average.
+        name : str
+            Name given to the averaged variable (used in log messages too).
+
+        Returns
+        -------
+        xarray.DataArray or None
+            None when `da` is None or has no "time" dimension.
+        """
+        if da is None or "time" not in da.dims:
+            logger.warning(f"{name} cannot be infered or computed")
+            return None
+        mean = da.mean("time", keep_attrs=True)
+        mean = mean.expand_dims({PERIOD_DIM: [da["time"].mean().values]})
+        mean[PERIOD_DIM].attrs["long_name"] = "middle of the averaging period"
+        mean.name = name
+        return mean
+
     def sel_u_mean_time(self):
-        """Select or compute the mean zonal current component (u) along time."""
-        u = self.sel_current_zonal()
-        if u is not None:
-            u_mean_time = self.ds["u"].mean('time')
-            u_mean_time = u_mean_time.expand_dims(dim={"tbound": [self.ds.time.mean().values]})   
-            self.ds["u_mean_time"] = u_mean_time
-            return self.ds["u_mean_time"]
-        else:
-            logger.warning("u_mean_time cannot be infered or computed")
+        """Compute the zonal current (u) averaged over the whole period."""
+        return self._mean_over_period(self.sel_current_zonal(), "u_mean_time")
 
     def sel_v_mean_time(self):
-        """Select or compute the mean meridional current component (v) along time."""
-        v = self.sel_current_meridional()
-        if v is not None:
-            v_mean_time = self.ds["v"].mean('time')
-            v_mean_time = v_mean_time.expand_dims(dim={"tbound": [self.ds.time.mean().values]})   
-            self.ds["v_mean_time"] = v_mean_time
-            return self.ds["v_mean_time"]
-        else:
-            logger.warning("v_mean_time cannot be infered or computed")      
+        """Compute the meridional current (v) averaged over the whole period."""
+        return self._mean_over_period(self.sel_current_meridional(), "v_mean_time")
 
     def _compute_geos(self, source, prefix):
         """Compute geostrophic current components from a sea level variable."""
@@ -231,26 +248,12 @@ class OceanVars(MethodRegistry):
         return self.ds.get("vgos")
     
     def sel_ugos_mean_time(self):
-        """Compute or retrieve the mean geostrophic zonal current from ssh along time."""
-        u = self.sel_ugos()
-        if u is not None:
-            ugos_mean_time = u.mean('time')
-            ugos_mean_time = ugos_mean_time.expand_dims(dim={"tbound": [self.ds.time.mean().values]})   
-            self.ds["ugos_mean_time"] = ugos_mean_time
-            return self.ds["ugos_mean_time"]
-        else:
-            logger.warning("ugos_mean_time cannot be infered or computed")
+        """Compute the geostrophic zonal current (from ssh) averaged over the whole period."""
+        return self._mean_over_period(self.sel_ugos(), "ugos_mean_time")
 
     def sel_vgos_mean_time(self):
-        """Compute or retrieve the mean geostrophic meridional current from ssh along time."""
-        v = self.sel_vgos()    
-        if v is not None:        
-            vgos_mean_time = v.mean('time')            
-            vgos_mean_time = vgos_mean_time.expand_dims(dim={"tbound": [self.ds.time.mean().values]})       
-            self.ds["vgos_mean_time"] = vgos_mean_time         
-            return self.ds["vgos_mean_time"]
-        else:
-            logger.warning("vgos_mean_time cannot be infered or computed")
+        """Compute the geostrophic meridional current (from ssh) averaged over the whole period."""
+        return self._mean_over_period(self.sel_vgos(), "vgos_mean_time")
 
     def sel_ugosa(self):
         """Compute or retrieve the geostrophic zonal current anomaly from sla."""
@@ -764,23 +767,26 @@ class OceanVars(MethodRegistry):
             logger.info(f"{ke_name} EXISTS")
             return self.ds[ke_name]
 
-        # Retrieve or compute velocity components
+        # Retrieve or compute velocity components. Use the selectors' return
+        # values rather than re-reading self.ds: some of them (the
+        # *_mean_time ones) deliberately don't store their result.
+        u = self.ds.get(u_name)
+        v = self.ds.get(v_name)
         if config["selectors"] is not None:
-            for var_name, selector_name in zip((u_name, v_name), config["selectors"]):
-                if var_name not in self.ds:
-                    logger.info(f"Retrieving {var_name} using {selector_name}()")
-                    getattr(self, selector_name)()
+            if u is None:
+                logger.info(f"Retrieving {u_name} using {config['selectors'][0]}()")
+                u = getattr(self, config["selectors"][0])()
+            if v is None:
+                logger.info(f"Retrieving {v_name} using {config['selectors'][1]}()")
+                v = getattr(self, config["selectors"][1])()
 
         # Check that velocity components are available
-        if u_name not in self.ds or v_name not in self.ds:
+        if u is None or v is None:
             logger.warning(
                 f"Cannot compute {ke_name}: "
                 f"'{u_name}' or '{v_name}' is missing from the dataset."
             )
             return None
-
-        u = self.ds[u_name]
-        v = self.ds[v_name]
 
         if not isinstance(u, xr.DataArray) or not isinstance(v, xr.DataArray):
             logger.warning(

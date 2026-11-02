@@ -30,6 +30,13 @@ New features
   sla is computed as the anomaly of ssh (for the model) or adt 
   (for the satellite) over the period defined by ``tbound`` 
   (``armoor.base.oceanvars.OceanVars.sel_sla``).
+  ``mke``/``mke_geos`` are averaged over the whole ``tbound`` window
+  (new size-1 ``period`` dimension, ``*_period_<start>_<end>.zarr`` coloc
+  files) and only plotted by the ``maps`` and ``diagdisp_glob`` outputs.
+  The geostrophic currents provided by DUACS are ignored: the reference
+  ``ugos``/``vgos`` are recomputed from adt with ``get_geos``, like the model
+  ones from ssh. ``ke``/``mke`` (total current) are only compared when the
+  reference provides a total current, so not against DUACS.
 
 - Added ``wmo_platform_code`` and ``institution_country`` (if exist) 
   in ``open_decode_cmems_insitu``.

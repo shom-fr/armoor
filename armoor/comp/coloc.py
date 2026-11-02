@@ -1043,6 +1043,7 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
     comparison = get_comparison(comp_func)
     dsref = comparison.compute_oceanvars(dsref, mparams)
     dsprod = comparison.compute_oceanvars(dsprod, mparams)
+    dsref, dsprod = comparison.select_common_vars(dsref, dsprod)
 
     # Set depth/pres as coordinate if needed
     for vcoord in ["depth", "pres"]:
@@ -1076,7 +1077,19 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
             if sub_ref is None or sub_prod is None:
                 continue
 
-            if "time" in sub_ref.dims:
+            if ranges.PERIOD_DIM in sub_ref.dims:
+                # Averaged over the whole colocated window (e.g. mke): never
+                # time-ranged, saved under its own "_period_<t0>_<tN>" name.
+                # Both sides were averaged over the same colocated time axis;
+                # share the ref's period coord so a mid-time computed at a
+                # different precision can't break the ref/prod alignment.
+                label = ranges.period_label(dsref)
+                sub_prod = sub_prod.assign_coords(
+                    {ranges.PERIOD_DIM: sub_ref[ranges.PERIOD_DIM].values}
+                )
+                sub_ref_list = [ranges.tag_period(sub_ref, label)]
+                sub_prod_list = [ranges.tag_period(sub_prod, label)]
+            elif "time" in sub_ref.dims:
                 sub_ref_list, sub_prod_list = _apply_time_ranges(
                     sub_ref, sub_prod, params, tbound
                 )

@@ -314,8 +314,42 @@ class TestOceanVars:
        """Test calculation of ke_geos with u and v computed from ssh"""
        result = self.ds.oceanvars.sel_ke_geos()
        assert result is not None
-       assert 'ke_geos' in self.ds         
-      
+       assert 'ke_geos' in self.ds
+
+    def test_sel_u_mean_time_on_period_dim(self):
+        """u_mean_time is the whole-window mean, on a size-1 period dim, not stored."""
+        result = self.ds.oceanvars.sel_u_mean_time()
+        assert result.dims == ("period", "lat", "lon")
+        assert result.sizes["period"] == 1
+        np.testing.assert_allclose(result.isel(period=0).values, self.u.mean(axis=0))
+        assert result["period"].values[0] == self.ds.time.mean().values
+        assert "u_mean_time" not in self.ds
+
+    def test_sel_u_mean_time_from_cdir_cspeed(self):
+        """u derived from cdir/cspeed (hence never stored) must still work."""
+        ds = self.ds.drop_vars(["u", "v"])
+        ds["cspeed"] = (("time", "lat", "lon"), np.ones_like(self.u))
+        ds["cdir"] = (("time", "lat", "lon"), np.zeros_like(self.u))
+        result = ds.oceanvars.sel_u_mean_time()
+        np.testing.assert_allclose(result.values, 1.0)
+
+    def test_sel_mke(self):
+        """mke = 0.5 * (mean(u)**2 + mean(v)**2) over the whole window."""
+        result = self.ds.oceanvars.sel_mke()
+        expected = 0.5 * (self.u.mean(axis=0) ** 2 + self.v.mean(axis=0) ** 2)
+        assert result.dims == ("period", "lat", "lon")
+        np.testing.assert_allclose(result.isel(period=0).values, expected)
+        assert "mke" in self.ds
+        assert "u_mean_time" not in self.ds
+        assert "v_mean_time" not in self.ds
+
+    def test_sel_mke_geos(self):
+        """mke_geos is built on the period dim from ssh-derived ugos/vgos."""
+        result = self.ds.oceanvars.sel_mke_geos()
+        assert result is not None
+        assert result.sizes["period"] == 1
+        assert "ugos_mean_time" not in self.ds
+
     def test_sel_method_routing(self):
         """Test routing of the sel method"""
         # Test with temperature

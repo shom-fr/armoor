@@ -132,6 +132,24 @@ class Comparison:
                     ds[var] = da
         return ds
 
+    def select_common_vars(self, dsref, dsprod):
+        """Hook to restrict both datasets to the variables they can be compared on.
+
+        Called right after `compute_oceanvars` on both sides. The generic
+        implementation returns them unchanged.
+
+        Parameters
+        ----------
+        dsref, dsprod : xarray.Dataset
+            Colocated reference and product datasets.
+
+        Returns
+        -------
+        tuple of xarray.Dataset
+            ``(dsref, dsprod)``.
+        """
+        return dsref, dsprod
+
     def check_output(self, outputs):
         """Validate that every requested output type is implemented.
 
@@ -316,19 +334,60 @@ class CompAlti(Comparison):
     ]
     colocation_params_user = {
         "time": ("trange_seq", "tfreq"),
-        "horizontal": ("href", "cloud"),
+        "horizontal": ("href",),
     }
     colocation_params_default = {
         "vertical": ("vlevel", {"vname": "depth", "levels": [0.0]}),
     }
+    # "period": True lets an otype read the whole-window coloc files
+    # (mke/mke_geos, averaged over the metazone's tbound -- see
+    # armoor.ranges.tag_period); the other otypes skip them.
     outputs_params = {
-        "diagdisp_glob": {"concat": ["time"]},
+        "diagdisp_glob": {"concat": ["time"], "period": True},
         "diagdisp_sel": {"sort": ["time"], "concat": ["time"]},
         "timeseries": {"concat": ["time"], "stat": ["time", "x", "y"], "output": "merge"},
-        "maps": {"sort": ["time"], "stat": ["time"]},
+        "maps": {"sort": ["time"], "stat": ["time"], "period": True},
     }
     comp_vars = ["sla", "ke", "ke_geos", "eke", "mke", "mke_geos"]
-    
+
+    def select_common_vars(self, dsref, dsprod):
+        """Drop the `comp_vars` that only one side could provide.
+
+        Total-current energies (ke, mke) need a real total current: an
+        altimetry reference (e.g. DUACS) only provides geostrophic currents,
+        so it only yields ke_geos/mke_geos/eke. Comparing a model's total ke
+        against a geostrophic one would be meaningless, so a variable missing
+        on one side is dropped from the other instead (downstream outputs,
+        e.g. diagdisp_glob, also expect the same variables on both sides).
+
+        Parameters
+        ----------
+        dsref, dsprod : xarray.Dataset
+            Colocated reference and product datasets.
+
+        Returns
+        -------
+        tuple of xarray.Dataset
+            ``(dsref, dsprod)``, without their unmatched `comp_vars`.
+        """
+        ref_vars = set(self.comp_vars) & set(dsref.data_vars)
+        prod_vars = set(self.comp_vars) & set(dsprod.data_vars)
+        only_prod = sorted(prod_vars - ref_vars)
+        only_ref = sorted(ref_vars - prod_vars)
+        if only_prod:
+            logger.info(
+                f"{dsref.attrs.get('data_name')} cannot provide {only_prod}: "
+                f"not compared for {dsprod.attrs.get('data_name')}"
+            )
+            dsprod = dsprod.drop_vars(only_prod)
+        if only_ref:
+            logger.info(
+                f"{dsprod.attrs.get('data_name')} cannot provide {only_ref}: "
+                f"not compared against {dsref.attrs.get('data_name')}"
+            )
+            dsref = dsref.drop_vars(only_ref)
+        return dsref, dsprod
+
     def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
         """Return the dataset lists unchanged.
 

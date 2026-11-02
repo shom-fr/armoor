@@ -41,6 +41,20 @@ Eddy Kinetic Energy (``eke``), Kinetic Energy from total u and v (``ke``), kinet
 and sea surface height (ssh or adt) (``ke_geos``), Mean Kinetic energy from total and geostrophic current (``mke`` and ``mke_geos``).
 sla is computed as the anomaly of ssh (for the model) or adt (for the satellite) over the period defined by ``tbound``
 
+``mke`` and ``mke_geos`` are computed from the current averaged over the whole
+period defined by ``tbound`` (never split by ``trange_seq``/``tfreq``). They
+carry a size-1 ``period`` dimension instead of ``time``, are saved in their own
+``*_period_<start>_<end>.zarr`` colocation files, and are only produced by the
+``maps`` and ``diagdisp_glob`` outputs.
+
+Geostrophic energies are compared geostrophic against geostrophic, computed the
+same way on both sides: ``ugos``/``vgos`` are derived with ``get_geos`` from the
+model ssh and from the DUACS adt. The geostrophic currents provided by DUACS
+(``ugos``/``vgos``/``ugosa``/``vgosa``) are ignored. ``ke`` and ``mke`` (total current)
+are only compared when the reference provides a total current, which altimetry
+does not: against DUACS they are dropped and only ``ke_geos``, ``mke_geos``,
+``eke`` and ``sla`` are compared.
+
 
 Geostrophic current from sla or ssh are computed using ``get_geos`` from the library ``shoot`` 
 
@@ -99,7 +113,6 @@ metazone parameters
     - ``tfreq``
     - ``polygon``
     - ``href``
-    - ``cloud``
     - ``vars``
 
     .. note::
