@@ -73,12 +73,8 @@ class TimeColocation(AbstractColocation):
         self.dsref = interp_time(self.dsref, time)
         self.dsprod = interp_time(self.dsprod, time)
         tt = pd.to_datetime(self.dsref.time)
-        self.dsref.attrs["trange"] = (
-            f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
-        )
-        self.dsprod.attrs["trange"] = (
-            f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
-        )
+        self.dsref.attrs["trange"] = f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
+        self.dsprod.attrs["trange"] = f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
         return self.dsref, self.dsprod
 
     def tmonth(self) -> Tuple[xr.Dataset, xr.Dataset]:
@@ -103,9 +99,7 @@ class TimeColocation(AbstractColocation):
         # indices as floats with 'units'/'calendar' in attrs, while the
         # product has plain int months from groupby. Make both consistent
         # (int, no CF attrs) so zarr encoding doesn't conflict.
-        ds_ref_monthly = ds_ref_monthly.assign_coords(
-            time=("time", common_months.astype(int), {})
-        )
+        ds_ref_monthly = ds_ref_monthly.assign_coords(time=("time", common_months.astype(int), {}))
         return ds_ref_monthly, ds_prod_monthly
 
     def trange_seq(self, args: dict) -> xr.Dataset:
@@ -138,12 +132,8 @@ class TimeColocation(AbstractColocation):
                 "Use 'reference' or 'product' to specify the reference timefor ranging then."
             )
         tt = pd.to_datetime(self.dsref.time)
-        self.dsref.attrs["trange"] = (
-            f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
-        )
-        self.dsprod.attrs["trange"] = (
-            f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
-        )
+        self.dsref.attrs["trange"] = f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
+        self.dsprod.attrs["trange"] = f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
         return self.dsref, self.dsprod
 
 
@@ -256,13 +246,9 @@ class HorizontalColocation(AbstractColocation):
             Reference and product datasets (the coarsened one(s) replaced).
         """
         if on in ("product", "both"):
-            self.dsprod = _coarsen(
-                self.dsprod, factor=factor, boundary=boundary, method=method
-            )
+            self.dsprod = _coarsen(self.dsprod, factor=factor, boundary=boundary, method=method)
         if on in ("reference", "both"):
-            self.dsref = _coarsen(
-                self.dsref, factor=factor, boundary=boundary, method=method
-            )
+            self.dsref = _coarsen(self.dsref, factor=factor, boundary=boundary, method=method)
         return self.dsref, self.dsprod
 
     def _clean_coordinates(self, dataset: xr.Dataset) -> xr.Dataset:
@@ -285,7 +271,8 @@ class HorizontalColocation(AbstractColocation):
         dist = (
             xgeo.get_distances(prod_data, ref_data)
             # .squeeze()
-            .rename(rename_dims).assign_coords(member=prod_data.member)
+            .rename(rename_dims)
+            .assign_coords(member=prod_data.member)
         )
         if "npts1" in dist.dims:
             # A time-independent reference (e.g. a single fixed mooring) has
@@ -315,9 +302,7 @@ class HorizontalColocation(AbstractColocation):
             valid_idx = np.where(any_valid.values)[0]
             self.dsprod = self.dsprod.isel(member=valid_idx)
             mask = mask.isel(member=valid_idx)
-            logger.info(
-                f"Compacted members: {n_before} -> {self.dsprod.sizes['member']}"
-            )
+            logger.info(f"Compacted members: {n_before} -> {self.dsprod.sizes['member']}")
 
         # Drop members whose ocean data are all-NaN at every (time, z) point.
         # These are land/masked cells in the model that passed the geographic
@@ -351,9 +336,7 @@ class HorizontalColocation(AbstractColocation):
                 )
 
         for coord in ["lon", "lat"]:
-            self.dsprod[coord] = self.dsprod[coord].expand_dims(
-                {"time": self.dsprod.time}
-            )
+            self.dsprod[coord] = self.dsprod[coord].expand_dims({"time": self.dsprod.time})
         self.dsprod = self.dsprod.reset_coords(["lon", "lat"])
 
         # Promote depth to coordinate before masking so where(mask) does not
@@ -389,9 +372,7 @@ class HorizontalColocation(AbstractColocation):
             self.dsprod = xcoords.geo_stack(self.dsprod, "member")
         if "time" not in self.dsref.lon.dims:
             # Time-independent case
-            dist_prod2ref = self._calculate_distances_vectorized(
-                self.dsprod, self.dsref
-            )
+            dist_prod2ref = self._calculate_distances_vectorized(self.dsprod, self.dsref)
             filtered_ds = self.dsprod.where(dist_prod2ref < radius_meters)
             self.dsprod = self._clean_coordinates(filtered_ds)
         else:
@@ -627,9 +608,7 @@ def _drop_time_cf_attrs_if_not_datetime(ds):
         # write fails.  Strip them so the encoder can set them properly.
         if any(k in time_var.attrs for k in ("units", "calendar")):
             clean_attrs = {
-                k: v
-                for k, v in time_var.attrs.items()
-                if k not in ("units", "calendar")
+                k: v for k, v in time_var.attrs.items() if k not in ("units", "calendar")
             }
             clean_time = xr.Variable(
                 "time",
@@ -689,22 +668,16 @@ def save_datasets(dsref, dsprod, dirout, staged=None):
             dict(dsref["time"].encoding),
             encoding_ref.get("time"),
         )
-    job_ref = dsref.to_zarr(
-        store=ncout_ref, mode="w", encoding=encoding_ref, compute=False
-    )
+    job_ref = dsref.to_zarr(store=ncout_ref, mode="w", encoding=encoding_ref, compute=False)
 
     if "mask" in dsprod.data_vars:
         dsprod = dsprod.drop_vars("mask")
     dsprod = _drop_time_cf_attrs_if_not_datetime(dsprod)
     dsprod = dsprod.chunk("auto")
     encoding_prod = get_zarr_encoding(dsprod)
-    if "time" in dsprod.coords and not np.issubdtype(
-        dsprod["time"].dtype, np.datetime64
-    ):
+    if "time" in dsprod.coords and not np.issubdtype(dsprod["time"].dtype, np.datetime64):
         encoding_prod["time"] = {"dtype": str(dsprod["time"].dtype)}
-    job_prod = dsprod.to_zarr(
-        store=ncout_prod, mode="w", encoding=encoding_prod, compute=False
-    )
+    job_prod = dsprod.to_zarr(store=ncout_prod, mode="w", encoding=encoding_prod, compute=False)
 
     dask.compute(job_ref, job_prod)
 
@@ -835,9 +808,7 @@ def _apply_colocations(dsref, dsprod, params, tbound):
         gc.collect()
 
     if params.get("horizontal"):
-        dsref, dsprod = process_horizontal_colocation(
-            dsref, dsprod, params["horizontal"]
-        )
+        dsref, dsprod = process_horizontal_colocation(dsref, dsprod, params["horizontal"])
         gc.collect()
 
     if params.get("vertical"):
@@ -908,9 +879,7 @@ def _apply_vertical_ranges(dsref_list, dsprod_list, params, comp_func):
     if params.get("vertical") is None:
         return dsref_list, dsprod_list
 
-    return get_comparison(comp_func).apply_vertical_ranges(
-        dsref_list, dsprod_list, params
-    )
+    return get_comparison(comp_func).apply_vertical_ranges(dsref_list, dsprod_list, params)
 
 
 def _split_by_dims(ds):
@@ -937,9 +906,7 @@ def select_vars_by_dims(prod_groups, sig):
     for group, ds in prod_groups.items():
         group = set(group)
 
-        if sig == group.intersection(sig) and len(sig) == len(group) - (
-            "member" in group
-        ):
+        if sig == group.intersection(sig) and len(sig) == len(group) - ("member" in group):
             return ds
 
     return None
@@ -1093,9 +1060,7 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
                 sub_ref_list = [ranges.tag_period(sub_ref, label)]
                 sub_prod_list = [ranges.tag_period(sub_prod, label)]
             elif "time" in sub_ref.dims:
-                sub_ref_list, sub_prod_list = _apply_time_ranges(
-                    sub_ref, sub_prod, params, tbound
-                )
+                sub_ref_list, sub_prod_list = _apply_time_ranges(sub_ref, sub_prod, params, tbound)
             else:
                 sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]
 
@@ -1138,16 +1103,12 @@ def _process_reference(ncref, ncins, params, tbound, staged, ncouts, mparams=Non
     _ds_meta = xr.open_dataset(ncref, engine="zarr", chunks={}, decode_times=False)
     _is_climato = get_data_type_by_name(_ds_meta.attrs.get("data_type")).is_climatology
     _ds_meta.close()
-    dsrefin = xr.open_dataset(
-        ncref, engine="zarr", chunks={}, decode_times=not _is_climato
-    )
+    dsrefin = xr.open_dataset(ncref, engine="zarr", chunks={}, decode_times=not _is_climato)
     dsrefin = _prepare_dataset(dsrefin, staged.comp_func, is_reference=True)
 
     results = []
     for ncin in ncins:
-        result = _process_single_product(
-            dsrefin, ncin, params, tbound, staged, mparams=mparams
-        )
+        result = _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=mparams)
         results.append(result)
 
     # Merge results into ncouts
@@ -1190,9 +1151,7 @@ def _process_metazone(staged, params, mz_files, metazones, ncouts):
     ncins = mz_files["prod"]
 
     for ncref in ncrefs:
-        _process_reference(
-            ncref, ncins, params, tbound, staged, ncouts, mparams=mparams
-        )
+        _process_reference(ncref, ncins, params, tbound, staged, ncouts, mparams=mparams)
 
     logger.info(f"End colocation for {metazone}.")
 
@@ -1220,9 +1179,7 @@ def main_coloc(ncs, metazones, comp_func):
     coloc_params = {}
     for metazone, params in coloc_check.items():
         if not params:
-            logger.info(
-                f"Skip {metazone}: colocation is not possible for this functionnality."
-            )
+            logger.info(f"Skip {metazone}: colocation is not possible for this functionnality.")
         else:
             coloc_params[metazone] = params
 
@@ -1248,9 +1205,7 @@ def main_coloc(ncs, metazones, comp_func):
     ncouts = {}
     for metazone, params in coloc_params.items():
         mz_files = ncs_index.get(metazone, {"ref": [], "prod": []})
-        staged = StagedDataset(
-            "", metazone=metazone, comp_func=comp_func, stage="coloc"
-        )
+        staged = StagedDataset("", metazone=metazone, comp_func=comp_func, stage="coloc")
         _process_metazone(staged, params, mz_files, metazones, ncouts)
 
     return ncouts

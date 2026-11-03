@@ -927,9 +927,7 @@ def open_decode_arpege_insta(path_files):
         dss.append(xr.merge(ds, combine_attrs="override"))
     ds_insta = xr.concat(dss, dim="valid_time")
     ds_insta = ds_insta.drop_vars(["step", "time"])
-    ds_insta = ds_insta.rename(
-        {"longitude": "lon", "latitude": "lat", "valid_time": "time"}
-    )
+    ds_insta = ds_insta.rename({"longitude": "lon", "latitude": "lat", "valid_time": "time"})
     ds_insta = ds_insta.swap_dims({"lon": "x", "lat": "y"})
     # matches open_decode_sst_satellite's broadcast -- downstream plotting assumes 2D lon/lat
     lat, lon = xr.broadcast(ds_insta["lat"], ds_insta["lon"])
@@ -959,9 +957,7 @@ def open_decode_sst_satellite(path_files, fmt):
     # Open
     # path = os.path.join(ROOTDIR, "config", f"{fmt}.cfg")
     cfspecs = xmeta.get_meta_specs(f"{fmt}")
-    ds = cfspecs.decode(
-        xr.open_mfdataset(path_files, decode_timedelta=True).chunk(chunks={})
-    )
+    ds = cfspecs.decode(xr.open_mfdataset(path_files, decode_timedelta=True).chunk(chunks={}))
     for var in ds.coords:
         if "or_" in var:
             ds = ds.drop_vars(var)
@@ -1214,9 +1210,7 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
     else:
         # Some time ranges are shared across files (per-variable organisation):
         # merge within each group, then concat groups along time.
-        logger.info(
-            f"open_decode_hycom: {len(_groups)} time group(s), merging per-variable files"
-        )
+        logger.info(f"open_decode_hycom: {len(_groups)} time group(s), merging per-variable files")
         _group_ds = []
         for _key, _paths in _groups.items():
             if len(_paths) == 1:
@@ -1389,9 +1383,7 @@ def open_decode_woa18(path_files):
     woa18["lon"] = xr.DataArray(lon, dims=["y", "x"])
     woa18["lat"] = xr.DataArray(lat, dims=["y", "x"])
     woa18 = woa18.set_coords(["lon", "lat"])
-    woa18["time"] = np.ceil(woa18["time"]) - 12.0 * np.trunc(
-        np.ceil(woa18["time"]) / 12.0
-    )
+    woa18["time"] = np.ceil(woa18["time"]) - 12.0 * np.trunc(np.ceil(woa18["time"]) / 12.0)
     woa18["time"] = woa18.time.where(woa18.time != 0.0, 12.0)
     # The original "months since ..." units/calendar attrs survive the
     # arithmetic above even though the values no longer mean that -- left
@@ -1450,12 +1442,7 @@ def open_decode_bobyclim(path_files):
     ds = convert_lons(ds)
 
     # Build 2D (y, x) grid from 1D lon/lat if needed
-    if (
-        "lon" in ds.coords
-        and ds["lon"].ndim == 1
-        and "lat" in ds.coords
-        and ds["lat"].ndim == 1
-    ):
+    if "lon" in ds.coords and ds["lon"].ndim == 1 and "lat" in ds.coords and ds["lat"].ndim == 1:
         lon2d, lat2d = np.meshgrid(ds["lon"].values, ds["lat"].values)
         ds = ds.swap_dims({"lon": "x", "lat": "y"})
         ds = ds.drop_vars(["lon", "lat"])
@@ -1470,9 +1457,7 @@ def open_decode_bobyclim(path_files):
             time_vals.dtype, np.integer
         ):
             # Already numeric — apply same formula as WOA18
-            ds["time"] = np.ceil(ds["time"]) - 12.0 * np.trunc(
-                np.ceil(ds["time"]) / 12.0
-            )
+            ds["time"] = np.ceil(ds["time"]) - 12.0 * np.trunc(np.ceil(ds["time"]) / 12.0)
             ds["time"] = ds["time"].where(ds["time"] != 0.0, 12.0)
         else:
             # datetime-like: extract month number
@@ -1917,11 +1902,7 @@ def open_decode_croco(path_file, fmt="croco"):
 
     ds_grid = xr.open_dataset(grid_file)
     # Separate grid file is excluded from data files; embedded grid files are kept
-    data_files = (
-        [f for f in path_file if f != grid_file]
-        if has_separate_grid
-        else list(path_file)
-    )
+    data_files = [f for f in path_file if f != grid_file] if has_separate_grid else list(path_file)
     n_files = len(data_files)
 
     # Use native file dim names (pre-decode: eta_rho/xi_rho, not y_rho/x_rho)
@@ -1995,9 +1976,9 @@ def open_decode_croco(path_file, fmt="croco"):
                 if "hc" not in ds.data_vars:
                     ds["hc"] = float(ds.attrs.get("hc"))
                 if sig == "sig_w":
-                    ds[sig].attrs[
-                        "formula_terms"
-                    ] = "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
+                    ds[sig].attrs["formula_terms"] = (
+                        "s: sig_w C: cs_w eta: ssh depth: bathy depth_c: hc"
+                    )
                 elif sig == "sig_rho":
                     if "cs_r" in ds:
                         cs_rho = "cs_r"
@@ -2007,17 +1988,15 @@ def open_decode_croco(path_file, fmt="croco"):
                         raise ArmoorError(
                             "cs_r and cs_rho are missing. Armoor should find one of them."
                         )
-                    ds[sig].attrs[
-                        "formula_terms"
-                    ] = f"s: sig_rho C: {cs_rho} eta: ssh depth: bathy depth_c: hc"
+                    ds[sig].attrs["formula_terms"] = (
+                        f"s: sig_rho C: {cs_rho} eta: ssh depth: bathy depth_c: hc"
+                    )
                 if "standard_name" not in ds[sig].attrs:
                     logger.warning(f"No standard_name attributes in {sig}")
                     if sig == "sig_rho":
                         ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2"
                     elif sig == "sig_w":
-                        ds[sig].attrs[
-                            "standard_name"
-                        ] = "ocean_s_coordinate_g2_at_w_location"
+                        ds[sig].attrs["standard_name"] = "ocean_s_coordinate_g2_at_w_location"
         ds = ds.decode_sigma()
     logger.info(f"  [timing] decode_sigma:     {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
@@ -2668,9 +2647,7 @@ def open_decode_cora(path_files):
                 if f"{var}_ADJUSTED_ERROR" in cora:
                     cora = cora.drop_vars(f"{var}_ADJUSTED_ERROR")
         for var in list(cora.keys()):
-            if "N_PROF" not in list(cora[var].dims) and "N_LEVELS" not in list(
-                cora[var].dims
-            ):
+            if "N_PROF" not in list(cora[var].dims) and "N_LEVELS" not in list(cora[var].dims):
                 cora = cora.drop_vars(var)
 
         # Decode
@@ -2774,8 +2751,7 @@ def open_decode_eddy_pet(path_files):
             da.assign_coords(
                 time=(
                     "obs",
-                    [datetime.datetime.strptime(file[-11:-3], "%Y%m%d")]
-                    * da.obs.shape[0],
+                    [datetime.datetime.strptime(file[-11:-3], "%Y%m%d")] * da.obs.shape[0],
                 )
             )
         ]
@@ -2821,9 +2797,7 @@ def open_decode_eddy_sacso(path_files):
         line = line.strip()  # remove spaces and line breaks
 
         if "Date" in line:
-            dates.append(
-                datetime.datetime.strptime(line[len(suffix_date) :], "%Y-%m-%d/%H:%M")
-            )
+            dates.append(datetime.datetime.strptime(line[len(suffix_date) :], "%Y-%m-%d/%H:%M"))
 
         # Check if new list of coordinates
         if line == "Liste_Points(lon/lat)":
@@ -2836,9 +2810,7 @@ def open_decode_eddy_sacso(path_files):
 
         if start_reading and line:
             if "Sens_de_rotation" in line:
-                rotation = (
-                    line[len(suffix_center) : -4].lower() + "e"
-                )  # cyclone or anticyclone
+                rotation = line[len(suffix_center) : -4].lower() + "e"  # cyclone or anticyclone
                 if rotation == "cyclone":
                     eddy_type.append(-1)
                 elif rotation == "anticyclone":
@@ -2918,9 +2890,7 @@ def open_decode_eddy_shoot(path_files):
         """Set "time" as a coordinate before concatenating along "obs"."""
         return ds.set_coords("time")
 
-    da = xr.open_mfdataset(
-        path_files, combine="nested", concat_dim="obs", preprocess=preprocessing
-    )
+    da = xr.open_mfdataset(path_files, combine="nested", concat_dim="obs", preprocess=preprocessing)
 
     # Keep only variables of interest and formatting
     list_vars = [

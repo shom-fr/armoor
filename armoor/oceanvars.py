@@ -67,7 +67,7 @@ class OceanVars(MethodRegistry):
         "u_mean_time": "sel_u_mean_time",
         "v_mean_time": "sel_v_mean_time",
         "ugos_mean_time": "sel_ugos_mean_time",
-        "vgos_mean_time": "sel_vgos_mean_time",       
+        "vgos_mean_time": "sel_vgos_mean_time",
         "ugosa": "sel_ugosa",
         "vgosa": "sel_vgosa",
         "ptemp": "sel_ptemp",
@@ -220,7 +220,7 @@ class OceanVars(MethodRegistry):
             return self.ds.cspeed * np.sin(self.ds.cdir * np.pi / 180.0)
         else:
             logger.warning("v cannot be infered or computed")
-            
+
     def _mean_over_period(self, da, name):
         """Average `da` over its whole "time" axis, onto a size-1 `period` dim.
 
@@ -294,9 +294,7 @@ class OceanVars(MethodRegistry):
 
         src = self.sel_sla() if source == "sla" else self.ds.get(source)
         if src is None:
-            logger.warning(
-                f"Cannot compute {u_name} and {v_name}: {source} is unavailable"
-            )
+            logger.warning(f"Cannot compute {u_name} and {v_name}: {source} is unavailable")
             return None, None
 
         cached = self._geos_cache.get(prefix)
@@ -325,7 +323,7 @@ class OceanVars(MethodRegistry):
     def sel_vgos(self):
         """Compute or retrieve the geostrophic meridional current from ssh (not stored)."""
         return self._compute_geos("ssh", "gos")[1]
-    
+
     def sel_ugos_mean_time(self):
         """Compute the geostrophic zonal current (from ssh) averaged over the whole period."""
         return self._mean_over_period(self.sel_ugos(), "ugos_mean_time")
@@ -371,9 +369,7 @@ class OceanVars(MethodRegistry):
                 ptemp.attrs["long_name"] = "Potential temperature"
                 return ptemp
             else:
-                logger.warning(
-                    "No salinity found, potential temperature cannot be computed."
-                )
+                logger.warning("No salinity found, potential temperature cannot be computed.")
                 return None
 
     def sel_temp(self):
@@ -421,9 +417,7 @@ class OceanVars(MethodRegistry):
         if "conduct" in self.ds and "temp" in self.ds:
             pres = self.sel_pres()
             if not isinstance(pres, xr.DataArray):
-                logger.warning(
-                    "No pressure found, salinity cannot be computed from conductivity."
-                )
+                logger.warning("No pressure found, salinity cannot be computed from conductivity.")
                 return None
             sal = _gsw_ufunc(gsw.SP_from_C, self.ds.conduct, self.ds.temp, pres)
             sal.attrs["standard_name"] = "sea_water_salinity"
@@ -578,9 +572,7 @@ class OceanVars(MethodRegistry):
                 logger.warning("Potential temperature cannot be computed")
                 return None
             if "depth" not in self.ds:
-                logger.warning(
-                    "No depth coordinate found, mixed layer depth cannot be computed"
-                )
+                logger.warning("No depth coordinate found, mixed layer depth cannot be computed")
                 return None
             # armoor.data.open_decode.register_cf() registers per-format CF
             # specs (cmems_argo, cmems_model, ...) into xoa's global meta
@@ -633,9 +625,7 @@ class OceanVars(MethodRegistry):
             available.
         """
         if "time" not in self.ds.dims or self.ds.sizes["time"] < 2:
-            logger.warning(
-                "Fewer than 2 stations, geostrophic velocity cannot be computed."
-            )
+            logger.warning("Fewer than 2 stations, geostrophic velocity cannot be computed.")
             return None
         sal = self.sel_sal()
         ptemp = self.sel_ptemp()
@@ -673,9 +663,7 @@ class OceanVars(MethodRegistry):
         sa = gsw.SA_from_SP(sal_vals, pres_vals, lon[np.newaxis, :], lat[np.newaxis, :])
         ct = gsw.CT_from_pt(sa, ptemp_vals)
         geo_strf = gsw.geo_strf_dyn_height(sa, ct, pres_vals, p_ref=p_ref, axis=0)
-        vel, mid_lon, mid_lat = gsw.geostrophic_velocity(
-            geo_strf, lon, lat, p=pres_vals
-        )
+        vel, mid_lon, mid_lat = gsw.geostrophic_velocity(geo_strf, lon, lat, p=pres_vals)
         depth_pair = 0.5 * (depth_vals[:, :-1] + depth_vals[:, 1:])
 
         coords = {"lon": ("pair", mid_lon), "lat": ("pair", mid_lat)}
@@ -797,8 +785,7 @@ class OceanVars(MethodRegistry):
         """
         if velocity_type not in self._KE_CONFIGS:
             raise ValueError(
-                f"Unknown velocity_type '{velocity_type}'. "
-                f"Choose from {list(self._KE_CONFIGS)}."
+                f"Unknown velocity_type '{velocity_type}'. Choose from {list(self._KE_CONFIGS)}."
             )
 
         config = self._KE_CONFIGS[velocity_type]
@@ -827,8 +814,7 @@ class OceanVars(MethodRegistry):
         # Check that velocity components are available
         if u is None or v is None:
             logger.warning(
-                f"Cannot compute {ke_name}: "
-                f"'{u_name}' or '{v_name}' is missing from the dataset."
+                f"Cannot compute {ke_name}: '{u_name}' or '{v_name}' is missing from the dataset."
             )
             return None
 
@@ -875,7 +861,7 @@ class OceanVars(MethodRegistry):
             KE data array.
         """
         return self._compute_kinetic_energy("ke")
-    
+
     def sel_ke_geos(self):
         """
         Compute Kinetic Energy (KE) from geostrophic u and v.
@@ -886,7 +872,7 @@ class OceanVars(MethodRegistry):
             KE data array.
         """
         return self._compute_kinetic_energy("ke_geos")
-    
+
     def sel_mke(self):
         """
         Compute Mean Kinetic Energy (MKE) from u and v (ie. total current).
@@ -896,8 +882,8 @@ class OceanVars(MethodRegistry):
         xarray.DataArray or None
             MKE data array.
         """
-        return self._compute_kinetic_energy("mke")    
-    
+        return self._compute_kinetic_energy("mke")
+
     def sel_mke_geos(self):
         """
         Compute Mean Kinetic Energy (MKE) from geostrophic u and v.
@@ -907,5 +893,4 @@ class OceanVars(MethodRegistry):
         xarray.DataArray or None
             MKE data array.
         """
-        return self._compute_kinetic_energy("mke_geos")        
-    
+        return self._compute_kinetic_energy("mke_geos")

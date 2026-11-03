@@ -233,7 +233,7 @@ def add_input_fmt_parser_arguments(parser: ArgumentParser) -> None:
             "cmems_sst_l3",
             "cersat_sst_l3",
             "cmems_sst_l4",
-            "cmems_alti_duacs", 
+            "cmems_alti_duacs",
             "sloop",
             "eddy_pet",
             "eddy_sacso",
@@ -361,8 +361,8 @@ def add_refinput_fmt_parser_arguments(parser: ArgumentParser) -> None:
             "cmems_sst_l3",
             "cersat_sst_l3",
             "cmems_sst_l4",
-            "cmems_alti_duacs", 
-            ),
+            "cmems_alti_duacs",
+        ),
         help="Format of the input files",
     )
     parser.add_argument(
