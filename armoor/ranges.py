@@ -83,6 +83,11 @@ def timegroups_to_list(grouped, label="trange"):
     for name, ds in grouped:
         dso = ds.copy()
         if label == "time":
+            # A single time step has no range: drop the whole-window trange
+            # tagged by the time colocation (armoor.comp.coloc.TimeColocation),
+            # which would otherwise win over "time" in plot labels and give
+            # every time step's figure the same name.
+            dso.attrs.pop("trange", None)
             tlabel = pd.to_datetime(name)
             dso.attrs[label] = f"{tlabel:%Y-%m-%dT%H:%M:%S}"
         else:

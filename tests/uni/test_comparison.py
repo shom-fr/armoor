@@ -118,16 +118,17 @@ def test_comp_alti_select_common_vars_drops_total_ke_without_total_current():
     dims = ("time", "y", "x")
     shape = (2, 2, 2)
     dsref = xr.Dataset(
-        {v: (dims, np.ones(shape)) for v in ("sla", "ke_geos", "eke")},
+        {v: (dims, np.ones(shape)) for v in ("sla", "ke_geos", "eke", "ssh")},
         attrs={"data_name": "duacs"},
     )
     dsprod = xr.Dataset(
-        {v: (dims, np.ones(shape)) for v in ("sla", "ke", "ke_geos", "eke", "ssh")},
+        {v: (dims, np.ones(shape)) for v in ("sla", "ke", "ke_geos", "eke", "ssh", "u", "v")},
         attrs={"data_name": "model"},
     )
     dsprod["mke"] = (("period", "y", "x"), np.ones((1, 2, 2)))
 
     dsref2, dsprod2 = get_comparison("comp_alti").select_common_vars(dsref, dsprod)
 
+    # ke/mke (total current) and the raw u/v are product-only: dropped
     assert set(dsprod2.data_vars) == {"sla", "ke_geos", "eke", "ssh"}
-    assert set(dsref2.data_vars) == {"sla", "ke_geos", "eke"}
+    assert set(dsref2.data_vars) == {"sla", "ke_geos", "eke", "ssh"}

@@ -357,7 +357,7 @@ class CompAlti(Comparison):
     comp_vars = ["sla", "ke", "ke_geos", "eke", "mke", "mke_geos"]
 
     def select_common_vars(self, dsref, dsprod):
-        """Drop the `comp_vars` that only one side could provide.
+        """Keep only the variables that both sides provide.
 
         Total-current energies (ke, mke) need a real total current: an
         altimetry reference (e.g. DUACS) only provides geostrophic currents,
@@ -365,6 +365,8 @@ class CompAlti(Comparison):
         against a geostrophic one would be meaningless, so a variable missing
         on one side is dropped from the other instead (downstream outputs,
         e.g. diagdisp_glob, also expect the same variables on both sides).
+        For the same reason, raw inputs found on one side only (e.g. the
+        model total current u/v) are dropped too.
 
         Parameters
         ----------
@@ -374,7 +376,7 @@ class CompAlti(Comparison):
         Returns
         -------
         tuple of xarray.Dataset
-            ``(dsref, dsprod)``, without their unmatched `comp_vars`.
+            ``(dsref, dsprod)``, with the same data variables.
         """
         ref_vars = set(self.comp_vars) & set(dsref.data_vars)
         prod_vars = set(self.comp_vars) & set(dsprod.data_vars)
@@ -392,6 +394,18 @@ class CompAlti(Comparison):
                 f"not compared against {dsref.attrs.get('data_name')}"
             )
             dsref = dsref.drop_vars(only_ref)
+        # Raw inputs kept on one side only (e.g. the model's total current
+        # u/v, which DUACS lacks) must go too: the outputs and plots iterate
+        # over the product variables and expect them in the reference.
+        common = set(dsref.data_vars) & set(dsprod.data_vars)
+        extra_prod = sorted(set(dsprod.data_vars) - common)
+        extra_ref = sorted(set(dsref.data_vars) - common)
+        if extra_prod:
+            logger.debug(f"Drop product-only variables {extra_prod}")
+            dsprod = dsprod.drop_vars(extra_prod)
+        if extra_ref:
+            logger.debug(f"Drop reference-only variables {extra_ref}")
+            dsref = dsref.drop_vars(extra_ref)
         return dsref, dsprod
 
     def apply_vertical_ranges(self, dsref_list, dsprod_list, params):

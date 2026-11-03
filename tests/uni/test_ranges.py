@@ -87,3 +87,26 @@ def test_process_vertical_range_mock_compute():
         # Row 0 unmasked, row 1 masked
         assert np.all(~np.isnan(res["temp"].values[0]))
         assert np.all(np.isnan(res["temp"].values[1]))
+
+def test_ranges_tfreq_drops_whole_window_trange():
+    """A per-time-step subset must not keep the whole-window trange tagged by
+    the time colocation: it would win over "time" in the plot labels and give
+    all time steps' figures the same name."""
+    from armoor.plot import format_time_label
+    from armoor.ranges import tfreq
+
+    time = pd.date_range("2024-01-01", periods=3, freq="D")
+    ds = xr.Dataset({"sla": (["time"], [1.0, 2.0, 3.0])}, coords={"time": time})
+    ds.attrs["trange"] = "[2024-01-01T00:00:00_2024-01-03T00:00:00["
+
+    subsets = tfreq(ds)
+
+    assert [sub.attrs["time"] for sub in subsets] == [
+        "2024-01-01T00:00:00",
+        "2024-01-02T00:00:00",
+        "2024-01-03T00:00:00",
+    ]
+    assert all("trange" not in sub.attrs for sub in subsets)
+    labels = {format_time_label(sub.attrs)[1] for sub in subsets}
+    assert len(labels) == 3
+    assert "trange" in ds.attrs  # the input is left untouched
