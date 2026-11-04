@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Compare sst satellite with model ouputs.
+Comparison of satellite sea surface temperature against products.
 """
 
 import sys

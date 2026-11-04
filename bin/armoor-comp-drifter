@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Compare sst satellite with model ouputs.
+Comparison of drifter trajectories against oceanparcels simulations.
 """
 
 import sys
