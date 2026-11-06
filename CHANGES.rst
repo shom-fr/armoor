@@ -12,6 +12,18 @@ Bug fixes
   WOA18 with ``vlevel``), from its shallowest level. It was missing, with
   the warning ``clim='woa18' configured but not resolved``.
 
+- ``oceanvars`` filter: a variable that can't be selected or computed (e.g.
+  ``u``/``v`` in WOA18) is now skipped with a warning instead of raising an
+  ``ArmoorError``. A source with none of the requested variables is dropped.
+  An unknown variable name still raises an error.
+
+- ``armoor-data``: fixed a crash when a dataset has no data left for a
+  metazone after filtering (``None`` in the list of loaded datasets), e.g.
+  no Argo float in the zone.
+
+- ``armoor-filters-*``: no output is written, with a warning, when no data is
+  left after filtering. It was crashing on ``None``.
+
 v2026.10.0
 ==========
 

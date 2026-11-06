@@ -504,7 +504,10 @@ class ArmoorFilters:
         Each name in `vnames` is resolved via the ``ds.oceanvars`` accessor
         (selecting it directly if present, or deriving it from related
         variables, e.g. ptemp from temp+sal); depth/pdens/time/lon/lat are
-        re-attached as coordinates on the result.
+        re-attached as coordinates on the result. A variable that can't be
+        selected or derived from `ds` (e.g. u/v in a climatology) is skipped
+        with a warning, since `vnames` is shared by all the sources of a
+        metazone.
 
         Parameters
         ----------
@@ -516,15 +519,15 @@ class ArmoorFilters:
 
         Returns
         -------
-        xarray.Dataset
-            Dataset containing only `vnames` as data variables, with the
-            original depth/pdens/time/lon/lat coordinates preserved.
+        xarray.Dataset or None
+            Dataset containing the available `vnames` as data variables,
+            with the original depth/pdens/time/lon/lat coordinates preserved,
+            or None if none of them is available.
 
         Raises
         ------
         ArmoorError
-            If a name in `vnames` is unrecognized, or cannot be derived
-            from what's available in `ds`.
+            If a name in `vnames` is unrecognized.
         """
         logger.info("oceanvars filter")
         coords = []
@@ -536,12 +539,15 @@ class ArmoorFilters:
             logger.info(vname)
             selected = ds.oceanvars.sel(vname)
             if selected is None:
-                raise ArmoorError(
-                    f"Cannot select or compute ocean variable '{vname}': "
-                    "unknown variable name, or missing dependencies in the "
-                    "input dataset."
+                logger.warning(
+                    f"Skipping ocean variable '{vname}': not found in the "
+                    "dataset and cannot be computed from its variables."
                 )
+                continue
             dss.append(selected.to_dataset(name=vname))
+        if not dss:
+            logger.warning(f"None of the ocean variables {list(vnames)} is available")
+            return None
         dso = xr.merge(dss)
         coords2set = []
         for coord in coords:
@@ -656,6 +662,8 @@ class ArmoorFilters:
 
         if "oceanvars" in filters_config:
             ds = self.oceanvars_filter(ds, filters_config["oceanvars"])
+            if ds is None:
+                return None
 
         return ds
 

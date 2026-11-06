@@ -44,8 +44,58 @@ def data_cfg_files(tmp_path_factory):
     [[vlevel]]
         vname=depth
         levels=10
+[faraway]
+    name=faraway
+    tbound=2026-06-15,2026-07-08
+    tfreq=1d
+    polygon=(-60,100),(-60,110),(-50,110),(-50,100)
+    [[vlevel]]
+        vname=depth
+        levels=10
 """)
     return tmp_path, cfgfile, metafile
+
+
+def test_no_data_at_all_does_not_raise(data_cfg_files):
+    """Having nothing to process in any metazone is a legitimate case."""
+    from armoor.cli.main import _init_heavy, main_data_pipeline
+    _init_heavy()
+
+    tmp_path, cfgfile, metafile = data_cfg_files
+    import os
+    cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        main_data_pipeline(
+            cfgfile, metafile, ["faraway"], tmp_path / "none.json",
+            ofilter=False, no_plot=True, plot_only=None, input_json=None,
+            kw_dask=(1, None, None), data_args={"tbound": None},
+        )
+    finally:
+        os.chdir(cwd)
+
+
+def test_no_data_in_hpc_wave_does_not_raise(data_cfg_files):
+    """Same for an HPC wave: it writes an empty list of paths."""
+    from armoor.cli.main import _init_heavy, main_data_pipeline
+    _init_heavy()
+
+    tmp_path, cfgfile, metafile = data_cfg_files
+    jsonfile = tmp_path / "wave0_faraway.json"
+    import os
+    cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        main_data_pipeline(
+            cfgfile, metafile, ["faraway"], jsonfile,
+            ofilter=False, no_plot=True, plot_only=None, input_json=None,
+            kw_dask=(1, None, None), data_args={"tbound": None}, load_only="glo12",
+        )
+    finally:
+        os.chdir(cwd)
+
+    with open(jsonfile) as f:
+        assert json.load(f) == {}
 
 
 def test_load_only_writes_metazone_paths_json(data_cfg_files):

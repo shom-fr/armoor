@@ -1013,6 +1013,7 @@ def load_datasets(data_cfg, metazones, dirout):
 
         elapsed = time.time() - start_time
         logger.info(f"{dataset_name} load in {elapsed:.1f}s")
-        ncouts += ncs
+        # None: no data left for this metazone after filtering
+        ncouts += [nc for nc in ncs if nc is not None]
 
     return ncouts

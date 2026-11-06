@@ -271,11 +271,18 @@ class TestArmoorFilters:
         with pytest.raises(ArmoorError, match="depth"):
             ArmoorFilters.oceanvars_filter(sample_ds_oceanvars, ["depth"])
 
-    def test_oceanvars_filter_missing_dependency_raises(self, sample_ds_oceanvars):
-        """A known variable that can't be derived from what's available must raise."""
+    def test_oceanvars_filter_skips_unavailable(self, sample_ds_oceanvars, caplog):
+        """A known variable that can't be derived is skipped with a warning."""
+        with caplog.at_level("WARNING", logger="armoor.filters"):
+            result = ArmoorFilters.oceanvars_filter(sample_ds_oceanvars, ["ptemp", "u"])
+        assert list(result.data_vars) == ["ptemp"]
+        assert "'u'" in caplog.text
+
+    def test_oceanvars_filter_nothing_available(self, sample_ds_oceanvars):
+        """No requested variable available: the filter gives no dataset."""
         ds = sample_ds_oceanvars.drop_vars("temp")
-        with pytest.raises(ArmoorError, match="ptemp"):
-            ArmoorFilters.oceanvars_filter(ds, ["ptemp"])
+        assert ArmoorFilters.oceanvars_filter(ds, ["ptemp"]) is None
+        assert ArmoorFilters(ds).apply_combined_filters({"oceanvars": ["ptemp"]}) is None
 
     # @patch('armoor.filters.open_decode')
     def test_bathy_filter(self, sample_ds_no_time):

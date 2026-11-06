@@ -87,6 +87,27 @@ class TestLoadDatasetsValidateLoadParamsGate:
         assert result == []
 
 
+class TestLoadDatasetsDroppedSource:
+    def test_source_without_requested_oceanvars_is_dropped(
+        self, sample_ds, tmp_path, monkeypatch, caplog
+    ):
+        """A source with none of the metazone's oceanvars gives no output,
+        whereas a source with some of them only loses the missing ones."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("armoor.data.load.open_decode", lambda *a, **k: sample_ds.copy())
+        data_cfg = {"clim": {"name": "clim", "path": "unused.nc", "fmt": "hycom"}}
+
+        with caplog.at_level("WARNING", logger="armoor.filters"):
+            metazones = {"mz1": {"oceanvars": ["u", "v"]}}
+            assert load_datasets(data_cfg, metazones, "data") == []
+        assert "'u'" in caplog.text
+
+        metazones = {"mz1": {"oceanvars": ["ptemp", "u"]}}
+        result = load_datasets(data_cfg, metazones, "data")
+        assert len(result) == 1
+        assert list(xr.open_dataset(result[0], engine="zarr").data_vars) == ["ptemp"]
+
+
 class TestStagedDataset:
     """Unit tests for StagedDataset -- the lightweight pipeline-context
     object that rides a zarr path across stages/processes without carrying

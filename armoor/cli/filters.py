@@ -65,6 +65,9 @@ def process_filters(args: Namespace, filters_config: dict) -> None:
     with armoor_cli_session(args, (args.ifmt, args.platform)):
         with open_decode_materialized(args.fins, args.ifmt, platform=args.platform) as ds:
             ds = ds.filters.combined(filters_config)
+            if ds is None:
+                logger.warning(f"No data left after filtering: {args.fout} not written.")
+                return
             # "threads" deadlocks intermittently: xarray's netCDF4 write lock
             # is a CombinedLock over several process-global locks, and
             # multiple dask worker threads doing netCDF I/O concurrently can
