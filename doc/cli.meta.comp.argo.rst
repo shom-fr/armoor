@@ -108,7 +108,7 @@ metazone parameters
     - ``polygon``
     - ``vrange``
     - ``vlevel``
-    - ``vars``
+    - ``oceanvars``
 
     .. note::
        Other given parameters are ignored.

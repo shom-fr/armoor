@@ -111,7 +111,7 @@ metazone parameters
     - ``tresample``
     - ``tsmooth``
     - ``polygon``
-    - ``vars``
+    - ``oceanvars``
 
     .. note::
        Other given parameters are ignored.

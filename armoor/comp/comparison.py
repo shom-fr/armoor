@@ -1,7 +1,7 @@
 """Comparison type hierarchy for the armoor-comp-* pipeline.
 
-Each `func_comp` string (comp_sst, comp_argo, comp_mooring, comp_drifter,
-comp_models, comp_clim) used to index five parallel dicts in
+Each `func_comp` string (comp_sst, comp_alti, comp_argo, comp_mooring,
+comp_drifter, comp_models, comp_clim) used to index five parallel dicts in
 ``armoor.comp`` (METAZONE_PARAMS, COLOCATION_PARAMS_USER,
 COLOCATION_PARAMS_DEFAULT, OUTPUTS_PARAMS, COMP_VARS) plus TITLE_PLOTS, and
 drove a handful of ``if func_comp == "comp_xxx"`` branches scattered across

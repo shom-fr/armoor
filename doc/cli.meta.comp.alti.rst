@@ -1,5 +1,5 @@
 :command:`armoor-comp-alti`
-==========================
+===========================
 
 Usage
 -----
@@ -36,27 +36,35 @@ configuration for the current run only.
 Scope
 -----
 
-Comparison with altimetry products (L4 product : ``fmt=cmems_alti_duacs``) by computing
-Eddy Kinetic Energy (``eke``), Kinetic Energy from total u and v (``ke``), kinetic Energy from geostrophic u and v computed from
-and sea surface height (ssh or adt) (``ke_geos``), Mean Kinetic energy from total and geostrophic current (``mke`` and ``mke_geos``).
-sla is computed as the anomaly of ssh (for the model) or adt (for the satellite) over the period defined by ``tbound``
+Comparison with altimetry products (L4 product: ``fmt=cmems_alti_duacs``) on the
+following variables:
 
-``mke`` and ``mke_geos`` are computed from the current averaged over the whole
-period defined by ``tbound`` (never split by ``trange_seq``/``tfreq``). They
+- ``ssh``: sea surface height (ssh for the model, adt for the satellite).
+- ``sla``: sea level anomaly, computed as the anomaly of ssh (for the model) or
+  adt (for the satellite) over the colocated time steps within ``tbound``. This
+  window is shorter than ``tbound`` if the data do not cover all of it.
+- ``eke``: Eddy Kinetic Energy, from the geostrophic current anomalies derived
+  from ``sla``.
+- ``ke``: Kinetic Energy, from the total u and v.
+- ``ke_geos``: Kinetic Energy, from the geostrophic u and v derived from ssh or
+  adt.
+- ``mke`` and ``mke_geos``: Mean Kinetic Energy, from the time-averaged total and
+  geostrophic currents respectively.
+
+``mke`` and ``mke_geos`` are computed from the current averaged over the same
+window as ``sla`` (never split by ``trange_seq``/``tfreq``). They
 carry a size-1 ``period`` dimension instead of ``time``, are saved in their own
 ``*_period_<start>_<end>.zarr`` colocation files, and are only produced by the
 ``maps`` and ``diagdisp_glob`` outputs.
 
 Geostrophic energies are compared geostrophic against geostrophic, computed the
-same way on both sides: ``ugos``/``vgos`` are derived with ``get_geos`` from the
-model ssh and from the DUACS adt. The geostrophic currents provided by DUACS
+same way on both sides: geostrophic currents are derived with ``get_geos`` from
+the library ``shoot``, from the model ssh and from the DUACS adt (and from
+``sla`` for ``eke``). The geostrophic currents provided by DUACS
 (``ugos``/``vgos``/``ugosa``/``vgosa``) are ignored. ``ke`` and ``mke`` (total current)
 are only compared when the reference provides a total current, which altimetry
-does not: against DUACS they are dropped and only ``ke_geos``, ``mke_geos``,
-``eke`` and ``sla`` are compared.
-
-
-Geostrophic current from sla or ssh are computed using ``get_geos`` from the library ``shoot`` 
+does not: against DUACS they are dropped and only ``ssh``, ``sla``, ``eke``,
+``ke_geos`` and ``mke_geos`` are compared.
 
 Pipeline control
 ----------------
@@ -109,11 +117,13 @@ metazone parameters
 -------------------
 
     - ``tbound``
+    - ``thours``
     - ``trange_seq``
     - ``tfreq``
     - ``polygon``
     - ``href``
-    - ``vars``
+    - ``oceanvars``
+    - ``bathy``
 
     .. note::
        Other given parameters are ignored.

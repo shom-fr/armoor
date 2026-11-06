@@ -136,6 +136,11 @@ user-selectable at all):
      - ``href``, ``cloud``
      - *(default:* ``vlevel`` @ 0m *)*
      - surface-only: no vertical ranging
+   * - ``comp_alti``
+     - ``trange_seq``, ``tfreq``
+     - ``href``
+     - *(default:* ``vlevel`` @ 0m *)*
+     - surface-only: no vertical ranging
    * - ``comp_argo``
      - ``trange_seq`` *(default: nearest, "*")*
      - ``radius``

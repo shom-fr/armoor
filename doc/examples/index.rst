@@ -43,7 +43,7 @@ See :ref:`guide-configuration` and :ref:`guide-metazones` for how these files ar
         
     .. grid-item-card:: Altimetry comparison
 
-        Configuration for running a altimetry comparison over a series of input data.
+        Configuration for running an altimetry comparison over a series of input data.
 
         .. literalinclude:: configs/comp_alti.cfg
          :language: ini

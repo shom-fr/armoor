@@ -4,6 +4,30 @@ What's new
 Develop
 =======
 
+New features
+------------
+
+- Added ``armoor-comp-alti``: new comparison of model ``ssh`` outputs against
+  altimetry products (``fmt=cmems_alti_duacs``), on ``ssh`` (adt for the
+  satellite), ``sla``, Eddy Kinetic Energy from sla (``eke``), Kinetic Energy
+  from u and v (``ke``), Kinetic Energy from u and v computed from ssh or adt
+  (``ke_geos``), Mean Kinetic Energy computed from u/v and geostrophic u/v
+  (``mke`` and ``mke_geos``)
+  (new ``armoor.oceanvars.OceanVars.sel_eke``,
+  ``armoor.oceanvars.OceanVars.sel_ke``, ``armoor.oceanvars.OceanVars.sel_ke_geos``,
+  ``armoor.oceanvars.OceanVars.sel_mke``, ``armoor.oceanvars.OceanVars.sel_mke_geos``
+  via the function ``get_geos`` from ``shoot``).
+  sla is computed as the anomaly of ssh (for the model) or adt
+  (for the satellite) over the colocated time steps within ``tbound``
+  (``armoor.oceanvars.OceanVars.sel_sla``).
+  ``mke``/``mke_geos`` are averaged over the same window
+  (new size-1 ``period`` dimension, ``*_period_<start>_<end>.zarr`` coloc
+  files) and only plotted by the ``maps`` and ``diagdisp_glob`` outputs.
+  The geostrophic currents provided by DUACS are ignored: the reference
+  ``ugos``/``vgos`` are recomputed from adt with ``get_geos``, like the model
+  ones from ssh. ``ke``/``mke`` (total current) are only compared when the
+  reference provides a total current, so not against DUACS.
+
 Bug fixes
 ---------
 
@@ -17,26 +41,6 @@ v2026.10.0
 
 New features
 ------------
-
-- Added ``armoor-comp-alti``: new comparison for model ``ssh`` output altimetry
-  products (``fmt=cmems_alti_duacs``) -- 
-  Comparison by computing Eddy Kinetic Energy from sla (``eke``), Kinetic Energy from u and v
-  (``ke``), Kinetic Energy from u and v computed from ssh or adt (``ke_geos``), 
-  Mean Kinetic Energy computed from u/v and geostrophic u/v (``mke`` and ``mke_geos``)
-  (new ``armoor.base.oceanvars.OceanVars.sel_eke``, 
-  ``armoor.base.oceanvars.OceanVars.sel_ke`` , ``armoor.base.oceanvars.OceanVars.sel_ke_geos`` 
-   ``armoor.base.oceanvars.OceanVars.sel_mke`` , ``armoor.base.oceanvars.OceanVars.sel_mke_geos`` 
-  via the function ``get_geos`` from ``shoot``). 
-  sla is computed as the anomaly of ssh (for the model) or adt 
-  (for the satellite) over the period defined by ``tbound`` 
-  (``armoor.base.oceanvars.OceanVars.sel_sla``).
-  ``mke``/``mke_geos`` are averaged over the whole ``tbound`` window
-  (new size-1 ``period`` dimension, ``*_period_<start>_<end>.zarr`` coloc
-  files) and only plotted by the ``maps`` and ``diagdisp_glob`` outputs.
-  The geostrophic currents provided by DUACS are ignored: the reference
-  ``ugos``/``vgos`` are recomputed from adt with ``get_geos``, like the model
-  ones from ssh. ``ke``/``mke`` (total current) are only compared when the
-  reference provides a total current, so not against DUACS.
 
 - Added ``wmo_platform_code`` and ``institution_country`` (if exist) 
   in ``open_decode_cmems_insitu``.
