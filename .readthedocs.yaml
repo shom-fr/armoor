@@ -29,10 +29,7 @@ build:
     build:
       html:
         # Serial build, same as the CI, instead of RTD's default `-j auto`.
-        # RTD discards the output of a command it kills on time out, so stop
-        # Sphinx before RTD's limit: SIGABRT makes faulthandler dump the Python
-        # stacks, and the log shows what was running.
-        - timeout -s ABRT 1200 python -X faulthandler -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+        - bash tools/rtd_build_html.sh
 
 conda:
   environment: environment.yml
