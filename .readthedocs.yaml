@@ -24,12 +24,6 @@ build:
       # Force cartopy's Natural Earth shapefile download before the
       # tutorials plot maps.
       - python -c "import cartopy.feature as cfeature; list(cfeature.LAND.geometries())"
-      # `conda env create --quiet` does not log the resolved versions.
-      - conda list
-    build:
-      html:
-        # Serial build, same as the CI, instead of RTD's default `-j auto`.
-        - bash tools/rtd_build_html.sh
 
 conda:
   environment: environment.yml
