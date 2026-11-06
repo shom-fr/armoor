@@ -94,7 +94,7 @@ metazone parameters
     - ``cloud``
     - ``vrange``
     - ``vlevel``
-    - ``vars``
+    - ``oceanvars``
 
     .. note::
        Other given parameters are ignored.

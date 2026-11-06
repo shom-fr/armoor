@@ -1,6 +1,11 @@
 """Unit tests for armoor.io."""
 
-from armoor.io import extract_suffix_from_filename, output_suffix, sort_ncs_by_suffix
+from armoor.io import (
+    extract_suffix_from_filename,
+    is_period_file,
+    output_suffix,
+    sort_ncs_by_suffix,
+)
 from armoor.data.load import StagedDataset
 
 
@@ -104,3 +109,36 @@ class TestSortNcsBySuffix:
 
         expected_key = f"{res['time']}_{res['z']}" if res.get("time") and res.get("z") else "None"
         assert expected_key in result
+
+
+class TestPeriodSuffix:
+    """Whole-window coloc files (armoor.ranges.tag_period, e.g. comp_alti's mke)."""
+
+    PERIOD = "2024-01-01T00:00:00_2024-12-31T00:00:00"
+
+    def test_period_takes_priority_over_time_and_trange(self):
+        attrs = {"period": self.PERIOD, "time": "2020-01-01", "trange": "[a_b["}
+        assert output_suffix(attrs) == f"_period_{self.PERIOD}"
+
+    def test_filename_keeps_period_marker(self):
+        res = extract_suffix_from_filename(f"ref_period_{self.PERIOD}.zarr")
+        assert res["time"] == f"period_{self.PERIOD}"
+
+    def test_period_and_trange_files_sort_apart(self):
+        """Same window: the mke file must not land in the ke file's bucket."""
+        ke = f"ref_{self.PERIOD}.zarr"
+        mke = f"ref_period_{self.PERIOD}.zarr"
+        result = sort_ncs_by_suffix([ke, mke], sort_dim=["time"])
+        assert result[self.PERIOD] == [ke]
+        assert result[f"period_{self.PERIOD}"] == [mke]
+
+    def test_staged_dataset_period_matches_filename_key(self):
+        nc = StagedDataset("some/opaque/path.zarr", period=self.PERIOD)
+        result = sort_ncs_by_suffix([nc], sort_dim=["time"])
+        assert f"period_{self.PERIOD}" in result
+
+    def test_is_period_file(self):
+        assert is_period_file(f"ref_period_{self.PERIOD}.zarr")
+        assert is_period_file(StagedDataset("x.zarr", period=self.PERIOD))
+        assert not is_period_file(f"ref_{self.PERIOD}.zarr")
+        assert not is_period_file("ref.zarr")

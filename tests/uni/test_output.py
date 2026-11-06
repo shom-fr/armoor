@@ -232,6 +232,21 @@ class TestConcatenateTimeDatasets:
         result = self.processor._concatenate_time_datasets([ds1, ds2])
         assert "vrange" not in result.attrs
 
+    def test_period_datasets_merged_not_dropped(self):
+        """Whole-window (period) datasets, e.g. comp_alti's mke, survive."""
+        ds1 = self._make_ds([0, 1], [1.0, 2.0])
+        ds_period = xr.Dataset({"mke": (["period"], [5.0])}, coords={"period": [0]})
+        result = self.processor._concatenate_time_datasets([ds1, ds_period])
+        assert result.sizes["time"] == 2
+        assert result.sizes["period"] == 1
+        np.testing.assert_array_equal(result["mke"].values, [5.0])
+
+    def test_period_datasets_only(self):
+        ds_period = xr.Dataset({"mke": (["period"], [5.0])}, coords={"period": [0]})
+        result = self.processor._concatenate_time_datasets([ds_period])
+        assert "time" not in result.dims
+        np.testing.assert_array_equal(result["mke"].values, [5.0])
+
 
 # ---------------------------------------------------------------------------
 # _concatenate_datasets (None filtering)

@@ -100,6 +100,12 @@ def format_time_label(attrs, ds=None, allow_clim_month=False):
     """
     trange = attrs.get("trange")
     tfreq = attrs.get("time")
+    period = attrs.get("period")
+    if period:
+        # Whole-window average (see armoor.ranges.tag_period): "<t0>_<tN>".
+        t1, t2 = [pd.to_datetime(t).strftime('%Y-%m-%dT%H:%M') for t in period.split('_')]
+        title_str = f"mean over [{t1}-{t2}]"
+        return title_str, "_period_" + re.sub('-', '_', f"{t1}_{t2}")
     if trange:
         title_str, suffix_str = format_trange(trange)
         return title_str, f"_{suffix_str}"

@@ -100,7 +100,7 @@ metazone parameters
     - ``polygon``
     - ``href``
     - ``vlevel``
-    - ``vars``
+    - ``oceanvars``
 
     .. note::
        Other given parameters are ignored.

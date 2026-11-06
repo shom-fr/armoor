@@ -168,6 +168,11 @@ class RangeAccessor:
         return self._obj.attrs.get("trange")
 
     @property
+    def period(self):
+        """The ``"period"`` attr set by `armoor.ranges.tag_period`, or None."""
+        return self._obj.attrs.get("period")
+
+    @property
     def vlevel(self):
         """The ``"vlevel"`` attr set by `vlevels`, or None."""
         return self._obj.attrs.get("vlevel")

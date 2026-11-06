@@ -1,4 +1,5 @@
 import logging
+from typing import ClassVar
 
 import gsw
 import xarray as xr
@@ -6,6 +7,7 @@ import numpy as np
 
 from armoor import ArmoorError
 from armoor.dispatch import MethodRegistry
+from armoor.ranges import PERIOD_DIM
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,14 @@ class OceanVars(MethodRegistry):
         "cspeed": "sel_current_speed",
         "u": "sel_current_zonal",
         "v": "sel_current_meridional",
+        "ugos": "sel_ugos",
+        "vgos": "sel_vgos",
+        "u_mean_time": "sel_u_mean_time",
+        "v_mean_time": "sel_v_mean_time",
+        "ugos_mean_time": "sel_ugos_mean_time",
+        "vgos_mean_time": "sel_vgos_mean_time",
+        "ugosa": "sel_ugosa",
+        "vgosa": "sel_vgosa",
         "ptemp": "sel_ptemp",
         "temp": "sel_temp",
         "sal": "sel_sal",
@@ -70,11 +80,68 @@ class OceanVars(MethodRegistry):
         "div": "sel_divergence",
         "okuboweiss": "sel_okuboweiss",
         "relvort": "sel_relvort",
+        "sla": "sel_sla",
+        "eke": "sel_eke",
+        "ke": "sel_ke",
+        "ke_geos": "sel_ke_geos",
+        "mke": "sel_mke",
+        "mke_geos": "sel_mke_geos",
+    }
+
+    #: Kinetic energy variants computed by `_compute_kinetic_energy`:
+    #: velocity component names, the selectors that provide them, and attrs.
+    #: Only the total-current ke has a CF standard name
+    #: (specific_kinetic_energy_of_sea_water); the geostrophic/mean/eddy
+    #: variants have none, so they only carry a long_name.
+    _KE_CONFIGS: ClassVar[dict] = {
+        "ke": {
+            "u": "u",
+            "v": "v",
+            "ke": "ke",
+            "long_name": "kinetic energy computed from u and v",
+            "standard_name": "specific_kinetic_energy_of_sea_water",
+            "selectors": ("sel_current_zonal", "sel_current_meridional"),
+        },
+        "ke_geos": {
+            "u": "ugos",
+            "v": "vgos",
+            "ke": "ke_geos",
+            "long_name": "geostrophic kinetic energy computed from SSH",
+            "standard_name": None,
+            "selectors": ("sel_ugos", "sel_vgos"),
+        },
+        "eke": {
+            "u": "ugosa",
+            "v": "vgosa",
+            "ke": "eke",
+            "long_name": "eddy kinetic energy computed from SLA",
+            "standard_name": None,
+            "selectors": ("sel_ugosa", "sel_vgosa"),
+        },
+        "mke": {
+            "u": "u_mean_time",
+            "v": "v_mean_time",
+            "ke": "mke",
+            "long_name": "mean kinetic energy computed from u and v",
+            "standard_name": None,
+            "selectors": ("sel_u_mean_time", "sel_v_mean_time"),
+        },
+        "mke_geos": {
+            "u": "ugos_mean_time",
+            "v": "vgos_mean_time",
+            "ke": "mke_geos",
+            "long_name": "mean geostrophic kinetic energy computed from SSH",
+            "standard_name": None,
+            "selectors": ("sel_ugos_mean_time", "sel_vgos_mean_time"),
+        },
     }
 
     def __init__(self, ds):
         self.ds = ds
         self.methods = {}
+        # Geostrophic currents are intermediates: kept here rather than in
+        # self.ds, so they are neither saved nor compared (see _compute_geos).
+        self._geos_cache = {}
         self.__post_init__()
 
     def sel(self, varname: str):
@@ -153,6 +220,125 @@ class OceanVars(MethodRegistry):
             return self.ds.cspeed * np.sin(self.ds.cdir * np.pi / 180.0)
         else:
             logger.warning("v cannot be infered or computed")
+
+    def _mean_over_period(self, da, name):
+        """Average `da` over its whole "time" axis, onto a size-1 `period` dim.
+
+        The result is not stored in the dataset: it lives on the
+        `armoor.ranges.PERIOD_DIM` dimension (one value: the mid-time of the
+        averaged window), which cannot share a dataset with the "time"-
+        dependent variables without being split apart downstream (see
+        `armoor.comp.coloc._process_single_product`).
+
+        Parameters
+        ----------
+        da : xarray.DataArray or None
+            Variable to average.
+        name : str
+            Name given to the averaged variable (used in log messages too).
+
+        Returns
+        -------
+        xarray.DataArray or None
+            None when `da` is None or has no "time" dimension.
+        """
+        if da is None or "time" not in da.dims:
+            logger.warning(f"{name} cannot be infered or computed")
+            return None
+        mean = da.mean("time", keep_attrs=True)
+        mean = mean.expand_dims({PERIOD_DIM: [da["time"].mean().values]})
+        mean[PERIOD_DIM].attrs["long_name"] = "middle of the averaging period"
+        mean.name = name
+        return mean
+
+    def sel_u_mean_time(self):
+        """Compute the zonal current (u) averaged over the whole period."""
+        return self._mean_over_period(self.sel_current_zonal(), "u_mean_time")
+
+    def sel_v_mean_time(self):
+        """Compute the meridional current (v) averaged over the whole period."""
+        return self._mean_over_period(self.sel_current_meridional(), "v_mean_time")
+
+    def _compute_geos(self, source, prefix):
+        """Compute geostrophic current components from a sea level variable.
+
+        The components are returned, not stored in the dataset: they are
+        intermediates of ke_geos/mke_geos/eke, which must not end up in the
+        colocation files nor be compared themselves. They are cached on this
+        accessor instead, so computing several energies from the same sea
+        level only calls `shoot.dyn.get_geos` once. The cache is keyed on the
+        source's underlying array (not its Variable, which xarray re-wraps on
+        every dataset assignment), so replacing the source invalidates it.
+
+        Parameters
+        ----------
+        source : {"ssh", "sla"}
+            Sea level variable to derive the currents from ("sla" is itself
+            derived from "ssh" if needed, see `sel_sla`).
+        prefix : str
+            Suffix of the returned names ("gos" -> ugos/vgos, "gosa" ->
+            ugosa/vgosa).
+
+        Returns
+        -------
+        tuple of (xarray.DataArray or None, xarray.DataArray or None)
+            ``(u, v)``; components already present in the dataset are
+            returned as is.
+        """
+        u_name = f"u{prefix}"
+        v_name = f"v{prefix}"
+
+        # Components provided by the dataset itself are used as is.
+        if u_name in self.ds and v_name in self.ds:
+            return self.ds[u_name], self.ds[v_name]
+
+        src = self.sel_sla() if source == "sla" else self.ds.get(source)
+        if src is None:
+            logger.warning(f"Cannot compute {u_name} and {v_name}: {source} is unavailable")
+            return None, None
+
+        cached = self._geos_cache.get(prefix)
+        if cached is not None and cached[0] is src.variable._data:
+            return cached[1], cached[2]
+
+        logger.info(f"Compute {u_name} and {v_name} from {source}")
+
+        from shoot.dyn import get_geos
+
+        u, v = get_geos(src)
+
+        u.name = u_name
+        u.attrs["units"] = "m s-1"
+
+        v.name = v_name
+        v.attrs["units"] = "m s-1"
+
+        self._geos_cache[prefix] = (src.variable._data, u, v)
+        return u, v
+
+    def sel_ugos(self):
+        """Compute or retrieve the geostrophic zonal current from ssh (not stored)."""
+        return self._compute_geos("ssh", "gos")[0]
+
+    def sel_vgos(self):
+        """Compute or retrieve the geostrophic meridional current from ssh (not stored)."""
+        return self._compute_geos("ssh", "gos")[1]
+
+    def sel_ugos_mean_time(self):
+        """Compute the geostrophic zonal current (from ssh) averaged over the whole period."""
+        return self._mean_over_period(self.sel_ugos(), "ugos_mean_time")
+
+    def sel_vgos_mean_time(self):
+        """Compute the geostrophic meridional current (from ssh) averaged over the whole period."""
+        return self._mean_over_period(self.sel_vgos(), "vgos_mean_time")
+
+    def sel_ugosa(self):
+        """Compute or retrieve the geostrophic zonal current anomaly from sla (not stored)."""
+        return self._compute_geos("sla", "gosa")[0]
+
+    def sel_vgosa(self):
+        """Compute or retrieve the geostrophic meridional current anomaly from sla (not stored)."""
+        return self._compute_geos("sla", "gosa")[1]
 
     def sel_ptemp(self):
         """Select or compute potential temperature from the dataset.
@@ -546,3 +732,165 @@ class OceanVars(MethodRegistry):
             return get_relvort(self.ds.u, self.ds.v)
         else:
             logger.warning("Relative vorticity cannot be infered or computed")
+
+    def sel_sla(self):
+        """Select the sea level anomaly, or compute it from ssh.
+
+        When computed, sla is the anomaly of ssh against its mean over the
+        dataset's whole time axis (the colocated period), and is stored in
+        the dataset since it is a compared variable.
+
+        Returns
+        -------
+        xarray.DataArray or None
+            Sea level anomaly in m, or None if neither sla nor ssh is
+            available.
+        """
+        if "sla" in self.ds.data_vars:
+            logger.debug("sla already in the dataset")
+            return self.ds["sla"]
+        if "ssh" in self.ds.data_vars:
+            logger.debug("Compute sla from ssh")
+            if self.ds["ssh"].sizes.get("time", 0) < 2:
+                # The anomaly is taken against the mean over the available
+                # time steps: with a single one, sla (and so eke) is 0.
+                logger.warning(
+                    "sla computed from ssh over a single time step: "
+                    "sla and eke will be zero everywhere"
+                )
+            sla = self.ds["ssh"] - self.ds["ssh"].mean("time")
+            sla.attrs["standard_name"] = "sea_level_anomaly"
+            sla.attrs["long_name"] = "Sea level anomaly computed from adt or ssh"
+            sla.attrs["units"] = "m"
+            self.ds["sla"] = sla
+            return self.ds["sla"]
+        logger.warning("sla cannot be infered or computed")
+        return None
+
+    def _compute_kinetic_energy(self, velocity_type="ke"):
+        """Compute kinetic energy from total current or geostrophic velocities.
+
+        Parameters
+        ----------
+        velocity_type : str
+            "ke"     : uses u and v.
+            "ke_geos" : uses ugos and vgos computed from ssh.
+            "eke"         : uses ugosa and vgosa computed from sla.
+            "mke"     : uses u_mean_time and v_mean_time.
+            "mke_geos" : uses ugos_mean_time and vgos_mean_time computed from ssh.
+        Returns
+        -------
+        xr.DataArray or None
+            Kinetic energy per unit mass in m2 s-2.
+        """
+        if velocity_type not in self._KE_CONFIGS:
+            raise ValueError(
+                f"Unknown velocity_type '{velocity_type}'. Choose from {list(self._KE_CONFIGS)}."
+            )
+
+        config = self._KE_CONFIGS[velocity_type]
+        u_name = config["u"]
+        v_name = config["v"]
+        ke_name = config["ke"]
+
+        # Return cached kinetic energy if available
+        if ke_name in self.ds:
+            logger.debug(f"{ke_name} already in the dataset")
+            return self.ds[ke_name]
+
+        # Retrieve or compute velocity components. Use the selectors' return
+        # values rather than re-reading self.ds: some of them (the
+        # *_mean_time ones) deliberately don't store their result.
+        u = self.ds.get(u_name)
+        v = self.ds.get(v_name)
+        if config["selectors"] is not None:
+            if u is None:
+                logger.info(f"Retrieving {u_name} using {config['selectors'][0]}()")
+                u = getattr(self, config["selectors"][0])()
+            if v is None:
+                logger.info(f"Retrieving {v_name} using {config['selectors'][1]}()")
+                v = getattr(self, config["selectors"][1])()
+
+        # Check that velocity components are available
+        if u is None or v is None:
+            logger.warning(
+                f"Cannot compute {ke_name}: '{u_name}' or '{v_name}' is missing from the dataset."
+            )
+            return None
+
+        if not isinstance(u, xr.DataArray) or not isinstance(v, xr.DataArray):
+            logger.warning(
+                f"Cannot compute {ke_name}: "
+                f"'{u_name}' and '{v_name}' must be xarray.DataArray objects."
+            )
+            return None
+
+        logger.info(f"compute {ke_name} from {u_name} and {v_name}")
+        # Compute kinetic energy per unit mass
+        ke = 0.5 * (u**2 + v**2)
+        ke.name = ke_name
+
+        ke.attrs = {"long_name": config["long_name"], "units": "m2 s-2"}
+        if config["standard_name"]:
+            ke.attrs["standard_name"] = config["standard_name"]
+
+        self.ds[ke_name] = ke
+
+        logger.info(f"{ke_name} successfully computed")
+
+        return self.ds[ke_name]
+
+    def sel_eke(self):
+        """
+        Compute Eddy Kinetic Energy (EKE) from SLA.
+
+        Returns
+        -------
+        xarray.DataArray or None
+            EKE data array.
+        """
+        return self._compute_kinetic_energy("eke")
+
+    def sel_ke(self):
+        """
+        Compute Kinetic Energy (KE) from u and v (ie. total current).
+
+        Returns
+        -------
+        xarray.DataArray or None
+            KE data array.
+        """
+        return self._compute_kinetic_energy("ke")
+
+    def sel_ke_geos(self):
+        """
+        Compute Kinetic Energy (KE) from geostrophic u and v.
+
+        Returns
+        -------
+        xarray.DataArray or None
+            KE data array.
+        """
+        return self._compute_kinetic_energy("ke_geos")
+
+    def sel_mke(self):
+        """
+        Compute Mean Kinetic Energy (MKE) from u and v (ie. total current).
+
+        Returns
+        -------
+        xarray.DataArray or None
+            MKE data array.
+        """
+        return self._compute_kinetic_energy("mke")
+
+    def sel_mke_geos(self):
+        """
+        Compute Mean Kinetic Energy (MKE) from geostrophic u and v.
+
+        Returns
+        -------
+        xarray.DataArray or None
+            MKE data array.
+        """
+        return self._compute_kinetic_energy("mke_geos")

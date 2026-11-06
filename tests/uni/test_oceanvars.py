@@ -13,6 +13,8 @@ class TestOceanVars:
 
     def setup_method(self):
         """Setup test data"""
+        
+        self.time = pd.to_datetime([1, 2, 3], unit="D", origin=pd.Timestamp("2000-01-01"))
         self.lat = np.array([45.0, 46.0])
         self.lon = np.array([2.0, 3.0])
         self.depth = np.array([0, 10, 20])
@@ -25,12 +27,46 @@ class TestOceanVars:
         self.pres = np.array([[[0.0, 0.0], [0.0, 0.0]],
                              [[10.0, 10.0], [10.0, 10.0]],
                              [[20.0, 20.0], [20.0, 20.0]]])
-
+        self.ssh = np.array([[[0.2, 0.15],
+                             [0.05, 0.8]],
+                             [[0.4, 0.9],
+                             [0.5, 0.2]],
+                             [[0.4, 0.5],
+                              [0.2, 0.3]]])
+        
+        self.sla = np.array([[[0.2, 0.15],
+                     [0.05, 0.8]],
+                     [[0.4, 0.9],
+                     [0.5, 0.2]],
+                     [[0.4, 0.5],
+                      [0.2, 0.3]]])
+        
+        
+        self.u = np.array([[[0.02, 0.1],
+                     [0.02, 0.08]],
+                     [[0.1, 0.3],
+                     [0.2, 0.05]],
+                     [[0.1, 0.3],
+                      [0.1, 0.2]]])
+        
+        self.v = np.array([[[-0.02, 0.2],
+             [0.05, -0.04]],
+             [[-0.1, 0.15],
+             [0.2, 0.05]],
+             [[-0.1, 0.3],
+              [0.1, -0.2]]])
+        
+        
         self.ds = xr.Dataset({
             'temp': (['depth', 'lat', 'lon'], self.temp),
             'sal': (['depth', 'lat', 'lon'], self.sal),
             'pres': (['depth', 'lat', 'lon'], self.pres),
+            'ssh': (['time', 'lat', 'lon'], self.ssh),
+            'sla': (['time', 'lat', 'lon'], self.sla),
+            'u': (['time', 'lat', 'lon'], self.u),
+            'v': (['time', 'lat', 'lon'], self.v),
             'depth': (['depth'], self.depth),
+            'time': (['time'], self.time),
             'lat': (['lat'], self.lat),
             'lon': (['lon'], self.lon)
         })
@@ -218,6 +254,135 @@ class TestOceanVars:
         ds_no_sal = self.ds.drop_vars('sal')
         result = ds_no_sal.oceanvars.sel_mld()
         assert result is None
+        
+    def test_sel_sla(self):
+        """Test calculation of sla"""          
+        result = self.ds.oceanvars.sel_sla()
+        assert result is not None
+        assert 'sla' in self.ds
+        
+    def test_sel_sla_from_ssh(self):
+         """Test calculation of sla from ssh"""   
+         ds_no_sla = self.ds.drop_vars(["sla"])
+         result = ds_no_sla.oceanvars.sel_sla()
+         assert result is not None
+         assert 'sla' in self.ds       
+        
+    def test_sel_sla_single_time_step_warns(self, caplog):
+        """With one time step, sla = ssh - mean(ssh) is 0: warn about it."""
+        ds = self.ds.drop_vars(["sla"]).isel(time=[0])
+        with caplog.at_level("WARNING", logger="armoor.oceanvars"):
+            result = ds.oceanvars.sel_sla()
+        np.testing.assert_allclose(result.values, 0.0)
+        assert "single time step" in caplog.text
+
+    def test_sel_sla_several_time_steps_no_warning(self, caplog):
+        ds = self.ds.drop_vars(["sla"])
+        with caplog.at_level("WARNING", logger="armoor.oceanvars"):
+            ds.oceanvars.sel_sla()
+        assert "single time step" not in caplog.text
+
+    def test_sel_ugos(self):
+       """Test calculation of ugos"""
+       result = self.ds.oceanvars.sel_ugos()
+       assert result is not None
+       assert 'ugos' not in self.ds  # intermediate: returned, not stored
+       
+    def test_sel_vgos(self):
+       """Test calculation of vgos"""
+       result = self.ds.oceanvars.sel_vgos()
+       assert result is not None
+       assert 'vgos' not in self.ds  # intermediate: returned, not stored
+       
+    def test_sel_ugosa(self):
+       """Test calculation of ugosa"""
+       result = self.ds.oceanvars.sel_ugosa()
+       assert result is not None
+       assert 'ugosa' not in self.ds  # intermediate: returned, not stored
+       
+    def test_sel_vgosa(self):
+       """Test calculation of vgosa"""
+       result = self.ds.oceanvars.sel_vgosa()
+       assert result is not None
+       assert 'vgosa' not in self.ds  # intermediate: returned, not stored
+       
+    def test_sel_eke(self):
+        """Test calculation of eke from sla"""
+        result = self.ds.oceanvars.sel_eke()
+        assert result is not None
+        assert 'eke' in self.ds
+      
+    def test_sel_ke(self):
+        """Test calculation of ke with u and v"""
+        result = self.ds.oceanvars.sel_ke()
+        assert result is not None
+        assert 'ke' in self.ds   
+        
+    def test_sel_ke_missing_uv(self):
+        """Test calculation of ke when u and v are missing"""
+        ds_no_uv = self.ds.drop_vars(["u", "v"])
+        result = ds_no_uv.oceanvars.sel_ke()
+        assert result is None
+        
+    def test_sel_ke_geos(self):
+       """Test calculation of ke_geos with u and v computed from ssh"""
+       result = self.ds.oceanvars.sel_ke_geos()
+       assert result is not None
+       assert 'ke_geos' in self.ds
+
+    def test_sel_u_mean_time_on_period_dim(self):
+        """u_mean_time is the whole-window mean, on a size-1 period dim, not stored."""
+        result = self.ds.oceanvars.sel_u_mean_time()
+        assert result.dims == ("period", "lat", "lon")
+        assert result.sizes["period"] == 1
+        np.testing.assert_allclose(result.isel(period=0).values, self.u.mean(axis=0))
+        assert result["period"].values[0] == self.ds.time.mean().values
+        assert "u_mean_time" not in self.ds
+
+    def test_sel_u_mean_time_from_cdir_cspeed(self):
+        """u derived from cdir/cspeed (hence never stored) must still work."""
+        ds = self.ds.drop_vars(["u", "v"])
+        ds["cspeed"] = (("time", "lat", "lon"), np.ones_like(self.u))
+        ds["cdir"] = (("time", "lat", "lon"), np.zeros_like(self.u))
+        result = ds.oceanvars.sel_u_mean_time()
+        np.testing.assert_allclose(result.values, 1.0)
+
+    def test_sel_mke(self):
+        """mke = 0.5 * (mean(u)**2 + mean(v)**2) over the whole window."""
+        result = self.ds.oceanvars.sel_mke()
+        expected = 0.5 * (self.u.mean(axis=0) ** 2 + self.v.mean(axis=0) ** 2)
+        assert result.dims == ("period", "lat", "lon")
+        np.testing.assert_allclose(result.isel(period=0).values, expected)
+        assert "mke" in self.ds
+        assert "u_mean_time" not in self.ds
+        assert "v_mean_time" not in self.ds
+
+    def test_sel_mke_geos(self):
+        """mke_geos is built on the period dim from ssh-derived ugos/vgos."""
+        result = self.ds.oceanvars.sel_mke_geos()
+        assert result is not None
+        assert result.sizes["period"] == 1
+        assert "ugos_mean_time" not in self.ds
+
+    def test_geos_intermediates_not_stored_and_computed_once(self):
+        """ke_geos + mke_geos share one get_geos(ssh) call; nothing but the
+        energies themselves lands in the dataset."""
+        from shoot.dyn import get_geos
+
+        with patch("shoot.dyn.get_geos", side_effect=get_geos) as mock_geos:
+            self.ds.oceanvars.sel_ke_geos()
+            self.ds.oceanvars.sel_mke_geos()
+        assert mock_geos.call_count == 1
+        assert "ke_geos" in self.ds and "mke_geos" in self.ds
+        for var in ("ugos", "vgos", "ugos_mean_time", "vgos_mean_time"):
+            assert var not in self.ds
+
+    def test_geos_cache_follows_source_variable(self):
+        """Replacing ssh must not reuse currents computed from the old one."""
+        u_before = self.ds.oceanvars.sel_ugos()
+        self.ds["ssh"] = self.ds["ssh"] * 2
+        u_after = self.ds.oceanvars.sel_ugos()
+        np.testing.assert_allclose(u_after.values, 2 * u_before.values)
 
     def test_sel_method_routing(self):
         """Test routing of the sel method"""

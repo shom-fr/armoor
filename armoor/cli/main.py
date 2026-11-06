@@ -955,6 +955,24 @@ def main_comp_sst() -> None:
     )
 
 
+def get_parser_comp_alti() -> ArgumentParser:
+    """Get parser for alti comparison."""
+    # Setup argument parser
+    parser = ArgumentParser(
+        description="Compare altimetry satellite products with model outputs.",
+        formatter_class=ArmoorArgumentHelpFormatter,
+    )
+    add_logging_parser_arguments(parser)
+    add_dask_parser_arguments(parser)
+    add_comp_parser_arguments(parser)
+    return parser
+
+
+def main_comp_alti() -> None:
+    """Compare altimetry reference with other products."""
+    _dispatch_comp("comp_alti", get_parser_comp_alti(), lambda args: {"tbound": args.tbound})
+
+
 def get_parser_comp_argo() -> ArgumentParser:
     """Get parser for argo comparison."""
     # Setup argument parser

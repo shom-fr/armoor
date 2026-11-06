@@ -11,7 +11,13 @@ import xarray as xr
 from collections import defaultdict
 
 from armoor import ArmoorError
-from armoor.io import get_zarr_encoding, sort_ncs_by_suffix, write_dataset_to_zarr
+from armoor.io import (
+    get_zarr_encoding,
+    is_period_file,
+    sort_ncs_by_suffix,
+    write_dataset_to_zarr,
+)
+from armoor.ranges import PERIOD_DIM
 from armoor.comp import GROUP_SUFFIX
 from armoor.comp.comparison import get_comparison
 from armoor.comp.stats import StatsComp
@@ -457,6 +463,12 @@ class OutputProcessor:
                 # under it, misclassifying every product as a second
                 # reference (same bug class already fixed in coloc.py).
                 type_files = [nc for nc in ncins if Path(str(nc)).name.startswith(file_type)]
+                # Whole-window averages (e.g. comp_alti's mke, see
+                # armoor.ranges.tag_period) are only meaningful for the
+                # otypes that opt in -- one point per window makes no sense
+                # on a timeseries or a per-range dispersion diagram.
+                if not output_params.get("period"):
+                    type_files = [nc for nc in type_files if not is_period_file(nc)]
 
                 # Sort files by the specified dimension
                 sorted_files = sort_ncs_by_suffix(type_files, sort_dim=sort_dim)
@@ -712,6 +724,22 @@ class OutputProcessor:
         -------
         Concatenated dataset
         """
+        # Whole-window averages (see armoor.ranges.tag_period) have no "time"
+        # axis to concatenate on: combine them on their own PERIOD_DIM, then
+        # merge them in next to the "time"-dependent variables.
+        period_datasets = [
+            ds for ds in datasets if PERIOD_DIM in ds.sizes and "time" not in ds.sizes
+        ]
+        datasets = [ds for ds in datasets if not any(ds is pds for pds in period_datasets)]
+        if period_datasets:
+            period_concat = concat_then_merge(period_datasets, dim=PERIOD_DIM)
+            if not datasets:
+                return period_concat
+            return xr.merge(
+                [self._concatenate_time_datasets(datasets), period_concat],
+                combine_attrs="override",
+            )
+
         # Handle multi-time datasets by splitting into individual time slices
         if any(ds.sizes["time"] > 1 for ds in datasets):
             time_slices = []

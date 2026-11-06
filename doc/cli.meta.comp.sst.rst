@@ -105,7 +105,7 @@ metazone parameters
     - ``polygon``
     - ``href``
     - ``cloud``
-    - ``vars``
+    - ``oceanvars``
 
     .. note::
        Other given parameters are ignored.

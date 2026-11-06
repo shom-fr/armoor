@@ -13,7 +13,14 @@ import xoa.geo as xgeo
 import armoor.ranges as ranges
 from armoor.__init__ import ArmoorError
 from armoor.dispatch import SubclassingMethodRegistry
-from armoor.interp import coarsen as _coarsen, grid2loc, grid2track, interp_time, regrid, vinterp
+from armoor.interp import (
+    coarsen as _coarsen,
+    grid2loc,
+    grid2track,
+    interp_time,
+    regrid,
+    vinterp,
+)
 from armoor.io import get_zarr_encoding
 from armoor.comp import COMP_VARS
 from armoor.comp.comparison import get_comparison
@@ -65,6 +72,9 @@ class TimeColocation(AbstractColocation):
         time = pd.date_range(start=self.start, end=self.end, freq=tfreq)
         self.dsref = interp_time(self.dsref, time)
         self.dsprod = interp_time(self.dsprod, time)
+        tt = pd.to_datetime(self.dsref.time)
+        self.dsref.attrs["trange"] = f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
+        self.dsprod.attrs["trange"] = f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
         return self.dsref, self.dsprod
 
     def tmonth(self) -> Tuple[xr.Dataset, xr.Dataset]:
@@ -121,6 +131,9 @@ class TimeColocation(AbstractColocation):
             raise ArmoorError(
                 "Use 'reference' or 'product' to specify the reference timefor ranging then."
             )
+        tt = pd.to_datetime(self.dsref.time)
+        self.dsref.attrs["trange"] = f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
+        self.dsprod.attrs["trange"] = f"[{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}["
         return self.dsref, self.dsprod
 
 
@@ -204,7 +217,11 @@ class HorizontalColocation(AbstractColocation):
         return self.dsref, self.dsprod
 
     def coarsen(
-        self, factor: int, on: str = "product", boundary: str = "trim", method: str = "mean"
+        self,
+        factor: int,
+        on: str = "product",
+        boundary: str = "trim",
+        method: str = "mean",
     ) -> Tuple[xr.Dataset, xr.Dataset]:
         """Coarsen one or both datasets by aggregating spatial blocks.
 
@@ -445,13 +462,17 @@ class VerticalColocation(AbstractColocation):
         if vref == "reference":
             attrs = self.dsprod.attrs
             self.dsprod = vinterp(
-                self.dsprod.chunk(dict(z=-1)), vcoord, self.dsref[vcoord].chunk(dict(z=-1))
+                self.dsprod.chunk(dict(z=-1)),
+                vcoord,
+                self.dsref[vcoord].chunk(dict(z=-1)),
             )
             self.dsprod.attrs.update(attrs)
         elif vref == "product":
             attrs = self.dsref.attrs
             self.dsref = vinterp(
-                self.dsref.chunk(dict(z=-1)), vcoord, self.dsprod[vcoord].chunk(dict(z=-1))
+                self.dsref.chunk(dict(z=-1)),
+                vcoord,
+                self.dsprod[vcoord].chunk(dict(z=-1)),
             )
             self.dsref.attrs.update(attrs)
         else:
@@ -479,7 +500,9 @@ def validate_and_get_params(metazones, comp_func):
     comparison = get_comparison(comp_func)
     metazones = validate_colocation(metazones, comparison.colocation_params_user)
     coloc_params = get_colocation_params(
-        metazones, comparison.colocation_params_user, comparison.colocation_params_default
+        metazones,
+        comparison.colocation_params_user,
+        comparison.colocation_params_default,
     )
     return coloc_params
 
@@ -709,9 +732,20 @@ def _prepare_dataset(ds, comp_func, is_reference=False):
         "sndspeed": {"ptemp", "temp", "sal", "pres"},
         "u": {"cdir", "cspeed"},
         "v": {"cdir", "cspeed"},
+        "ugos": {"ssh"},
+        "vgos": {"ssh"},
         "cdir": {"u", "v"},
         "cspeed": {"u", "v"},
         "mld": {"ptemp", "temp", "sal", "pres"},
+        # What each comp var actually reads (see armoor.oceanvars.OceanVars):
+        # sla <- ssh; eke <- ugosa/vgosa <- sla <- ssh; ke/mke <- u/v
+        # (or cdir/cspeed); ke_geos/mke_geos <- ugos/vgos <- ssh.
+        "sla": {"ssh"},
+        "eke": {"ssh", "sla", "ugosa", "vgosa"},
+        "ke": {"u", "v", "cdir", "cspeed"},
+        "ke_geos": {"ssh", "ugos", "vgos"},
+        "mke": {"u", "v", "cdir", "cspeed"},
+        "mke_geos": {"ssh", "ugos", "vgos"},
     }
     needed = set(COMP_VARS[comp_func])
     vars_to_keep = needed & set(ds.data_vars)
@@ -813,6 +847,7 @@ def _apply_time_ranges(dsref, dsprod, params, tbound):
 
     if "trange_seq" in time_coloc[0]:
         tfreq = time_coloc[1]["tfreq"]
+
         if tfreq != "*":
             return (
                 ranges.trange_seq(dsref, *tbound, tfreq),
@@ -903,8 +938,8 @@ def _save_colocation_results(dssref, dssprod, staged):
 
         dirout = staged.output_dir(
             "coloc",
-            ref_name=dsref.attrs['data_name'],
-            prod_name=dsprod.attrs['data_name'],
+            ref_name=dsref.attrs["data_name"],
+            prod_name=dsprod.attrs["data_name"],
         )
         dirout.mkdir(parents=True, exist_ok=True)
 
@@ -953,8 +988,8 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
     logger.info(dsprodin.sizes)
 
     dsref = dsrefin.copy()
-    prod_name = dsprodin.attrs['data_name']
-    ref_name = dsrefin.attrs['data_name']
+    prod_name = dsprodin.attrs["data_name"]
+    ref_name = dsrefin.attrs["data_name"]
     gattrs_prod = dsprodin.attrs.copy()
     # Move instead of copy: avoids holding two full datasets in memory.
     dsprod = dsprodin
@@ -978,6 +1013,7 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
     comparison = get_comparison(comp_func)
     dsref = comparison.compute_oceanvars(dsref, mparams)
     dsprod = comparison.compute_oceanvars(dsprod, mparams)
+    dsref, dsprod = comparison.select_common_vars(dsref, dsprod)
 
     # Set depth/pres as coordinate if needed
     for vcoord in ["depth", "pres"]:
@@ -1011,7 +1047,19 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
             if sub_ref is None or sub_prod is None:
                 continue
 
-            if "time" in sub_ref.dims:
+            if ranges.PERIOD_DIM in sub_ref.dims:
+                # Averaged over the whole colocated window (e.g. mke): never
+                # time-ranged, saved under its own "_period_<t0>_<tN>" name.
+                # Both sides were averaged over the same colocated time axis;
+                # share the ref's period coord so a mid-time computed at a
+                # different precision can't break the ref/prod alignment.
+                label = ranges.period_label(dsref)
+                sub_prod = sub_prod.assign_coords(
+                    {ranges.PERIOD_DIM: sub_ref[ranges.PERIOD_DIM].values}
+                )
+                sub_ref_list = [ranges.tag_period(sub_ref, label)]
+                sub_prod_list = [ranges.tag_period(sub_prod, label)]
+            elif "time" in sub_ref.dims:
                 sub_ref_list, sub_prod_list = _apply_time_ranges(sub_ref, sub_prod, params, tbound)
             else:
                 sub_ref_list, sub_prod_list = [sub_ref], [sub_prod]

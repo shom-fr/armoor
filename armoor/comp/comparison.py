@@ -1,7 +1,7 @@
 """Comparison type hierarchy for the armoor-comp-* pipeline.
 
-Each `func_comp` string (comp_sst, comp_argo, comp_mooring, comp_drifter,
-comp_models, comp_clim) used to index five parallel dicts in
+Each `func_comp` string (comp_sst, comp_alti, comp_argo, comp_mooring,
+comp_drifter, comp_models, comp_clim) used to index five parallel dicts in
 ``armoor.comp`` (METAZONE_PARAMS, COLOCATION_PARAMS_USER,
 COLOCATION_PARAMS_DEFAULT, OUTPUTS_PARAMS, COMP_VARS) plus TITLE_PLOTS, and
 drove a handful of ``if func_comp == "comp_xxx"`` branches scattered across
@@ -131,6 +131,24 @@ class Comparison:
                 if isinstance(da, xr.DataArray):
                     ds[var] = da
         return ds
+
+    def select_common_vars(self, dsref, dsprod):
+        """Hook to restrict both datasets to the variables they can be compared on.
+
+        Called right after `compute_oceanvars` on both sides. The generic
+        implementation returns them unchanged.
+
+        Parameters
+        ----------
+        dsref, dsprod : xarray.Dataset
+            Colocated reference and product datasets.
+
+        Returns
+        -------
+        tuple of xarray.Dataset
+            ``(dsref, dsprod)``.
+        """
+        return dsref, dsprod
 
     def check_output(self, outputs):
         """Validate that every requested output type is implemented.
@@ -287,6 +305,113 @@ class CompSst(Comparison):
         """Return the dataset lists unchanged.
 
         SST is a surface-only product, so no vertical ranging applies.
+
+        Parameters
+        ----------
+        dsref_list : list of xarray.Dataset
+            Reference datasets, one per product.
+        dsprod_list : list of xarray.Dataset
+            Product datasets, matching `dsref_list`.
+        params : dict
+            Colocation parameters for the metazone (unused).
+
+        Returns
+        -------
+        tuple of (list of xarray.Dataset, list of xarray.Dataset)
+            `dsref_list` and `dsprod_list`, unchanged.
+        """
+        return dsref_list, dsprod_list
+
+
+class CompAlti(Comparison):
+    """Comparison of satellite altimetry against products."""
+
+    name = "comp_alti"
+    title = "altimetry"
+    metazone_params = [
+        "tbound",
+        "thours",
+        "trange_seq",
+        "tfreq",
+        "polygon",
+        "href",
+        "oceanvars",
+        "bathy",
+    ]
+    colocation_params_user = {
+        "time": ("trange_seq", "tfreq"),
+        "horizontal": ("href",),
+    }
+    colocation_params_default = {
+        "vertical": ("vlevel", {"vname": "depth", "levels": [0.0]}),
+    }
+    # "period": True lets an otype read the whole-window coloc files
+    # (mke/mke_geos, averaged over the metazone's tbound -- see
+    # armoor.ranges.tag_period); the other otypes skip them.
+    outputs_params = {
+        "diagdisp_glob": {"concat": ["time"], "period": True},
+        "diagdisp_sel": {"sort": ["time"], "concat": ["time"]},
+        "timeseries": {"concat": ["time"], "stat": ["time", "x", "y"], "output": "merge"},
+        "maps": {"sort": ["time"], "stat": ["time"], "period": True},
+    }
+    comp_vars = ["sla", "ke", "ke_geos", "eke", "mke", "mke_geos"]
+
+    def select_common_vars(self, dsref, dsprod):
+        """Keep only the variables that both sides provide.
+
+        Total-current energies (ke, mke) need a real total current: an
+        altimetry reference (e.g. DUACS) only provides geostrophic currents,
+        so it only yields ke_geos/mke_geos/eke. Comparing a model's total ke
+        against a geostrophic one would be meaningless, so a variable missing
+        on one side is dropped from the other instead (downstream outputs,
+        e.g. diagdisp_glob, also expect the same variables on both sides).
+        For the same reason, raw inputs found on one side only (e.g. the
+        model total current u/v) are dropped too.
+
+        Parameters
+        ----------
+        dsref, dsprod : xarray.Dataset
+            Colocated reference and product datasets.
+
+        Returns
+        -------
+        tuple of xarray.Dataset
+            ``(dsref, dsprod)``, with the same data variables.
+        """
+        ref_vars = set(self.comp_vars) & set(dsref.data_vars)
+        prod_vars = set(self.comp_vars) & set(dsprod.data_vars)
+        only_prod = sorted(prod_vars - ref_vars)
+        only_ref = sorted(ref_vars - prod_vars)
+        if only_prod:
+            logger.info(
+                f"{dsref.attrs.get('data_name')} cannot provide {only_prod}: "
+                f"not compared for {dsprod.attrs.get('data_name')}"
+            )
+            dsprod = dsprod.drop_vars(only_prod)
+        if only_ref:
+            logger.info(
+                f"{dsprod.attrs.get('data_name')} cannot provide {only_ref}: "
+                f"not compared against {dsref.attrs.get('data_name')}"
+            )
+            dsref = dsref.drop_vars(only_ref)
+        # Raw inputs kept on one side only (e.g. the model's total current
+        # u/v, which DUACS lacks) must go too: the outputs and plots iterate
+        # over the product variables and expect them in the reference.
+        common = set(dsref.data_vars) & set(dsprod.data_vars)
+        extra_prod = sorted(set(dsprod.data_vars) - common)
+        extra_ref = sorted(set(dsref.data_vars) - common)
+        if extra_prod:
+            logger.debug(f"Drop product-only variables {extra_prod}")
+            dsprod = dsprod.drop_vars(extra_prod)
+        if extra_ref:
+            logger.debug(f"Drop reference-only variables {extra_ref}")
+            dsref = dsref.drop_vars(extra_ref)
+        return dsref, dsprod
+
+    def apply_vertical_ranges(self, dsref_list, dsprod_list, params):
+        """Return the dataset lists unchanged.
+
+        SSH is a surface-only product, so no vertical ranging applies.
 
         Parameters
         ----------

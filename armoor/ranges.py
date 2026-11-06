@@ -9,6 +9,55 @@ from armoor import ArmoorError
 
 logger = logging.getLogger(__name__)
 
+#: Size-1 dimension carried by variables averaged over the whole colocated
+#: time window (the metazone's ``tbound``), e.g. comp_alti's mke/mke_geos.
+#: Such variables cannot share the "time" axis of the other variables, are
+#: never split by `trange_seq`/`tfreq`, and are saved in their own
+#: ``*_period_<t0>_<tN>.zarr`` coloc files (see `tag_period`).
+PERIOD_DIM = "period"
+
+
+def period_label(ds):
+    """Return the ``<t0>_<tN>`` label of the time window covered by `ds`.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset with a datetime-like "time" coordinate.
+
+    Returns
+    -------
+    str
+    """
+    tt = pd.to_datetime(ds["time"].values)
+    return f"{tt[0]:%Y-%m-%dT%H:%M:%S}_{tt[-1]:%Y-%m-%dT%H:%M:%S}"
+
+
+def tag_period(ds, label):
+    """Tag a `PERIOD_DIM` dataset with its averaging window.
+
+    Drops the ``time``/``trange`` attrs inherited from the full dataset --
+    they would otherwise give this dataset the same output filename suffix
+    as the "time"-dependent one it was split from (see
+    `armoor.io.output_suffix`) -- and sets ``attrs["period"]`` instead.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+    label : str
+        See `period_label`.
+
+    Returns
+    -------
+    xarray.Dataset
+        A shallow copy of `ds`, retagged.
+    """
+    attrs = {k: v for k, v in ds.attrs.items() if k not in ("time", "trange")}
+    attrs["period"] = label
+    out = ds.copy()
+    out.attrs = attrs
+    return out
+
 
 def timegroups_to_list(grouped, label="trange"):
     """Turn a ``groupby``/``groupby_bins`` result into a list of datasets.
@@ -34,6 +83,11 @@ def timegroups_to_list(grouped, label="trange"):
     for name, ds in grouped:
         dso = ds.copy()
         if label == "time":
+            # A single time step has no range: drop the whole-window trange
+            # tagged by the time colocation (armoor.comp.coloc.TimeColocation),
+            # which would otherwise win over "time" in plot labels and give
+            # every time step's figure the same name.
+            dso.attrs.pop("trange", None)
             tlabel = pd.to_datetime(name)
             dso.attrs[label] = f"{tlabel:%Y-%m-%dT%H:%M:%S}"
         else:

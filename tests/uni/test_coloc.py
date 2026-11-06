@@ -1516,6 +1516,7 @@ class TestProcessSingleProductSplitBehavior:
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
         mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
+        mock_get_comparison.return_value.select_common_vars.side_effect = lambda r, p: (r, p)
         mock_coloc.return_value = (dsref, dsprod)
         mock_vrange.return_value = ([dsref], [dsprod])
         mock_save.return_value = []
@@ -1544,6 +1545,7 @@ class TestProcessSingleProductSplitBehavior:
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
         mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
+        mock_get_comparison.return_value.select_common_vars.side_effect = lambda r, p: (r, p)
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_save.return_value = []
@@ -1572,6 +1574,7 @@ class TestProcessSingleProductSplitBehavior:
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
         mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
+        mock_get_comparison.return_value.select_common_vars.side_effect = lambda r, p: (r, p)
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_vrange.return_value = ([dsref], [dsprod])
@@ -1619,6 +1622,7 @@ class TestProcessSingleProductSplitBehavior:
         mock_open.return_value = dsprod
         mock_prep.return_value = dsprod
         mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
+        mock_get_comparison.return_value.select_common_vars.side_effect = lambda r, p: (r, p)
         mock_coloc.return_value = (dsref, dsprod)
         mock_trange.return_value = ([dsref], [dsprod])
         mock_vrange.return_value = ([dsref], [dsprod])
@@ -1904,3 +1908,80 @@ class TestMainColoc:
         main_coloc(ncs, metazones, "comp_argo")
 
         assert mock_metazone.call_count == 2
+
+
+# =============================================================================
+# Whole-window ("period") variables, e.g. comp_alti's mke/mke_geos
+# =============================================================================
+
+def _make_alti_like_ds(name):
+    time = pd.date_range("2023-01-01", periods=3, freq="D")
+    ds = xr.Dataset(
+        {
+            "ke": (("time", "y", "x"), np.ones((3, 2, 2))),
+            "mke": (("period", "y", "x"), np.ones((1, 2, 2))),
+        },
+        coords={"time": time, "period": [time.mean()]},
+    )
+    ds.attrs = {
+        "data_name": name,
+        "trange": "[2023-01-01T00:00:00_2023-01-03T00:00:00[",
+    }
+    return ds
+
+
+@patch("armoor.comp.coloc._apply_colocations")
+@patch("armoor.comp.coloc.get_comparison")
+@patch("armoor.comp.coloc._save_colocation_results")
+@patch("armoor.comp.coloc._prepare_dataset")
+@patch("armoor.comp.coloc.xr.open_dataset")
+def test_period_group_gets_its_own_suffix(
+    mock_open, mock_prep, mock_save, mock_get_comparison, mock_coloc
+):
+    """With tfreq="*" the mke group must not share (hence overwrite) the ke file."""
+    dsref = _make_alti_like_ds("ref")
+    dsprod = _make_alti_like_ds("prod")
+    mock_open.return_value = dsprod
+    mock_prep.return_value = dsprod
+    mock_get_comparison.return_value.compute_oceanvars.side_effect = lambda ds, mparams=None: ds
+    mock_get_comparison.return_value.select_common_vars.side_effect = lambda r, p: (r, p)
+    mock_coloc.return_value = (dsref, dsprod)
+    mock_save.return_value = []
+
+    params = {"time": ("trange_seq", {"tfreq": "*"})}
+    tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03"))
+    staged = StagedDataset("", metazone="z1", comp_func="comp_alti")
+    _process_single_product(dsref, Path("/fake.nc"), params, tbound, staged)
+
+    dssref, dssprod, _ = mock_save.call_args[0]
+    assert len(dssref) == 2
+    suffixes = {ds.range.suffix for ds in dssref}
+    assert len(suffixes) == 2
+    (period_ref,) = [ds for ds in dssref if "period" in ds.dims]
+    (period_prod,) = [ds for ds in dssprod if "period" in ds.dims]
+    assert period_ref.attrs["period"] == "2023-01-01T00:00:00_2023-01-03T00:00:00"
+    assert "trange" not in period_ref.attrs
+    assert period_ref.range.suffix == "_period_2023-01-01T00:00:00_2023-01-03T00:00:00"
+    assert period_prod.attrs["data_name"] == "prod"
+
+
+@pytest.mark.parametrize(
+    "raw_vars, expected",
+    [
+        # model with total currents: everything comp_alti needs is derivable
+        (("ssh", "u", "v", "temp"), {"ssh", "u", "v"}),
+        # currents given as direction/speed instead of u/v
+        (("ssh", "cdir", "cspeed", "sal"), {"ssh", "cdir", "cspeed"}),
+        # altimetry: only adt (decoded as ssh) is left
+        (("ssh", "flag"), {"ssh"}),
+    ],
+)
+def test_prepare_dataset_comp_alti_keeps_raw_inputs(raw_vars, expected):
+    """_prepare_dataset keeps exactly the raw inputs comp_alti derives from."""
+    time = pd.date_range("2023-01-01", periods=2)
+    ds = xr.Dataset(
+        {v: (("time", "y", "x"), np.ones((2, 2, 2))) for v in raw_vars},
+        coords={"time": time},
+    )
+    result = _prepare_dataset(ds, "comp_alti")
+    assert set(result.data_vars) == expected

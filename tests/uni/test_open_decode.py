@@ -20,6 +20,7 @@ from armoor.data.open_decode import (
     open_decode,
     open_decode_arpege_insta,
     open_decode_sst_satellite,
+    open_decode_alti_satellite,
     open_decode_cmems_model,
     open_decode_hycom,
     open_decode_woa18,
@@ -48,6 +49,7 @@ from armoor.data.open_decode import (
     OdarDecoder,
     SloopDecoder,
     SstSatelliteDecoder,
+    SshSatelliteDecoder,
     Woa18Decoder,
 )
 
@@ -82,6 +84,7 @@ def setup_test_data():
     test_files['woa18'] = TEST_DATA_DIR / "woa18_*.nc"
     test_files['cmems_sst_l4'] = TEST_DATA_DIR / "cmems_sst_l4.nc"
     test_files['cmems_sst_l3'] = TEST_DATA_DIR / "cmems_sst_l3.nc"
+    test_files['cmems_alti_duacs'] = TEST_DATA_DIR / "cmems_duacs_l4.nc"
     test_files['cersat_sst_l3'] = TEST_DATA_DIR / "20210623-IFR-L3C_GHRSST-SSTsubskin-ODYSSEA-GLOB_010_adjusted-v2.0-fv1.0.nc"
     test_files['cmems_insitu_argo'] = TEST_DATA_DIR / "*_PR_PF_*.nc"
     test_files['cmems_insitu_glider'] = TEST_DATA_DIR / "*_PR_GL_*.nc"
@@ -228,6 +231,31 @@ class TestOpenDecodeSST:
         assert 'x' in result.dims
         assert 'y' in result.dims
         assert 'time' in result.dims
+
+class TestOpenDecodeSSH:
+    """Tests for open_decode_alti_satellite function."""
+    
+    def test_open_decode_cmems_alti_duacs(self, setup_test_data):
+        """
+        Test basic functionality of open_decode_alti_satellite.
+        
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['cmems_alti_duacs']
+        result = open_decode_alti_satellite([filepath], fmt="cmems_alti_duacs")
+
+        assert isinstance(result, xr.Dataset)
+        assert 'x' in result.dims
+        assert 'y' in result.dims
+        assert 'time' in result.dims
+        # DUACS geostrophic currents are ignored (recomputed from adt like for
+        # the models) and must never pose as a total u/v either.
+        for var in ('sla', 'slaref', 'ugos', 'vgos', 'ugosa', 'vgosa', 'u', 'v'):
+            assert var not in result
+        assert 'ssh' in result
 
 # ============================================================================
 # Test open_decode_cmems_model
@@ -913,6 +941,7 @@ class TestOpenDecode:
         ("cmems_sst_l4", SstSatelliteDecoder),
         ("cmems_sst_l3", SstSatelliteDecoder),
         ("cersat_sst_l3", SstSatelliteDecoder),
+        ("cmems_alti_duacs", SshSatelliteDecoder),
         ("hycom", HycomDecoder),
         ("hycom3d", HycomDecoder),
         ("croco", CrocoDecoder),
