@@ -20,6 +20,9 @@ build:
       # package data -- armoor must resolve to the checkout, not to
       # site-packages (same as PYTHONPATH=$PWD in the CI).
       - python -m pip install --no-cache-dir -e ".[doc]"
+      # Log the resolved versions (conda env create runs with --quiet), to
+      # compare a failing build with the last good one.
+      - conda list
     pre_build:
       # Force cartopy's Natural Earth shapefile download before the
       # tutorials plot maps.
