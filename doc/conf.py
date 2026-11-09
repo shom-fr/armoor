@@ -14,6 +14,17 @@ import os
 import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+# Same thread limits as the armoor-* executables (armoor/cli/main.py), set
+# before anything imports numba. autosummary imports every armoor module in
+# this process: first ones that import numba (via xoa/gsw), which then sizes
+# its thread pool from NUMBA_NUM_THREADS (unset: the CPU count), then
+# armoor.cli.main, which sets NUMBA_NUM_THREADS=1. The tutorials run in this
+# same process, and numba refuses the changed value once its threads are
+# running: "Cannot set NUMBA_NUM_THREADS to a different value once the
+# threads have been launched" (02_gridded_model, ds.interp.vertical).
+for _var in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMBA_NUM_THREADS'):
+    os.environ.setdefault(_var, '1')
+
 # %% Project information -----------------------------------------------------
 
 project = 'Armoor'
