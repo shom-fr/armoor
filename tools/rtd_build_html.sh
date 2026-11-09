@@ -24,9 +24,12 @@ sphinx_log=$log_dir/sphinx.log
 monitor_log=$log_dir/monitor.log
 
 # Memory limit and usage: cgroup v2 when bounded, else /proc/meminfo.
+# Not memory.current: it includes the page cache (~6.8 GiB left by the conda
+# install on RTD), which the kernel reclaims. Count what it cannot reclaim:
+# anonymous memory and shmem (/dev/shm, used by multiprocessing).
 if [ -r /sys/fs/cgroup/memory.max ] && [ "$(cat /sys/fs/cgroup/memory.max)" != max ]; then
     mem_limit=$(cat /sys/fs/cgroup/memory.max)
-    mem_used() { cat /sys/fs/cgroup/memory.current; }
+    mem_used() { awk '$1 == "anon" || $1 == "shmem" {s += $2} END {print s}' /sys/fs/cgroup/memory.stat; }
 else
     mem_limit=$(($(awk '/^MemTotal:/ {print $2}' /proc/meminfo) * 1024))
     mem_used() { echo $((mem_limit - $(awk '/^MemAvailable:/ {print $2}' /proc/meminfo) * 1024)); }
@@ -61,6 +64,8 @@ while kill -0 "$sphinx_pid" 2> /dev/null; do
         last_sample=$elapsed
         {
             echo "=== t=${elapsed}s used=$((used >> 20)) MiB peak=$((peak >> 20)) MiB"
+            [ -r /sys/fs/cgroup/memory.current ] && echo "cgroup memory.current (with cache): $(($(cat /sys/fs/cgroup/memory.current) >> 20)) MiB"
+            [ -r /sys/fs/cgroup/memory.pressure ] && sed 's/^/memory.pressure /' /sys/fs/cgroup/memory.pressure
             ps -eo pid,ppid,etimes,rss,pcpu,args --sort=-rss | head -8 | cut -c1-160
             echo "sphinx: $(tail -c 300 "$sphinx_log" | tr '\r' '\n' | grep -v '^$' | tail -1 | cut -c1-150)"
         } >> "$monitor_log" 2>&1
@@ -90,6 +95,9 @@ status=$?
 cat "$sphinx_log"
 echo "=== memory samples (peak $((peak >> 20)) MiB of $((mem_limit >> 20)) MiB)"
 cat "$monitor_log"
+for f in /sys/fs/cgroup/memory.events /sys/fs/cgroup/memory.pressure; do
+    [ -r "$f" ] && { echo "=== $f"; cat "$f"; }
+done
 echo "=== sphinx exit status: $status${reason:+ (stopped: $reason)}"
 [ -n "$reason" ] && exit 1
 exit "$status"
