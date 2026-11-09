@@ -27,6 +27,13 @@ build:
       # Force cartopy's Natural Earth shapefile download before the
       # tutorials plot maps.
       - python -c "import cartopy.feature as cfeature; list(cfeature.LAND.geometries())"
+    build:
+      html:
+        # Sphinx under a memory watchdog: when the container reaches its
+        # memory limit it stalls until RTD kills the build, without any log.
+        # The script stops Sphinx before that and prints the log and the
+        # memory samples (see tools/rtd_build_html.sh).
+        - bash tools/rtd_build_html.sh
 
 conda:
   environment: environment.yml
