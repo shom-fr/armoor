@@ -27,13 +27,29 @@ build:
       # Force cartopy's Natural Earth shapefile download before the
       # tutorials plot maps.
       - python -c "import cartopy.feature as cfeature; list(cfeature.LAND.geometries())"
+      # DIAGNOSTIC (RTD time out): run each tutorial as its own command, with
+      # its duration and memory. RTD keeps the log of every command that
+      # returns, so if one tutorial stalls or kills the container, it is the
+      # last one shown (see tools/rtd_probe_tutorial.py).
+      - python tools/rtd_probe_tutorial.py tutorials/01_library/01_mooring_dataset.py
+      - python tools/rtd_probe_tutorial.py tutorials/01_library/02_gridded_model.py
+      - python tools/rtd_probe_tutorial.py tutorials/02_cli/03_data_config.py
+      - python tools/rtd_probe_tutorial.py tutorials/02_cli/04_comp_config.py
+      - python tools/rtd_probe_tutorial.py tutorials/02_cli/05_comp_sst.py
+      - python tools/rtd_probe_tutorial.py tutorials/02_cli/06_comp_drifter.py
+      - python tools/rtd_probe_tutorial.py tutorials/02_cli/07_comp_mooring.py
+      - python tools/rtd_probe_tutorial.py tutorials/02_cli/08_comp_models.py
+      - python tools/rtd_probe_tutorial.py tutorials/02_cli/09_comp_clim.py
+      - python tools/rtd_probe_tutorial.py tutorials/02_cli/10_comp_hydrosection.py
     build:
       html:
         # Sphinx under a memory watchdog: when the container reaches its
         # memory limit it stalls until RTD kills the build, without any log.
         # The script stops Sphinx before that and prints the log and the
         # memory samples (see tools/rtd_build_html.sh).
-        - bash tools/rtd_build_html.sh
+        # DIAGNOSTIC: the tutorials already ran above, so do not run them
+        # again (plot_gallery=0), to stay within RTD's build time limit.
+        - bash tools/rtd_build_html.sh -D plot_gallery=0
 
 conda:
   environment: environment.yml

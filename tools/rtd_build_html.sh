@@ -46,9 +46,9 @@ echo "memory limit: $((mem_limit >> 20)) MiB, Sphinx stopped above $((mem_stop >
 # No core dump on SIGABRT: only the faulthandler stacks are wanted.
 ulimit -c 0
 # Own session/process group, so the tutorials' subprocesses can be killed too.
-# Serial build (no -j), same as the CI.
+# Serial build (no -j), same as the CI. Extra arguments go to Sphinx.
 setsid python -X faulthandler -m sphinx -T -b html \
-    -d _build/doctrees -D language=en doc "$READTHEDOCS_OUTPUT/html" \
+    -d _build/doctrees -D language=en "$@" doc "$READTHEDOCS_OUTPUT/html" \
     > "$sphinx_log" 2>&1 < /dev/null &
 sphinx_pid=$!
 
