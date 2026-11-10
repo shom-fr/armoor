@@ -14,6 +14,17 @@ import os
 import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+# Same thread limits as the armoor-* executables (armoor/cli/main.py), set
+# before anything imports numba. autosummary imports every armoor module in
+# this process: first ones that import numba (via xoa/gsw), which then sizes
+# its thread pool from NUMBA_NUM_THREADS (unset: the CPU count), then
+# armoor.cli.main, which sets NUMBA_NUM_THREADS=1. The tutorials run in this
+# same process, and numba refuses the changed value once its threads are
+# running: "Cannot set NUMBA_NUM_THREADS to a different value once the
+# threads have been launched" (02_gridded_model, ds.interp.vertical).
+for _var in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMBA_NUM_THREADS'):
+    os.environ.setdefault(_var, '1')
+
 # %% Project information -----------------------------------------------------
 
 project = 'Armoor'
@@ -130,6 +141,30 @@ sphinx_gallery_conf = {
     'copyfile_regex': r'.*\.cfg$',
 }
 
+# One tutorial per Sphinx process (Read the Docs, see .readthedocs.yaml).
+# Running all of them in the single Sphinx process stalls RTD's container
+# (7 GiB, no swap) until the build is killed, while each one runs fine on its
+# own. With ARMOOR_GALLERY_ONLY=<tutorial file stem>, only that tutorial is
+# executed, then Sphinx stops right after the gallery generation: the
+# tutorial's outputs and its .md5 stay in doc/tutorials/, so the final full
+# build skips it (sphinx-gallery only re-runs examples whose md5 changed) and
+# reuses its figures. Tutorials that are not executed write no .md5.
+ARMOOR_GALLERY_ONLY = os.environ.get('ARMOOR_GALLERY_ONLY')
+if ARMOOR_GALLERY_ONLY:
+    import re  # noqa: E402
+
+    sphinx_gallery_conf['filename_pattern'] = rf'/{re.escape(ARMOOR_GALLERY_ONLY)}\.py$'
+
+
+def _stop_after_gallery(app):
+    """Exit once sphinx-gallery has run the ARMOOR_GALLERY_ONLY tutorial."""
+    failing = app.config.sphinx_gallery_conf.get('failing_examples', {})
+    for fname, traceback in failing.items():
+        print(f'Tutorial failed: {fname}\n{traceback}', file=sys.stderr)
+    print(f'ARMOOR_GALLERY_ONLY={ARMOOR_GALLERY_ONLY}: done, stopping Sphinx')
+    # SystemExit is not an Exception: Sphinx lets it through.
+    sys.exit(1 if failing else 0)
+
 # %% Options for LATEXPDF output---------------------------------------------
 
 latex_toplevel_sectioning = 'section'
@@ -172,4 +207,7 @@ napoleon_use_rtype = True
 
 def setup(app):
     app.add_css_file('custom.css')
+    if ARMOOR_GALLERY_ONLY:
+        # After sphinx-gallery's generate_gallery_rst (default priority 500).
+        app.connect('builder-inited', _stop_after_gallery, priority=900)
 

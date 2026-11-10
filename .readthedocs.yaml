@@ -20,10 +20,35 @@ build:
       # package data -- armoor must resolve to the checkout, not to
       # site-packages (same as PYTHONPATH=$PWD in the CI).
       - python -m pip install --no-cache-dir -e ".[doc]"
+      # Log the resolved versions (conda env create runs with --quiet), to
+      # compare a failing build with the last good one.
+      - conda list
     pre_build:
       # Force cartopy's Natural Earth shapefile download before the
       # tutorials plot maps.
       - python -c "import cartopy.feature as cfeature; list(cfeature.LAND.geometries())"
+      # One tutorial per Sphinx process: all of them in the same process
+      # stall RTD's container until the build is killed, while each runs fine
+      # on its own. Each command only runs sphinx-gallery on one tutorial and
+      # stops; the html build below then reuses their outputs (md5 cache).
+      # See ARMOOR_GALLERY_ONLY in doc/conf.py. Keep in sync with tutorials/.
+      - ARMOOR_GALLERY_ONLY=01_mooring_dataset python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=02_gridded_model python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=03_data_config python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=04_comp_config python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=05_comp_sst python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=06_comp_drifter python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=07_comp_mooring python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=08_comp_models python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=09_comp_clim python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=10_comp_hydrosection python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+    build:
+      html:
+        # Sphinx under a memory watchdog: when the container reaches its
+        # memory limit it stalls until RTD kills the build, without any log.
+        # The script stops Sphinx before that and prints the log and the
+        # memory samples (see tools/rtd_build_html.sh).
+        - bash tools/rtd_build_html.sh
 
 conda:
   environment: environment.yml
