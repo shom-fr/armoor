@@ -266,19 +266,30 @@ class DataMeteo(DataOceanModel):
 
 class DataEddies(DataType):
     """Eddy-detection tool output (py-eddy-tracker, sacso, shoot)."""
-
+    # sort-time keys are used to gather subdatasets in case of trange
     name = "eddies"
     fmts = ("eddy_pet", "eddy_sacso", "eddy_shoot")
     data_vars = ["vmax_area", "vmax_radius"]
     forbidden_params = ["tfreq", "vlevel", "vrange", "cloud"]
-    outputs_params = {
-        "pdf_eddies": {
-            # Eddy detections are obs-indexed (one row per detection), not
-            # on a regular time/z grid -- concatenate along "obs" instead
-            # of the time/z-based stat/sort armoor.data.datatype.py's
-            # other types use. See armoor.diags.eddies.pdf.
+    outputs_params = {        
+        "map_eddies": {
+            "mparams_con": {
+                "time": ["trange_seq"],
+                }
+            },
+        "map_occurence_eddies": {
+            "sort": ["time"],
+            },
+        "histogram_eddies": {
+            "sort": ["time"],
+            "unwanted_vars": ["pdf", "center", "contour", "eddy_type"]
+            },
+        "timeseries_eddies": {
             "concat": ["obs"],
-        },
+            },
+        "pdf_eddies": {      
+            "sort": ["time"],
+            },
     }
 
 
