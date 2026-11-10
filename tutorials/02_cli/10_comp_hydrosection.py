@@ -199,8 +199,9 @@ show_png(cgeo_png)
 # Next steps
 # ----------
 #
-# - This was the last comparison type in this series -- see :ref:`examples`
-#   for more ready-to-run configuration files, and ``armoor-comp-*
+# - :doc:`11_comp_alti` (``armoor-comp-alti``) compares the model sea
+#   surface height and derived kinetic energies with DUACS altimetry.
+# - See :ref:`examples` for more ready-to-run configuration files, and ``armoor-comp-*
 #   --help`` for the full CLI reference of each.
 # - Full config schema: ``armoor/cli/comp.ini`` and
 #   ``armoor/cli/metazones.ini``

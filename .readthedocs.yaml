@@ -42,6 +42,7 @@ build:
       - ARMOOR_GALLERY_ONLY=08_comp_models python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
       - ARMOOR_GALLERY_ONLY=09_comp_clim python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
       - ARMOOR_GALLERY_ONLY=10_comp_hydrosection python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
+      - ARMOOR_GALLERY_ONLY=11_comp_alti python -m sphinx -T -b html -d _build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
     build:
       html:
         # Sphinx under a memory watchdog: when the container reaches its
