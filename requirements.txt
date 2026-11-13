@@ -10,7 +10,7 @@ cmocean
 colorlog
 configobj=5.0.9
 dask
-esmf=8.7.0
+esmf=8.7.0=nompi*
 esmpy=8.7.0
 geojson
 gitpython
