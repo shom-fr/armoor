@@ -865,7 +865,7 @@ def get_parser_comp_models() -> ArgumentParser:
     """Get parser for models comparison."""
     # Setup argument parser
     parser = ArgumentParser(
-        description="Compare models ouputs.",
+        description="Compare models outputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
     )
     add_logging_parser_arguments(parser)
@@ -933,7 +933,7 @@ def get_parser_comp_sst() -> ArgumentParser:
     """Get parser for sst comparison."""
     # Setup argument parser
     parser = ArgumentParser(
-        description="Compare sst satellite with model ouputs.",
+        description="Compare sst satellite with model outputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
     )
     add_logging_parser_arguments(parser)
@@ -977,7 +977,7 @@ def get_parser_comp_argo() -> ArgumentParser:
     """Get parser for argo comparison."""
     # Setup argument parser
     parser = ArgumentParser(
-        description="Compare argo data with model ouputs.",
+        description="Compare argo data with model outputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
     )
     add_logging_parser_arguments(parser)
@@ -1011,7 +1011,7 @@ def get_parser_comp_mooring() -> ArgumentParser:
     """Get parser for mooring comparison."""
     # Setup argument parser
     parser = ArgumentParser(
-        description="Compare mooring data with model ouputs.",
+        description="Compare mooring data with model outputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
     )
     add_logging_parser_arguments(parser)
@@ -1045,7 +1045,7 @@ def get_parser_comp_drifter() -> ArgumentParser:
     """Get parser for drifter comparison."""
     # Setup argument parser
     parser = ArgumentParser(
-        description="Compare drifter data with model ouputs.",
+        description="Compare drifter data with model outputs.",
         formatter_class=ArmoorArgumentHelpFormatter,
     )
     add_logging_parser_arguments(parser)
