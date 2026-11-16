@@ -1673,7 +1673,8 @@ class PlotEddies(_PlotDataBase):
                 
             # Only show one entry per eddy type in legend
             handles, labels = ax[0].get_legend_handles_labels()
-            sel_handles=[]; sel_labels=[]
+            sel_handles=[]
+            sel_labels=[]
             if 'anticyclones' in labels:
                 first_a = labels.index('anticyclones')
                 sel_handles.append(handles[first_a])
@@ -1898,7 +1899,8 @@ class PlotEddies(_PlotDataBase):
         ax.grid(axis='y', alpha=0.2)
         ax.xaxis.set_tick_params(labelrotation=45)
         xlabel = 'Time'
-        if "trange_seq" in dse.attrs: xlabel += f' [{trange_seq} range]'
+        if "trange_seq" in dse.attrs:
+            xlabel += f' [{trange_seq} range]'
         ax.set_xlabel(xlabel)
         ax.set_ylabel('Number of eddies')
         

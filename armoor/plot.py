@@ -114,23 +114,25 @@ def format_time_label(attrs, ds=None, allow_clim_month=False):
         return title_str, f"_{suffix_str}"
     if tfreq:
         return tfreq, f"_{tfreq}"
-    # Include any kind of dataset (unique timestamps, or not like eddies) with np.unique
-    if ds is not None and np.unique(ds.time).shape[0] == 1:
-        time_str = f"{pd.to_datetime(np.unique(ds.time)[0]):%Y-%m-%dT%H:%M:%S}"
-        return time_str, f"_{time_str}"
+    # Include any kind of dataset (unique timestamps, or not -- like eddies) with np.unique
+    if ds is not None and 'time' in ds.sizes:
+        if np.unique(ds.time).shape[0] == 1:
+            time_str = f"{pd.to_datetime(np.unique(ds.time)[0]):%Y-%m-%dT%H:%M:%S}"
+            return time_str, f"_{time_str}"
+        if np.unique(ds.time).shape[0] > 1: # tbound or no timebound
+            unq = np.unique(ds.time)
+            t1 = datetime.strftime(pd.to_datetime(unq[0]),"%Y%m%d")
+            t2 = datetime.strftime(pd.to_datetime(unq[-1]),"%Y%m%d")
+            title_str =  f"[{t1}-{t2}]"
+            del unq,t1,t2 
+            suffix_str = re.sub("-", "_", re.sub(r"[\[\]]", "", title_str))
+            return title_str, f"_{suffix_str}"
     if allow_clim_month and "clim_month" in attrs:
         import calendar
 
         return calendar.month_name[attrs["clim_month"]], f"_m{attrs['clim_month']:02d}"
-    else: # tbound or no timebound was given
-        unq = np.unique(ds.time)
-        t1 = datetime.strftime(pd.to_datetime(unq[0]),"%Y%m%d")
-        t2 = datetime.strftime(pd.to_datetime(unq[-1]),"%Y%m%d")
-        title_str =  f"[{t1}-{t2}]"
-        del unq,t1,t2 
-        suffix_str = re.sub("-", "_", re.sub(r"[\[\]]", "", title_str))
-        return title_str, f"_{suffix_str}"
-    #return "", ""
+    
+    return "", ""
 
 
 def format_vertical_label(attrs, allow_vrange=True):
