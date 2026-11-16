@@ -119,19 +119,19 @@ def format_time_label(attrs, ds=None, allow_clim_month=False):
         if np.unique(ds.time).shape[0] == 1:
             time_str = f"{pd.to_datetime(np.unique(ds.time)[0]):%Y-%m-%dT%H:%M:%S}"
             return time_str, f"_{time_str}"
-        if np.unique(ds.time).shape[0] > 1: # tbound or no timebound
+        if np.unique(ds.time).shape[0] > 1:  # tbound or no timebound
             unq = np.unique(ds.time)
-            t1 = datetime.strftime(pd.to_datetime(unq[0]),"%Y%m%d")
-            t2 = datetime.strftime(pd.to_datetime(unq[-1]),"%Y%m%d")
-            title_str =  f"[{t1}-{t2}]"
-            del unq,t1,t2 
+            t1 = datetime.strftime(pd.to_datetime(unq[0]), "%Y%m%d")
+            t2 = datetime.strftime(pd.to_datetime(unq[-1]), "%Y%m%d")
+            title_str = f"[{t1}-{t2}]"
+            del unq, t1, t2
             suffix_str = re.sub("-", "_", re.sub(r"[\[\]]", "", title_str))
             return title_str, f"_{suffix_str}"
     if allow_clim_month and "clim_month" in attrs:
         import calendar
 
         return calendar.month_name[attrs["clim_month"]], f"_m{attrs['clim_month']:02d}"
-    
+
     return "", ""
 
 
@@ -461,11 +461,11 @@ def shadow_line(x, y, ax, label=None, color='k'):
 
 
 def determine_figsize(
-        dataset, lon_name: str = "contour_lon", lat_name: str = "contour_lat"
-    ) -> list[int]:
+    dataset, lon_name: str = "contour_lon", lat_name: str = "contour_lat"
+) -> list[int]:
     """
     Determine figsize from longitude and latitude arrays.
-    
+
     Parameters
     ----------
     dataset : xarray.dataset
@@ -474,13 +474,13 @@ def determine_figsize(
         Longitude variable name in dataset
     lat_name : str
         Latitude variable name in dataset
-    
+
     Returns
     -------
     List[int]
         List of figure sizes along longitude and latitude axis.
         Typically expressed in inches and used as 'figsize' option in matplotlib.pyplot.figure
-        
+
     Raises
     ------
     ArmoorError
@@ -503,11 +503,9 @@ def determine_figsize(
             resY = 18
             resX = int((18 * dx / dy)) + 1
         return resX, resY
-    
-    
-def get_intuitive_bins(
-        data, nbins_max: int = 10
-    ) -> np.ndarray:
+
+
+def get_intuitive_bins(data, nbins_max: int = 10) -> np.ndarray:
     """
     Function to define intuitive bins for histograms.
 
@@ -527,27 +525,26 @@ def get_intuitive_bins(
     # Make sure data is not a list
     data = np.asarray(data)
     data_min, data_max = np.nanmin(data), np.nanmax(data)
-    if data_min == data_max: # all values are the same in array, or single non-NaN value
+    if data_min == data_max:  # all values are the same in array, or single non-NaN value
         return np.asarray(data_min)
     elif all([np.isnan(data_min), np.isnan(data_max)]):
         raise ArmoorError("Array is only made of NaN. Can't plot this histogram.")
     else:
         data_range = data_max - data_min
-    
+
         # Determine order of magnitude of data values
         magnitude = 10 ** (np.floor(np.log10(data_range / nbins_max)))
         candidates = np.array([1, 2, 5, 10, 20, 25, 50, 100])
-    
+
         steps = candidates * magnitude
-    
+
         # Choose the step that gives the closest number of bins regarding nbins_max
         nbins_estimates = data_range / steps
         best_idx = np.argmin(np.abs(nbins_estimates - nbins_max))
         step = steps[best_idx]
-    
+
         # Adjust the bin limits so they are intuitive, round-ish
         min_bin = np.floor(data_min / step) * step
         max_bin = np.ceil(data_max / step) * step
-    
-        return np.arange(min_bin, max_bin + step, step)
 
+        return np.arange(min_bin, max_bin + step, step)
