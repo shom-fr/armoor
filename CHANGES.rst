@@ -27,6 +27,7 @@ New features
   ``ugos``/``vgos`` are recomputed from adt with ``get_geos``, like the model
   ones from ssh. ``ke``/``mke`` (total current) are only compared when the
   reference provides a total current, so not against DUACS.
+- Added already-implemented ``armoor-comp-clim`` tool to CLIs.
 
 Bug fixes
 ---------
