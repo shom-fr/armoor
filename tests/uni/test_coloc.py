@@ -4,6 +4,7 @@ import gc
 from pathlib import Path
 from unittest.mock import MagicMock, patch, PropertyMock
 
+import dask.array as da
 import numpy as np
 import pandas as pd
 import pytest
@@ -28,6 +29,8 @@ from armoor.comp.coloc import (
     _apply_vertical_ranges,
     _save_colocation_results,
     _split_by_dims,
+    _can_precompact_members,
+    _precompact_members,
     _process_single_product,
     _process_reference,
     _process_metazone,
@@ -1985,3 +1988,104 @@ def test_prepare_dataset_comp_alti_keeps_raw_inputs(raw_vars, expected):
     )
     result = _prepare_dataset(ds, "comp_alti")
     assert set(result.data_vars) == expected
+
+
+# =============================================================================
+# Pre-compaction of product members before time colocation
+# =============================================================================
+
+
+def _make_gridded_prod(chunked=False):
+    """Curvilinear-like (y, x) product with lon/lat 2-D coords and depth."""
+    rng = np.random.default_rng(0)
+    time = pd.date_range("2023-01-01", periods=6, freq="D")
+    ny, nx, nz = 8, 9, 3
+    lon2d, lat2d = np.meshgrid(np.linspace(40.0, 41.6, nx), np.linspace(12.0, 13.4, ny))
+    ptemp = rng.random((time.size, nz, ny, nx)).astype("float32")
+    ptemp[:, :, 0, 0] = np.nan  # a land point
+    depth = np.broadcast_to(
+        -np.arange(1, nz + 1, dtype="float64")[None, :, None, None] * 10.0,
+        ptemp.shape,
+    ).copy()
+    ds = xr.Dataset(
+        {
+            "ptemp": (("time", "z", "y", "x"), ptemp),
+            "sal": (("time", "z", "y", "x"), ptemp + 35.0),
+        },
+        coords={
+            "time": time,
+            "lon": (("y", "x"), lon2d),
+            "lat": (("y", "x"), lat2d),
+            "depth": (("time", "z", "y", "x"), depth),
+        },
+        attrs={"data_name": "prod"},
+    )
+    return ds.chunk({"time": 2}) if chunked else ds
+
+
+def _make_argo_ref():
+    """Argo-like reference: one profile per time with moving positions."""
+    time = pd.to_datetime(["2023-01-01T12:00", "2023-01-03T00:00", "2023-01-05T06:00"])
+    ds = xr.Dataset(
+        {"ptemp": (("time", "z"), np.ones((time.size, 3)))},
+        coords={
+            "time": time,
+            "lon": ("time", [40.1, 40.9, 41.5]),
+            "lat": ("time", [12.1, 12.8, 13.3]),
+        },
+        attrs={"data_name": "ref"},
+    )
+    return ds
+
+
+_PRECOMPACT_PARAMS = {
+    "time": ("trange_seq", {"tfreq": "*", "tref": "reference", "method": "linear"}),
+    "horizontal": ("radius", 20.0),
+}
+
+
+class TestPrecompactMembers:
+    """Pre-selecting grid points must not change the colocation result."""
+
+    def test_same_result_as_regular_horizontal_colocation(self):
+        tbound = (pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-06"))
+        dsref = _make_argo_ref()
+
+        ref_a, prod_a = _apply_colocations(
+            dsref.copy(), _make_gridded_prod(), _PRECOMPACT_PARAMS, tbound
+        )
+
+        dsprod = _make_gridded_prod(chunked=True)
+        assert _can_precompact_members(dsref, dsprod, _PRECOMPACT_PARAMS)
+        dsprod = _precompact_members(dsref, dsprod, 20.0)
+        assert dsprod.sizes["member"] < 8 * 9
+        assert isinstance(dsprod["ptemp"].data, da.Array)  # still lazy
+        ref_b, prod_b = _apply_colocations(dsref.copy(), dsprod.load(), _PRECOMPACT_PARAMS, tbound)
+
+        xr.testing.assert_identical(ref_a, ref_b)
+        xr.testing.assert_identical(prod_a, prod_b)
+
+    def test_no_point_within_radius_returns_stacked_product(self):
+        dsref = _make_argo_ref().assign_coords(lon=("time", [0.0, 0.1, 0.2]))
+        dsprod = _precompact_members(dsref, _make_gridded_prod(), 20.0)
+        assert dsprod.sizes["member"] == 8 * 9
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            {"horizontal": ("radius", 20.0), "time": ("trange_seq", {"tref": "product"})},
+            {"horizontal": ("radius", 20.0), "time": ("tfreq", "1D")},
+            {"horizontal": ("cloud", [(40.0, 12.0)])},
+            {"time": ("trange_seq", {"tref": "reference"})},
+        ],
+    )
+    def test_disabled_when_not_equivalent(self, params):
+        assert not _can_precompact_members(_make_argo_ref(), _make_gridded_prod(), params)
+
+    def test_disabled_for_time_independent_reference(self):
+        dsref = _make_argo_ref().isel(time=0)  # fixed position: lon/lat are scalars
+        assert not _can_precompact_members(dsref, _make_gridded_prod(), _PRECOMPACT_PARAMS)
+
+    def test_enabled_without_time_colocation(self):
+        params = {"horizontal": ("radius", 20.0)}
+        assert _can_precompact_members(_make_argo_ref(), _make_gridded_prod(), params)

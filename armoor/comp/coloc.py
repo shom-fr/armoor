@@ -954,6 +954,92 @@ def _save_colocation_results(dssref, dssprod, staged):
     return paths
 
 
+def _can_precompact_members(dsref, dsprod, params):
+    """Tell whether product grid points can be pre-selected before time colocation.
+
+    Pre-selection is exactly equivalent to what
+    `HorizontalColocation._handle_time_dependent` does later (it drops every
+    member never within the radius of any reference position), provided
+    that:
+
+    - the horizontal colocation is ``radius`` with a time-dependent
+      reference position (e.g. Argo profiles);
+    - the time colocation does not modify the reference positions, i.e. it
+      is absent or interpolates the product onto the reference times
+      (``trange_seq`` with ``tref="reference"``);
+    - the product has a horizontal grid that is not stacked yet.
+
+    Parameters
+    ----------
+    dsref: xr.Dataset
+        Prepared reference dataset.
+    dsprod: xr.Dataset
+        Lazily opened product dataset.
+    params: dict
+        Colocation parameters.
+
+    Returns
+    -------
+    bool
+    """
+    horizontal = params.get("horizontal")
+    if not horizontal or horizontal[0] != "radius":
+        return False
+    if "lon" not in dsref or "time" not in dsref["lon"].dims:
+        return False
+    if "lon" not in dsprod.coords or "lat" not in dsprod.coords or "member" in dsprod.dims:
+        return False
+    time = params.get("time")
+    if time:
+        method = time[0]
+        args = time[1] if len(time) > 1 else {}
+        if method != "trange_seq" or not isinstance(args, dict):
+            return False
+        if args.get("tref") != "reference":
+            return False
+    return True
+
+
+def _precompact_members(dsref, dsprod, radius):
+    """Keep only the product grid points within `radius` of any reference position.
+
+    This is done on the lazy product, before it is loaded and interpolated
+    in time, so that memory scales with the number of colocated points
+    instead of the full grid size.
+
+    Parameters
+    ----------
+    dsref: xr.Dataset
+        Reference dataset with time-dependent ``lon``/``lat``.
+    dsprod: xr.Dataset
+        Lazy product dataset with an unstacked horizontal grid.
+    radius: float
+        Colocation radius in km.
+
+    Returns
+    -------
+    xr.Dataset
+        Product stacked along ``member`` and reduced to the kept points.
+        If no point is within the radius, the stacked product is returned
+        untouched so that the regular horizontal colocation handles it.
+    """
+    dsprod = xcoords.geo_stack(dsprod, "member")
+    geo = xr.Dataset(
+        coords={
+            "lon": dsprod["lon"].reset_coords(drop=True).load(),
+            "lat": dsprod["lat"].reset_coords(drop=True).load(),
+        }
+    )
+    dist = xgeo.get_distances(geo, dsref)
+    keep = (dist < radius * 1e3).any(dim="npts1")
+    idx = np.where(keep.values)[0]
+    n_before = dsprod.sizes["member"]
+    if idx.size == 0 or idx.size == n_before:
+        return dsprod
+    logger.info(f"Pre-compacted members before time colocation: {n_before} -> {idx.size}")
+    return dsprod.isel(member=idx)
+
+
 def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None):
     """Process colocation for a single product against a reference.
 
@@ -984,6 +1070,9 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
     dsprodin = xr.open_dataset(ncin, chunks={})
     if "depth" in dsprodin and "depth" not in dsprodin.coords:
         dsprodin = dsprodin.set_coords("depth")
+    if _can_precompact_members(dsrefin, dsprodin, params):
+        # Still lazy here: only the kept grid points will be loaded below.
+        dsprodin = _precompact_members(dsrefin, dsprodin, params["horizontal"][1])
     dsprodin = _prepare_dataset(dsprodin, comp_func, is_reference=False)
     logger.info(dsprodin.sizes)
 
