@@ -27,6 +27,7 @@ from armoor.plot import (
     get_output_vminmax,
     save_figure,
     determine_figsize,
+    get_map_aspect_ratio,
     get_intuitive_bins,
 )
 from armoor.data.datatype import (
@@ -96,7 +97,7 @@ class _PlotDataBase(SubclassingMethodRegistry):
         self.metazone = metazone
         self.ax_minimap = [0.7, 0.91, 0.19]
         self.dt = dt
-        self.vminmax = vminmax
+        self.vminmax = vminmax or {}
         self.saved_files = []
         self.__post_init__()
 
@@ -128,6 +129,7 @@ class _PlotDataBase(SubclassingMethodRegistry):
         filename.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, filename)
         self.saved_files.append(str(filename.resolve()))
+        plt.close(fig)
         del fig
 
 
@@ -974,9 +976,7 @@ class PlotOceanModel(_PlotDataBase):
             cmin, cmax = 0, speed_mean.mean() + 1.75 * speed_mean.std()
         vmax = speed_std.mean() + 1.75 * speed_std.std()
 
-        dlat = ds_mean.lat.max() - ds_mean.lat.min()
-        dlon = ds_mean.lon.max() - ds_mean.lon.min()
-        aspect_ratio = 3 / 2 * dlat / dlon
+        aspect_ratio = get_map_aspect_ratio(ds_mean)
         fig, axes = create_subplots(
             nrows=2,
             figsize=(8 / aspect_ratio, 8),
@@ -1082,9 +1082,7 @@ class PlotOceanModel(_PlotDataBase):
             vstd = vmean + 1.75 * ds_std.std()
             vmax = vstd
 
-            dlat = ds_mean.lat.max() - ds_mean.lat.min()
-            dlon = ds_mean.lon.max() - ds_mean.lon.min()
-            aspect_ratio = 3 / 2 * dlat / dlon
+            aspect_ratio = get_map_aspect_ratio(ds_mean)
             fig, axes = create_subplots(
                 nrows=2,
                 figsize=(8 / aspect_ratio, 8),
@@ -1204,9 +1202,7 @@ class PlotOceanModel(_PlotDataBase):
                 else:
                     vmin, vmax = float(da.min()), float(da.max())
 
-                dlat = da.lat.max() - da.lat.min()
-                dlon = da.lon.max() - da.lon.min()
-                aspect_ratio = 3 / 2 * dlat / dlon
+                aspect_ratio = get_map_aspect_ratio(da)
                 fig, axes = create_subplots(
                     nrows=1,
                     figsize=(8 / aspect_ratio, 8),
@@ -1281,9 +1277,7 @@ class PlotOceanModel(_PlotDataBase):
             else:
                 vmin, vmax = float(speed.min()), float(speed.max())
 
-            dlat = u.lat.max() - u.lat.min()
-            dlon = u.lon.max() - u.lon.min()
-            aspect_ratio = 3 / 2 * dlat / dlon
+            aspect_ratio = get_map_aspect_ratio(u)
             fig, axes = create_subplots(
                 nrows=1,
                 figsize=(8 / aspect_ratio, 8),
@@ -1441,9 +1435,7 @@ class PlotOceanModel(_PlotDataBase):
             if vlevel_str:
                 date_str = f"{date_str} - {vlevel_str}" if date_str else vlevel_str
 
-            dlat = da.lat.max() - da.lat.min()
-            dlon = da.lon.max() - da.lon.min()
-            aspect_ratio = 3 / 2 * dlat / dlon
+            aspect_ratio = get_map_aspect_ratio(da)
             fig, axes = create_subplots(
                 nrows=1,
                 figsize=(8 / aspect_ratio, 8),
@@ -1554,9 +1546,7 @@ class PlotOceanModel(_PlotDataBase):
             if vlevel_str:
                 date_str = f"{date_str} - {vlevel_str}" if date_str else vlevel_str
 
-            dlat = u.lat.max() - u.lat.min()
-            dlon = u.lon.max() - u.lon.min()
-            aspect_ratio = 3 / 2 * dlat / dlon
+            aspect_ratio = get_map_aspect_ratio(u)
             fig, axes = create_subplots(
                 nrows=1,
                 figsize=(8 / aspect_ratio, 8),
@@ -1775,26 +1765,29 @@ class PlotEddies(_PlotDataBase):
         # Source - https://stackoverflow.com/questions/67605719/displaying-lowest-values-as-white#comment119506380_67608399
         cmap = LinearSegmentedColormap.from_list('', ['white', *plt.cm.RdPu(np.arange(255))])
 
-        datasets = [dse, dsa, dsc]
-        add_title = ['All eddies', 'Anticyclones', 'Cyclones']
+        datasets = {
+            "All_eddies": dse,
+            "Anticyclones": dsa,
+            "Cyclones": dsc,
+        }
 
         # Compute occurence on 2D grid
-        for i in range(len(datasets)):
+        for add_title, dataset in datasets.items():
             func_with_args = partial(self._contour_presence, lat_bins=lat_bins, lon_bins=lon_bins)
             # DataArray with time dimension
-            presence = datasets[i].groupby("time").map(func_with_args)
+            presence = dataset.groupby("time").map(func_with_args)
             # Number of occurences of eddies per box for all timesteps
             # DataArray with latlon dimensions only
             presence_sum = presence.sum(dim="time")
 
-            nt = len(np.unique(datasets[i].time.values))
+            nt = len(np.unique(dataset.time.values))
             # Transform number of occurences to occurence percentage
             # (an eddy contour appears in a certain cell x% of the time)
             percentage = (presence_sum / nt) * 100
 
             plt.style.use('default')
             f, ax = create_subplots(nrows=1, figsize=(resX, resY), projection=projection)
-            f.suptitle(f'{main_title}\n{add_title[i]} {time_title}', y=0.90)
+            f.suptitle(f'{main_title}\n{add_title} {time_title}', y=0.90)
             ax[0].add_feature(cfeature.COASTLINE, linewidth=0.3)
 
             mesh = ax[0].pcolormesh(lon_bins, lat_bins, percentage, cmap=cmap, shading='nearest')
@@ -1806,7 +1799,7 @@ class PlotEddies(_PlotDataBase):
             figname = (
                 f"data/plot/{self.metazone}/"
                 + f"map_occurence_{dse.data_name}{time_figname}"
-                + f"_{add_title[i].split()[0].lower()}.png"
+                + f"_{add_title.split()[0].lower()}.png"
             )
 
             self.save_figure(f, figname)
@@ -1895,6 +1888,7 @@ class PlotEddies(_PlotDataBase):
             time_figname = f'_trange{trange_seq}'
         else:
             bins = np.unique(dse.time)
+            time_title, time_figname = format_time_label(dse.attrs, ds=dse)
 
         groups = dse.groupby_bins('time', bins).groups
         counts = [len(k) for k in groups.values()]

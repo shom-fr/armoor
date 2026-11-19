@@ -505,6 +505,17 @@ def determine_figsize(
         return resX, resY
 
 
+def get_map_aspect_ratio(da):
+    dlat = float(da.lat.max() - da.lat.min())
+    dlon = float(da.lon.max() - da.lon.min())
+
+    # Prevent from division by zero
+    if not np.isfinite(dlat) or not np.isfinite(dlon) or dlon <= 0:
+        return 1.0
+
+    return 1.5 * dlat / dlon
+
+
 def get_intuitive_bins(data, nbins_max: int = 10) -> np.ndarray:
     """
     Function to define intuitive bins for histograms.
