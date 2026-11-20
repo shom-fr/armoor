@@ -1815,6 +1815,11 @@ def _finalize_croco(ds):
         if "depth" in ds.coords:
             # positive depth: its attributes are set by format_cf
             depth = -ds.depth
+            # decode_sigma yields float64 (the largest variable of the
+            # dataset, 2x a float32 field); float32 keeps ~0.5 mm precision
+            # at 6000 m, far below the model's vertical resolution.
+            if depth.dtype == np.float64:
+                depth = depth.astype("float32")
             depth.attrs = {}
             ds = ds.assign_coords(depth=depth)
 

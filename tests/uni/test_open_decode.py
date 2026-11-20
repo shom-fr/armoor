@@ -749,6 +749,8 @@ class TestOpenDecodeCroco:
         assert 'z' in result.dims
         assert 'depth' in result.coords
         assert set(('time', 'z', 'y', 'x')).issubset(result.depth.dims)
+        # float32 halves the size of the largest variable (see _finalize_croco)
+        assert result.depth.dtype == np.float32
     
     def test_open_decode_croco_velocity_stagger(self, setup_test_data):
         """
