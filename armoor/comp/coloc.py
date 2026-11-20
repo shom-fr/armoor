@@ -1111,6 +1111,13 @@ def _process_single_product(dsrefin, ncin, params, tbound, staged, mparams=None)
         if vcoord in dsprod.data_vars:
             dsprod = dsprod.set_coords(vcoord)
 
+    # The vertical colocation (vinterp) and the derived variables (e.g. mld)
+    # are still lazy here, in a single dask chunk along time. Each time/vertical
+    # range saved below slices that graph, so dask would recompute the whole
+    # chunk once per saved file (~50 times for 15-day ranges over a year).
+    # Compute it once instead; a no-op for already-loaded datasets.
+    dsref, dsprod = dask.persist(dsref, dsprod)
+
     if comp_func == "comp_drifter" and not params.get("horizontal"):
         # No horizontal colocation step is configured for this comp func
         # (comp_drifter: spatial matching happens later, via OceanParcels in
