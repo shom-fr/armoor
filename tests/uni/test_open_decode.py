@@ -1161,3 +1161,41 @@ class TestDecoderFixedLevels:
     def test_fixed_level_formats(self, fmt):
         from armoor.data.open_decode import get_decoder
         assert get_decoder(fmt).fixed_levels is True
+
+
+class TestPreferAdjusted:
+    """Argo X_ADJUSTED values win over the raw X, point by point."""
+
+    @staticmethod
+    def _raw():
+        nan = np.nan
+        return xr.Dataset(
+            {
+                "TEMP": (("TIME", "DEPTH"), np.array([[10.0, 11.0], [12.0, 13.0]], "f4")),
+                "TEMP_ADJUSTED": (("TIME", "DEPTH"), np.array([[10.5, nan], [nan, nan]], "f4")),
+                "TEMP_QC": (("TIME", "DEPTH"), np.array([[1.0, 1.0], [1.0, 1.0]], "f4")),
+                "TEMP_ADJUSTED_QC": (("TIME", "DEPTH"), np.array([[2.0, nan], [nan, nan]], "f4")),
+                "PSAL_ADJUSTED": (("TIME", "DEPTH"), np.array([[35.0, 35.1], [35.2, 35.3]], "f4")),
+            },
+            coords={
+                "PRES": (("TIME", "DEPTH"), np.array([[5.0, 50.0], [5.0, 50.0]], "f4"),
+                         {"units": "decibar"}),
+                "PRES_ADJUSTED": (("TIME", "DEPTH"), np.array([[5.5, 50.5], [nan, nan]], "f4")),
+            },
+        )
+
+    def test_merges_adjusted_then_raw(self):
+        from armoor.data.open_decode import _prefer_adjusted
+
+        out = _prefer_adjusted(self._raw())
+        np.testing.assert_array_equal(out["TEMP"], [[10.5, 11.0], [12.0, 13.0]])
+        np.testing.assert_array_equal(out["TEMP_QC"], [[2.0, 1.0], [1.0, 1.0]])
+        np.testing.assert_array_equal(out["PRES"], [[5.5, 50.5], [5.0, 50.0]])
+        assert "PRES" in out.coords and out["PRES"].attrs == {"units": "decibar"}
+        assert not [name for name in out.variables if "ADJUSTED" in name]
+
+    def test_adjusted_only_is_renamed(self):
+        from armoor.data.open_decode import _prefer_adjusted
+
+        out = _prefer_adjusted(self._raw())
+        np.testing.assert_array_equal(out["PSAL"], self._raw()["PSAL_ADJUSTED"])

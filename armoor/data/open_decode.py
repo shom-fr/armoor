@@ -1504,6 +1504,225 @@ def open_decode_cora_insitu(path_files, platform):
         return dss
 
 
+#: Coordinates kept by `open_decode_cmems_insitu`
+_CMEMS_INSITU_COORDS = ["time", "lon", "lat", "depth"]
+
+#: Use a process pool to decode at least this many CMEMS in-situ files
+_INSITU_POOL_MIN_FILES = 50
+
+#: Maximum number of processes decoding CMEMS in-situ files
+_INSITU_POOL_MAX_WORKERS = 16
+
+
+def _prefer_adjusted(ds):
+    """Merge every Argo ``X_ADJUSTED`` variable into ``X``, before decoding.
+
+    ``cf_cmems_argo.cfg`` lists ``X_ADJUSTED`` then ``X`` as alt_names of
+    pres/temp/sal (and of their QC), but when both exist xoa does not always
+    pick the first one: for pres the choice depended on the Python hash seed,
+    i.e. changed from one run to the next. Leave a single candidate instead:
+    ``X`` takes the adjusted value wherever it is defined and keeps the raw
+    one elsewhere (real-time profiles have no adjusted values); ``X_QC``
+    follows the same choice, point by point. ``X_ADJUSTED`` and
+    ``X_ADJUSTED_QC`` are then dropped.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Raw (not yet decoded) CMEMS Argo dataset.
+
+    Returns
+    -------
+    xarray.Dataset
+    """
+    suffix = "_ADJUSTED"
+    for adj in [name for name in ds.variables if name.endswith(suffix)]:
+        raw = adj[: -len(suffix)]
+        qc_adj, qc_raw = f"{adj}_QC", f"{raw}_QC"
+        if raw not in ds.variables:
+            renames = {adj: raw}
+            if qc_adj in ds.variables and qc_raw not in ds.variables:
+                renames[qc_adj] = qc_raw
+            ds = ds.rename(renames)
+            continue
+        has_adj = ds[adj].notnull()
+        merged = {raw: ds[adj].where(has_adj, ds[raw]).assign_attrs(ds[raw].attrs)}
+        if qc_adj in ds.variables and qc_raw in ds.variables:
+            merged[qc_raw] = ds[qc_adj].where(has_adj, ds[qc_raw]).assign_attrs(ds[qc_raw].attrs)
+        for name, da in merged.items():
+            da.encoding = ds[name].encoding
+            if name in ds.coords:
+                ds = ds.assign_coords({name: da})
+            else:
+                ds[name] = da
+        ds = ds.drop_vars([name for name in (adj, qc_adj) if name in ds.variables])
+    return ds
+
+
+def _decode_cmems_insitu_file(path, platform):
+    """Open and decode one CMEMS in-situ file (see `open_decode_cmems_insitu`).
+
+    Returns
+    -------
+    xarray.Dataset or None
+        None when the file holds no usable profile/level for `platform`.
+    """
+    cmems_coords = _CMEMS_INSITU_COORDS
+    cfspecs = xmeta.get_meta_specs(f"cmems_{platform}")
+    ds = xr.open_dataset(path, chunks={})
+    if platform == "argo":
+        ds = _prefer_adjusted(ds)
+    ds = cfspecs.decode(ds)
+    object_vars = [var for var in ds.data_vars if ds[var].dtype == "object"]
+    ds = ds.drop_vars(object_vars)
+    vars2drop = []
+    for var in ds.data_vars:
+        if var.isupper():
+            vars2drop.append(var)
+    ds = ds.drop_vars(vars2drop)
+    if "depth" in ds.dims:
+        ds = ds.swap_dims({"depth": "z"})
+    elif ("DEPTH" in ds.dims) or ("depth" in ds.dims):
+        ds = ds.swap_dims({"DEPTH": "z"})
+    if "DEPH" in ds.coords:
+        ds = ds.rename({"DEPH": "depth"})
+    if (("lon" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lon"])) or (
+        ("lat" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lat"])
+    ):
+        # ds = ds.drop_dims("POSITION")
+        lon_ds = ds.lon.assign_coords(lon=ds.time.data).rename({"lon": "time"})
+        lat_ds = ds.lat.assign_coords(lat=ds.time.data).rename({"lat": "time"})
+        ds = ds.drop_vars(["lon", "lat"])
+        if platform == "mooring":
+            ds["lat"] = lat_ds.isel(time=0)
+            ds["lon"] = lon_ds.isel(time=0)
+        else:
+            ds["lat"] = lat_ds
+            ds["lon"] = lon_ds
+    ds.set_coords(["lon", "lat"])
+    if "institution_country" in ds.attrs:
+        ds["country"] = xr.DataArray(
+            np.full(ds["lat"].shape, ds.institution_country),
+            dims=ds["lat"].dims,
+            coords=ds["lat"].coords,
+        )
+    if "wmo_platform_code" in ds.attrs:
+        ds["wmo"] = xr.DataArray(
+            np.full(ds["lat"].shape, ds.wmo_platform_code),
+            dims=ds["lat"].dims,
+            coords=ds["lat"].coords,
+        )
+
+    for coord in ds.coords:
+        if coord not in cmems_coords:
+            ds = ds.reset_coords(coord)
+    if ("depth" not in ds) and ("pres" in ds):
+        ds = depth_from_pres(ds)
+        if platform == "glider":
+            ds = ds.drop_vars("pres")
+    if "depth" in ds:
+        if platform == "argo":
+            # Keep profiles reaching below 10 m. One vectorized reduction
+            # instead of one dask compute + isel per profile.
+            if "time" in ds.depth.dims:
+                zdims = [d for d in ds.depth.dims if d != "time"]
+                keep = (ds.depth.min(dim=zdims) < -10.0).values
+                ds = ds.isel(time=np.flatnonzero(keep))
+            elif not bool(ds.depth.min() < -10.0):
+                return None
+            if ds.sizes["time"] == 0:
+                return None
+            ds["depth"] = -1 * ds["depth"]
+        if platform == "glider":
+            if ds["depth"].dims == ("z",):
+                ds["depth"] = ds["depth"].broadcast_like(ds["temp"])
+            if ds.depth.min() < 0:
+                ds["depth"] = -1 * ds["depth"]
+        if platform == "mooring":
+            if "time" in ds.depth.dims:
+                return None
+            iz2keep = []
+            for iz in range(ds.sizes["z"]):
+                if (
+                    (np.isfinite(ds.isel(z=iz).depth))
+                    and (ds.isel(z=iz).depth > 0.0)
+                    and (np.all(np.isfinite(ds.isel(z=iz).temp)))
+                ):
+                    iz2keep.append(iz)
+            ds = ds.isel(z=iz2keep)
+            if ds.depth.sizes["z"] == 0:
+                return None
+        if platform == "drifter":
+            ds = ds.isel(z=[-1])
+            if "time" in ds.depth.dims:
+                ds["depth"] = ds.depth.isel(time=1)
+            if "u" not in ds.data_vars:
+                ds["u"] = (
+                    ds.lon.differentiate("time", datetime_unit="s")
+                    * xgeo.EARTH_RADIUS
+                    * np.pi
+                    / 180
+                )
+                ds["u"] *= np.cos(np.radians(ds.lat.values))
+                ds["v"] = (
+                    ds.lat.differentiate("time", datetime_unit="s")
+                    * xgeo.EARTH_RADIUS
+                    * np.pi
+                    / 180
+                )
+    for var in ds.data_vars:
+        if var in cmems_coords:
+            ds = ds.set_coords(var)
+    for var in ds.data_vars:
+        if var in cmems_coords:
+            ds = ds.set_coords(var)
+    return ds
+
+
+def _decode_cmems_insitu_file_loaded(args):
+    """Pool worker: decode one file and load it so it can be sent back."""
+    path, platform = args
+    ds = _decode_cmems_insitu_file(path, platform)
+    if ds is None:
+        return None
+    ds = ds.load()
+    ds.close()
+    return ds
+
+
+def _decode_cmems_insitu_files(path_files, platform):
+    """Decode CMEMS in-situ files, in a process pool when there are many.
+
+    The xoa decoding is pure Python (~0.2 s per file, GIL-bound), so
+    hundreds of monthly Argo float files take minutes one after the other.
+    Above `_INSITU_POOL_MIN_FILES` files they are decoded in 'spawn'
+    processes (clean children, as in `armoor.data.plot.main_plot`); the
+    order of `path_files` is kept. Either way each decoded file is loaded
+    in memory (CMEMS in-situ files are small).
+    """
+    try:
+        ncpu = len(os.sched_getaffinity(0))
+    except AttributeError:
+        ncpu = os.cpu_count() or 1
+    nworkers = min(_INSITU_POOL_MAX_WORKERS, ncpu, len(path_files))
+    if len(path_files) < _INSITU_POOL_MIN_FILES or nworkers < 2:
+        # Loaded as in the pool, so both paths give the same (numpy-backed)
+        # datasets: kept lazy, hundreds of one-chunk-per-file arrays made the
+        # later concat/sortby graph explode.
+        dss = [_decode_cmems_insitu_file_loaded((path, platform)) for path in path_files]
+        return [ds for ds in dss if ds is not None]
+
+    import multiprocessing
+
+    logger.info(f"Decoding {len(path_files)} files with {nworkers} processes")
+    ctx = multiprocessing.get_context("spawn")
+    args = [(path, platform) for path in path_files]
+    chunksize = max(1, len(args) // (4 * nworkers))
+    with ctx.Pool(nworkers, initializer=register_cf) as pool:
+        dss = pool.map(_decode_cmems_insitu_file_loaded, args, chunksize=chunksize)
+    return [ds for ds in dss if ds is not None]
+
+
 def open_decode_cmems_insitu(path_files, platform):
     """
     Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
@@ -1519,113 +1738,7 @@ def open_decode_cmems_insitu(path_files, platform):
         CMEMS dataset.
     """
     # Open
-    cmems_coords = ["time", "lon", "lat", "depth"]
-    cfspecs = xmeta.get_meta_specs(f"cmems_{platform}")
-    dss = []
-    for path in path_files:
-        ds = cfspecs.decode(xr.open_dataset(path, chunks={}))
-        object_vars = [var for var in ds.data_vars if ds[var].dtype == "object"]
-        ds = ds.drop_vars(object_vars)
-        vars2drop = []
-        for var in ds.data_vars:
-            if var.isupper():
-                vars2drop.append(var)
-        ds = ds.drop_vars(vars2drop)
-        if "depth" in ds.dims:
-            ds = ds.swap_dims({"depth": "z"})
-        elif ("DEPTH" in ds.dims) or ("depth" in ds.dims):
-            ds = ds.swap_dims({"DEPTH": "z"})
-        if "DEPH" in ds.coords:
-            ds = ds.rename({"DEPH": "depth"})
-        if (("lon" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lon"])) or (
-            ("lat" in ds.lon.dims) and (ds.sizes["time"] == ds.sizes["lat"])
-        ):
-            # ds = ds.drop_dims("POSITION")
-            lon_ds = ds.lon.assign_coords(lon=ds.time.data).rename({"lon": "time"})
-            lat_ds = ds.lat.assign_coords(lat=ds.time.data).rename({"lat": "time"})
-            ds = ds.drop_vars(["lon", "lat"])
-            if platform == "mooring":
-                ds["lat"] = lat_ds.isel(time=0)
-                ds["lon"] = lon_ds.isel(time=0)
-            else:
-                ds["lat"] = lat_ds
-                ds["lon"] = lon_ds
-        ds.set_coords(["lon", "lat"])
-        if "institution_country" in ds.attrs:
-            ds["country"] = xr.DataArray(
-                np.full(ds["lat"].shape, ds.institution_country),
-                dims=ds["lat"].dims,
-                coords=ds["lat"].coords,
-            )
-        if "wmo_platform_code" in ds.attrs:
-            ds["wmo"] = xr.DataArray(
-                np.full(ds["lat"].shape, ds.wmo_platform_code),
-                dims=ds["lat"].dims,
-                coords=ds["lat"].coords,
-            )
-
-        for coord in ds.coords:
-            if coord not in cmems_coords:
-                ds = ds.reset_coords(coord)
-        if ("depth" not in ds) and ("pres" in ds):
-            ds = depth_from_pres(ds)
-            if platform == "glider":
-                ds = ds.drop_vars("pres")
-        if "depth" in ds:
-            if platform == "argo":
-                # Keep profiles reaching below 10 m. One vectorized reduction
-                # instead of one dask compute + isel per profile.
-                if "time" in ds.depth.dims:
-                    zdims = [d for d in ds.depth.dims if d != "time"]
-                    keep = (ds.depth.min(dim=zdims) < -10.0).values
-                    ds = ds.isel(time=np.flatnonzero(keep))
-                elif not bool(ds.depth.min() < -10.0):
-                    continue
-                if ds.sizes["time"] == 0:
-                    continue
-                ds["depth"] = -1 * ds["depth"]
-            if platform == "glider":
-                if ds["depth"].dims == ("z",):
-                    ds["depth"] = ds["depth"].broadcast_like(ds["temp"])
-                if ds.depth.min() < 0:
-                    ds["depth"] = -1 * ds["depth"]
-            if platform == "mooring":
-                if "time" in ds.depth.dims:
-                    continue
-                iz2keep = []
-                for iz in range(ds.sizes["z"]):
-                    if (
-                        (np.isfinite(ds.isel(z=iz).depth))
-                        and (ds.isel(z=iz).depth > 0.0)
-                        and (np.all(np.isfinite(ds.isel(z=iz).temp)))
-                    ):
-                        iz2keep.append(iz)
-                ds = ds.isel(z=iz2keep)
-                if ds.depth.sizes["z"] == 0:
-                    continue
-            if platform == "drifter":
-                ds = ds.isel(z=[-1])
-                if "time" in ds.depth.dims:
-                    ds["depth"] = ds.depth.isel(time=1)
-                if "u" not in ds.data_vars:
-                    ds["u"] = (
-                        ds.lon.differentiate("time", datetime_unit="s")
-                        * xgeo.EARTH_RADIUS
-                        * np.pi
-                        / 180
-                    )
-                    ds["u"] *= np.cos(np.radians(ds.lat.values))
-                    ds["v"] = (
-                        ds.lat.differentiate("time", datetime_unit="s")
-                        * xgeo.EARTH_RADIUS
-                        * np.pi
-                        / 180
-                    )
-        for var in ds.data_vars:
-            if var in cmems_coords:
-                ds = ds.set_coords(var)
-        dss.append(ds)
-        ds.close()
+    dss = _decode_cmems_insitu_files(path_files, platform)
     if platform == "argo":
         ds = concat_argo(dss)
         if "TRAJECTORY" in ds:
@@ -3108,32 +3221,15 @@ def concat_argo(list_ds):
     """
     dim_z = np.max([ds.sizes["z"] for ds in list_ds])
     for ids, dsin in enumerate(list_ds):
-        dsin = dsin.reset_coords("depth")
-        if dsin.sizes["z"] != dim_z:
-            das = []
-            for var in dsin.data_vars:
-                if "z" in dsin[var].dims:
-                    arr1 = dsin[var].values
-                    dim_z_to_fill = dim_z - arr1.shape[1]
-                    arr2 = np.nan * np.ones((arr1.shape[0], dim_z_to_fill))
-                    arr3 = np.concatenate((arr1, arr2), axis=1)
-                    das.append(
-                        xr.DataArray(
-                            data=arr3,
-                            dims=["time", "z"],
-                            name=var,
-                            coords={
-                                "time": dsin.time,
-                                "lon": dsin.lon,
-                                "lat": dsin.lat,
-                            },
-                            attrs=dsin[var].attrs,
-                        )
-                    )
-                else:
-                    das.append(dsin[var])
-            ds = xr.merge(das)
-            ds = ds.set_coords("depth")
-            list_ds[ids] = ds
-    ds = xr.combine_nested(list_ds, "time")
+        nfill = dim_z - dsin.sizes["z"]
+        if nfill:
+            # NaN-pad every "z" variable (depth included) at the bottom, in
+            # one lazy-friendly operation: no per-variable .values/merge.
+            # Padded variables are float64, as the former NaN concatenation.
+            dsin = dsin.reset_coords("depth")
+            zvars = [var for var in dsin.data_vars if "z" in dsin[var].dims]
+            padded = dsin[zvars].astype("float64").pad(z=(0, nfill), constant_values=np.nan)
+            ds = dsin.drop_vars(zvars).assign({var: padded[var] for var in zvars})
+            list_ds[ids] = ds.set_coords("depth")
+    ds = xr.combine_nested(list_ds, "time", data_vars="all")
     return ds.sortby("time")
