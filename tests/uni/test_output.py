@@ -48,8 +48,10 @@ from armoor.comp.output import (
     check_output,
     _DRIFTER_OTYPE_REMAP,
     DATA_TYPES,
-    OutputProcessor,
 )
+from armoor.comp.output import OutputProcessor as compOutputProcessor
+from armoor.data.output import OutputProcessor as dataOutputProcessor
+
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +102,7 @@ class TestCheckOutput:
 class TestParseConfiguration:
 
     def setup_method(self):
-        self.processor = OutputProcessor(func_comp="comp_sst")
+        self.processor = compOutputProcessor(func_comp="comp_sst")
 
     def test_single_key_dicts(self):
         ocfg = [
@@ -131,7 +133,7 @@ class TestParseConfiguration:
 class TestValidateOutputCompatibility:
 
     def setup_method(self):
-        self.processor = OutputProcessor(func_comp="comp_sst")
+        self.processor = compOutputProcessor(func_comp="comp_sst")
 
     def test_valid_output(self):
         oparams = {"otype": "timeseries"}
@@ -149,7 +151,7 @@ class TestValidateOutputCompatibility:
 
     def test_missing_required_params(self):
         """comp_argo maps requires trange_seq and vlevel/vrange."""
-        processor = OutputProcessor(func_comp="comp_argo")
+        processor = compOutputProcessor(func_comp="comp_argo")
         oparams = {"otype": "maps"}
         mparams = {"ncins": {}}
         assert not processor._validate_output_compatibility(
@@ -157,7 +159,7 @@ class TestValidateOutputCompatibility:
         )
 
     def test_has_required_params(self):
-        processor = OutputProcessor(func_comp="comp_argo")
+        processor = compOutputProcessor(func_comp="comp_argo")
         oparams = {"otype": "maps"}
         mparams = {"ncins": {}, "trange_seq": True, "vlevel": True}
         assert processor._validate_output_compatibility(
@@ -166,7 +168,7 @@ class TestValidateOutputCompatibility:
 
     def test_conflicting_params(self):
         """comp_argo mvprofiles has mparams_con: vertical: [vlevel]."""
-        processor = OutputProcessor(func_comp="comp_argo")
+        processor = compOutputProcessor(func_comp="comp_argo")
         oparams = {"otype": "mvprofiles"}
         mparams = {"ncins": {}, "trange_seq": True, "vlevel": True}
         assert not processor._validate_output_compatibility(
@@ -174,7 +176,7 @@ class TestValidateOutputCompatibility:
         )
 
     def test_drifter_otype_remap_in_validation(self):
-        processor = OutputProcessor(func_comp="comp_drifter")
+        processor = compOutputProcessor(func_comp="comp_drifter")
         oparams = {"otype": "timeseries"}
         mparams = {"ncins": {}}
         assert processor._validate_output_compatibility(
@@ -189,7 +191,7 @@ class TestValidateOutputCompatibility:
 class TestConcatenateTimeDatasets:
 
     def setup_method(self):
-        self.processor = OutputProcessor(func_comp="comp_sst")
+        self.processor = compOutputProcessor(func_comp="comp_sst")
 
     def _make_ds(self, times, values):
         return xr.Dataset(
@@ -255,7 +257,7 @@ class TestConcatenateTimeDatasets:
 class TestConcatenateDatasets:
 
     def setup_method(self):
-        self.processor = OutputProcessor(func_comp="comp_sst")
+        self.processor = compOutputProcessor(func_comp="comp_sst")
 
     def test_all_none_returns_empty(self):
         result = self.processor._concatenate_datasets([None, None], ["time"])
@@ -324,6 +326,21 @@ class TestConcatenateDatasets:
         result = self.processor._concatenate_datasets(trees, concat_dim=["time"], output="timeseries")
 
         assert isinstance(result["mean"], xr.Dataset)
+                
+
+
+# ---------------------------------------------------------------------------
+# _compute_diags
+# ---------------------------------------------------------------------------
+
+def test_compute_diags():
+    processor = dataOutputProcessor()
+    ds = xr.Dataset({"vmax_area": ("obs", [np.pi])})
+    ds = processor._compute_diags(ds, "netcdf")
+
+    assert "vmax_radius" in ds
+    np.testing.assert_allclose(ds["vmax_radius"], [1.0])
+
 
 
 # ---------------------------------------------------------------------------

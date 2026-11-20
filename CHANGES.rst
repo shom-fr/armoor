@@ -28,6 +28,23 @@ New features
   ones from ssh. ``ke``/``mke`` (total current) are only compared when the
   reference provides a total current, so not against DUACS.
 - Added already-implemented ``armoor-comp-clim`` tool to CLIs.
+- Added five ``armoor-data`` eddy-detection plot types (erratum to v2026.10.0): 
+
+  - ``map_eddies`` (eddy contours map per timestep), 
+  - ``map_occurence_eddies`` (eddy contours occurrence over a grid box),
+  - ``histogram_eddies``,
+  - ``timeseries_eddies``,
+  - ``pdf_eddies``.
+  
+  Note that histograms and timeseries allow counting of eddies, which 
+  could lead to multiple counting of a single eddy due to missing eddy-tracking 
+  variables in the current version. Such plots are therefore only allowed for 
+  single-timestep datasets for now, so that timeseries are not functional
+  in this version.
+- Added ``get_map_aspect_ratio`` and ``determine_figsize`` in ``armoor.plot`` 
+  to pool instructions dispatched in ``armoor.data.plot``. Both functions could
+  possibly be merged into one.
+  
 
 Bug fixes
 ---------

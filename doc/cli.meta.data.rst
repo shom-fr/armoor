@@ -10,6 +10,8 @@ Configuration file
         .. literalinclude:: ../armoor/cli/data.ini
                :language: ini
                
+See details for outputs parameters below in :ref:`plot-rendering-parameters`.
+               
 data
 ====
 
@@ -93,14 +95,78 @@ outputs
                 One map per native time step (not aggregated), color scale
                 fixed once over the whole series. See ``vminmax`` and the
                 mapseries-specific parameters below.
+                
+*Eddy-detection plots*
+^^^^^^^^^^^^^^^^^^^^^^
 
-            .. grid-item-card:: Eddy detections PDF (``pdf_eddies``)
+``armoor-data`` allows specific plots for eddy-detection sources only (``fmt`` in
+``eddy_pet``, ``eddy_sacso``, ``eddy_shoot``).
 
-                Probability-density plot of eddy detections (max
-                area/radius). Only for eddy-detection sources (``fmt`` in
-                ``eddy_pet``, ``eddy_sacso``, ``eddy_shoot``).
+Note that histograms and time series allow counting of eddies, which 
+could lead to multiple counting of a single eddy due to missing eddy-tracking 
+variables in the current version. Such plots are therefore only allowed for 
+single-timestep datasets for now, so that timeseries are not functional
+in this version.
 
-        .. rubric:: ``vminmax`` and plot-rendering parameters
+    Eddy-typical variables can be automatically used for plotting, depending on their
+    availability in the decoded dataset or computability :
+        - ``vmax_area`` : area enclosed in the maximum velocity contour, 
+        - ``vmax_radius`` : equivalent radius of a circle of ``vmax_area`` size.
+    Tracking variables will be included in Armoor next versions.
+                
+    .. grid:: 3
+
+            .. grid-item-card:: Map of eddy contours (``map_eddies``)
+
+                Plot a map of eddy contours for each timestep of a dataset
+                (instantaneous), with distincts cyclones and anticyclones.
+                
+                .. image:: images/map_sacso_2016-07-13T00:00:00.png
+
+                :download:`Download <images/map_sacso_2016-07-13T00:00:00.png>`
+                
+            .. grid-item-card:: Map of eddy contours occurence on a custom 
+                                grid (``map_occurence_eddies``)
+
+                Plot a map of eddy contour occurence  in a time range 
+                (``trange_seq``, ``tbound`` or all available timesteps) 
+                for a defined box size (``map_boxsize`` config option). 
+                Occurence is given as the percentage of times a given cell 
+                allows an eddy contour. Three maps are plotted :
+                all eddies, cyclones and anticyclones.
+
+                .. image:: images/map_occurence_sacso_20160701_20160715_all_eddies.png
+
+                :download:`Download <images/map_occurence_sacso_20160701_20160715_all_eddies.png>`
+                
+            .. grid-item-card:: Histograms for eddy variables (``histogram_eddies``)
+
+                Plot a histogram of number of eddies for every eddy variables available, 
+                with distincts cyclones and anticyclones.
+
+                .. image:: images/hist_vmax_area_sacso_20160701_20160715.png
+
+                :download:`Download <images/hist_vmax_area_sacso_20160701_20160715.png>`
+                
+            .. grid-item-card:: Timeseries (``timeseries_eddies``)
+
+                Plot a timeserie of the number of eddies throughout a period of time.
+                Not functional for now due to missing eddy tracking variables.
+                
+            .. grid-item-card:: PDF for eddy variables (``pdf_eddies``)
+
+                Plot a Probability Density Function for every eddy variables available, 
+                with distincts cyclones and anticyclones.
+
+                .. image:: images/pdf_vmax_radius_sacso_20160701_20160715.png
+
+                :download:`Download <images/pdf_vmax_radius_sacso_20160701_20160715.png>`
+                
+
+.. _plot-rendering-parameters:                        
+
+*Plot-rendering parameters*
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
         Each output block also accepts, nested under its own name:
 
@@ -134,6 +200,10 @@ outputs
         - ``cbar_group``: (optional) name shared by several ``mapseries``
           outputs to pool their color-scale range, so they use the same
           fixed min/max instead of each being scaled independently.
+          
+        Other ``otype``-specific parameters :
+        
+        - ``map_boxsize`` : cell size in degrees to compute occurence in ``map_occurence_eddies`` (defaults 0.2°)
 
 Execution
 ---------
