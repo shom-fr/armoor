@@ -115,7 +115,7 @@ def format_time_label(attrs, ds=None, allow_clim_month=False):
     if tfreq:
         return tfreq, f"_{tfreq}"
     # Include any kind of dataset (unique timestamps, or not -- like eddies) with np.unique
-    if ds is not None and 'time' in ds.sizes:
+    if ds is not None and ('time' in ds.dims or 'time' in ds.coords):
         if np.unique(ds.time).shape[0] == 1:
             time_str = f"{pd.to_datetime(np.unique(ds.time)[0]):%Y-%m-%dT%H:%M:%S}"
             return time_str, f"_{time_str}"

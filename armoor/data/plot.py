@@ -1642,8 +1642,9 @@ class PlotEddies(_PlotDataBase):
 
             # Initialize figure
             f, ax = create_subplots(
-                nrows=1, figsize=(resX, resY), title=title, projection=projection
+                nrows=1, figsize=(resX, resY), projection=projection
             )
+            f.suptitle(title, y=0.90)
             # Plot each eddie
             n_a, n_c = [0, 0]
             for n in range(ds.obs.shape[0]):
@@ -1734,6 +1735,10 @@ class PlotEddies(_PlotDataBase):
         """
         Plot a map of eddy contour occurence for a defined box size.
         Occurence is given as the percentage of times a given cell sees an eddy contour.
+        
+        Optional parameters
+        -------------------
+        map_boxsize : Cell size to compute occurence. Later spread to lon_bins/lat_bins.
 
         """
         dse = self.dt.children["data"].to_dataset()
@@ -1806,7 +1811,7 @@ class PlotEddies(_PlotDataBase):
 
     def histogram_eddies(self):
         """
-        Plot histograms for eddies datasets
+        Plot histograms for eddies datasets.
 
         """
         dse = self.dt.children["data"].to_dataset()
