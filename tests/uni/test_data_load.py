@@ -206,3 +206,65 @@ class TestStagedDataset:
         assert new_sd.vrange is None
         assert new_sd.trange is None
         assert new_sd.time is None
+
+
+class TestDropUnusedVarsBeforeStaging:
+    """Variables no metazone keeps are dropped before zarr staging."""
+
+    @pytest.fixture
+    def model_ds(self):
+        shape4, shape3 = (2, 3, 4, 5), (2, 4, 5)
+        dims4, dims3 = ("time", "z", "y", "x"), ("time", "y", "x")
+        depth = np.broadcast_to(
+            np.array([5.0, 50.0, 500.0])[None, :, None, None], shape4
+        ).copy()
+        ds = xr.Dataset(
+            {
+                "ptemp": (dims4, 10 + np.random.rand(*shape4).astype("float32")),
+                "sal": (dims4, 35 + np.random.rand(*shape4).astype("float32")),
+                "u": (dims4, np.random.rand(*shape4).astype("float32")),
+                "v": (dims4, np.random.rand(*shape4).astype("float32")),
+                "shflux": (dims3, np.random.rand(*shape3).astype("float32")),
+                "bathy": (("y", "x"), np.full((4, 5), 1000.0, dtype="float32")),
+            },
+            coords={
+                "time": pd.date_range("2024-01-01", periods=2, freq="D"),
+                "lon": (("y", "x"), np.tile(np.linspace(40, 44, 5), (4, 1))),
+                "lat": (("y", "x"), np.tile(np.linspace(10, 13, 4)[:, None], (1, 5))),
+                "depth": (dims4, depth),
+            },
+        )
+        return ds.chunk({"time": 1})
+
+    def test_keeps_only_oceanvars_inputs(self, model_ds):
+        from armoor.data.load import _drop_unused_vars_before_staging
+
+        metazones = {"A": {"oceanvars": ["ptemp", "sal"]}, "B": {"oceanvars": ["ptemp"]}}
+        out = _drop_unused_vars_before_staging(model_ds, metazones)
+        assert set(out.data_vars) == {"ptemp", "sal"}
+        assert set(out.coords) == set(model_ds.coords)
+
+    def test_output_unchanged_by_the_drop(self, model_ds):
+        from armoor.data.load import _drop_unused_vars_before_staging
+
+        vnames = ["ptemp", "sal", "pres"]
+        out = _drop_unused_vars_before_staging(model_ds, {"A": {"oceanvars": vnames}})
+        assert "u" not in out and "shflux" not in out
+        for vname in vnames:
+            xr.testing.assert_allclose(
+                out.oceanvars.sel(vname).compute(), model_ds.oceanvars.sel(vname).compute()
+            )
+
+    def test_keeps_qc_variable(self, model_ds):
+        from armoor.data.load import _drop_unused_vars_before_staging
+
+        metazones = {"A": {"oceanvars": ["ptemp"], "qc": ["u", 0, 1]}}
+        out = _drop_unused_vars_before_staging(model_ds, metazones)
+        assert set(out.data_vars) == {"ptemp", "u"}
+
+    def test_unchanged_when_a_metazone_has_no_oceanvars(self, model_ds):
+        from armoor.data.load import _drop_unused_vars_before_staging
+
+        metazones = {"A": {"oceanvars": ["ptemp"]}, "B": {}}
+        out = _drop_unused_vars_before_staging(model_ds, metazones)
+        assert set(out.data_vars) == set(model_ds.data_vars)

@@ -797,6 +797,73 @@ def _apply_prefilter(ds, bounds):
     return ds.where(mask_2d.isel({dim_y: y_slice, dim_x: x_slice}))
 
 
+def _dask_layer_names(arr):
+    """Return the names of the dask graph layers (or keys) behind `arr`."""
+    graph = arr.__dask_graph__()
+    if hasattr(graph, "layers"):
+        return set(graph.layers)
+    return {k[0] if isinstance(k, tuple) else k for k in graph}
+
+
+def _drop_unused_vars_before_staging(ds, metazones):
+    """Drop the data variables that no metazone will keep, before zarr staging.
+
+    When every metazone sets ``oceanvars``, the final output only holds those
+    variables (plus the depth/pdens/time/lon/lat coordinates, see
+    `armoor.filters.oceanvars_filter`). Staging the other variables (e.g.
+    u/v and the surface fluxes of a CROCO file for an Argo comparison) only
+    costs I/O and CPU.
+
+    The variables each requested oceanvar depends on are found by looking for
+    their dask arrays in the lazy graph of ``ds.oceanvars.sel(name)``, so
+    derived variables (e.g. pres from depth) keep their inputs. Variables used
+    by the quality and data_selection filters, and data variables not backed
+    by dask (their use cannot be detected), are always kept. Coordinates are
+    never dropped. If anything cannot be resolved, `ds` is returned unchanged.
+    """
+    vnames = set()
+    keep = set()
+    for mz_param in metazones.values():
+        if not mz_param.get("oceanvars"):
+            return ds
+        vnames.update(mz_param["oceanvars"])
+        if "qc" in mz_param:
+            keep.add(mz_param["qc"][0])
+
+    dask_vars = {}
+    for var in ds.data_vars:
+        data = ds[var].data
+        if isinstance(data, da.Array):
+            dask_vars[var] = data.name
+        else:
+            keep.add(var)
+
+    for vname in sorted(vnames):
+        try:
+            selected = ds.oceanvars.sel(vname)
+        except Exception as exc:  # noqa: BLE001 -- fall back to staging everything
+            logger.info(f"Staging: cannot resolve oceanvar {vname!r} ({exc}), keeping all vars")
+            return ds
+        if selected is None:
+            return ds  # the per-metazone oceanvars filter will raise the error
+        if vname in ds.data_vars:
+            keep.add(vname)
+        if not isinstance(selected.data, da.Array):
+            return ds
+        layers = _dask_layer_names(selected.data)
+        keep.update(var for var, name in dask_vars.items() if name in layers)
+
+    to_drop = [var for var in ds.data_vars if var not in keep]
+    if to_drop:
+        logger.info(
+            f"Staging: dropping {len(to_drop)} unused variable(s) {sorted(to_drop)} "
+            f"({sum(ds[v].nbytes for v in to_drop) / 1e9:.1f} GB), "
+            f"keeping {sorted(keep & set(ds.data_vars))}"
+        )
+        ds = ds.drop_vars(to_drop)
+    return ds
+
+
 def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
     """Stage union-prefiltered datasets to one temporary zarr per source, then process.
 
@@ -824,6 +891,7 @@ def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
     # the main source of excess tasks in Phase 2 (~4× task reduction).
     dss_rechunked = []
     for ds in dss:
+        ds = _drop_unused_vars_before_staging(ds, metazones)
         non_time_dims = [d for d in ds.dims if d != 'time']
         rechunk_spec = {d: _STAGING_SPATIAL_CHUNK for d in non_time_dims}
         if 'time' in ds.dims:
