@@ -1573,14 +1573,16 @@ def open_decode_cmems_insitu(path_files, platform):
                 ds = ds.drop_vars("pres")
         if "depth" in ds:
             if platform == "argo":
-                dssi = []
-                for itime in range(ds.sizes["time"]):
-                    dsi = ds.isel(time=[itime])
-                    if dsi.depth.min() < -10.0:
-                        dssi.append(dsi)
-                if len(dssi) == 0:
+                # Keep profiles reaching below 10 m. One vectorized reduction
+                # instead of one dask compute + isel per profile.
+                if "time" in ds.depth.dims:
+                    zdims = [d for d in ds.depth.dims if d != "time"]
+                    keep = (ds.depth.min(dim=zdims) < -10.0).values
+                    ds = ds.isel(time=np.flatnonzero(keep))
+                elif not bool(ds.depth.min() < -10.0):
                     continue
-                ds = xr.combine_nested(dssi, "time", data_vars="all")
+                if ds.sizes["time"] == 0:
+                    continue
                 ds["depth"] = -1 * ds["depth"]
             if platform == "glider":
                 if ds["depth"].dims == ("z",):
