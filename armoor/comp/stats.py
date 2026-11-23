@@ -33,6 +33,13 @@ class StatsComp:
         Additional dimensions for future processing (not directly used here).
     exclude_dims : list of str or None, optional
         Dimensions to exclude from processing.
+    keep_member_data : bool, optional
+        If True (default), the ``prod/data`` node keeps the raw,
+        member-resolved product dataset. If False, it holds the
+        member-averaged product instead -- for outputs whose plots never
+        look at individual members (e.g. ``timeseries``), this avoids
+        carrying a ``time x z x member`` copy of every colocated file
+        through concatenation and saving.
 
     Attributes
     ----------
@@ -52,6 +59,7 @@ class StatsComp:
         dims: Optional[List[str]],
         extra_dims: Optional[List[str]] = None,
         exclude_dims: Optional[List[str]] = None,
+        keep_member_data: bool = True,
     ):
         self.mparams = mparams
         self.dsref = dsref
@@ -88,6 +96,8 @@ class StatsComp:
             dsprod = (
                 dsprod.reset_coords(["lon", "lat"]).mean(dim="member").set_coords(["lon", "lat"])
             )
+            if not keep_member_data:
+                self.dtprod.update(xr.DataTree.from_dict({"data": dsprod}))
         self.dsprod = dsprod
 
     # -------------------------------------------------------------------------

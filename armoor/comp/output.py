@@ -28,6 +28,12 @@ from armoor.diags.parcels import Parcels
 logger = logging.getLogger(__name__)
 
 DATA_TYPES = ("prod", "ref", "comp")
+# Otypes whose plots only use the member-averaged product (or just its attrs)
+# from the "prod/data" node -- see plot.timeseries_stats/timeseries_sel. For
+# these, StatsComp stores the member mean instead of the raw member-resolved
+# dataset, which would otherwise be concatenated and kept in memory for every
+# product (time x z x member, ~60 GB per product on a comp_argo run).
+MEMBER_AVERAGED_DATA_OTYPES = ("timeseries",)
 EPOCH = "1950-01-01"
 
 # Re-exported for backward compatibility (still imported directly by tests).
@@ -565,8 +571,12 @@ class OutputProcessor:
         prod_datasets = []
         ref_datasets = []
         try:
-            prod_datasets = [xr.open_dataset(f) for f in prod_files_list]
-            ref_datasets = [xr.open_dataset(f) for f in ref_files_list]
+            # cache=False: otherwise every array read while computing the
+            # stats (e.g. the member mean) stays pinned in memory inside the
+            # "data" node kept in the result trees, for every file of every
+            # product until _save_outputs.
+            prod_datasets = [xr.open_dataset(f, cache=False) for f in prod_files_list]
+            ref_datasets = [xr.open_dataset(f, cache=False) for f in ref_files_list]
 
             # Process each file pair
             for file_idx in range(num_files):
@@ -647,7 +657,10 @@ class OutputProcessor:
         # Prepare statistics configuration
         stats = output_params.get("stat").copy() if output_params.get("stat") else None
         # Compute statistics and comparisons
-        dt_prod, dt_ref, dt_comps = StatsComp(mparams, ds_prod, ds_ref, stats).compute()
+        keep_member_data = output not in MEMBER_AVERAGED_DATA_OTYPES
+        dt_prod, dt_ref, dt_comps = StatsComp(
+            mparams, ds_prod, ds_ref, stats, keep_member_data=keep_member_data
+        ).compute()
         dt_comps = self.comparison.compute_comparison(dt_comps, ds_ref, ds_prod, output)
         if closest_ds is not None:
             dt_prod.update(xr.DataTree.from_dict({"closest": closest_ds}))

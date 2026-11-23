@@ -327,6 +327,56 @@ class TestConcatenateDatasets:
 
 
 # ---------------------------------------------------------------------------
+# _process_coloc_pair -- member-resolved vs member-averaged "prod/data"
+# ---------------------------------------------------------------------------
+
+class TestProcessColocPairMemberData:
+    """For otype=timeseries, "prod/data" must hold the member mean, not the
+    raw (time, z, member) product -- keeping the latter for every file of
+    every product is what OOMs large comp_argo timeseries runs."""
+
+    def setup_method(self):
+        self.processor = OutputProcessor(func_comp="comp_argo")
+        time = pd.date_range("2024-01-01", periods=3, freq="D")
+        z = [0.0, 10.0]
+        member = np.arange(4)
+        rng = np.random.default_rng(0)
+        self.ds_prod = xr.Dataset(
+            {"ptemp": (("time", "z", "member"), rng.random((3, 2, 4)))},
+            coords={
+                "time": time,
+                "z": z,
+                "member": member,
+                "lon": ("member", [0.0, 0.1, 0.2, 0.3]),
+                "lat": ("member", [45.0, 45.1, 45.2, 45.3]),
+            },
+        )
+        self.ds_ref = xr.Dataset(
+            {"ptemp": (("time", "z"), rng.random((3, 2)))},
+            coords={"time": time, "z": z, "lon": 0.15, "lat": 45.15},
+        )
+        self.mparams = {"vrange": {"bins_min": [0.0], "bins_max": [2000.0]}}
+
+    def _run(self, output):
+        computed = {dt: [] for dt in DATA_TYPES}
+        self.processor._process_coloc_pair(
+            self.ds_prod, self.ds_ref, self.mparams, {"stat": ["z"]}, output, computed
+        )
+        return computed["prod"][0]["data"].to_dataset()
+
+    def test_timeseries_stores_member_mean(self):
+        ds_data = self._run("timeseries")
+        assert "member" not in ds_data.dims
+        np.testing.assert_allclose(
+            ds_data["ptemp"].values, self.ds_prod["ptemp"].mean("member").values
+        )
+
+    def test_other_otypes_keep_members(self):
+        ds_data = self._run("diagdisp_glob")
+        assert ds_data.sizes["member"] == 4
+
+
+# ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
