@@ -8,7 +8,7 @@ class TestFormatTwoTimes:
     def test_returns_title_and_suffix(self):
         title, suffix = format_two_times("[2020-01-01T00:00:00_2020-01-31T00:00:00[", attr="trange")
         assert title == "[ 2020-01-01T00:00 - 2020-01-31T00:00 ["
-        assert suffix == "2020-01-01T00-00_2020-01-31T00-00"
+        assert suffix == "_trange_2020-01-01T00-00_2020-01-31T00-00"
 
 
 class TestGetOutputVminmax:
