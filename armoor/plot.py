@@ -51,15 +51,15 @@ def get_output_vminmax(cfg_outputs, output):
 
 
 def format_two_times(times_str: str, attr: Literal["tbound", "trange", "period"] = "trange"):
-    """Format a string of two datetimes (e.g. ``"t1_t2"``) for display/filenames, 
-    either bracketed for ``trange`` attr or non-bracketed for ``period`` or 
+    """Format a string of two datetimes (e.g. ``"t1_t2"``) for display/filenames,
+    either bracketed for ``trange`` attr or non-bracketed for ``period`` or
     ``tbound`` attr.
 
     Parameters
     ----------
     times_str: str
-        A string containing two datetimes separated by an underscore, as set 
-        by `armoor.ranges.trange_seq` or `armoor.ranges.period_label`, 
+        A string containing two datetimes separated by an underscore, as set
+        by `armoor.ranges.trange_seq` or `armoor.ranges.period_label`,
         or set in format_time_label.
     attr : Literal["tbound", "trange", "period"]
         The attribute type, either ``tbound``, ``trange`` or ``period``.
@@ -68,7 +68,7 @@ def format_two_times(times_str: str, attr: Literal["tbound", "trange", "period"]
     -------
     tuple of str
         ``(title_str, filename_safe_str)`` -- e.g.
-        
+
         - for tbound :
         ``("[ 2020-01-01T00:00 - 2020-01-31T00:00 ]", "2020-01-01T00-00_2020-01-31T00-00")``,
         - for trange :
