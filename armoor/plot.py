@@ -80,7 +80,7 @@ def format_two_times(times_str: str, attr: Literal["tbound", "trange", "period"]
     title_str = f"{t1} - {t2}"
     suffix_str = re.sub(':', '-', f'{t1}_{t2}')
     if attr == "tbound":
-        return f"[ {title_str} ]", suffix_str
+        return f"[ {title_str} ]", f"_{suffix_str}"
     if attr == "trange":
         return f"[ {title_str} [", f"_trange_{suffix_str}"
     if attr == "period":
