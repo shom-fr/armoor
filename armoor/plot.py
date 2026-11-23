@@ -8,6 +8,7 @@ import re
 import numpy as np
 import pandas as pd
 from datetime import datetime
+from typing import Literal
 
 from armoor import ArmoorError
 
@@ -49,25 +50,41 @@ def get_output_vminmax(cfg_outputs, output):
     return None
 
 
-def format_trange(trange):
-    """Format a bracketed ``trange`` attr (e.g. ``"[t1_t2["``) for display/filenames.
+def format_two_times(times_str: str, attr: Literal["tbound", "trange", "period"] = "trange"):
+    """Format a string of two datetimes (e.g. ``"t1_t2"``) for display/filenames, 
+    either bracketed for ``trange`` attr or non-bracketed for ``period`` or 
+    ``tbound`` attr.
 
     Parameters
     ----------
-    trange : str
-        A ``"[<start>_<end>["`` bracketed range, as set by
-        `armoor.ranges.trange_seq`.
+    times_str: str
+        A string containing two datetimes separated by an underscore, as set 
+        by `armoor.ranges.trange_seq` or `armoor.ranges.period_label`, 
+        or set in format_time_label.
+    attr : Literal["tbound", "trange", "period"]
+        The attribute type, either ``tbound``, ``trange`` or ``period``.
 
     Returns
     -------
     tuple of str
         ``(title_str, filename_safe_str)`` -- e.g.
-        ``("[2020-01-01T00:00-2020-01-31T00:00[", "2020-01-01T00_00_2020-01-31T00_00")``.
+        
+        - for tbound :
+        ``("[ 2020-01-01T00:00 - 2020-01-31T00:00 ]", "2020-01-01T00-00_2020-01-31T00-00")``,
+        - for trange :
+        ``("[ 2020-01-01T00:00 - 2020-01-31T00:00 [", "_trange_2020-01-01T00-00_2020-01-31T00-00")``,
+        - for period :
+        ``("mean over [ 2020-01-01T00:00 - 2020-01-31T00:00 ]", "_period_2020-01-01T00-00_2020-01-31T00-00")``.
     """
-    t1, t2 = [pd.to_datetime(t).strftime('%Y-%m-%dT%H:%M') for t in trange.strip('[').split('_')]
-    title_str = f"[{t1}-{t2}["
-    suffix_str = re.sub('-', '_', re.sub(r'[\[\]]', '', title_str))
-    return title_str, suffix_str
+    t1, t2 = [pd.to_datetime(t).strftime('%Y-%m-%dT%H:%M') for t in times_str.strip('[').split('_')]
+    title_str = f"{t1} - {t2}"
+    suffix_str = re.sub(':', '-', f'{t1}_{t2}')
+    if attr == "tbound":
+        return f"[ {title_str} ]", suffix_str
+    if attr == "trange":
+        return f"[ {title_str} [", f"_trange_{suffix_str}"
+    if attr == "period":
+        return f"mean over [ {title_str} ]", f"_period_{suffix_str}"
 
 
 def format_time_label(attrs, ds=None, allow_clim_month=False):
@@ -105,28 +122,22 @@ def format_time_label(attrs, ds=None, allow_clim_month=False):
     tfreq = attrs.get("time")
     period = attrs.get("period")
     if period:
-        # Whole-window average (see armoor.ranges.tag_period): "<t0>_<tN>".
-        t1, t2 = [pd.to_datetime(t).strftime('%Y-%m-%dT%H:%M') for t in period.split('_')]
-        title_str = f"mean over [{t1}-{t2}]"
-        return title_str, "_period_" + re.sub('-', '_', f"{t1}_{t2}")
+        return format_two_times(period, attr="period")
     if trange:
-        title_str, suffix_str = format_trange(trange)
-        return title_str, f"_{suffix_str}"
+        return format_two_times(trange, attr="trange")
     if tfreq:
         return tfreq, f"_{tfreq}"
     # Include any kind of dataset (unique timestamps, or not -- like eddies) with np.unique
     if ds is not None and ('time' in ds.dims or 'time' in ds.coords):
         if np.unique(ds.time).shape[0] == 1:
-            time_str = f"{pd.to_datetime(np.unique(ds.time)[0]):%Y-%m-%dT%H:%M:%S}"
-            return time_str, f"_{time_str}"
+            time_str = f"{pd.to_datetime(np.unique(ds.time)[0]):%Y-%m-%dT%H:%M}"
+            return time_str, f"_{re.sub(':', '-', f'{time_str}')}"
         if np.unique(ds.time).shape[0] > 1:  # tbound or no timebound
             unq = np.unique(ds.time)
             t1 = datetime.strftime(pd.to_datetime(unq[0]), "%Y%m%d")
             t2 = datetime.strftime(pd.to_datetime(unq[-1]), "%Y%m%d")
-            title_str = f"[{t1}-{t2}]"
+            return format_two_times(f"{t1}_{t2}", attr="tbound")
             del unq, t1, t2
-            suffix_str = re.sub("-", "_", re.sub(r"[\[\]]", "", title_str))
-            return title_str, f"_{suffix_str}"
     if allow_clim_month and "clim_month" in attrs:
         import calendar
 
