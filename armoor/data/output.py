@@ -347,7 +347,15 @@ def save_datasets(dsprod: xr.Dataset, dirout: Path, prod_name: str, ofmt: list) 
     """
     ncname = dsprod.range.suffix
     ncout_prod = dirout / f"prod{ncname}.zarr"
-    dsprod = dsprod.chunk("auto")
+    if dsprod.attrs["data_type"] == "eddies":
+        # 'eddy_type' var is made of strings and not supported by .chunk('auto')
+        # This block helps to bypass this exception
+        eddy_type = dsprod.eddy_type
+        dsprod = dsprod.drop_vars("eddy_type")
+        dsprod = dsprod.chunk("auto")
+        dsprod["eddy_type"] = eddy_type
+    else:
+        dsprod = dsprod.chunk("auto")
     encoding = get_zarr_encoding(dsprod)
     if 'netcdf' in ofmt:
         dsprod.to_netcdf(
@@ -1785,6 +1793,12 @@ class OutputProcessor:
 
         ncout = dirout / f"{prod_name}.zarr"
         encoding = get_zarr_encoding(dt)
+
+        # Workaround for encoding problem with array of strings
+        # credits to https://github.com/pydata/xarray/issues/3476#issuecomment-630863198
+        for group in dt.groups:
+            if 'eddy_type' in dt[group].data_vars:
+                del dt[group]['eddy_type'].encoding['filters']
 
         logger.info(f"Saving output: {ncout}")
         dt.to_zarr(ncout, mode="w", encoding=encoding)

@@ -340,6 +340,7 @@ def test_compute_diags():
 
     assert "vmax_radius" in ds
     np.testing.assert_allclose(ds["vmax_radius"], [1.0])
+    assert "comment" in ds.vmax_radius.attrs
 
 
 

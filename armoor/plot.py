@@ -472,7 +472,7 @@ def shadow_line(x, y, ax, label=None, color='k'):
 
 
 def determine_figsize(
-    dataset, lon_name: str = "contour_lon", lat_name: str = "contour_lat"
+    dataset, lon_name: str = "x_vmax_contour", lat_name: str = "y_vmax_contour"
 ) -> list[int]:
     """
     Determine figsize from longitude and latitude arrays.

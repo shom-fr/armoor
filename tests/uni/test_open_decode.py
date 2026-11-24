@@ -29,6 +29,7 @@ from armoor.data.open_decode import (
     open_decode_cmems_insitu,
     open_decode_odar,
     open_decode_croco,
+    _eddy_dataset_set_attrs,
     open_decode_eddy_pet,
     open_decode_eddy_sacso,
     open_decode_eddy_shoot,
@@ -789,6 +790,31 @@ class TestOpenDecodeCroco:
 
 class TestOpenDecodeEddies:
     """Tests for the open_decode_eddy_* functions."""
+    
+    def test_eddy_dataset_set_attrs(self, setup_test_data):
+        """
+        Test EDDY_VAR_ATTRS availability in SHOOT 
+        and attribute replacement/assignment.
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        filepath = setup_test_data['eddies_shoot']
+        ds = xr.open_dataset(filepath)
+        ds = _eddy_dataset_set_attrs(ds)
+        
+        assert isinstance(ds, xr.Dataset)
+        assert ds.y_eff_contour.attrs != {}
+        assert ds.x_eff_contour.attrs != {}
+        assert ds.eff_radius.attrs != {}
+        assert ds.y_cen.attrs != {}
+        assert ds.x_cen.attrs != {}
+        assert ds.vmax.attrs != {}
+        assert ds.y_vmax_contour.attrs != {}
+        assert ds.x_vmax_contour.attrs != {}
+        assert ds.vmax_radius.attrs != {}
 
     def test_open_decode_eddies_pet(self, setup_test_data):
         """
@@ -812,7 +838,7 @@ class TestOpenDecodeEddies:
         assert "contour_lat" in ds.data_vars
         assert "center_lon" in ds.data_vars
         assert "center_lat" in ds.data_vars
-        assert "vmax_area" in ds.data_vars
+        assert "vmax_radius" in ds.data_vars
 
     def test_open_decode_eddies_sacso(self, setup_test_data):
         """
@@ -860,7 +886,7 @@ class TestOpenDecodeEddies:
         assert "contour_lat" in ds.data_vars
         assert "center_lon" in ds.data_vars
         assert "center_lat" in ds.data_vars
-        assert "vmax_area" in ds.data_vars
+        assert "vmax_radius" in ds.data_vars
 
 
 # ============================================================================

@@ -1620,8 +1620,8 @@ class PlotOceanModel(_PlotDataBase):
 
 class PlotEddies(_PlotDataBase):
     """
-    Plot methods for eddy-detection tool output (contour_lat/contour_lon,
-    center_lat/center_lon, eddy_type, vmax_area -- no depth/ptemp/sal, so
+    Plot methods for eddy-detection tool output (x_vmax_contour/y_vmax_contour,
+    x_cen/y_cen, eddy_type, vmax_area -- no depth/ptemp/sal, so
     none of PlotOceanModel's methods apply).
     """
 
@@ -1647,11 +1647,11 @@ class PlotEddies(_PlotDataBase):
             n_a, n_c = [0, 0]
             for n in range(ds.obs.shape[0]):
                 eddy = ds.isel(obs=n)
-                lon = eddy.contour_lon
-                lat = eddy.contour_lat
+                lon = eddy.x_vmax_contour
+                lat = eddy.y_vmax_contour
                 mask = np.isfinite(lon) & np.isfinite(lat)
 
-                if eddy.eddy_type == -1:
+                if eddy.eddy_type == 'cyclone':
                     color = 'blue'
                     label = 'cyclones'
                     n_c += 1
@@ -1662,9 +1662,7 @@ class PlotEddies(_PlotDataBase):
                 ax[0].fill(
                     lon[mask], lat[mask], fill=False, color=color, label=label, linewidth=0.6
                 )
-                ax[0].scatter(
-                    eddy.center_lon, eddy.center_lat, marker='o', label=label, color=color, s=3
-                )
+                ax[0].scatter(eddy.x_cen, eddy.y_cen, marker='o', label=label, color=color, s=3)
 
             # Only show one entry per eddy type in legend
             handles, labels = ax[0].get_legend_handles_labels()
@@ -1711,8 +1709,8 @@ class PlotEddies(_PlotDataBase):
             Binary presence mask on the 2D grid
 
         """
-        lat = ds.contour_lat.values.flatten()
-        lon = ds.contour_lon.values.flatten()
+        lat = ds.y_vmax_contour.values.flatten()
+        lon = ds.x_vmax_contour.values.flatten()
 
         mask = ~np.isnan(lat) & ~np.isnan(lon)
         lat = lat[mask]
@@ -1750,15 +1748,15 @@ class PlotEddies(_PlotDataBase):
 
         # Define grid resolution
         lat_bins = np.arange(
-            dse.center_lat.min().values, dse.center_lat.max().values + map_boxsize, map_boxsize
+            dse.y_cen.min().values, dse.y_cen.max().values + map_boxsize, map_boxsize
         )
         lon_bins = np.arange(
-            dse.center_lon.min().values, dse.center_lon.max().values + map_boxsize, map_boxsize
+            dse.x_cen.min().values, dse.x_cen.max().values + map_boxsize, map_boxsize
         )
 
         # Split by eddy_type
-        dsa = dse.where(dse.eddy_type == 1)
-        dsc = dse.where(dse.eddy_type == -1)
+        dsa = dse.where(dse.eddy_type == 'anticyclone')
+        dsc = dse.where(dse.eddy_type == 'cyclone')
 
         projection = ccrs.PlateCarree()
         resX, resY = determine_figsize(dse)
@@ -1814,8 +1812,8 @@ class PlotEddies(_PlotDataBase):
         """
         dse = self.dt.children["data"].to_dataset()
 
-        dsa = dse.where(dse.eddy_type == 1)
-        dsc = dse.where(dse.eddy_type == -1)
+        dsa = dse.where(dse.eddy_type == 'anticyclone')
+        dsc = dse.where(dse.eddy_type == 'cyclone')
 
         time_title, time_figname = format_time_label(dse.attrs, ds=dse)
 
@@ -1867,8 +1865,6 @@ class PlotEddies(_PlotDataBase):
 
         """
         dse = self.dt.children["data"].to_dataset()
-
-        # return None
 
         # In any case, the concat-obs option from datatype groups every ranges into one dataset
         if "trange_seq" in dse.attrs:

@@ -23,6 +23,8 @@ import xoa.geo as xgeo
 import xoa.sigma as xsigma
 from xoa.grid import dz2depth, shift
 
+from shoot.eddies.eddies2d import EDDY_VAR_ATTRS
+
 from armoor import ROOTDIR, ArmoorError
 
 logger = logging.getLogger(__name__)
@@ -775,7 +777,8 @@ class EddyPetDecoder(Decoder):
             See `open_decode_eddy_pet`.
         """
         logger.info("Opening/decoding py-eddy-tracker eddy detection netcdf")
-        return open_decode_eddy_pet(path_files)
+        ds = open_decode_eddy_pet(path_files)
+        return _eddy_dataset_set_attrs(ds)
 
 
 class EddySacsoDecoder(Decoder):
@@ -802,7 +805,8 @@ class EddySacsoDecoder(Decoder):
             See `open_decode_eddy_sacso`.
         """
         logger.info("Opening/decoding sacso eddy detection text file")
-        return open_decode_eddy_sacso(path_files)
+        ds = open_decode_eddy_sacso(path_files)
+        return _eddy_dataset_set_attrs(ds)
 
 
 class EddyShootDecoder(Decoder):
@@ -829,7 +833,8 @@ class EddyShootDecoder(Decoder):
             See `open_decode_eddy_shoot`.
         """
         logger.info("Opening/decoding shoot eddy detection netcdf")
-        return open_decode_eddy_shoot(path_files)
+        ds = open_decode_eddy_shoot(path_files)
+        return _eddy_dataset_set_attrs(ds)
 
 
 def get_decoder(fmt) -> Decoder:
@@ -2668,6 +2673,27 @@ def open_decode_cora(path_files):
     return cora
 
 
+def _eddy_dataset_set_attrs(ds: xr.Dataset):
+    """
+    Sets attributes for eddy variables, taking SHOOT attributes as reference.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset from open_decode_[eddy-type] function.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset
+    """
+    for var in ds.data_vars:
+        if var in EDDY_VAR_ATTRS.keys():
+            ds[var] = ds[var].assign_attrs(EDDY_VAR_ATTRS[var])
+
+    return ds
+
+
 def open_decode_eddy_pet(path_files):
     """
     Open py-eddy-tracker netcdf file(s) and store it in dataset.
@@ -2680,7 +2706,7 @@ def open_decode_eddy_pet(path_files):
     Returns
     -------
     xarray.Dataset
-        dataset
+        Dataset
     """
     outputs = []
     all_paths = [path for path in path_files if "Cyclonic" in path]
@@ -2688,64 +2714,31 @@ def open_decode_eddy_pet(path_files):
     for file in all_paths:
         cyclones = xr.open_dataset(file)
         anticyclones = xr.open_dataset(file.replace("Cyclonic", "Anticyclonic"))
+        ds_list = {'cyclone': cyclones, 'anticyclone': anticyclones}
 
-        ds_cyclones = xr.Dataset(
-            {
-                "contour_lat": (
-                    ["obs", "nb_sample"],
-                    cyclones.speed_contour_latitude.data,
-                ),
-                "contour_lon": (
-                    ["obs", "nb_sample"],
-                    cyclones.speed_contour_longitude.data,
-                ),
-                "center_lat": (["obs"], cyclones.latitude.data),
-                "center_lon": (["obs"], cyclones.longitude.data),
-                "eddy_type": (
-                    ["obs"],
-                    np.zeros(cyclones.obs.shape[0]) - 1,
-                    {"comment": "-1 if cyclone, +1 if anticyclone"},
-                ),
-                "vmax_area": (
-                    ["obs"],
-                    np.pi * cyclones.speed_radius.data**2 / 1e6,
-                    {"comment": "Area of the vmax contour", "units": "km2"},
-                ),
-            },
-            coords={
-                "nb_sample": (["nb_sample"], cyclones.NbSample.data),
-            },
-        )
+        datasets = []
+        for ds_type, ds in ds_list.items():
+            ds['eddy_type'] = xr.DataArray(data=[ds_type] * ds.obs.shape[0], dims=['obs'])
+            datasets.append(
+                ds.rename(
+                    {
+                        # All PET variables defined in SHOOT are renamed, attrs are preserved
+                        # Other variables remain unchanged
+                        'NbSample': 'nb_sample',
+                        'longitude': 'x_cen',
+                        'latitude': 'y_cen',
+                        'effective_radius': 'eff_radius',
+                        'effective_contour_longitude': 'x_eff_contour',
+                        'effective_contour_latitude': 'y_eff_contour',
+                        'speed_radius': 'vmax_radius',
+                        'speed_contour_longitude': 'x_vmax_contour',
+                        'speed_contour_latitude': 'y_vmax_contour',
+                        'speed_average': 'vmax',
+                    }
+                )
+            )
 
-        ds_anticyclones = xr.Dataset(
-            {
-                "contour_lat": (
-                    ["obs", "nb_sample"],
-                    anticyclones.speed_contour_latitude.data,
-                ),
-                "contour_lon": (
-                    ["obs", "nb_sample"],
-                    anticyclones.speed_contour_longitude.data,
-                ),
-                "center_lat": (["obs"], anticyclones.latitude.data),
-                "center_lon": (["obs"], anticyclones.longitude.data),
-                "eddy_type": (
-                    ["obs"],
-                    np.zeros(anticyclones.obs.shape[0]) + 1,
-                    {"comment": "-1 if cyclone, +1 if anticyclone"},
-                ),
-                "vmax_area": (
-                    ["obs"],
-                    np.pi * anticyclones.speed_radius.data**2 / 1e6,
-                    {"comment": "Area of the vmax contour", "units": "km2"},
-                ),
-            },
-            coords={
-                "nb_sample": (["nb_sample"], anticyclones.NbSample.data),
-            },
-        )
-
-        da = xr.concat([ds_cyclones, ds_anticyclones], dim="obs")
+        da = xr.concat(datasets, dim="obs")
 
         outputs += [
             da.assign_coords(
@@ -2773,19 +2766,19 @@ def open_decode_eddy_sacso(path_files):
     Returns
     -------
     xarray.Dataset
-        dataset
+        Dataset
     """
     # Initialize
     all_points = []
     current_block = []
     eddy_type = []
-    center_lat = []
-    center_lon = []
+    y_cen = []
+    x_cen = []
     dates = []
     surfaces = []
-    suffix_date = "Date" + " " * 33
-    suffix_center = "Centre(lon/lat)" + " " * 22
-    suffix_surface = "Surface(km2)" + " " * 25
+    a_ell = []
+    b_ell = []
+    angle_ell = []
 
     content = []
     for path in path_files:
@@ -2794,13 +2787,15 @@ def open_decode_eddy_sacso(path_files):
 
     start_reading = False
     for line in content:
-        line = line.strip()  # remove spaces and line breaks
+        # remove spaces and line breaks, gives list as ['Variable','Result']
+        # e.g. ['Longueur(km)','100.6']
+        line = [sub for sub in line.split(' ') if sub != '']
 
         if "Date" in line:
-            dates.append(datetime.datetime.strptime(line[len(suffix_date) :], "%Y-%m-%d/%H:%M"))
+            dates.append(datetime.datetime.strptime(line[1].strip(), "%Y-%m-%d/%H:%M"))
 
         # Check if new list of coordinates
-        if line == "Liste_Points(lon/lat)":
+        if "Liste_Points(lon/lat)" in line:
             if current_block:
                 # Pass full block to all_points
                 all_points.append(np.array(current_block))
@@ -2810,20 +2805,23 @@ def open_decode_eddy_sacso(path_files):
 
         if start_reading and line:
             if "Sens_de_rotation" in line:
-                rotation = line[len(suffix_center) : -4].lower() + "e"  # cyclone or anticyclone
-                if rotation == "cyclone":
-                    eddy_type.append(-1)
-                elif rotation == "anticyclone":
-                    eddy_type.append(1)
+                rotation = line[1][:-5].lower() + "e"  # cyclone or anticyclone
+                eddy_type.append(rotation)
             elif "Centre(lon/lat)" in line:
-                center = line[len(suffix_center) :]
-                center_lon.append(float(center[: center.find("/")]))
-                center_lat.append(float(center[center.find("/") + 1 :]))
+                x_center, y_center = map(float, line[1].split("/"))
+                x_cen.append(x_center)
+                y_cen.append(y_center)
             elif "Surface(km2)" in line:
-                surfaces.append(float(line[len(suffix_surface) :]))
+                surfaces.append(float(line[1]))
+            elif "Longueur(km)" in line:
+                a_ell.append(float(line[1]) / 2)
+            elif "Largeur(km)" in line:
+                b_ell.append(float(line[1]) / 2)
+            elif "Orientation/E(deg)" in line:
+                angle_ell.append(float(line[1]))
             else:
                 try:
-                    lon, lat = map(float, line.split("/"))
+                    lon, lat = map(float, line[0].split("/"))
                     current_block.append([lon, lat])
                 except ValueError:
                     pass
@@ -2845,21 +2843,20 @@ def open_decode_eddy_sacso(path_files):
             lats[i, : len(block)] = block[:, 1]
 
         ds = xr.Dataset(
-            {
-                "contour_lat": (["obs", "nb_sample"], lats),
-                "contour_lon": (["obs", "nb_sample"], lons),
-                "center_lat": (["obs"], np.array(center_lat)),
-                "center_lon": (["obs"], np.array(center_lon)),
-                "eddy_type": (
-                    ["obs"],
-                    np.array(eddy_type),
-                    {"comment": "-1 if cyclone, +1 if anticyclone"},
-                ),
+            data_vars={
+                "y_vmax_contour": (["obs", "nb_sample"], lats),
+                "x_vmax_contour": (["obs", "nb_sample"], lons),
+                "y_cen": (["obs"], np.array(y_cen)),
+                "x_cen": (["obs"], np.array(x_cen)),
+                "eddy_type": (["obs"], np.array(eddy_type)),
                 "vmax_area": (
                     ["obs"],
                     np.array(surfaces),
-                    {"comment": "Area of the vmax contour", "units": "km2"},
+                    {'comment': 'Area of the vmax contour', 'units': 'km2'},
                 ),
+                "a_ell": (["obs"], np.array(a_ell)),
+                "b_ell": (["obs"], np.array(b_ell)),
+                "angle_ell": (["obs"], np.array(angle_ell)),
             },
             coords={"nb_sample": np.arange(max_length)},
         ).assign_coords(time=("obs", np.array(dates)))
@@ -2873,6 +2870,7 @@ def open_decode_eddy_sacso(path_files):
 def open_decode_eddy_shoot(path_files):
     """
     Open shoot netcdf file(s) and store it in dataset.
+    SHOOT variables formatting is considered as reference, no changes.
 
     Parameters
     ----------
@@ -2882,7 +2880,7 @@ def open_decode_eddy_shoot(path_files):
     Returns
     -------
     xarray.Dataset
-        dataset
+        Dataset
     """
 
     # Open
@@ -2890,42 +2888,9 @@ def open_decode_eddy_shoot(path_files):
         """Set "time" as a coordinate before concatenating along "obs"."""
         return ds.set_coords("time")
 
-    da = xr.open_mfdataset(path_files, combine="nested", concat_dim="obs", preprocess=preprocessing)
-
-    # Keep only variables of interest and formatting
-    list_vars = [
-        a
-        for a in da.data_vars
-        if "vmax_contour" not in a
-        and "eddy_type" not in a
-        and "x_cen" not in a
-        and "y_cen" not in a
-        and "vmax_radius" not in a
-    ]  # time is already included in coordinates = will be kept
-    da = (
-        da.drop_vars(list_vars)
-        .drop_attrs()
-        .rename(
-            {
-                "x_vmax_contour": "contour_lon",
-                "y_vmax_contour": "contour_lat",
-                "x_cen": "center_lon",
-                "y_cen": "center_lat",
-            }
-        )
-        .load()
-        .assign_coords(nb_sample=("nb_sample", da.nb_sample.data))
-    )
-
-    da["eddy_type"] = xr.DataArray(
-        np.where(da["eddy_type"] == "cyclone", -1, 1), dims="obs"
-    ).assign_attrs({"comment": "-1 if cyclone, +1 if anticyclone"})
-
-    da["vmax_area"] = np.pi * da.vmax_radius**2 / 1e6
-    da["vmax_area"] = da["vmax_area"].assign_attrs(
-        {"comment": "Area of the vmax contour", "units": "km2"}
-    )
-    da = da.drop_vars("vmax_radius")
+    da = xr.open_mfdataset(
+        path_files, combine="nested", concat_dim="obs", preprocess=preprocessing
+    ).load()
 
     return da
 

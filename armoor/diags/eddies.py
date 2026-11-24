@@ -75,10 +75,32 @@ def area2radius(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+def radius2area(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Compute the approximated area enclosed by the eddy vmax contour from the radius.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset with vmax_radius variable.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset extended with a new vmax_area variable.
+    """
+    vmax_radius = ds.vmax_radius
+    vmax_area = np.pi * vmax_radius**2
+    ds['vmax_area'] = vmax_area.assign_attrs(
+        {'comment': 'Area of the vmax contour approx. from vmax_radius', 'units': 'km2'}
+    )
+    return ds
+
+
 def compute_vars(ds: xr.Dataset) -> xr.Dataset:
     """Add any derivable eddy diagnostic variables missing from `ds`.
 
-    A no-op for non-eddy datasets (checks for `vmax_area` presence).
+    A no-op for non-eddy datasets.
 
     Parameters
     ----------
@@ -88,9 +110,10 @@ def compute_vars(ds: xr.Dataset) -> xr.Dataset:
     Returns
     -------
     xarray.Dataset
-        `ds`, with `vmax_radius` added if derivable and missing.
+        `ds`, with all possible derived variables.
     """
     if "vmax_area" in ds.data_vars and "vmax_radius" not in ds.data_vars:
         ds = area2radius(ds)
-
+    if "vmax_radius" in ds.data_vars and "vmax_area" not in ds.data_vars:
+        ds = radius2area(ds)
     return ds
