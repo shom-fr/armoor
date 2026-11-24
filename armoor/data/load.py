@@ -740,6 +740,16 @@ def _apply_prefilter(ds, bounds):
         if not lat_mask.any():
             logger.warning("_apply_prefilter: no lat points inside bbox — returning full lat range")
             return ds
+        if lat.dims == lon.dims:
+            # Trajectory/profiles: lat and lon share one dimension; they are
+            # combined below in a single slice
+            if lon_vals.min() >= 0 and lon_min < 0:
+                return ds
+            both = lat_mask & (lon_vals >= lon_min) & (lon_vals <= lon_max)
+            if not both.any():
+                return ds
+            idx = np.where(both)[0]
+            return ds.isel({lat.dims[0]: slice(int(idx[0]), int(idx[-1]) + 1)})
         lat_idx = np.where(lat_mask)[0]
         lat_slice = slice(int(lat_idx[0]), int(lat_idx[-1]) + 1)
 

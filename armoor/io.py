@@ -370,7 +370,11 @@ def compute_bundled_zarr_writes(write_jobs):
             num_workers = 1
         else:
             num_workers = ncpus - 2
-        kw["num_workers"] = min(num_workers, max(n_jobs * 4, ncpus // 4))
+        num_workers = min(num_workers, max(n_jobs * 4, ncpus // 4))
+        # Never more threads than the CPUs given to the job (Slurm cgroup)
+        if hasattr(os, "sched_getaffinity"):
+            num_workers = min(num_workers, len(os.sched_getaffinity(0)))
+        kw["num_workers"] = num_workers
 
     # dt is the progress-bar refresh interval, but it also caps the delay
     # dask's ProgressBar._finish() incurs on exit: it joins a background

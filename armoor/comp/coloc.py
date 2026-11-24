@@ -347,6 +347,7 @@ class HorizontalColocation(AbstractColocation):
 
         coords = [coord for coord in mask.coords]
         mask = mask.drop_vars(coords)
+        self.dsprod, mask = _pack_members(self.dsprod, mask)
         self.dsprod = self.dsprod.where(mask)
         self.dsprod = self.dsprod.set_coords(["lon", "lat"])
 
@@ -480,6 +481,59 @@ class VerticalColocation(AbstractColocation):
                 "Use 'reference' or 'product' to specify the vertical reference for ranging then."
             )
         return self.dsref, self.dsprod
+
+
+def _pack_members(ds, mask):
+    """Gather, at each time, the members selected by `mask` in the first slots.
+
+    The product of a radius colocation holds the union of the points matched
+    at any time: for a moving reference (e.g. Argo) almost all of it is masked
+    at a given time. Here "member" becomes a rank among the points matched at
+    that time, so its size is the largest number of points matched at once.
+    The order of the points is kept, and unused slots point to a real member
+    (finite depth, needed by the vertical interpolation), to be masked.
+
+    Nothing is done if the size of "member" would not decrease (e.g. a fixed
+    reference).
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Product with "time" and "member" dimensions.
+    mask : xarray.DataArray
+        Selected points (time, member), without coordinates.
+
+    Returns
+    -------
+    xarray.Dataset, xarray.DataArray
+        Packed product and mask.
+    """
+    sel = mask.transpose("time", "member").values
+    counts = sel.sum(axis=1)
+    nslot = max(int(counts.max()), 1)
+    if nslot >= sel.shape[1]:
+        return ds, mask
+    # Stable sort: selected members first, in their original order
+    index = np.argsort(~sel, axis=1, kind="stable")[:, :nslot]
+    index = xr.DataArray(index, dims=("time", "member"))
+    time_index = xr.DataArray(np.arange(sel.shape[0]), dims="time")
+    ds = ds.drop_vars([c for c in ds.coords if c == "member"])
+    out = {}
+    for name, var in ds.variables.items():
+        if "member" not in var.dims:
+            continue
+        indexers = {"member": index}
+        if "time" in var.dims:
+            indexers["time"] = time_index
+        dims = (["time"] if "time" not in var.dims else []) + list(var.dims)
+        new = var.isel({k: v.variable for k, v in indexers.items()}).transpose(*dims)
+        out[name] = new
+    coords = {n for n in out if n in ds.coords}
+    packed = ds.drop_vars(list(out)).assign({n: v for n, v in out.items()})
+    packed = packed.set_coords(list(coords))
+    packed_mask = xr.DataArray(np.arange(nslot)[None, :] < counts[:, None], dims=("time", "member"))
+    logger.info(f"Packed members: {sel.shape[1]} -> {nslot}")
+    return packed, packed_mask
 
 
 def validate_and_get_params(metazones, comp_func):
