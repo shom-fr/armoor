@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import ClassVar
 
 import gsw
@@ -20,6 +21,25 @@ def _gsw_ufunc(func, *args):
         dask="parallelized",
         output_dtypes=[np.float32],
     )
+
+
+def _p_from_depth(depth, lat):
+    """Compute sea pressure from a positive depth array (numpy).
+
+    Meant to be applied block by block: `gsw.p_from_z` raises an error when
+    any height is above 5 m, which on a dask array computes the whole array
+    just for this check, and fails on meaningless depths (e.g. land points
+    of CROCO, whose depth is not masked). Such points are set to NaN.
+    """
+    z = -np.asarray(depth, dtype="float64")
+    invalid = z > 5
+    if invalid.any():
+        warnings.warn(
+            "Depths above 5 m over the surface found (land points?): pressure is set to NaN there",
+            stacklevel=2,
+        )
+        z[invalid] = np.nan
+    return gsw.conversions.p_from_z(z, lat)
 
 
 def _set_attrs(da, name=None, **attrs):
@@ -449,8 +469,17 @@ class OceanVars(MethodRegistry):
             if "lat" not in self.ds:
                 logger.warning("pressure cannot be computed")
                 return None
-            lat = float(self.ds.lat.mean())
-            pres = _set_attrs(gsw.conversions.p_from_z(-self.ds.depth, lat), "pres")
+            # Fill values left in lat (e.g. land tiles of CROCO) are ignored.
+            lat = self.ds.lat
+            lat = float(lat.where(abs(lat) <= 90.0).mean())
+            pres = xr.apply_ufunc(
+                _p_from_depth,
+                self.ds.depth,
+                kwargs={"lat": lat},
+                dask="parallelized",
+                output_dtypes=[np.float64],
+            )
+            pres = _set_attrs(pres, "pres")
             # Cache to avoid recomputing (sel_pdens calls sel_pres
             # multiple times via sel_ptemp / SA_from_SP).
             self.ds["pres"] = pres
