@@ -1,6 +1,11 @@
 """Unit tests for armoor.io."""
 
+import numpy as np
+import xarray as xr
+import zarr
+
 from armoor.io import (
+    write_datatree_to_zarr,
     extract_suffix_from_filename,
     is_period_file,
     output_suffix,
@@ -142,3 +147,34 @@ class TestPeriodSuffix:
         assert is_period_file(StagedDataset("x.zarr", period=self.PERIOD))
         assert not is_period_file(f"ref_{self.PERIOD}.zarr")
         assert not is_period_file("ref.zarr")
+
+
+class TestWriteDatatreeToZarr:
+    """Tests for write_datatree_to_zarr."""
+
+    @staticmethod
+    def _tree(n):
+        ds = xr.Dataset({"ptemp": ("z", np.arange(3, dtype="f4"))}, coords={"z": [0.0, 1.0, 2.0]})
+        return xr.DataTree.from_dict({f"prod/data/{i}": ds + i for i in range(n)})
+
+    def test_consolidates_once(self, tmp_path, monkeypatch):
+        """Metadata is consolidated once, whatever the number of nodes."""
+        calls = []
+        consolidate = zarr.consolidate_metadata
+
+        def counted(*args, **kwargs):
+            calls.append(args)
+            return consolidate(*args, **kwargs)
+
+        monkeypatch.setattr(zarr, "consolidate_metadata", counted)
+        path = tmp_path / "all.zarr"
+        write_datatree_to_zarr(self._tree(6), path)
+        assert len(calls) == 1
+        assert xr.open_datatree(path, engine="zarr", consolidated=True).identical(self._tree(6))
+
+    def test_overwrites(self, tmp_path):
+        """Nodes of a previous store do not survive."""
+        path = tmp_path / "all.zarr"
+        write_datatree_to_zarr(self._tree(4), path)
+        write_datatree_to_zarr(self._tree(2), path)
+        assert set(xr.open_datatree(path, engine="zarr")["prod/data"].children) == {"0", "1"}

@@ -569,6 +569,25 @@ def get_zarr_encoding(ds: xr.Dataset, rechunk: bool = True) -> dict:
     return create_fast_encoding(ds)
 
 
+def write_datatree_to_zarr(dt: xr.DataTree, path) -> None:
+    """Write a datatree to a new zarr store, consolidating its metadata once.
+
+    By default, ``DataTree.to_zarr`` consolidates the metadata of the whole
+    store after writing each node, reading again every metadata file written
+    so far: the cost is quadratic in the number of nodes, and prohibitive on a
+    parallel file system (e.g. uvprofiles/udiagts, with nodes per profile).
+
+    Parameters
+    ----------
+    dt : xarray.DataTree
+        Tree to write.
+    path : str or Path
+        Output store, overwritten if it exists.
+    """
+    dt.to_zarr(path, mode="w", encoding=get_zarr_encoding(dt), consolidated=False)
+    zarr.consolidate_metadata(str(path))
+
+
 def zarrs2netcdfs(fins):
     """
     Convert multiple Zarr files to NetCDF format.

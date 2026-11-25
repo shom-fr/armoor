@@ -11,7 +11,7 @@ import pandas as pd
 import xarray as xr
 
 from armoor.__init__ import ArmoorError
-from armoor.io import get_zarr_encoding, sort_ncs_by_suffix
+from armoor.io import get_zarr_encoding, sort_ncs_by_suffix, write_datatree_to_zarr
 from armoor.misc import optimize_for_low_swap, validate_metazone_params
 import armoor.ranges as ranges
 from armoor.data import INTERP_PARAMS_USER
@@ -1784,10 +1784,8 @@ class OutputProcessor:
         dt.update(xr.DataTree.from_dict(dsouts))
 
         ncout = dirout / f"{prod_name}.zarr"
-        encoding = get_zarr_encoding(dt)
-
         logger.info(f"Saving output: {ncout}")
-        dt.to_zarr(ncout, mode="w", encoding=encoding)
+        write_datatree_to_zarr(dt, ncout)
 
         return ncout
 

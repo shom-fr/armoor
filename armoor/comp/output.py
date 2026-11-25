@@ -12,10 +12,10 @@ from collections import defaultdict
 
 from armoor import ArmoorError
 from armoor.io import (
-    get_zarr_encoding,
     is_period_file,
     sort_ncs_by_suffix,
     write_dataset_to_zarr,
+    write_datatree_to_zarr,
 )
 from armoor.ranges import PERIOD_DIM
 from armoor.comp import GROUP_SUFFIX
@@ -889,8 +889,7 @@ class OutputProcessor:
 
         # Save combined file
         output_file = sort_dir / "all.zarr"
-        encoding = get_zarr_encoding(dt)
-        dt.to_zarr(output_file, mode="w", encoding=encoding)
+        write_datatree_to_zarr(dt, output_file)
         logger.info(f"{output_file} saved")
         return output_file
 
@@ -936,8 +935,7 @@ class OutputProcessor:
 
             # Save product file
             output_file = sort_dir / f"{prod_name}.zarr"
-            encoding = get_zarr_encoding(dt)
-            dt.to_zarr(output_file, mode="w", encoding=encoding)
+            write_datatree_to_zarr(dt, output_file)
             output_files.append(output_file)
             logger.info(f"{output_file} saved")
 
