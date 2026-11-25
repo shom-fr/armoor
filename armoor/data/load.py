@@ -2,6 +2,7 @@ import gc
 import logging
 import os
 import shutil
+import tempfile
 from pathlib import Path
 import time
 from typing import Any, Dict, Tuple
@@ -835,6 +836,7 @@ def _drop_unused_vars_before_staging(ds, metazones):
     keep = set()
     for mz_param in metazones.values():
         if not mz_param.get("oceanvars"):
+            logger.info("Staging: metazone(s) without oceanvars, keeping all vars")
             return ds
         vnames.update(mz_param["oceanvars"])
         if "qc" in mz_param:
@@ -918,7 +920,18 @@ def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
 
     # ONE staging zarr per source dataset (not one per metazone).
     total_nbytes = sum(ds.nbytes for ds in dss_rechunked)
-    zarr_dir = _get_zarr_tmp_dir(needed_bytes=total_nbytes)
+    # Unique private directory: /dev/shm is shared by all the jobs and users of
+    # the node, so a fixed name can collide with a concurrent run, or with
+    # leftovers of another user that cannot be removed (sticky bit).
+    # The Slurm job id in the name lets the job script remove it if the job is
+    # killed (see armoor.cli.hpc._write_script).
+    job_id = os.environ.get("SLURM_JOB_ID", "nojob")
+    zarr_dir = Path(
+        tempfile.mkdtemp(
+            prefix=f"armoor_{job_id}_{data_key}_",
+            dir=_get_zarr_tmp_dir(needed_bytes=total_nbytes),
+        )
+    )
 
     zfiles = []
     ncs = []
@@ -978,9 +991,7 @@ def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
         ncs = nc_paths_p2
 
     finally:
-        for zfile in zfiles:
-            if zfile.exists():
-                shutil.rmtree(zfile)
+        shutil.rmtree(zarr_dir, ignore_errors=True)
 
     return ncs
 

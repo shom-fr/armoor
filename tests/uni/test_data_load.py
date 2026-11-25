@@ -268,3 +268,43 @@ class TestDropUnusedVarsBeforeStaging:
         metazones = {"A": {"oceanvars": ["ptemp"]}, "B": {}}
         out = _drop_unused_vars_before_staging(model_ds, metazones)
         assert set(out.data_vars) == set(model_ds.data_vars)
+
+
+class TestStagingDirectory:
+    """The staging zarr must not collide with other jobs/users in /dev/shm."""
+
+    @pytest.mark.parametrize("fails", [False, True])
+    def test_private_directory_removed(self, monkeypatch, tmp_path, fails):
+        from armoor.data import load
+
+        # Leftover of another run, under the former fixed name
+        leftover = tmp_path / "tmp_croco1_0.zarr"
+        leftover.mkdir()
+        staged = []
+
+        def fake_write(ds, path, **kwargs):
+            Path(path).mkdir()
+            staged.append(Path(path))
+
+        def fake_compute(jobs):
+            if fails:
+                raise RuntimeError("staging failure")
+
+        monkeypatch.setattr(load, "_get_zarr_tmp_dir", lambda needed_bytes=0: tmp_path)
+        monkeypatch.setattr(load, "write_dataset_to_zarr", fake_write)
+        monkeypatch.setattr(load, "compute_bundled_zarr_writes", fake_compute)
+        monkeypatch.setattr(
+            load, "_process_metazone_from_union_zarr", lambda zfile, *args: "out.zarr"
+        )
+
+        ds = xr.Dataset({"ptemp": ("x", np.arange(3.0))})
+        for _ in range(2):
+            if fails:
+                with pytest.raises(RuntimeError, match="staging failure"):
+                    load._process_large_dataset_pipelined([ds], "croco1", {"A": {}}, "d")
+            else:
+                ncs = load._process_large_dataset_pipelined([ds], "croco1", {"A": {}}, "d")
+                assert ncs == ["out.zarr"]
+
+        assert staged[0] != staged[1]
+        assert [p.name for p in tmp_path.iterdir()] == [leftover.name]
