@@ -388,3 +388,95 @@ def test_drifter_otype_remap_keys():
     assert set(_DRIFTER_OTYPE_REMAP.keys()) == {
         "timeseries", "maps_current", "maps_trajectory"
     }
+
+
+class TestSharedOutputs:
+    """Otypes holding the same data are computed and written once."""
+
+    OTYPES = ("maps", "mvprofiles", "mdiagts", "diagdisp_sel", "uvprofiles", "udiagts")
+
+    @staticmethod
+    def _write_pair(path):
+        import numpy as np
+
+        paths = []
+        for kind in ("prod", "ref"):
+            dims = ("time", "z") + (("member",) if kind == "prod" else ())
+            shape = (2, 3) + ((4,) if kind == "prod" else ())
+            hdims = ("time",) + dims[2:]
+            hshape = (2,) + shape[2:]
+            rng = np.random.default_rng(0)
+            ds = xr.Dataset(
+                {v: (dims, rng.random(shape)) for v in ("ptemp", "sal")},
+                coords={
+                    "time": np.array(["2024-01-02", "2024-01-03"], "datetime64[ns]"),
+                    "lon": (hdims, rng.random(hshape)),
+                    "lat": (hdims, rng.random(hshape)),
+                    "depth": (dims, rng.random(shape)),
+                },
+                attrs={"data_name": kind},
+            )
+            name = f"{kind}_2024-01-01T00:00:00_2024-01-16T00:00:00_0.0-10.0.zarr"
+            ds.to_zarr(path / name)
+            paths.append(str(path / name))
+        return paths
+
+    def _run(self, files, otypes):
+        from armoor.comp.output import main_output
+
+        mparams = {"trange_seq": {"tfreq": "15D"}, "vrange": {}}
+        return main_output(
+            {"MZ": {"ARGO": {"mod": files}}},
+            {"MZ": mparams},
+            {o: {"otype": o} for o in otypes},
+            "comp_argo",
+        )
+
+    def test_same_as_unshared(self, tmp_path, monkeypatch):
+        """Linked outputs hold what would be computed for each otype alone."""
+        from pathlib import Path
+
+        files = self._write_pair(tmp_path)
+        shared_dir, alone_dir = tmp_path / "shared", tmp_path / "alone"
+        shared_dir.mkdir()
+        alone_dir.mkdir()
+        monkeypatch.chdir(shared_dir)
+        shared = self._run(files, self.OTYPES)
+        assert set(shared) == set(self.OTYPES)
+        linked = {o for o in shared if Path(shared[o]["MZ"][0]).is_symlink()}
+        assert linked == {"mdiagts", "diagdisp_sel", "udiagts"}
+        monkeypatch.chdir(alone_dir)
+        for otype in self.OTYPES:
+            alone = self._run(files, [otype])
+            assert alone[otype] == shared[otype]
+            for path in alone[otype]["MZ"]:
+                expected = xr.open_datatree(alone_dir / path, engine="zarr").load()
+                result = xr.open_datatree(shared_dir / path, engine="zarr").load()
+                assert result.identical(expected)
+
+    def test_rerun_with_other_otypes(self, tmp_path, monkeypatch):
+        """Links and stores of a previous run are replaced."""
+        from pathlib import Path
+
+        files = self._write_pair(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        first = self._run(files, ["mvprofiles", "mdiagts"])
+        second = self._run(files, ["mdiagts", "mvprofiles"])
+        assert Path(first["mvprofiles"]["MZ"][0]).is_symlink()
+        path = Path(second["mdiagts"]["MZ"][0])
+        assert path.is_dir() and not path.is_symlink()
+        assert xr.open_datatree(Path(second["mvprofiles"]["MZ"][0]), engine="zarr").children
+
+
+def test_hpc_stage_workers():
+    """The workers follow the CPUs of the job, unless set by the user."""
+    from armoor.cli.hpc import _build_stage_cmd, _ncpus
+
+    assert _ncpus({"ncpus_comp": 8, "ncpus": 2}, "comp") == 8
+    assert _ncpus({"ncpus": 2}, "comp") == 2
+    args = ("MZ", True, None, None, None)
+    cmd = _build_stage_cmd(["armoor-comp-argo", "MZ"], *args, n_workers=8)
+    assert cmd[cmd.index("--dask-nworkers") + 1] == "8"
+    cmd = _build_stage_cmd(["armoor-comp-argo", "MZ", "--dask-nworkers", "2"], *args, n_workers=8)
+    assert cmd.count("--dask-nworkers") == 1 and "8" not in cmd
+    assert "--dask-nworkers" not in _build_stage_cmd(["armoor-comp-argo", "MZ"], *args)

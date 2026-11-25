@@ -170,6 +170,8 @@ def run_hpc(
                 input_json=None,
                 output_json=output_json,
                 input_zarrs=extra_zarrs,
+                # Mostly waiting for I/O: never less than the default (4)
+                n_workers=max(4, _ncpus(hpc_cfg, stage1_label)) if is_hpc else None,
             )
             script = _write_script(
                 subdir, cmd, workdir=workdir, mem=_mem(hpc_cfg, stage1_label, scheduler)
@@ -415,7 +417,14 @@ def _redirect_log_file_to_devnull(argv):
 
 
 def _build_stage_cmd(
-    original_argv, mz, no_plot, plot_only, input_json, output_json, input_zarrs=None
+    original_argv,
+    mz,
+    no_plot,
+    plot_only,
+    input_json,
+    output_json,
+    input_zarrs=None,
+    n_workers=None,
 ):
     """Reconstruct the CLI command for a sub-job.
 
@@ -428,6 +437,8 @@ def _build_stage_cmd(
     input_json : Path|None
     output_json : Path|None
     input_zarrs : str|None — comma-separated JSON paths for Wave 1 (--input-zarrs)
+    n_workers : int|None — --dask-nworkers, unless already set by the user
+        (should match the CPUs allocated to the job)
 
     Returns
     -------
@@ -490,6 +501,10 @@ def _build_stage_cmd(
         argv.extend(["--input-json", str(input_json)])
     if input_zarrs is not None:
         argv.extend(["--input-zarrs", input_zarrs])
+    if n_workers is not None and not any(
+        arg.split("=")[0] == "--dask-nworkers" for arg in argv if isinstance(arg, str)
+    ):
+        argv.extend(["--dask-nworkers", str(n_workers)])
 
     _redirect_log_file_to_devnull(argv)
     return argv
@@ -685,16 +700,22 @@ def _finalize(merged_json, jsonfile, cfgfile, ini_schema, png_paths=None):
 # ---------------------------------------------------------------------------
 
 
+def _ncpus(hpc_cfg, stage):
+    """Return the number of CPUs of a stage.
+
+    Priority: user stage-specific > user general > default stage-specific >
+    default general.
+    """
+    key = f"ncpus_{stage}"
+    return hpc_cfg.get(key, hpc_cfg.get("ncpus", HPC_DEFAULTS.get(key, HPC_DEFAULTS["ncpus"])))
+
+
 def _opts(hpc_cfg, stage, name, host=None, subdir=None):
     """Build the woom opts dict for a job."""
     time_key = f"time_{stage}"
     walltime = hpc_cfg.get(time_key, HPC_DEFAULTS.get(time_key, "01:00:00"))
     queue_generic = hpc_cfg.get("queue", HPC_DEFAULTS["queue"])
-    ncpus_key = f"ncpus_{stage}"
-    # Priority: user stage-specific > user general > default stage-specific > default general
-    ncpus = hpc_cfg.get(
-        ncpus_key, hpc_cfg.get("ncpus", HPC_DEFAULTS.get(ncpus_key, HPC_DEFAULTS["ncpus"]))
-    )
+    ncpus = _ncpus(hpc_cfg, stage)
     queue = host.get_queue(queue_generic) if host is not None else queue_generic
     opts = {
         "name": f"armoor_{stage}_{name}",

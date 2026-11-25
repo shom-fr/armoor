@@ -584,6 +584,9 @@ def write_datatree_to_zarr(dt: xr.DataTree, path) -> None:
     path : str or Path
         Output store, overwritten if it exists.
     """
+    if os.path.islink(path):
+        # Link to another output of a previous run, which must not be modified
+        os.unlink(path)
     dt.to_zarr(path, mode="w", encoding=get_zarr_encoding(dt), consolidated=False)
     zarr.consolidate_metadata(str(path))
 

@@ -1,6 +1,7 @@
 import gc
 import itertools
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Dict, List, Any, Tuple
@@ -19,7 +20,7 @@ from armoor.io import (
 )
 from armoor.ranges import PERIOD_DIM
 from armoor.comp import GROUP_SUFFIX
-from armoor.comp.comparison import get_comparison
+from armoor.comp.comparison import Comparison, get_comparison
 from armoor.comp.stats import StatsComp
 from armoor.data.load import StagedDataset
 import armoor  # noqa: F401 — registers all xarray accessors
@@ -34,6 +35,8 @@ DATA_TYPES = ("prod", "ref", "comp")
 # dataset, which would otherwise be concatenated and kept in memory for every
 # product (time x z x member, ~60 GB per product on a comp_argo run).
 MEMBER_AVERAGED_DATA_OTYPES = ("timeseries",)
+# Otypes made of one entry per profile, with the closest member.
+PROFILE_OTYPES = ("uvprofiles", "udiagts")
 EPOCH = "1950-01-01"
 
 # Re-exported for backward compatibility (still imported directly by tests).
@@ -293,6 +296,41 @@ def concat_then_merge(datasets, dim="time"):
         concat_groups = dominant + renamed_minor
 
     return xr.merge(concat_groups, combine_attrs="override")
+
+
+def _link_output(path, source, output):
+    """Link an output file of the otype `source` in the directory of `output`.
+
+    Parameters
+    ----------
+    path : str
+        ``<comp>/output/<metazone>/<ref>/<source>/<sort_key>/<name>.zarr``.
+    source, output : str
+        Existing and new otypes.
+
+    Returns
+    -------
+    str
+        Path of the link, or `path` if the link cannot be created.
+    """
+    path = Path(path)
+    parts = list(path.parts)
+    index = len(parts) - 3
+    if index < 0 or parts[index] != source:
+        return str(path)
+    parts[index] = output
+    link = Path(*parts)
+    try:
+        link.parent.mkdir(parents=True, exist_ok=True)
+        if link.is_symlink() or link.is_file():
+            link.unlink()
+        elif link.is_dir():
+            shutil.rmtree(link)  # from a previous run
+        link.symlink_to(os.path.relpath(path, link.parent), target_is_directory=True)
+    except OSError as exc:
+        logger.warning(f"Cannot link {link} ({exc}), using {path}")
+        return str(path)
+    return str(link)
 
 
 class OutputProcessor:
@@ -588,7 +626,7 @@ class OutputProcessor:
                 # signature) alongside the real vertical-profile file --
                 # uvprofiles/udiagts only plot the latter, and mixing the
                 # two would misalign the "data"/"closest" bin lists below.
-                if output in ("uvprofiles", "udiagts") and "z" not in ds_ref.dims:
+                if output in PROFILE_OTYPES and "z" not in ds_ref.dims:
                     continue
 
                 # uvprofiles/udiagts need one entry per real profile, but
@@ -598,7 +636,7 @@ class OutputProcessor:
                 # same coloc file. Split those apart here, scoped to just
                 # these two otypes, instead of hardening the shared coloc
                 # stage for everyone.
-                if output in ("uvprofiles", "udiagts") and ds_ref.sizes.get("time", 1) > 1:
+                if output in PROFILE_OTYPES and ds_ref.sizes.get("time", 1) > 1:
                     pairs = [
                         (ds_prod.isel(time=[it]), ds_ref.isel(time=[it]))
                         for it in range(ds_ref.sizes["time"])
@@ -639,11 +677,7 @@ class OutputProcessor:
         # udiagts read a single representative profile instead of the
         # ensemble mean/std.
         closest_ds = None
-        if (
-            output in ("uvprofiles", "udiagts")
-            and "member" in ds_prod.dims
-            and "depth" in ds_prod.variables
-        ):
+        if output in PROFILE_OTYPES and "member" in ds_prod.dims and "depth" in ds_prod.variables:
             # Colocation runs once per metazone and is shared by every
             # otype, so a sort_key bucket here can also hold the mld-only
             # file (no "z"/"depth", split apart upstream by dims signature)
@@ -707,7 +741,7 @@ class OutputProcessor:
                 concatenated_dataset = self._concatenate_time_datasets(datasets)
             elif len(datasets) == 1:
                 concatenated_dataset = datasets[0]
-            elif output in ("uvprofiles", "udiagts", "sections"):
+            elif output in (*PROFILE_OTYPES, "sections"):
                 # No fusion requested: keep one dataset per dims-signature
                 # group sharing this sort_key (e.g. sections always splits
                 # a "mld"-only group -- no "z" dim -- from the depth-
@@ -991,6 +1025,70 @@ class OutputPipelineManager:
 
         return filtered_results
 
+    def _sharing_key(self, output_config: List[Dict[str, Any]]):
+        """Return a key equal for the outputs holding the same data, or None.
+
+        Several otypes only differ by their plots (e.g. mvprofiles, mdiagts
+        and diagdisp_sel, or uvprofiles and udiagts). None means that the
+        output cannot share its data.
+        """
+        if type(self.comparison).compute_comparison is not Comparison.compute_comparison:
+            return None  # the data may depend on the otype
+        metazone, output, _, _ = self.processor._parse_configuration(output_config)
+        params = {
+            key: value
+            for key, value in self.comparison.outputs_params[output].items()
+            if key not in ("mparams_pro", "mparams_con")
+        }
+        return (
+            metazone,
+            repr(sorted(params.items())),
+            output in PROFILE_OTYPES,
+            output in MEMBER_AVERAGED_DATA_OTYPES,
+            output == "sections",
+        )
+
+    def _group_configurations(self, output_configs):
+        """Group the configurations of the outputs holding the same data."""
+        groups = defaultdict(list)
+        for i, config in enumerate(output_configs):
+            key = self._sharing_key(config)
+            groups[i if key is None else key].append(config)
+        return list(groups.values())
+
+    def process_group(self, group: List[List[Dict[str, Any]]]) -> Dict[str, Dict[str, List[str]]]:
+        """Process outputs holding the same data: compute once, then link.
+
+        Parameters
+        ----------
+        group
+            Output configurations, see `_group_configurations`
+
+        Returns
+        -------
+        Dictionary with only non-empty results, for all the outputs
+        """
+        # Compatibility with the metazone depends on the otype
+        configs = {}
+        for config in group:
+            metazone, output, mparams, oparams = self.processor._parse_configuration(config)
+            if output not in configs and self.processor._validate_output_compatibility(
+                oparams, mparams, metazone, output
+            ):
+                configs[output] = config
+        if not configs:
+            return {}
+        (source, config), *others = configs.items()
+        results = self.process_and_extract(config)
+        if source in results:
+            for output, _ in others:
+                logger.info(f"{output} holds the same data as {source}: linking its files")
+                results[output] = {
+                    metazone: [_link_output(path, source, output) for path in paths]
+                    for metazone, paths in results[source].items()
+                }
+        return results
+
     def process_all_outputs(
         self, ncs: Dict[str, Any], metazones_in: Dict[str, Any], outputs: Dict[str, Any], **kwargs
     ) -> Dict[str, Dict[str, List[str]]]:
@@ -1022,7 +1120,8 @@ class OutputPipelineManager:
         output_configs = self._prepare_output_configurations(ncs, metazones_in, outputs, **kwargs)
         # Create delayed tasks for parallel processing
         delayed_tasks = [
-            dask.delayed(self.process_and_extract)(config) for config in output_configs
+            dask.delayed(self.process_group)(group)
+            for group in self._group_configurations(output_configs)
         ]
 
         # Execute all tasks in parallel
