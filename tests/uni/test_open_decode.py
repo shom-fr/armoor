@@ -6,6 +6,7 @@ open_decode_* functions with sample data files stored in the library's
 test data directory.
 """
 
+import dask.array as da
 import pytest
 import xarray as xr
 import numpy as np
@@ -21,6 +22,8 @@ from armoor.data.open_decode import (
     open_decode_arpege_insta,
     open_decode_sst_satellite,
     open_decode_alti_satellite,
+    _broadcast_depth_lazily,
+    _combine_model_files,
     open_decode_cmems_model,
     open_decode_hycom,
     open_decode_woa18,
@@ -318,6 +321,57 @@ class TestOpenDecodeCmemsModel:
             # Depth should be reset to coords
             assert 'depth' in result.coords
             assert len(result.depth.dims) == 4
+
+    def test_combine_does_not_read_the_data(self):
+        """Files split by variable and by time are combined lazily."""
+        def forbidden(*args, **kwargs):
+            raise AssertionError("data has been computed")
+
+        def make(name, start):
+            data = da.map_blocks(forbidden, chunks=((1, 1), (3,), (4,), (5,)), dtype="f4",
+                                 meta=np.empty((0,) * 4, "f4"))
+            lat, lon = np.meshgrid(np.arange(4.0), np.arange(5.0), indexing="ij")
+            return xr.Dataset(
+                {name: (("time", "z", "y", "x"), data)},
+                coords={
+                    "time": np.datetime64(start, "ns") + np.arange(2) * np.timedelta64(1, "D"),
+                    "depth": ("z", np.array([0.0, 10.0, 50.0])),
+                    "lon": (("y", "x"), lon),
+                    "lat": (("y", "x"), lat),
+                },
+            )
+
+        # unsorted, "sal" missing over the second period
+        ds = _combine_model_files(
+            [make("ptemp", "2024-01-03"), make("ptemp", "2024-01-01"), make("sal", "2024-01-01")]
+        )
+        ds = _broadcast_depth_lazily(ds)
+        assert dict(ds.sizes) == {"time": 4, "z": 3, "y": 4, "x": 5}
+        assert ds.get_index("time").is_monotonic_increasing
+        assert ds["depth"].dims == ds["ptemp"].dims
+        assert isinstance(ds["depth"].data, da.Array)
+        np.testing.assert_array_equal(ds["depth"][2, :, 1, 1], [0, 10, 50])
+        assert ds["sal"].sizes["time"] == 4
+
+    def test_combine_values_and_duplicates(self):
+        """Values follow their date, the first one wins when duplicated."""
+        def make(days, offset):
+            return xr.Dataset(
+                {"ssh": (("time", "x"), da.from_array(np.add.outer(np.array(days) + offset, [0.0, 0.5])))},
+                coords={"time": np.datetime64("2024-01-01", "ns") + np.array(days) * np.timedelta64(1, "D")},
+            )
+
+        ds = _combine_model_files([make([1, 2], 100), make([0, 1], 0)])
+        np.testing.assert_array_equal(ds["ssh"][:, 0], [0, 1, 102])
+
+    def test_combine_rejects_different_grids(self):
+        """Files on different grids must not be silently merged."""
+        def make(shift):
+            return xr.Dataset(coords={"lon": (("y", "x"), np.ones((2, 2)) * shift)})
+
+        with pytest.raises(ArmoorError, match="same grid"):
+            _combine_model_files([make(0.0), make(1.0)])
+
 
 
 # ============================================================================

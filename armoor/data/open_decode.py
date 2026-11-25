@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List
 
 import time
+import dask.array as dsa
 import gsw
 import numpy as np
 import pandas as pd
@@ -1027,6 +1028,125 @@ def open_decode_alti_satellite(path_files, fmt):
     return ds
 
 
+def _combine_model_files(dss):
+    """Combine decoded model files without reading their data.
+
+    The files may be split along time, by variable, or both. Each variable is
+    concatenated along time, then the variables are merged. Unlike
+    ``xr.merge(dss, compat="no_conflicts")``, files are neither reindexed on
+    the full time axis nor compared value by value: that loads the whole
+    dataset in memory.
+
+    Parameters
+    ----------
+    dss : list of xarray.Dataset
+        Datasets sharing the same horizontal grid.
+
+    Returns
+    -------
+    xarray.Dataset
+        Combined dataset. If a variable is given several times at the same
+        date, only the first occurrence is kept.
+
+    Raises
+    ------
+    ArmoorError
+        If the files are not all on the same horizontal grid.
+    """
+
+    def grid_edges(da2d):
+        """Return the border values, enough to identify a grid at low cost."""
+        a = np.atleast_2d(da2d.values)
+        return np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
+
+    for ds in dss[1:]:
+        for name in ("lon", "lat"):
+            if name not in ds.coords or name not in dss[0].coords:
+                continue
+            a, b = dss[0][name], ds[name]
+            if a.shape != b.shape or not np.allclose(
+                grid_edges(a), grid_edges(b), atol=1e-4, rtol=0, equal_nan=True
+            ):
+                raise ArmoorError(f"Model files are not on the same grid: {name} differs")
+
+    pieces = {}
+    static_coords = {}
+    for ds in dss:
+        if "time" in ds.coords and ds["time"].ndim == 0 and "bathy" not in ds:
+            ds = ds.expand_dims("time")
+        timed_coords = [
+            name for name in ds.coords if "time" in ds[name].dims and name not in ds.dims
+        ]
+        for name in ds.coords:
+            if "time" not in ds[name].dims:
+                static_coords.setdefault(name, ds[name].variable)
+        for name in [*ds.data_vars, *timed_coords]:
+            # Only the index coordinates are kept, the others are set back below
+            piece = ds[name].reset_coords(drop=True).to_dataset(name=name)
+            pieces.setdefault(name, []).append(piece)
+
+    coord_names = {name for ds in dss for name in ds.coords}
+    combined = []
+    for name, parts in pieces.items():
+        # A size-0 time axis brings nothing, and has no first date to sort on
+        timed = [part for part in parts if part.sizes.get("time", 0)]
+        if not timed:
+            combined.append(parts[0])
+            continue
+        timed.sort(key=lambda part: part["time"].values[0])
+        ds = timed[0]
+        if len(timed) > 1:
+            ds = xr.concat(
+                timed,
+                dim="time",
+                data_vars="minimal",
+                coords="minimal",
+                compat="override",
+                join="exact",
+                combine_attrs="override",
+            )
+        index = ds.get_index("time")
+        duplicated = index.duplicated()
+        if duplicated.any():
+            logger.warning(
+                f"{name}: {int(duplicated.sum())} duplicated date(s) in the model files, "
+                "keeping the first occurrence"
+            )
+            ds = ds.isel(time=np.flatnonzero(~duplicated))
+        if not ds.get_index("time").is_monotonic_increasing:
+            ds = ds.sortby("time")
+        combined.append(ds)
+
+    ds = xr.merge(combined, join="outer", compat="override", combine_attrs="override")
+    ds = ds.assign_coords(static_coords)
+    ds = ds.set_coords([name for name in coord_names if name in ds.data_vars])
+    ds.attrs = dict(dss[0].attrs)
+    return ds
+
+
+def _broadcast_depth_lazily(ds):
+    """Broadcast a 1D depth coordinate to 4D as a dask array.
+
+    The chunks are those of the first 4D variable. A numpy broadcast would be
+    materialized by the first operation that copies or hashes it (about 650 GB
+    for one year of daily global 1/12 degree data).
+    """
+    if "depth" not in ds.coords or ds["depth"].ndim != 1:
+        return ds
+    zdim = ds["depth"].dims[0]
+    refs = [var for var in ds.data_vars.values() if var.ndim == 4 and zdim in var.dims]
+    if not refs:
+        return ds
+    ref = refs[0]
+    if ref.chunks is None:
+        return ds.assign_coords(depth=ds["depth"].broadcast_like(ref))
+    iz = ref.dims.index(zdim)
+    depth = dsa.from_array(ds["depth"].values, chunks=(ref.chunks[iz],))
+    depth = depth.reshape([-1 if i == iz else 1 for i in range(ref.ndim)])
+    depth = dsa.broadcast_to(depth, ref.shape, chunks=ref.chunks)
+    return ds.assign_coords(depth=(ref.dims, depth, ds["depth"].attrs))
+
+
 def open_decode_cmems_model(path_files):
     """
     Open CMEMS netcdf file(s) and store it into a ready-to-use dataset.
@@ -1043,7 +1163,7 @@ def open_decode_cmems_model(path_files):
     """
 
     def preprocess_cmems_model(ds):
-        """Decode CF specs, rename dims to x/y/z and broadcast lon/lat/depth."""
+        """Decode CF specs, rename dims to x/y/z and broadcast lon/lat."""
         ds = cfspecs.decode(ds)
         if "bathy" in ds.data_vars:
             ds = ds[["bathy"]]
@@ -1056,10 +1176,6 @@ def open_decode_cmems_model(path_files):
             ds["lon"] = lon
             ds["lat"] = lat
             ds = ds.set_coords(["lon", "lat"])
-        if "depth" in ds.coords and len(ds.depth.dims) == 1:
-            ref_vars = [v for v in ds.data_vars if len(ds[v].dims) == 4]
-            if ref_vars:
-                ds = ds.assign_coords(depth=ds["depth"].broadcast_like(ds[ref_vars[0]]))
         return ds
 
     # Open
@@ -1093,10 +1209,12 @@ def open_decode_cmems_model(path_files):
     if n_files == 1:
         ds = _processed[0]
     else:
-        ds = xr.merge(_processed, compat="no_conflicts")
+        ds = _combine_model_files(_processed)
     if "depth" in ds.data_vars:
         ds = ds.set_coords("depth")
-    return ds
+    # Only once the files are combined: done per file, the 4D depth would be
+    # held in memory as soon as the time axes have to be aligned.
+    return _broadcast_depth_lazily(ds)
 
 
 def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
@@ -1310,6 +1428,8 @@ def open_decode_sloop(path_files):
     n_files = len(sorted_paths)
     open_kw = dict(
         engine="netcdf4",
+        chunks={"time": 30},
+        cache=False,
         decode_times=True,
         decode_coords=True,
         decode_cf=True,
@@ -1325,14 +1445,9 @@ def open_decode_sloop(path_files):
             ds = ds.swap_dims({"X": "x"})
         if "depth" in ds.dims:
             ds = ds.swap_dims({"depth": "z"})
-        if "depth" in ds.coords and len(ds.depth.dims) == 1:
-            ref_vars = [v for v in ds.data_vars if len(ds[v].dims) == 4]
-            if ref_vars:
-                ds = ds.assign_coords(depth=ds["depth"].broadcast_like(ds[ref_vars[0]]))
         _processed.append(ds)
-    if n_files == 1:
-        return _processed[0]
-    return xr.merge(_processed)
+    ds = _processed[0] if n_files == 1 else _combine_model_files(_processed)
+    return _broadcast_depth_lazily(ds)
 
 
 def open_decode_woa18(path_files):
