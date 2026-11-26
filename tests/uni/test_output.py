@@ -335,7 +335,7 @@ class TestConcatenateDatasets:
 
 def test_compute_diags():
     processor = dataOutputProcessor()
-    ds = xr.Dataset({"vmax_area": ("obs", [np.pi])})
+    ds = xr.Dataset({"vmax_area": ("obs", [np.pi], {'units':'m2'})})
     ds = processor._compute_diags(ds, "netcdf")
 
     assert "vmax_radius" in ds

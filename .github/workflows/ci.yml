@@ -42,7 +42,7 @@ jobs:
         shell: bash -l {0}
         run: pip install .
 
-      - name: Force cartopy's Natural Earth shapefile download
+      - name: Force cartopys Natural Earth shapefile download
         shell: bash -l {0}
         run: python -c "import cartopy.feature as cfeature; list(cfeature.LAND.geometries())"
 

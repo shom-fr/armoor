@@ -23,8 +23,6 @@ import xoa.geo as xgeo
 import xoa.sigma as xsigma
 from xoa.grid import dz2depth, shift
 
-from shoot.eddies.eddies2d import EDDY_VAR_ATTRS
-
 from armoor import ROOTDIR, ArmoorError
 
 logger = logging.getLogger(__name__)
@@ -778,7 +776,8 @@ class EddyPetDecoder(Decoder):
         """
         logger.info("Opening/decoding py-eddy-tracker eddy detection netcdf")
         ds = open_decode_eddy_pet(path_files)
-        return _eddy_dataset_set_attrs(ds)
+        cfspecs = xmeta.get_meta_specs("eddies")
+        return cfspecs.fill_attrs(ds)
 
 
 class EddySacsoDecoder(Decoder):
@@ -806,7 +805,8 @@ class EddySacsoDecoder(Decoder):
         """
         logger.info("Opening/decoding sacso eddy detection text file")
         ds = open_decode_eddy_sacso(path_files)
-        return _eddy_dataset_set_attrs(ds)
+        cfspecs = xmeta.get_meta_specs("eddies")
+        return cfspecs.fill_attrs(ds)
 
 
 class EddyShootDecoder(Decoder):
@@ -834,7 +834,8 @@ class EddyShootDecoder(Decoder):
         """
         logger.info("Opening/decoding shoot eddy detection netcdf")
         ds = open_decode_eddy_shoot(path_files)
-        return _eddy_dataset_set_attrs(ds)
+        cfspecs = xmeta.get_meta_specs("eddies")
+        return cfspecs.fill_attrs(ds)
 
 
 def get_decoder(fmt) -> Decoder:
@@ -2673,24 +2674,41 @@ def open_decode_cora(path_files):
     return cora
 
 
-def _eddy_dataset_set_attrs(ds: xr.Dataset):
+def _check_units_from_cfspecs(ds):
     """
-    Sets attributes for eddy variables, taking SHOOT attributes as reference.
+    Check if units from dataset attributes correspond to those expected in cfspecs.
+    If not, values are modified accordingly and units attribute is changed.
 
     Parameters
     ----------
     ds : xarray.Dataset
-        Dataset from open_decode_[eddy-type] function.
+        Dataset whose variables units will be compared to cfspecs ones
 
     Returns
     -------
     xarray.Dataset
-        Dataset
-    """
-    for var in ds.data_vars:
-        if var in EDDY_VAR_ATTRS.keys():
-            ds[var] = ds[var].assign_attrs(EDDY_VAR_ATTRS[var])
 
+    """
+    cfspecs = xmeta.get_meta_specs("eddies")
+    for var in ds.data_vars:
+        if var == 'vmax_area':
+            # SACSO defines surfaces in km2
+            # vmax_area units must correspond to vmax_radius ones in cfspecs
+            units = cfspecs.dict['data_vars']['vmax_radius']['attrs']['units'][0]
+            if units == 'm':
+                new = ds['vmax_area'] * 1e6  # surfaces converted to m2
+                ds['vmax_area'] = new.assign_attrs({'units': 'm2'})
+            else:
+                pass
+        if 'units' in ds[var].attrs and var in cfspecs.dict['data_vars']:
+            cf_units = cfspecs.dict['data_vars'][var]['attrs']['units'][0]
+            pet_units = ds[var].attrs['units']
+            if (pet_units == 'm' or pet_units == 'km') and pet_units != cf_units:
+                if cf_units == 'm':  # PET is in km instead of m
+                    new = ds[var] * 1e3
+                else:  # PET is in m instead of km
+                    new = ds[var] / 1e3
+                ds[var] = new.assign_attrs({'units': cf_units})
     return ds
 
 
@@ -2718,25 +2736,29 @@ def open_decode_eddy_pet(path_files):
 
         datasets = []
         for ds_type, ds in ds_list.items():
-            ds['eddy_type'] = xr.DataArray(data=[ds_type] * ds.obs.shape[0], dims=['obs'])
-            datasets.append(
-                ds.rename(
-                    {
-                        # All PET variables defined in SHOOT are renamed, attrs are preserved
-                        # Other variables remain unchanged
-                        'NbSample': 'nb_sample',
-                        'longitude': 'x_cen',
-                        'latitude': 'y_cen',
-                        'effective_radius': 'eff_radius',
-                        'effective_contour_longitude': 'x_eff_contour',
-                        'effective_contour_latitude': 'y_eff_contour',
-                        'speed_radius': 'vmax_radius',
-                        'speed_contour_longitude': 'x_vmax_contour',
-                        'speed_contour_latitude': 'y_vmax_contour',
-                        'speed_average': 'vmax',
-                    }
-                )
+            ds = ds.rename(
+                {
+                    # All PET variables defined in SHOOT are renamed, attrs are preserved
+                    # Other variables remain unchanged
+                    'NbSample': 'nb_sample',
+                    'longitude': 'x_cen',
+                    'latitude': 'y_cen',
+                    'effective_radius': 'eff_radius',
+                    'effective_contour_longitude': 'x_eff_contour',
+                    'effective_contour_latitude': 'y_eff_contour',
+                    'speed_radius': 'vmax_radius',
+                    'speed_contour_longitude': 'x_vmax_contour',
+                    'speed_contour_latitude': 'y_vmax_contour',
+                    'speed_average': 'vmax',
+                }
             )
+            ds['eddy_type'] = xr.DataArray(data=[ds_type] * ds.obs.shape[0], dims=['obs'])
+
+            # Check if PET units are those expected in eddies cfspecs
+            # If not, adapt PET values
+            ds = _check_units_from_cfspecs(ds)
+
+            datasets.append(ds)
 
         da = xr.concat(datasets, dim="obs")
 
@@ -2858,12 +2880,17 @@ def open_decode_eddy_sacso(path_files):
                 "b_ell": (["obs"], np.array(b_ell)),
                 "angle_ell": (["obs"], np.array(angle_ell)),
             },
-            coords={"nb_sample": np.arange(max_length)},
         ).assign_coords(time=("obs", np.array(dates)))
+
         ds["time"].encoding = {
             "units": "nanoseconds since 1970-01-01",
             "dtype": "float64",
         }
+
+        # Check if SACSO units are those expected in eddies cfspecs
+        # If not, adapt SACSO values
+        ds = _check_units_from_cfspecs(ds)
+
         return ds
 
 

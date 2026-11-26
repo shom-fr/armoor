@@ -219,6 +219,8 @@ Workflow
     2. Interpolate/organize data in time and space if necessary, cleanup unecessary variables --> Zarr files stored at ``./data/interp/{metazone.name}/{data.name}/``.
     3. Compute outputs --> Zarr files stored at ``./data/output/{metazone.name}/{data.name}/{otype}/``.
     4. (if png format is given) Plots --> png files stored at ``./data/plot/{metazone.name}/``.
+    
+Note that for eddy-type datasets, open/decode also sets attributes to eddy variables with SHOOT *(v2026.11)* attributes as reference.
 
 Pipeline control
 -----------------

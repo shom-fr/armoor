@@ -68,9 +68,16 @@ def area2radius(ds: xr.Dataset) -> xr.Dataset:
         Dataset extended with a new vmax_radius variable.
     """
     vmax_area = ds.vmax_area
+    units = vmax_area.attrs['units']
+    if units == 'km2':
+        units = 'km'
+    if units == 'm2':
+        units = 'm'
+    else:
+        units = f'sqrt({units})'
     vmax_radius = np.sqrt(vmax_area / np.pi)
     ds['vmax_radius'] = vmax_radius.assign_attrs(
-        {'comment': 'Radius of the vmax contour from vmax_area', 'units': 'km'}
+        {'comment': 'Radius of the vmax contour from vmax_area', 'units': units}
     )
     return ds
 
@@ -90,9 +97,16 @@ def radius2area(ds: xr.Dataset) -> xr.Dataset:
         Dataset extended with a new vmax_area variable.
     """
     vmax_radius = ds.vmax_radius
+    units = vmax_radius.attrs['units']
+    if units == 'km':
+        units = 'km2'
+    if units == 'm':
+        units = 'm2'
+    else:
+        units = f'({units})**2'
     vmax_area = np.pi * vmax_radius**2
     ds['vmax_area'] = vmax_area.assign_attrs(
-        {'comment': 'Area of the vmax contour approx. from vmax_radius', 'units': 'km2'}
+        {'comment': 'Area of the vmax contour approx. from vmax_radius', 'units': units}
     )
     return ds
 

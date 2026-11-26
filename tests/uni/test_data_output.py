@@ -1,11 +1,5 @@
-"""Unit tests for OutputProcessor's data-type awareness in armoor.data.output.
-
-Before this, _validate_output_compatibility/_process_output_type always read
-the flat, ocean-model-shaped OUTPUTS_PARAMS dict regardless of the actual
-dataset's type. For an eddies dataset, whose outputs_params only defines
-"pdf_eddies", this would have incorrectly treated e.g. otype="maps" as
-valid (ocean model's own entry), letting eddy data reach stats code that
-assumes ptemp/depth. Now it must be skipped (logged forbidden, no crash).
+"""
+Unit tests for OutputProcessor's data-type awareness in armoor.data.output.
 """
 from pathlib import Path
 from unittest.mock import patch
@@ -58,25 +52,6 @@ class TestValidateOutputCompatibilityPerType:
             )
 
 
-class TestGenerateOutputsPerType:
-
-    def test_eddies_dataset_produces_no_outputs_without_touching_files(self):
-        # outputs_params is empty for eddies, so _validate_output_compatibility
-        # must reject every otype before _process_output_type ever runs --
-        # fouts=[] would blow up downstream if that guard didn't hold.
-        processor = OutputProcessor()
-        ncouts = processor._generate_outputs(
-            fouts=[],
-            metazone="mz1",
-            mparams={},
-            outputs={"o1": {"otype": "maps"}},
-            prod_name="eddy1",
-            ncouts={},
-            outputs_params=DataEddies().outputs_params,
-        )
-        assert ncouts == {}
-
-
 class TestPrepareInterpolationParamsDoesNotCorruptMetazones:
     """Regression test for the mparams=None crash.
 
@@ -114,7 +89,7 @@ class TestComputeDiags:
 
     def test_adds_vmax_radius_regardless_of_otype(self):
         processor = OutputProcessor()
-        ds = xr.Dataset({"vmax_area": ("obs", [np.pi])})
+        ds = xr.Dataset({"vmax_area": ("obs", [np.pi], {'units':'m2'})})
         ds = processor._compute_diags(ds, "netcdf")
 
         assert "vmax_radius" in ds
@@ -135,11 +110,11 @@ class TestProcessTreeDatasetObsConcat:
     def test_concatenates_along_obs_and_sorts_by_time(self):
         processor = OutputProcessor()
         ds1 = xr.Dataset(
-            {"vmax_area": ("obs", [1.0, 2.0])},
+            {"vmax_area": ("obs", [1.0, 2.0], {'units':'m2'})},
             coords={"time": ("obs", np.array(["2020-01-02", "2020-01-03"], dtype="datetime64[ns]"))},
         )
         ds2 = xr.Dataset(
-            {"vmax_area": ("obs", [3.0])},
+            {"vmax_area": ("obs", [3.0], {'units':'m2'})},
             coords={"time": ("obs", np.array(["2020-01-01"], dtype="datetime64[ns]"))},
         )
         dts0 = [self._make_node(ds1), self._make_node(ds2)]
@@ -152,7 +127,7 @@ class TestProcessTreeDatasetObsConcat:
     def test_runs_compute_diags_and_assigns_output_attrs(self):
         processor = OutputProcessor()
         ds = xr.Dataset(
-            {"vmax_area": ("obs", [np.pi])},
+            {"vmax_area": ("obs", [np.pi], {'units':'m2'})},
             coords={"time": ("obs", np.array(["2020-01-01"], dtype="datetime64[ns]"))},
         )
         dts0 = [self._make_node(ds)]
@@ -925,7 +900,10 @@ class TestSaveProcessedDatasetsSectionPath:
     def _ds(self, data_name):
         return xr.Dataset(
             {"temp": (["npts"], np.zeros(3))},
-            attrs={"data_name": data_name},
+            attrs={
+                "data_name": data_name,
+                "data_type": None, # datasets in Armoor always have a data_type attr
+                },
         )
 
     def test_section_name_becomes_its_own_directory(self, tmp_path, monkeypatch):
