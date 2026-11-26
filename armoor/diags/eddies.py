@@ -68,9 +68,45 @@ def area2radius(ds: xr.Dataset) -> xr.Dataset:
         Dataset extended with a new vmax_radius variable.
     """
     vmax_area = ds.vmax_area
+    units = vmax_area.attrs['units']
+    if units == 'km2':
+        units = 'km'
+    if units == 'm2':
+        units = 'm'
+    else:
+        units = f'sqrt({units})'
     vmax_radius = np.sqrt(vmax_area / np.pi)
     ds['vmax_radius'] = vmax_radius.assign_attrs(
-        {'comment': 'Radius of the vmax contour from vmax_area', 'units': 'km'}
+        {'comment': 'Radius of the vmax contour from vmax_area', 'units': units}
+    )
+    return ds
+
+
+def radius2area(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Compute the approximated area enclosed by the eddy vmax contour from the radius.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset
+        Dataset with vmax_radius variable.
+
+    Returns
+    -------
+    xarray.Dataset
+        Dataset extended with a new vmax_area variable.
+    """
+    vmax_radius = ds.vmax_radius
+    units = vmax_radius.attrs['units']
+    if units == 'km':
+        units = 'km2'
+    if units == 'm':
+        units = 'm2'
+    else:
+        units = f'({units})**2'
+    vmax_area = np.pi * vmax_radius**2
+    ds['vmax_area'] = vmax_area.assign_attrs(
+        {'comment': 'Area of the vmax contour approx. from vmax_radius', 'units': units}
     )
     return ds
 
@@ -78,7 +114,7 @@ def area2radius(ds: xr.Dataset) -> xr.Dataset:
 def compute_vars(ds: xr.Dataset) -> xr.Dataset:
     """Add any derivable eddy diagnostic variables missing from `ds`.
 
-    A no-op for non-eddy datasets (checks for `vmax_area` presence).
+    A no-op for non-eddy datasets.
 
     Parameters
     ----------
@@ -88,9 +124,10 @@ def compute_vars(ds: xr.Dataset) -> xr.Dataset:
     Returns
     -------
     xarray.Dataset
-        `ds`, with `vmax_radius` added if derivable and missing.
+        `ds`, with all possible derived variables.
     """
     if "vmax_area" in ds.data_vars and "vmax_radius" not in ds.data_vars:
         ds = area2radius(ds)
-
+    if "vmax_radius" in ds.data_vars and "vmax_area" not in ds.data_vars:
+        ds = radius2area(ds)
     return ds

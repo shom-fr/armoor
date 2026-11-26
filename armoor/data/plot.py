@@ -10,10 +10,13 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from tqdm import tqdm
+from functools import partial
 from matplotlib.collections import LineCollection
+from matplotlib.colors import LinearSegmentedColormap
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from xoa.plot import plot_minimap, plot_ts, plot_flow
 from xoa import geo as xgeo
+
 
 from armoor import CMAP_VARS, MINMAX_VARS
 from armoor.dispatch import SubclassingMethodRegistry
@@ -23,6 +26,9 @@ from armoor.plot import (
     format_vertical_label,
     get_output_vminmax,
     save_figure,
+    determine_figsize,
+    get_map_aspect_ratio,
+    get_intuitive_bins,
 )
 from armoor.data.datatype import (
     DataEddies,
@@ -91,7 +97,7 @@ class _PlotDataBase(SubclassingMethodRegistry):
         self.metazone = metazone
         self.ax_minimap = [0.7, 0.91, 0.19]
         self.dt = dt
-        self.vminmax = vminmax
+        self.vminmax = vminmax or {}
         self.saved_files = []
         self.__post_init__()
 
@@ -123,6 +129,7 @@ class _PlotDataBase(SubclassingMethodRegistry):
         filename.parent.mkdir(parents=True, exist_ok=True)
         save_figure(fig, filename)
         self.saved_files.append(str(filename.resolve()))
+        plt.close(fig)
         del fig
 
 
@@ -969,9 +976,7 @@ class PlotOceanModel(_PlotDataBase):
             cmin, cmax = 0, speed_mean.mean() + 1.75 * speed_mean.std()
         vmax = speed_std.mean() + 1.75 * speed_std.std()
 
-        dlat = ds_mean.lat.max() - ds_mean.lat.min()
-        dlon = ds_mean.lon.max() - ds_mean.lon.min()
-        aspect_ratio = 3 / 2 * dlat / dlon
+        aspect_ratio = get_map_aspect_ratio(ds_mean)
         fig, axes = create_subplots(
             nrows=2,
             figsize=(8 / aspect_ratio, 8),
@@ -1077,9 +1082,7 @@ class PlotOceanModel(_PlotDataBase):
             vstd = vmean + 1.75 * ds_std.std()
             vmax = vstd
 
-            dlat = ds_mean.lat.max() - ds_mean.lat.min()
-            dlon = ds_mean.lon.max() - ds_mean.lon.min()
-            aspect_ratio = 3 / 2 * dlat / dlon
+            aspect_ratio = get_map_aspect_ratio(ds_mean)
             fig, axes = create_subplots(
                 nrows=2,
                 figsize=(8 / aspect_ratio, 8),
@@ -1199,9 +1202,7 @@ class PlotOceanModel(_PlotDataBase):
                 else:
                     vmin, vmax = float(da.min()), float(da.max())
 
-                dlat = da.lat.max() - da.lat.min()
-                dlon = da.lon.max() - da.lon.min()
-                aspect_ratio = 3 / 2 * dlat / dlon
+                aspect_ratio = get_map_aspect_ratio(da)
                 fig, axes = create_subplots(
                     nrows=1,
                     figsize=(8 / aspect_ratio, 8),
@@ -1276,9 +1277,7 @@ class PlotOceanModel(_PlotDataBase):
             else:
                 vmin, vmax = float(speed.min()), float(speed.max())
 
-            dlat = u.lat.max() - u.lat.min()
-            dlon = u.lon.max() - u.lon.min()
-            aspect_ratio = 3 / 2 * dlat / dlon
+            aspect_ratio = get_map_aspect_ratio(u)
             fig, axes = create_subplots(
                 nrows=1,
                 figsize=(8 / aspect_ratio, 8),
@@ -1436,9 +1435,7 @@ class PlotOceanModel(_PlotDataBase):
             if vlevel_str:
                 date_str = f"{date_str} - {vlevel_str}" if date_str else vlevel_str
 
-            dlat = da.lat.max() - da.lat.min()
-            dlon = da.lon.max() - da.lon.min()
-            aspect_ratio = 3 / 2 * dlat / dlon
+            aspect_ratio = get_map_aspect_ratio(da)
             fig, axes = create_subplots(
                 nrows=1,
                 figsize=(8 / aspect_ratio, 8),
@@ -1549,9 +1546,7 @@ class PlotOceanModel(_PlotDataBase):
             if vlevel_str:
                 date_str = f"{date_str} - {vlevel_str}" if date_str else vlevel_str
 
-            dlat = u.lat.max() - u.lat.min()
-            dlon = u.lon.max() - u.lon.min()
-            aspect_ratio = 3 / 2 * dlat / dlon
+            aspect_ratio = get_map_aspect_ratio(u)
             fig, axes = create_subplots(
                 nrows=1,
                 figsize=(8 / aspect_ratio, 8),
@@ -1624,13 +1619,336 @@ class PlotOceanModel(_PlotDataBase):
 
 
 class PlotEddies(_PlotDataBase):
-    """Plot methods for eddy-detection tool output (contour_lat/contour_lon,
-    center_lat/center_lon, eddy_type, vmax_area -- no depth/ptemp/sal, so
-    none of PlotOceanModel's methods apply).
-
-    No methods yet -- calling any output method raises a clear ArmoorError
-    via the inherited call() dispatch until eddy plotting is designed.
     """
+    Plot methods for eddy-detection tool output (x_vmax_contour/y_vmax_contour,
+    x_cen/y_cen, eddy_type, vmax_area -- no depth/ptemp/sal, so
+    none of PlotOceanModel's methods apply).
+    """
+
+    def map_eddies(self):
+        """Plot a map of eddy contours for each timestep of a single dataset"""
+        dse = self.dt.children["data"].to_dataset()
+
+        projection = ccrs.PlateCarree()
+        resX, resY = determine_figsize(dse)
+
+        times = np.unique(dse.time)
+
+        for dt in times:
+            ds = dse.where(dse.time == dt, drop=True)
+
+            time_title, time_figname = format_time_label(ds.attrs, ds=ds)
+            title = ds.data_name + ' - ' + time_title
+
+            # Initialize figure
+            f, ax = create_subplots(nrows=1, figsize=(resX, resY), projection=projection)
+            f.suptitle(title, y=0.90)
+            # Plot each eddie
+            n_a, n_c = [0, 0]
+            for n in range(ds.obs.shape[0]):
+                eddy = ds.isel(obs=n)
+                lon = eddy.x_vmax_contour
+                lat = eddy.y_vmax_contour
+                mask = np.isfinite(lon) & np.isfinite(lat)
+
+                if eddy.eddy_type == 'cyclone':
+                    color = 'blue'
+                    label = 'cyclones'
+                    n_c += 1
+                else:
+                    color = 'red'
+                    label = 'anticyclones'
+                    n_a += 1
+                ax[0].fill(
+                    lon[mask], lat[mask], fill=False, color=color, label=label, linewidth=0.6
+                )
+                ax[0].scatter(eddy.x_cen, eddy.y_cen, marker='o', label=label, color=color, s=3)
+
+            # Only show one entry per eddy type in legend
+            handles, labels = ax[0].get_legend_handles_labels()
+            sel_handles = []
+            sel_labels = []
+            if 'anticyclones' in labels:
+                first_a = labels.index('anticyclones')
+                sel_handles.append(handles[first_a])
+                sel_labels.append(labels[first_a] + ' (' + str(n_a) + ' eddies)')
+            if 'cyclones' in labels:
+                first_c = labels.index('cyclones')
+                sel_handles.append(handles[first_c])
+                sel_labels.append(labels[first_c] + ' (' + str(n_c) + ' eddies)')
+            ax[0].legend(
+                sel_handles, sel_labels, prop={"size": "small"}, frameon=True, framealpha=1
+            )
+            ax[0].add_feature(cfeature.COASTLINE, linewidth=0.3)
+
+            figname = f"data/plot/{self.metazone}/" + f"map_{ds.data_name}{time_figname}.png"
+
+            self.save_figure(f, figname)
+
+    def _contour_presence(
+        self, ds: xr.Dataset, lat_bins: np.ndarray, lon_bins: np.ndarray
+    ) -> xr.DataArray:
+        """
+        Presence or not of eddy contours in every grid cell for a given timestep.
+
+        Values are either 1 (presence) or 0 (absence).
+        Cell size is given by 'map_boxsize' option in config file and spread to lon_bins/lat_bins.
+
+        Parameters
+        ----------
+        ds : xarray.Dataset
+            Dataset containing eddy contours coordinates
+        lat_bins : numpy.ndarray
+            Latitude bin edges
+        lon_bins : numpy.ndarray
+            Longitude bin edges
+
+        Returns
+        -------
+        xarray.DataArray
+            Binary presence mask on the 2D grid
+
+        """
+        lat = ds.y_vmax_contour.values.flatten()
+        lon = ds.x_vmax_contour.values.flatten()
+
+        mask = ~np.isnan(lat) & ~np.isnan(lon)
+        lat = lat[mask]
+        lon = lon[mask]
+
+        if len(lat) == 0:
+            return xr.DataArray(
+                np.zeros((len(lat_bins) - 1, len(lon_bins) - 1)), dims=("lat", "lon")
+            )
+
+        hist, _, _ = np.histogram2d(lat, lon, bins=[lat_bins, lon_bins])
+
+        presence = xr.DataArray((hist > 0).astype(int), dims=("lat", "lon"))
+
+        return presence
+
+    def map_occurence_eddies(self):
+        """
+        Plot a map of eddy contour occurence for a defined box size.
+        Occurence is given as the percentage of times a given cell sees an eddy contour.
+
+        Optional parameters
+        -------------------
+        map_boxsize : Cell size to compute occurence. Later spread to lon_bins/lat_bins.
+
+        """
+        dse = self.dt.children["data"].to_dataset()
+
+        time_title, time_figname = format_time_label(dse.attrs, ds=dse)
+
+        if "map_boxsize" in dse.attrs:
+            map_boxsize = float(dse.attrs['map_boxsize'])
+        else:
+            map_boxsize = 0.2
+
+        # Define grid resolution
+        lat_bins = np.arange(
+            dse.y_cen.min().values, dse.y_cen.max().values + map_boxsize, map_boxsize
+        )
+        lon_bins = np.arange(
+            dse.x_cen.min().values, dse.x_cen.max().values + map_boxsize, map_boxsize
+        )
+
+        # Split by eddy_type
+        dsa = dse.where(dse.eddy_type == 'anticyclone')
+        dsc = dse.where(dse.eddy_type == 'cyclone')
+
+        projection = ccrs.PlateCarree()
+        resX, resY = determine_figsize(dse)
+        main_title = (
+            f'Time fraction spent within the maximum speed contour by each pixel of {map_boxsize}°'
+        )
+        # Source - https://stackoverflow.com/questions/67605719/displaying-lowest-values-as-white#comment119506380_67608399
+        cmap = LinearSegmentedColormap.from_list('', ['white', *plt.cm.RdPu(np.arange(255))])
+
+        datasets = {
+            "All_eddies": dse,
+            "Anticyclones": dsa,
+            "Cyclones": dsc,
+        }
+
+        # Compute occurence on 2D grid
+        for add_title, dataset in datasets.items():
+            func_with_args = partial(self._contour_presence, lat_bins=lat_bins, lon_bins=lon_bins)
+            # DataArray with time dimension
+            presence = dataset.groupby("time").map(func_with_args)
+            # Number of occurences of eddies per box for all timesteps
+            # DataArray with latlon dimensions only
+            presence_sum = presence.sum(dim="time")
+
+            nt = len(np.unique(dataset.time.values))
+            # Transform number of occurences to occurence percentage
+            # (an eddy contour appears in a certain cell x% of the time)
+            percentage = (presence_sum / nt) * 100
+
+            plt.style.use('default')
+            f, ax = create_subplots(nrows=1, figsize=(resX, resY), projection=projection)
+            f.suptitle(f'{main_title}\n{add_title} {time_title}', y=0.90)
+            ax[0].add_feature(cfeature.COASTLINE, linewidth=0.3)
+
+            mesh = ax[0].pcolormesh(lon_bins, lat_bins, percentage, cmap=cmap, shading='nearest')
+
+            plt.colorbar(
+                mesh, label='Contour occurence [% of total timesteps]', fraction=0.046, pad=0.04
+            )
+
+            figname = (
+                f"data/plot/{self.metazone}/"
+                + f"map_occurence_{dse.data_name}{time_figname}"
+                + f"_{add_title.split()[0].lower()}.png"
+            )
+
+            self.save_figure(f, figname)
+
+    def histogram_eddies(self):
+        """
+        Plot histograms for eddies datasets.
+
+        """
+        dse = self.dt.children["data"].to_dataset()
+
+        dsa = dse.where(dse.eddy_type == 'anticyclone')
+        dsc = dse.where(dse.eddy_type == 'cyclone')
+
+        time_title, time_figname = format_time_label(dse.attrs, ds=dse)
+
+        unwanted_vars = DataEddies.outputs_params['histogram_eddies']['unwanted_vars']
+        vars = [var for var in dse.data_vars if not any(x in var for x in unwanted_vars)]
+
+        for var in vars:
+            all_data = np.concatenate([dsa[var], dsc[var]])
+            bins = get_intuitive_bins(all_data)
+            del all_data
+
+            plt.style.use('default')
+            f, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 6), dpi=200)
+            title = dse.data_name + ' - ' + time_title
+            f.suptitle(title, y=0.95, fontsize=15, fontweight='bold')
+
+            ax.grid(axis='y', alpha=0.2)
+            ax.hist(
+                [dsa[var], dsc[var]],
+                bins=bins,
+                label=['anticyclones', 'cyclones'],
+                color=['tab:red', 'tab:blue'],
+                alpha=0.8,
+                align='left',
+            )
+
+            label = var
+            if any(k in dse[var].attrs for k in ['unit', 'units']):
+                k = next((k for k in ['unit', 'units'] if k in dse[var].attrs.keys()), None)
+                label += f" [{dse[var].attrs[k]}]"
+                del k
+
+            ax.set_xlabel(label)
+            ax.set_xticks(bins[:-1])
+            ax.set_ylabel('Number of eddies')
+            ax.set_yticks(get_intuitive_bins(ax.get_yticks()))
+            ax.set_ylim(0.8 * ax.get_ylim()[0])
+            ax.legend()
+
+            figname = (
+                f"data/plot/{self.metazone}/" + f"hist_{var}_{dse.data_name}{time_figname}.png"
+            )
+
+            self.save_figure(f, figname)
+
+    def timeseries_eddies(self):
+        """
+        Plot time series for eddies datasets
+
+        """
+        dse = self.dt.children["data"].to_dataset()
+
+        # In any case, the concat-obs option from datatype groups every ranges into one dataset
+        if "trange_seq" in dse.attrs:
+            trange_seq = dse.attrs["trange_seq"]
+            time_min = min(dse.time).values
+            time_max = max(dse.time).values
+            bins = pd.date_range(time_min, time_max, freq=trange_seq).to_numpy()
+            if bins[-1] != time_max:
+                bins = np.concatenate(
+                    (
+                        bins,
+                        np.asarray(
+                            [
+                                time_max,
+                            ]
+                        ),
+                    )
+                )  # always include tmax in bins
+            time_title = f'time range {trange_seq}'
+            time_figname = f'_trange{trange_seq}'
+        else:
+            bins = np.unique(dse.time)
+            time_title, time_figname = format_time_label(dse.attrs, ds=dse)
+
+        groups = dse.groupby_bins('time', bins).groups
+        counts = [len(k) for k in groups.values()]
+        del groups
+
+        f, ax = plt.subplots(nrows=1, figsize=(10, 6), dpi=200)
+        title = dse.data_name + ' - ' + time_title
+        f.suptitle(title, y=0.95, fontsize=15, fontweight='bold')
+
+        ax.plot(bins[:-1] + np.diff(bins) / 2, counts, color='#01153E', alpha=0.8)
+        ax.grid(axis='y', alpha=0.2)
+        ax.xaxis.set_tick_params(labelrotation=45)
+        xlabel = 'Time'
+        if "trange_seq" in dse.attrs:
+            xlabel += f' [{trange_seq} range]'
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel('Number of eddies')
+
+        figname = f"data/plot/{self.metazone}/" + f"timeseries_{dse.data_name}{time_figname}.png"
+
+        self.save_figure(f, figname)
+
+    def pdf_eddies(self):
+        """Plot PDF for eddy-type datasets"""
+        dse = self.dt.children["data"].to_dataset()
+
+        time_title, time_figname = format_time_label(dse.attrs, ds=dse)
+
+        vars = [var for var in dse.data_vars if 'pdf_A' in var]
+        for var in vars:
+            plt.style.use('default')
+            f, ax = plt.subplots(nrows=1, ncols=1, figsize=(7, 6), dpi=200)
+            f.suptitle(
+                f'PDF distribution - {time_title} - {var[:-6]}',
+                y=0.95,
+                fontsize=12,
+                fontweight='bold',
+            )
+            ax.grid(axis='y', linestyle='--', alpha=0.5, color='black')
+
+            label = f'{var[:-6]}'
+            if any(k in dse[var].attrs for k in ['unit', 'units']):
+                label += (
+                    f" [{next((k for k in ['unit', 'units'] if k in dse[var].attrs.keys()), None)}]"
+                )
+
+            ax.set_xlabel(label)
+            ax.set_ylabel('Density')
+
+            ax.plot(
+                dse[var[:-1] + 'bins_C'], dse[var[:-1] + 'C'], color='tab:blue', label='cyclones'
+            )
+            ax.plot(dse[var[:-1] + 'bins_A'], dse[var], color='tab:red', label='anticyclones')
+
+            ax.legend()
+
+            figname = (
+                f"data/plot/{self.metazone}/" + f"pdf_{var[:-6]}_{dse.data_name}{time_figname}.png"
+            )
+
+            self.save_figure(f, figname)
 
 
 class PlotSstSatellite(PlotOceanModel):

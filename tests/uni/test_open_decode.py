@@ -29,6 +29,7 @@ from armoor.data.open_decode import (
     open_decode_cmems_insitu,
     open_decode_odar,
     open_decode_croco,
+    _check_units_from_cfspecs,
     open_decode_eddy_pet,
     open_decode_eddy_sacso,
     open_decode_eddy_shoot,
@@ -789,6 +790,71 @@ class TestOpenDecodeCroco:
 
 class TestOpenDecodeEddies:
     """Tests for the open_decode_eddy_* functions."""
+    
+    def test_eddy_dataset_set_attrs(self, setup_test_data):
+        """
+        Test attribute replacement/assignment for eddies using cf_eddies.cfg 
+        file with xoa.meta.get_meta_specs("eddies").
+
+        Parameters
+        ----------
+        setup_test_data : dict
+            Fixture containing test file paths.
+        """
+        import xoa.meta as xmeta
+        
+        filepath = setup_test_data['eddies_sacso']
+        ds = open_decode_eddy_sacso(get_paths(str(filepath)))
+        cfspecs = xmeta.get_meta_specs("eddies")
+        ds = cfspecs.decode(ds)
+        
+        assert isinstance(ds, xr.Dataset)
+        assert ds.y_cen.attrs != {}
+        assert ds.x_cen.attrs != {}
+        assert ds.y_vmax_contour.attrs != {}
+        assert ds.x_vmax_contour.attrs != {}
+        assert ds.a_ell.attrs != {}
+        assert ds.b_ell.attrs != {}
+        assert ds.angle_ell.attrs != {}
+        
+    def test_check_units_from_cfspecs(self):
+        """
+        Test _check_units_from_cfspecs alignment of vars values/attributes with cfspecs
+        """
+        # Info on cfspecs : {'vmax_radius':'m', 'vmax_area':'m2', 'a_ell':'km'}      
+        ds = xr.Dataset(
+            data_vars={
+                "vmax_radius": (
+                    ["obs", "nb_sample"], 
+                    [[1000]],
+                    {'units':'m'},                    
+                ),
+                "vmax_area": (
+                    ["obs", "nb_sample"], 
+                    [[20]],
+                    {'units':'km2'},                    
+                ),
+                "a_ell": (
+                    ["obs", "nb_sample"], 
+                    [[5000]],
+                    {'units':'m'},                    
+                )
+            })
+        ds = _check_units_from_cfspecs(ds)
+        
+        # Test if dataset out of function frame is preserved
+        assert isinstance(ds, xr.Dataset)
+        assert set(["obs", "nb_sample"]).issubset(ds.dims)
+        assert "vmax_radius" in ds.data_vars
+        assert "vmax_area" in ds.data_vars
+        assert "a_ell" in ds.data_vars
+        # Test if function works
+        assert ds.vmax_radius == pytest.approx(1000)
+        assert ds.vmax_radius.attrs['units'] == 'm'
+        assert ds.vmax_area == pytest.approx(20e6)
+        assert ds.vmax_area.attrs['units'] == 'm2'
+        assert ds.a_ell == pytest.approx(5)
+        assert ds.a_ell.attrs['units'] == 'km'
 
     def test_open_decode_eddies_pet(self, setup_test_data):
         """
@@ -804,15 +870,14 @@ class TestOpenDecodeEddies:
 
         assert isinstance(ds, xr.Dataset)
         assert set(["obs", "nb_sample"]).issubset(ds.dims)
-        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert set(["time",]).issubset(ds.coords)
         assert ds.time.dims == ("obs",)
-        assert ds.nb_sample.dims == ("nb_sample",)
         assert "eddy_type" in ds.data_vars
-        assert "contour_lon" in ds.data_vars
-        assert "contour_lat" in ds.data_vars
-        assert "center_lon" in ds.data_vars
-        assert "center_lat" in ds.data_vars
-        assert "vmax_area" in ds.data_vars
+        assert "x_vmax_contour" in ds.data_vars
+        assert "y_vmax_contour" in ds.data_vars
+        assert "x_cen" in ds.data_vars
+        assert "y_cen" in ds.data_vars
+        assert "vmax_radius" in ds.data_vars
 
     def test_open_decode_eddies_sacso(self, setup_test_data):
         """
@@ -828,14 +893,13 @@ class TestOpenDecodeEddies:
 
         assert isinstance(ds, xr.Dataset)
         assert set(["obs", "nb_sample"]).issubset(ds.dims)
-        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert set(["time",]).issubset(ds.coords)
         assert ds.time.dims == ("obs",)
-        assert ds.nb_sample.dims == ("nb_sample",)
         assert "eddy_type" in ds.data_vars
-        assert "contour_lon" in ds.data_vars
-        assert "contour_lat" in ds.data_vars
-        assert "center_lon" in ds.data_vars
-        assert "center_lat" in ds.data_vars
+        assert "x_vmax_contour" in ds.data_vars
+        assert "y_vmax_contour" in ds.data_vars
+        assert "x_cen" in ds.data_vars
+        assert "y_cen" in ds.data_vars
         assert "vmax_area" in ds.data_vars
 
     def test_open_decode_eddies_shoot(self, setup_test_data):
@@ -852,15 +916,14 @@ class TestOpenDecodeEddies:
 
         assert isinstance(ds, xr.Dataset)
         assert set(["obs", "nb_sample"]).issubset(ds.dims)
-        assert set(["time", "nb_sample"]).issubset(ds.coords)
+        assert set(["time",]).issubset(ds.coords)
         assert ds.time.dims == ("obs",)
-        assert ds.nb_sample.dims == ("nb_sample",)
         assert "eddy_type" in ds.data_vars
-        assert "contour_lon" in ds.data_vars
-        assert "contour_lat" in ds.data_vars
-        assert "center_lon" in ds.data_vars
-        assert "center_lat" in ds.data_vars
-        assert "vmax_area" in ds.data_vars
+        assert "x_vmax_contour" in ds.data_vars
+        assert "y_vmax_contour" in ds.data_vars
+        assert "x_cen" in ds.data_vars
+        assert "y_cen" in ds.data_vars
+        assert "vmax_radius" in ds.data_vars
 
 
 # ============================================================================

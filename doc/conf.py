@@ -12,7 +12,7 @@
 #
 import os
 import sys
-# sys.path.insert(0, os.path.abspath('.'))
+#sys.path.insert(0, os.path.abspath('..'))
 
 # Same thread limits as the armoor-* executables (armoor/cli/main.py), set
 # before anything imports numba. autosummary imports every armoor module in

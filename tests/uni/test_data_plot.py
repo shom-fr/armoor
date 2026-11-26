@@ -17,7 +17,6 @@ import xarray as xr
 # documented in REFACTOR_PLAN_BASE_EXTRACTION.md.
 from unittest.mock import MagicMock, patch
 
-from armoor.__init__ import ArmoorError
 from armoor.data.plot import (
     PlotEddies, PlotMeteo, PlotOceanModel, PlotSstSatellite, get_plotter,
     _plot_task, main_plot, _cbar_range,
@@ -115,14 +114,14 @@ class TestGetPlotter:
             plotter.clean()
 
 
-class TestPlotEddiesNotImplemented:
+class TestPlotEddiesRegistersMethods:
 
-    def test_calling_any_method_raises(self, tmp_path):
+    def test_known_methods_registered(self, tmp_path):
         nc = _write_datatree(tmp_path, "eddies")
         plotter = get_plotter(nc, "mz1")
         try:
-            with pytest.raises(ArmoorError, match="mdiagts"):
-                plotter.call("mdiagts")
+            for method_name in ("map_eddies", "map_occurence_eddies", "histogram_eddies", "timeseries_eddies", "pdf_eddies"):
+                assert method_name in plotter.methods
         finally:
             plotter.clean()
 

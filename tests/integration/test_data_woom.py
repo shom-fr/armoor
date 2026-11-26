@@ -1,4 +1,4 @@
-"""Woom integration test for armoor-data — mirrors test_comps_woom.py's shape.
+"""Woom integration test for armoor-data -- mirrors test_comps_woom.py's shape.
 
 Builds a minimal ``workflow_data.cfg`` on the fly (only the data downloads
 required by armoor-data + the data task itself), then runs the full woom
@@ -8,7 +8,7 @@ Exercises armoor-data against every metazone shape used by the comp_*
 integration tests, plus a fully unconfigured one, via three tasks:
 
 - ``data`` (meta1, meta2): reuses the comp_* metazones.cfg entries, so
-  vlevel (meta1) and vrange+trange_seq (meta2) are exercised too — one
+  vlevel (meta1) and vrange+trange_seq (meta2) are exercised too -- one
   output/plot per vertical level or bin. Since armoor-data has no colocation
   step, metazones.cfg's static ``tbound`` (meant to be overridden by
   armoor-comp-*'s own ``--tbound``) would otherwise filter out all of
@@ -16,7 +16,7 @@ integration tests, plus a fully unconfigured one, via three tasks:
 - ``data_native`` (meta3): no vlevel/vrange/tbound at all, so armoor-data
   must fall back to the data's own native vertical levels and time steps.
 - ``data_mapseries`` (meta3): dedicated ``data_mapseries.cfg`` for the
-  ``mapseries`` otype — a model source (cmems_glo12, ptemp/sal/curr), a
+  ``mapseries`` otype -- a model source (cmems_glo12, ptemp/sal/curr), a
   second "obs" source with the same ptemp (cmems_sst_l4, a satellite SST
   product -- armoor.data.datatype.DataSstSatellite/PlotSstSatellite, both
   thin DataOceanModel/PlotOceanModel subclasses), and a woa18 climatology
@@ -39,7 +39,7 @@ import woom.workflow as wworkflow
 
 
 # ---------------------------------------------------------------------------
-# Geographic extent — must cover the polygon defined in metazones.cfg.
+# Geographic extent -- must cover the polygon defined in metazones.cfg.
 # ---------------------------------------------------------------------------
 REGION = {"lon_min": -14.0, "lon_max": -7.0, "lat_min": 45.0, "lat_max": 49.0}
 

@@ -1,4 +1,4 @@
-"""Parametrized woom integration tests — one test per comp function.
+"""Parametrized woom integration tests -- one test per comp function.
 
 Each test builds a minimal ``workflow_<comp>.cfg`` on the fly (only the data
 downloads required by that comp + the comp task itself), then runs the full
@@ -15,11 +15,11 @@ run from ``test_comp`` to check actual output content, not just task status.
 ``test_bull`` (defined last) exercises ``make_bull`` on its own, relying on
 the ``comp_sst``/``comp_argo``/``comp_mooring``/``comp_drifter`` run
 directories left in ``scratch_dir`` by the parametrized ``test_comp`` tests
-above — see its docstring. The production ``workflow.cfg`` no longer runs
+above -- see its docstring. The production ``workflow.cfg`` no longer runs
 ``comp``/``bull`` itself (this file is now the only place that does), since
 ``comp_*``/``make_bull`` task run-dir lookups (``workflow.get_task_run_dir``)
 resolve through the shared taskmanager and ``scratch_dir`` regardless of
-which workflow/app triggered them — they don't need to be declared in the
+which workflow/app triggered them -- they don't need to be declared in the
 same workflow.cfg that runs make_bull.
 """
 
@@ -33,7 +33,7 @@ import xarray as xr
 
 
 # ---------------------------------------------------------------------------
-# Geographic extent — must cover the polygon defined in metazones.cfg.
+# Geographic extent -- must cover the polygon defined in metazones.cfg.
 # All comp functions use the same region.
 # ---------------------------------------------------------------------------
 REGION = {"lon_min": -14.0, "lon_max": -7.0, "lat_min": 45.0, "lat_max": 49.0}
@@ -55,7 +55,7 @@ COMP_DATA_DEPS = {
     "comp_hydrosection": "get_cmems_insitu,get_cmems_glo12_temp,get_cmems_glo12_sal",
 }
 
-# comp_* tasks that make_bull (tasks.cfg) links artifacts from — comp_clim is
+# comp_* tasks that make_bull (tasks.cfg) links artifacts from -- comp_clim is
 # deliberately excluded, matching make_bull's own commandline.
 BULL_COMP_DEPS = ("comp_sst", "comp_argo", "comp_mooring", "comp_drifter")
 
@@ -215,7 +215,7 @@ def test_bull(woom_env):
 
     ``make_bull`` (see ``tasks.cfg``) locates its inputs via
     ``workflow.get_task_run_dir('comp_sst')`` and friends, which resolve
-    through the shared taskmanager + ``scratch_dir`` — not through this
+    through the shared taskmanager + ``scratch_dir`` -- not through this
     workflow's own task tree. So it finds the run directories that
     ``test_comp[comp_sst|comp_argo|comp_mooring|comp_drifter]`` already
     populated earlier in this same session, without re-running them.

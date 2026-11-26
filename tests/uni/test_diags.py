@@ -10,11 +10,11 @@ from armoor.diags.eddies import area2radius, compute_vars
 # ---------------------------------------------------------------------------
 
 def test_area2radius():
-    ds = xr.Dataset({"vmax_area": ("obs", [np.pi, 4 * np.pi])})
+    ds = xr.Dataset({"vmax_area": ("obs", [np.pi, 4 * np.pi], {'units':'m2'})})
     ds = area2radius(ds)
 
     np.testing.assert_allclose(ds["vmax_radius"], [1.0, 2.0])
-    assert ds["vmax_radius"].attrs["units"] == "km"
+    assert ds["vmax_radius"].attrs["units"] == "m"
 
 
 class TestComputeVars:
@@ -22,7 +22,7 @@ class TestComputeVars:
     def test_compute_vars_adds_radius(self):
         ds = xr.Dataset(
             {
-                "vmax_area": ("obs", [np.pi]),
+                "vmax_area": ("obs", [np.pi], {'units':'m2'}),
             }
         )
         ds = compute_vars(ds)
@@ -33,8 +33,8 @@ class TestComputeVars:
     def test_compute_vars_keeps_existing_radius(self):
         ds = xr.Dataset(
             {
-                "vmax_area": ("obs", [np.pi]),
-                "vmax_radius": ("obs", [42.0]),
+                "vmax_area": ("obs", [np.pi], {'units':'m2'}),
+                "vmax_radius": ("obs", [42.0], {'units':'m'}),
             }
         )
         ds = compute_vars(ds)
