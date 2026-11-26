@@ -1293,9 +1293,20 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
             pass
         return None
 
+    # Large chunks computed from the stored ones, see armoor.chunks.read_chunks.
+    # The files usually hold one variable each, all on the same grid: the first
+    # file with time dependent variables is enough.
+    chunks = {}
+    for path in sorted_paths:
+        chunks = read_chunks(path)
+        if chunks:
+            break
+    chunks = {"Y": -1, "X": -1, "lev": -1, **chunks}
+    logger.info(f"Read chunks: {chunks}")
+
     _open_kw = dict(
         engine="netcdf4",
-        chunks={"time": 30, "Y": 1024, "X": 1024, "lev": 100},
+        chunks=chunks,
         cache=False,
         decode_times=True,
         decode_coords=True,
@@ -1400,7 +1411,7 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
     for dim, dim_chunks in zip(good_var.dims, good_var.chunks):
         dim_size = good_var.sizes[dim]
         if dim == "time":
-            chunk_dict[dim] = dim_chunks[0]  # keep 1 time step per chunk
+            chunk_dict[dim] = dim_chunks[0]  # keep the read time chunk
         else:
             # Keep the large chunks set at open time; fall back to native if
             # they are somehow still small (unknown dim name was ignored).

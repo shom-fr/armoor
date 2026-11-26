@@ -414,6 +414,15 @@ class TestOpenDecodeHycom:
         assert result['u'].dims == result['ptemp'].dims
         assert 'z' in result['u'].dims
     
+    def test_open_decode_hycom_reads_whole_time_steps(self, setup_test_data):
+        """Each chunk holds one whole time step: one large netCDF read per task."""
+        result = open_decode_hycom(get_paths(str(setup_test_data['hycom'])))
+        for name in ('ptemp', 'u'):
+            da = result[name]
+            for dim, dim_chunks in zip(da.dims, da.chunks):
+                expected = 1 if dim == 'time' else da.sizes[dim]
+                assert set(dim_chunks) == {expected}, (name, dim, dim_chunks)
+
     def test_open_decode_hycom_duplicate_times(self, setup_test_data):
         """
         Test removal of duplicate times in open_decode_hycom.
