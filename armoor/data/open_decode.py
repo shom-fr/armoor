@@ -24,6 +24,7 @@ import xoa.geo as xgeo
 import xoa.sigma as xsigma
 from xoa.grid import dz2depth, shift
 
+from armoor.chunks import read_chunks
 from armoor import ROOTDIR, ArmoorError
 
 logger = logging.getLogger(__name__)
@@ -2140,19 +2141,14 @@ def open_decode_croco(path_file, fmt="croco"):
     data_files = [f for f in path_file if f != grid_file] if has_separate_grid else list(path_file)
     n_files = len(data_files)
 
-    # Use native file dim names (pre-decode: eta_rho/xi_rho, not y_rho/x_rho)
-    # and large chunks to minimise dask task count.
-    nx = ds_grid.sizes["xi_rho"]
-    ny = ds_grid.sizes["eta_rho"]
-    chunk_x = min(nx, 1024)
-    chunk_y = min(ny, 1024)
+    # Large chunks computed from the stored ones, see armoor.chunks.read_chunks
+    # (native file dim names, pre-decode). The dimensions of the grid only
+    # (e.g. bathy) are never split.
     chunks = {
-        "time": 1,
-        "eta_rho": chunk_y,
-        "xi_rho": chunk_x,
-        "eta_v": chunk_y,
-        "xi_u": chunk_x,
+        dim: -1 for dim in ("s_rho", "s_w", "eta_rho", "xi_rho", "eta_u", "xi_u", "eta_v", "xi_v")
     }
+    chunks.update(read_chunks(data_files[0]))
+    logger.info(f"Read chunks: {chunks}")
 
     ds = xr.open_mfdataset(
         data_files,

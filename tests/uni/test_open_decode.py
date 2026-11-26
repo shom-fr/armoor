@@ -762,6 +762,15 @@ class TestOpenDecodeCroco:
         assert set(('y', 'x')).issubset(result.lon.dims)
         assert set(('y', 'x')).issubset(result.lat.dims)
         
+    def test_open_decode_croco_reads_whole_time_steps(self, setup_test_data):
+        """Each chunk holds one whole time step: one large netCDF read per task."""
+        result = open_decode_croco([setup_test_data['croco']])
+        for name in ('ptemp', 'sal', 'depth'):
+            da = result[name]
+            for dim, dim_chunks in zip(da.dims, da.chunks):
+                expected = 1 if dim == 'time' else da.sizes[dim]
+                assert set(dim_chunks) == {expected}, (name, dim, dim_chunks)
+
     def test_open_decode_croco_v1(self, setup_test_data):
         """
         Test basic functionality of open_decode_croco.

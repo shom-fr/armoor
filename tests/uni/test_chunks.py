@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from armoor.chunks import DEFAULT, MAP, POINT, ChunkType, select_chunk_type
+from armoor.chunks import DEFAULT, MAP, POINT, ChunkType, read_chunks, select_chunk_type
 from armoor.comp.comparison import get_comparison
 from armoor.data.datatype import get_data_type
 from armoor.data.load import _chunk_output, save_result
@@ -88,3 +88,50 @@ def test_written_store(tmp_path, monkeypatch, func_comp):
     assert res.temp.encoding["chunks"] == tuple(expected[d] for d in res.temp.dims)
     np.testing.assert_array_equal(res.temp.values, values)
 
+
+def _nc(path, shape, stored, unlimited=True, zlib=False):
+    import netCDF4
+
+    with netCDF4.Dataset(path, "w") as nc:
+        names = ("time", "s_rho", "eta_rho", "xi_rho")
+        for name, size in zip(names, shape):
+            nc.createDimension(name, None if unlimited and name == "time" else size)
+        kw = {"contiguous": True} if stored is None else {"chunksizes": stored}
+        var = nc.createVariable("temp", "f4", names, zlib=zlib, **kw)
+        var[:] = np.zeros(shape, "f4")
+        nc.createVariable("h", "f4", names[2:])[:] = np.zeros(shape[2:], "f4")
+    return str(path)
+
+
+class TestReadChunks:
+    def test_whole_time_step_when_small(self, tmp_path):
+        path = _nc(tmp_path / "a.nc", (2, 8, 70, 120), (1, 4, 35, 24))
+        assert read_chunks(path) == {"time": 1, "s_rho": 8, "eta_rho": 70, "xi_rho": 120}
+
+    def test_split_along_stored_chunks_above_the_cap(self, tmp_path):
+        path = _nc(tmp_path / "b.nc", (1, 8, 70, 120), (1, 4, 35, 24), zlib=True)
+        chunks = read_chunks(path, max_mb=8 * 70 * 120 * 4 / 1024**2 / 3)
+        assert chunks["time"] == 1
+        for dim, stored in (("s_rho", 4), ("eta_rho", 35), ("xi_rho", 24)):
+            assert chunks[dim] % stored == 0
+        assert np.prod([chunks[d] for d in ("s_rho", "eta_rho", "xi_rho")]) * 4 <= (
+            8 * 70 * 120 * 4 / 3
+        )
+        # The largest dimension is split first.
+        assert chunks["xi_rho"] < 120 and chunks["s_rho"] == 8
+
+    def test_stored_time_chunk_is_kept(self, tmp_path):
+        path = _nc(tmp_path / "c.nc", (6, 4, 10, 10), (3, 4, 10, 10))
+        assert read_chunks(path)["time"] == 3
+
+    def test_contiguous(self, tmp_path):
+        path = _nc(tmp_path / "d.nc", (2, 4, 10, 10), None, unlimited=False)
+        assert read_chunks(path) == {"time": 1, "s_rho": 4, "eta_rho": 10, "xi_rho": 10}
+
+    def test_no_time_variable(self, tmp_path):
+        import netCDF4
+
+        with netCDF4.Dataset(tmp_path / "e.nc", "w") as nc:
+            nc.createDimension("y", 3)
+            nc.createVariable("h", "f4", ("y",))[:] = 0
+        assert read_chunks(str(tmp_path / "e.nc")) == {}

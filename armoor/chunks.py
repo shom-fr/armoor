@@ -109,3 +109,63 @@ def select_chunk_type(comparison=None, data_type=None):
             return chunk_type
     return DEFAULT
 
+
+def read_chunks(path, max_mb=512):
+    """Compute the dask chunks for opening a netCDF file, from its own chunks.
+
+    netCDF4 reads are serialized by a lock shared by all the threads, so
+    few large reads are much faster than many small ones (on Lustre, 259 MB/s
+    with whole CROCO time steps against 73 MB/s with chunks split at 1024
+    along x). Each dask chunk is thus a whole time step, or the stored time
+    chunk if longer. Only above `max_mb`, the largest other dimensions are
+    split, along multiples of the stored chunks, so that no stored chunk is
+    read (and decompressed) twice.
+
+    Parameters
+    ----------
+    path : str
+        netCDF file, representative of all the files to open (same
+        configuration).
+    max_mb : float
+        Upper bound of the uncompressed size in MiB of a chunk of the largest
+        variable, unless a single stored chunk is larger.
+
+    Returns
+    -------
+    dict
+        Chunk length of every dimension of the time dependent variables of
+        the file, with their file names. Empty without such variables.
+    """
+    import netCDF4
+
+    chunks = {}
+    with netCDF4.Dataset(path) as nc:
+        for var in nc.variables.values():
+            dims = var.dimensions
+            if var.ndim < 2 or not any(_is_time(nc, dim) for dim in dims):
+                continue
+            stored = var.chunking()
+            if stored == "contiguous" or stored is None:
+                stored = [1 if _is_time(nc, dim) else size for dim, size in zip(dims, var.shape)]
+            lengths = {
+                dim: stored_len if _is_time(nc, dim) else size
+                for dim, size, stored_len in zip(dims, var.shape, stored)
+            }
+            stored = dict(zip(dims, stored))
+            budget = max_mb * 1024**2 / var.dtype.itemsize
+            # Halve the largest dimension, in stored chunks, until it fits.
+            while math.prod(lengths.values()) > budget:
+                splittable = [d for d in dims if lengths[d] > stored[d]]
+                if not splittable:
+                    break
+                dim = max(splittable, key=lengths.get)
+                nblocks = math.ceil(lengths[dim] / stored[dim])
+                lengths[dim] = stored[dim] * max(1, nblocks // 2)
+            for dim, length in lengths.items():
+                # The finest one, so that every variable fits.
+                chunks[dim] = min(chunks.get(dim, length), length)
+    return chunks
+
+
+def _is_time(nc, dim):
+    return nc.dimensions[dim].isunlimited() or "time" in dim.lower()
