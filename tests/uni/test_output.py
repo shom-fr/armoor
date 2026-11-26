@@ -480,3 +480,72 @@ def test_hpc_stage_workers():
     cmd = _build_stage_cmd(["armoor-comp-argo", "MZ", "--dask-nworkers", "2"], *args, n_workers=8)
     assert cmd.count("--dask-nworkers") == 1 and "8" not in cmd
     assert "--dask-nworkers" not in _build_stage_cmd(["armoor-comp-argo", "MZ"], *args)
+
+
+class TestConcurrentWrites:
+    """The output stores are written several at once, within a global cap."""
+
+    PERIODS = tuple(
+        f"2024-01-{d:02d}T00:00:00_2024-01-{d + 1:02d}T00:00:00" for d in range(1, 13)
+    )
+
+    @staticmethod
+    def _write_pairs(path, periods):
+        rng = np.random.default_rng(0)
+        files = []
+        for period in periods:
+            for kind in ("prod", "ref"):
+                dims = ("time", "z") + (("member",) if kind == "prod" else ())
+                shape = (1, 3) + ((4,) if kind == "prod" else ())
+                hdims = ("time",) + dims[2:]
+                ds = xr.Dataset(
+                    {v: (dims, rng.random(shape)) for v in ("ptemp", "sal")},
+                    coords={
+                        "time": np.array([period[:10]], "datetime64[ns]"),
+                        "lon": (hdims, rng.random((1,) + shape[2:])),
+                        "lat": (hdims, rng.random((1,) + shape[2:])),
+                        "depth": (dims, rng.random(shape)),
+                    },
+                    attrs={"data_name": kind},
+                )
+                name = path / f"{kind}_{period}_0.0-10.0.zarr"
+                ds.to_zarr(name)
+                files.append(str(name))
+        return files
+
+    def test_cap_and_order(self, tmp_path, monkeypatch):
+        import threading
+        import time
+
+        from armoor.comp import output as comp_output
+
+        files = self._write_pairs(tmp_path, self.PERIODS)
+        monkeypatch.chdir(tmp_path)
+        mparams = {"MZ": {"trange_seq": {"tfreq": "1D"}, "vrange": {}}}
+        otypes = {"diagdisp_sel": {"otype": "diagdisp_sel"}}
+
+        def run():
+            return comp_output.main_output(
+                {"MZ": {"ARGO": {"mod": files}}}, mparams, otypes, "comp_argo"
+            )
+
+        expected = run()["diagdisp_sel"]["MZ"]
+        assert len(expected) == len(self.PERIODS)
+
+        write = comp_output.write_datatree_to_zarr
+        lock = threading.Lock()
+        state = {"running": 0, "max": 0}
+
+        def slow_write(dt, path):
+            with lock:
+                state["running"] += 1
+                state["max"] = max(state["max"], state["running"])
+            time.sleep(0.05)
+            write(dt, path)
+            with lock:
+                state["running"] -= 1
+
+        monkeypatch.setattr(comp_output, "write_datatree_to_zarr", slow_write)
+        monkeypatch.setattr(comp_output, "_WRITE_SLOTS", threading.BoundedSemaphore(3))
+        assert run()["diagdisp_sel"]["MZ"] == expected
+        assert state["max"] == 3
