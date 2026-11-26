@@ -423,6 +423,18 @@ class TestOpenDecodeHycom:
                 expected = 1 if dim == 'time' else da.sizes[dim]
                 assert set(dim_chunks) == {expected}, (name, dim, dim_chunks)
 
+    def test_open_decode_hycom_velocity_shift_ignores_chunks(self, setup_test_data, monkeypatch):
+        """Regression: u/v used to be shifted block by block, wrong along the
+        borders of the chunks (e.g. column 1023 of a 1080 wide grid)."""
+        import armoor.data.open_decode as od
+
+        paths = get_paths(str(setup_test_data['hycom']))
+        whole = open_decode_hycom(paths)
+        monkeypatch.setattr(od, "read_chunks", lambda path: {"time": 1, "X": 3, "Y": 2})
+        split = open_decode_hycom(paths)
+        for name in ('u', 'v'):
+            np.testing.assert_allclose(split[name].values, whole[name].values, equal_nan=True)
+
     def test_open_decode_hycom_duplicate_times(self, setup_test_data):
         """
         Test removal of duplicate times in open_decode_hycom.

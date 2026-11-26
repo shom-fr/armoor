@@ -1256,11 +1256,11 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
         return ds
 
     def shift_u_block(d):
-        """Shift a HYCOM "u" block from its staggered grid onto the T-grid."""
+        """Shift HYCOM "u" from its staggered grid onto the T-grid."""
         return shift(d["u"], {"x": "right"}).xoa.reloc(u=False)
 
     def shift_v_block(d):
-        """Shift a HYCOM "v" block from its staggered grid onto the T-grid."""
+        """Shift HYCOM "v" from its staggered grid onto the T-grid."""
         return shift(d["v"], {"y": "top"}).xoa.reloc(v=False)
 
     sorted_paths = sorted(map(str, path_files))
@@ -1381,11 +1381,13 @@ def open_decode_hycom(path_files):  # , chunk_size_time=1, chunk_size_xy=200):
     else:
         bathy = None
 
+    # Not block by block (map_blocks): the points along the chunk borders need
+    # their neighbours of the next chunk.
     if "u" in ds:
-        ds["u"] = ds.map_blocks(shift_u_block, template=ds["u"])
+        ds["u"] = shift_u_block(ds)
     if "v" in ds:
-        ds["v"] = ds.map_blocks(shift_v_block, template=ds["v"])
-    logger.info(f"  [timing] map_blocks u/v: {time.perf_counter() - _t:.1f}s")
+        ds["v"] = shift_v_block(ds)
+    logger.info(f"  [timing] u/v shift:      {time.perf_counter() - _t:.1f}s")
     _t = time.perf_counter()
 
     if bathy is not None:
