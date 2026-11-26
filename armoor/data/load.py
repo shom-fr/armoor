@@ -13,8 +13,10 @@ import numpy as np
 import xarray as xr
 
 import armoor  # noqa: F401 — registers all xarray accessors (ds.filters, …)
+from armoor.chunks import select_chunk_type
+from armoor.comp.comparison import get_comparison
 from armoor.io import write_dataset_to_zarr, compute_bundled_zarr_writes
-from armoor.data.datatype import get_data_type
+from armoor.data.datatype import get_data_type, get_data_type_by_name
 from armoor.data.open_decode import get_decoder, open_decode, register_cf
 
 
@@ -402,6 +404,32 @@ def save_result(dsout, mz_name, func_comp):
     return StagedDataset(str(nc), metazone=mz_name, comp_func=func_comp, stage="load")
 
 
+def _chunk_output(dsout, func_comp):
+    """Chunk a load output for the way it will be read.
+
+    Parameters
+    ----------
+    dsout : xarray.Dataset
+        Processed dataset.
+    func_comp : str or None
+        Comparison type identifier, or any other output directory.
+
+    Returns
+    -------
+    xarray.Dataset
+        The chunked dataset.
+    """
+    try:
+        comparison = get_comparison(func_comp)
+    except armoor.ArmoorError:  # armoor-data: not a comparison
+        comparison = None
+    data_type = get_data_type_by_name(dsout.attrs.get("data_type"))
+    chunk_type = select_chunk_type(comparison, data_type)
+    chunks = chunk_type.resolve(dsout)
+    logger.info(f"Output chunks ({chunk_type.name}): {chunks}")
+    return dsout.chunk(chunks)
+
+
 def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     """Process a single dataset×metazone combination."""
     ds, mz_name, mz_param, dirout = task_data
@@ -414,10 +442,9 @@ def process_single_task(task_data: Tuple[Any, Dict, str, Any, Any]) -> str:
     if dsout:
         # dsout = optimize_for_low_swap(dsout)
         try:
-            tc = _compute_output_time_chunk(dsout)
-            dsout = dsout.chunk({'time': tc}) if tc else dsout.chunk('auto')
-        except Exception:
-            logger.info("No chunks")
+            dsout = _chunk_output(dsout, dirout)
+        except Exception as exc:  # noqa: BLE001 -- chunking is only an optimization
+            logger.warning(f"Output chunks of {mz_name} left unchanged: {exc}")
         ncout = save_result(dsout, mz_name, dirout)
         del dsout
         return ncout
@@ -897,22 +924,19 @@ def _process_large_dataset_pipelined(dss, data_key, metazones, dirout):
     # tens of thousands of dask tasks; merging non-time dims to
     # _STAGING_SPATIAL_CHUNK reduces task count by ~100×.
     #
-    # Use the output time_chunk (Blosc 2 GB per-variable limit) rather than
-    # _STAGING_TIME_CHUNK=10.  This means Phase 2 inherits the right chunk size
-    # directly from the staging zarr and never needs to rechunk, eliminating
-    # the main source of excess tasks in Phase 2 (~4× task reduction).
+    # The staging time chunk stays short, as the sources often have one time
+    # step per chunk: long ones would hold most of a variable in memory. Phase 2
+    # rechunks for the final store, see _chunk_output.
     dss_rechunked = []
     for ds in dss:
         ds = _drop_unused_vars_before_staging(ds, metazones)
         non_time_dims = [d for d in ds.dims if d != 'time']
-        rechunk_spec = {d: _STAGING_SPATIAL_CHUNK for d in non_time_dims}
+        # Never split the vertical: columns are always processed as a whole.
+        rechunk_spec = {d: -1 if d == 'z' else _STAGING_SPATIAL_CHUNK for d in non_time_dims}
         if 'time' in ds.dims:
-            # _compute_output_time_chunk on the full union-prefiltered domain gives
-            # a conservative lower bound: every per-metazone subset has a smaller
-            # or equal bytes/tstep → its optimal tc is >= this value → no rechunk needed.
             staging_tc = _compute_output_time_chunk(ds) or _STAGING_TIME_CHUNK
             rechunk_spec['time'] = staging_tc
-            logger.info(f"Staging time_chunk={staging_tc} (output-aligned, avoids Phase 2 rechunk)")
+            logger.info(f"Staging time_chunk={staging_tc}")
         if rechunk_spec and any(isinstance(v.data, da.Array) for v in ds.variables.values()):
             ds = ds.chunk(rechunk_spec)
         dss_rechunked.append(ds)

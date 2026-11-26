@@ -8,6 +8,7 @@ which solves the same shape of problem for ``armoor-comp-*``.
 """
 
 from armoor import ArmoorError
+from armoor.chunks import MAP
 
 _REGISTRY = {}  # fmt string -> DataType instance
 _BY_NAME = {}  # DataType.name -> DataType instance
@@ -30,6 +31,7 @@ class DataType:
     outputs_params = {}
     plotter_cls = None
     is_climatology = False
+    chunk_type = None  # armoor.chunks.ChunkType of the load outputs
 
     def __init_subclass__(cls, **kwargs):
         """Register `cls` in the module-level registries.
@@ -232,6 +234,7 @@ class DataSstSatellite(DataOceanModel):
 
     name = "sst_satellite"
     fmts = ("cmems_sst_l4", "cmems_sst_l3", "cersat_sst_l3")
+    chunk_type = MAP
 
 
 class DataMeteo(DataOceanModel):

@@ -23,6 +23,7 @@ from xoa.geo import bearing, haversine
 
 import armoor.ranges as ranges
 from armoor import ArmoorError
+from armoor.chunks import MAP, POINT
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class Comparison:
     outputs_params = {}
     comp_vars = []
     otype_remap = {}
+    chunk_type = None  # armoor.chunks.ChunkType of the load outputs
 
     def __init_subclass__(cls, **kwargs):
         """Register `cls` in the module-level registry under its `name`.
@@ -273,6 +275,7 @@ class CompSst(Comparison):
     """Comparison of satellite sea surface temperature against products."""
 
     name = "comp_sst"
+    chunk_type = MAP
     title = "Sea surface temperature"
     metazone_params = [
         "tbound",
@@ -434,6 +437,7 @@ class CompArgo(Comparison):
     """Comparison of Argo hydrological profiles against products."""
 
     name = "comp_argo"
+    chunk_type = POINT
     title = "Hydrological profiles"
     metazone_params = [
         "tbound",
@@ -531,6 +535,7 @@ class CompMooring(_ForcedDepthVLevelMixin, Comparison):
     """Comparison of hydrological mooring time series against products."""
 
     name = "comp_mooring"
+    chunk_type = POINT
     title = "Hydrological mooring"
     metazone_params = [
         "tfreq",
@@ -565,6 +570,7 @@ class CompDrifter(_ForcedDepthVLevelMixin, Comparison):
     """Comparison of drifter trajectories against oceanparcels simulations."""
 
     name = "comp_drifter"
+    chunk_type = MAP
     title = "Drifters"
     metazone_params = [
         "tbound",
