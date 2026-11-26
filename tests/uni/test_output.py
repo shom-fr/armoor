@@ -482,6 +482,28 @@ def test_hpc_stage_workers():
     assert "--dask-nworkers" not in _build_stage_cmd(["armoor-comp-argo", "MZ"], *args)
 
 
+@pytest.mark.parametrize(
+    ("ini", "example", "stage"),
+    [("comp.ini", "comp_argo.cfg", "comp"), ("data.ini", "data.cfg", "output")],
+)
+def test_hpc_stage_ncpus_from_cfg(tmp_path, ini, example, stage):
+    """The CPUs of a stage are read as integers, with ncpus as fallback."""
+    from pathlib import Path
+
+    import armoor.cli
+    from armoor.cli.hpc import _get_hpc_cfg, _ncpus
+
+    schema = str(Path(armoor.cli.__file__).parent / ini)
+    example = Path(__file__).parents[1] / "integration" / "woom" / example
+    text = example.read_text().split("[hpc]")[0]
+    cfgfile = tmp_path / "cfg.cfg"
+    cfgfile.write_text(text + f"[hpc]\nncpus = 128\nncpus_{stage} = 32\n")
+    hpc_cfg = _get_hpc_cfg(cfgfile, schema)
+    assert _ncpus(hpc_cfg, stage) == 32
+    assert _ncpus(hpc_cfg, "plot") == 128
+    assert _ncpus(hpc_cfg, "load") == 8
+
+
 class TestConcurrentWrites:
     """The output stores are written several at once, within a global cap."""
 

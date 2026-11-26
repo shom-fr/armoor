@@ -234,6 +234,8 @@ def run_hpc(
                 plot_only=otype,
                 input_json=merged_json,
                 output_json=plot_json,
+                # One plotting process per CPU of the job
+                n_workers=_ncpus(hpc_cfg, "plot") if is_hpc else None,
             )
             script = _write_script(
                 subdir, cmd, workdir=workdir, mem=_mem(hpc_cfg, "plot", scheduler)
