@@ -14,9 +14,17 @@ logger = logging.getLogger(__name__)
 
 
 def _gsw_ufunc(func, *args):
-    """Wrap a gsw function so it works with both numpy and dask arrays."""
+    """Wrap a gsw function so it works with both numpy and dask arrays.
+
+    gsw computes in float64 whatever the input type: the result is cast to
+    float32 block by block, so that the blocks match the declared dtype.
+    """
+
+    def func32(*arrays):
+        return func(*arrays).astype(np.float32)
+
     return xr.apply_ufunc(
-        func,
+        func32,
         *args,
         dask="parallelized",
         output_dtypes=[np.float32],
@@ -39,7 +47,9 @@ def _p_from_depth(depth, lat):
             stacklevel=2,
         )
         z[invalid] = np.nan
-    return gsw.conversions.p_from_z(z, lat)
+    # Computed in float64, stored in float32: an error of 1e-3 dbar at most
+    # at 6000 dbar, and half the memory of a 3D field.
+    return gsw.conversions.p_from_z(z, lat).astype(np.float32)
 
 
 def _set_attrs(da, name=None, **attrs):
@@ -477,7 +487,7 @@ class OceanVars(MethodRegistry):
                 self.ds.depth,
                 kwargs={"lat": lat},
                 dask="parallelized",
-                output_dtypes=[np.float64],
+                output_dtypes=[np.float32],
             )
             pres = _set_attrs(pres, "pres")
             # Cache to avoid recomputing (sel_pdens calls sel_pres

@@ -95,6 +95,25 @@ class TestOceanVars:
         result = ds_no_pres.oceanvars.sel_pres()
         assert result is not None
 
+    @pytest.mark.parametrize("name", ["pres", "ptemp", "pdens", "sndspeed"])
+    def test_computed_blocks_are_float32(self, name):
+        """The computed blocks are float32, as declared, and not float64 as gsw returns."""
+        ds = self.ds.drop_vars(["pres", "ptemp"], errors="ignore").chunk()
+        result = ds.oceanvars.sel(name)
+        assert result.dtype == np.float32
+        assert result.compute().values.dtype == np.float32
+
+    def test_sel_pres_from_depth_precision(self):
+        """The float32 pressure stays within 1e-3 dbar of the float64 one."""
+        import gsw
+
+        ds = xr.Dataset(
+            coords={"depth": ("z", np.array([0.0, 10.0, 1000.0, 6000.0])), "lat": 45.0}
+        )
+        result = ds.oceanvars.sel_pres()
+        expected = gsw.p_from_z(-ds.depth.values, 45.0)
+        np.testing.assert_allclose(result.values, expected, atol=1e-3, rtol=0)
+
     def test_sel_ptemp_computed(self):
         """Test calculation of potential temperature"""
         ds_no_ptemp = self.ds.copy()
